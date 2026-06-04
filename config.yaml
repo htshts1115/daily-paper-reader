@@ -25,3 +25,417 @@ subscriptions:
     stage: A
     diff_threshold_pct: 15
   keyword_recall_mode: or
+  intent_profiles:
+    - tag: mono-depth
+      description: 单目深度估计，用于人像虚化、主体背景层次、手持物和头戴物深度判断。
+      enabled: true
+      paper_sources:
+        - arxiv
+      keywords:
+        - keyword: monocular depth estimation
+          keyword_cn: 单目深度估计
+          query: monocular depth estimation
+        - keyword: relative depth
+          keyword_cn: 相对深度
+          query: relative depth prediction
+        - keyword: metric depth
+          keyword_cn: 度量深度
+          query: metric depth estimation
+        - keyword: zero-shot depth
+          keyword_cn: 零样本深度
+          query: zero-shot depth estimation
+        - keyword: depth foundation model
+          keyword_cn: 深度基础模型
+          query: depth foundation model
+        - keyword: Depth Anything
+          keyword_cn: Depth Anything 模型
+          query: Depth Anything model
+      intent_queries:
+        - query: monocular depth estimation for portrait bokeh and mobile photography
+          query_cn: 面向人像虚化和手机摄影的单目深度估计
+          enabled: true
+          source: manual
+          note: ''
+        - query: lightweight depth model for mobile devices
+          query_cn: 移动端轻量级深度模型
+          enabled: true
+          source: manual
+          note: ''
+        - query: monocular depth estimation for thin structures transparent objects and handheld objects
+          query_cn: 面向细小结构、透明物和手持物的单目深度估计
+          enabled: true
+          source: manual
+          note: ''
+        - query: depth foundation model for zero shot generalization in real world images
+          query_cn: 面向真实图像零样本泛化的深度基础模型
+          enabled: true
+          source: manual
+          note: ''
+      updated_at: '2026-06-04T07:35:57.817Z'
+    - tag: depth-refine
+      description: 深度图精修、深度超分、RGB 引导深度增强，用于修正边界、主体归属和区域一致性。
+      enabled: true
+      paper_sources:
+        - arxiv
+      keywords:
+        - keyword: coarse-to-fine depth
+          keyword_cn: 粗到细深度估计
+          query: coarse-to-fine depth
+        - keyword: edge-aware depth refinement
+          keyword_cn: 边缘感知深度精修
+          query: edge-aware depth refinement
+        - keyword: guided depth completion
+          keyword_cn: 引导式深度补全
+          query: guided depth completion
+        - keyword: depth refinement
+          keyword_cn: 深度精修
+          query: improve depth map quality by refining boundaries
+        - keyword: depth super resolution
+          keyword_cn: 深度超分辨率
+          query: increase resolution of depth maps using guidance
+        - keyword: rgb guided depth enhancement
+          keyword_cn: RGB引导深度增强
+          query: enhance depth map with rgb image guidance
+      intent_queries:
+        - query: segmentation aware or matting aware depth refinement for foreground background separation
+          query_cn: 面向前景背景分离的分割感知或抠图感知深度精修
+          enabled: true
+          source: manual
+          note: ''
+        - query: edge aware depth refinement for hair boundaries thin structures and occlusions
+          query_cn: 面向发丝边界、细小结构和遮挡的边缘感知深度精修
+          enabled: true
+          source: manual
+          note: ''
+        - query: RGB guided depth refinement for high resolution monocular depth maps
+          query_cn: 面向高分辨率单目深度图的 RGB 引导精修
+          enabled: true
+          source: manual
+          note: ''
+        - query: coarse to fine depth refinement for portrait bokeh and mobile devices
+          query_cn: 面向人像虚化和移动端的粗到细深度精修
+          enabled: true
+          source: manual
+          note: ''
+      updated_at: '2026-06-04T07:39:50.846Z'
+    - tag: stereo-depth
+      description: 双目深度估计，重点关注手机双摄、小基线、校正误差和非严格校正双目。
+      enabled: true
+      paper_sources:
+        - arxiv
+      keywords:
+        - keyword: dual-camera depth
+          keyword_cn: 双摄深度
+          query: dual-camera depth
+        - keyword: rectification-free stereo
+          keyword_cn: 无需校正双目
+          query: rectification-free stereo
+        - keyword: stereo depth estimation
+          keyword_cn: 双目深度估计
+          query: binocular depth estimation for mobile dual cameras
+        - keyword: stereo matching
+          keyword_cn: 双目匹配
+          query: dual camera stereo matching small baseline
+        - keyword: unrectified stereo
+          keyword_cn: 非校正双目
+          query: uncalibrated stereo depth estimation dual camera
+        - keyword: mobile stereo depth
+          keyword_cn: 手机立体深度
+          query: mobile stereo depth estimation smartphone dual camera
+      intent_queries:
+        - query: stereo depth estimation for occlusion weak texture and portrait bokeh scenes
+          query_cn: 面向遮挡、弱纹理和人像虚化场景的双目深度估计
+          enabled: true
+          source: manual
+          note: ''
+        - query: stereo depth estimation for mobile dual camera and small baseline systems
+          query_cn: 面向手机双摄和小基线系统的双目深度估计
+          enabled: true
+          source: manual
+          note: ''
+        - query: unrectified stereo matching robust to calibration and rectification errors
+          query_cn: 对标定误差和校正误差鲁棒的非校正双目匹配
+          enabled: true
+          source: manual
+          note: ''
+        - query: lightweight stereo matching for real time depth estimation on mobile devices
+          query_cn: 面向移动端实时深度估计的轻量双目匹配
+          enabled: true
+          source: manual
+          note: ''
+      updated_at: '2026-06-04T07:42:31.202Z'
+    - tag: matting
+      description: 人像抠图、人体抠图、视频抠图，重点关注发丝、透明物、前景完整性和边界自然度。
+      enabled: true
+      paper_sources:
+        - arxiv
+      keywords:
+        - keyword: trimap-free matting
+          keyword_cn: 无三分图抠图
+          query: trimap-free matting
+        - keyword: portrait matting
+          keyword_cn: 人像抠图
+          query: portrait matting
+        - keyword: human matting
+          keyword_cn: 人体抠图
+          query: human segmentation for matting
+        - keyword: image matting
+          keyword_cn: 图像抠图
+          query: natural image matting
+        - keyword: video matting
+          keyword_cn: 视频抠图
+          query: video matting without trimap
+        - keyword: hair matting
+          keyword_cn: 头发抠图
+          query: fine hair detail matting
+      intent_queries:
+        - query: trimap free matting for robust foreground background separation in real world images
+          query_cn: 面向真实图像前景背景分离的无三分图抠图
+          enabled: true
+          source: manual
+          note: ''
+        - query: human matting for hair details transparent objects and thin structures
+          query_cn: 面向发丝、透明物和细小结构的人体抠图
+          enabled: true
+          source: manual
+          note: ''
+        - query: High quality portrait matting with hair detail
+          query_cn: 高质量人像抠图，含发丝细节
+          enabled: true
+          source: manual
+          note: ''
+        - query: Real time video matting for human subjects
+          query_cn: 实时视频人体抠图
+          enabled: true
+          source: manual
+          note: ''
+      updated_at: '2026-06-04T07:45:07.375Z'
+    - tag: seg
+      description: 人像分割、人体分割、前景分割，重点关注虚化场景中的主体完整性和手持物归属。
+      enabled: true
+      paper_sources:
+        - arxiv
+      keywords:
+        - keyword: open-vocabulary segmentation
+          keyword_cn: 开放词汇分割
+          query: open-vocabulary segmentation
+        - keyword: instance segmentation
+          keyword_cn: 实例分割
+          query: instance segmentation
+        - keyword: semantic segmentation
+          keyword_cn: 语义分割
+          query: semantic segmentation
+        - keyword: portrait segmentation
+          keyword_cn: 人像分割
+          query: Portrait segmentation for subject integrity in blur
+        - keyword: human segmentation
+          keyword_cn: 人体分割
+          query: Human segmentation algorithm with handheld object detection
+        - keyword: foreground segmentation
+          keyword_cn: 前景分割
+          query: Foreground segmentation in defocused images
+      intent_queries:
+        - query: foreground segmentation for handheld objects accessories and portrait scenes
+          query_cn: 面向手持物、饰品和人像场景的前景分割
+          enabled: true
+          source: manual
+          note: ''
+        - query: segmentation model for thin structures hair boundaries and occlusions
+          query_cn: 面向细小结构、发丝边界和遮挡的分割模型
+          enabled: true
+          source: manual
+          note: ''
+      updated_at: '2026-06-04T07:48:36.266Z'
+    - tag: vfm
+      description: 视觉基础模型和即插即用模块，只关注对 depth、segmentation、matting、dense prediction 有迁移价值的工作。
+      enabled: true
+      paper_sources:
+        - arxiv
+      keywords:
+        - keyword: universal image encoder
+          keyword_cn: 通用图像编码器
+          query: universal image encoder
+        - keyword: self-supervised visual pretraining
+          keyword_cn: 自监督视觉预训练
+          query: self-supervised visual pretraining
+        - keyword: dense prediction
+          keyword_cn: 密集预测
+          query: dense prediction tasks computer vision
+        - keyword: vision foundation model
+          keyword_cn: 视觉基础模型
+          query: visual foundation models for transfer to dense prediction tasks
+        - keyword: pretrained vision model
+          keyword_cn: 预训练视觉模型
+          query: pretrained vision models for depth and segmentation
+        - keyword: plug and play module
+          keyword_cn: 即插即用模块
+          query: plug and play modules for computer vision vision foundation models
+      intent_queries:
+        - query: universal image encoder as teacher model for depth segmentation and matting
+          query_cn: 作为深度、分割和抠图教师模型的通用图像编码器
+          enabled: true
+          source: manual
+          note: ''
+        - query: self supervised visual representation for dense prediction tasks
+          query_cn: 面向密集预测任务的自监督视觉表征
+          enabled: true
+          source: manual
+          note: ''
+        - query: vision foundation model for depth estimation segmentation and matting
+          query_cn: 用于深度估计、分割和抠图的视觉基础模型
+          enabled: true
+          source: manual
+          note: ''
+        - query: plug and play modules for improving dense prediction models
+          query_cn: 提升密集预测的即插即用模块
+          enabled: true
+          source: manual
+          note: ''
+      updated_at: '2026-06-04T07:53:16.136Z'
+    - tag: lite-vision
+      description: 知识蒸馏、轻量视觉模型、量化和端侧部署，重点关注像素级任务。
+      enabled: true
+      paper_sources:
+        - arxiv
+      keywords:
+        - keyword: efficient dense prediction
+          keyword_cn: 高效密集预测
+          query: efficient dense prediction
+        - keyword: mobile vision backbone
+          keyword_cn: 移动端视觉骨干网络
+          query: model compression
+        - keyword: knowledge distillation
+          keyword_cn: 知识蒸馏
+          query: knowledge distillation techniques for vision
+        - keyword: lightweight vision model
+          keyword_cn: 轻量视觉模型
+          query: lightweight neural network model compression
+      intent_queries:
+        - query: Knowledge distillation for lightweight vision models on edge devices
+          query_cn: 在端侧设备上对轻量视觉模型进行知识蒸馏
+          enabled: true
+          source: manual
+          note: ''
+        - query: knowledge distillation for monocular depth estimation segmentation and matting
+          query_cn: 面向单目深度、分割和抠图的知识蒸馏
+          enabled: true
+          source: manual
+          note: ''
+        - query: teacher student learning for efficient pixel level prediction models
+          query_cn: 面向高效像素级预测模型的教师学生学习
+          enabled: true
+          source: manual
+          note: ''
+        - query: lightweight vision backbone for real time dense prediction on mobile devices
+          query_cn: 面向移动端实时密集预测的轻量视觉骨干网络
+          enabled: true
+          source: manual
+          note: ''
+      updated_at: '2026-06-04T07:56:57.170Z'
+    - tag: neural-bokeh
+      description: 神经网络虚化、学习式景深渲染、人像散景渲染，重点关注 depth/matting/seg 联合使用。
+      enabled: true
+      paper_sources:
+        - arxiv
+      keywords:
+        - keyword: depth-aware blur
+          keyword_cn: 深度感知模糊
+          query: depth-aware blur
+        - keyword: learned defocus blur
+          keyword_cn: 学习式离焦模糊
+          query: learned defocus blur
+        - keyword: neural bokeh
+          keyword_cn: 神经网络虚化
+          query: neural network based bokeh rendering
+        - keyword: depth of field rendering
+          keyword_cn: 景深渲染
+          query: learned depth of field rendering with neural networks
+        - keyword: portrait bokeh
+          keyword_cn: 人像散景
+          query: portrait bokeh rendering using depth and matting
+        - keyword: bokeh rendering
+          keyword_cn: 散景渲染
+          query: bokeh synthesis with depth and segmentation
+      intent_queries:
+        - query: depth aware blur rendering with occlusion and boundary handling
+          query_cn: 具有遮挡和边界处理的深度感知虚化渲染
+          enabled: true
+          source: manual
+          note: ''
+        - query: learned defocus blur for realistic foreground background composition
+          query_cn: 面向真实前景背景融合的学习式离焦模糊
+          enabled: true
+          source: manual
+          note: ''
+        - query: neural bokeh rendering for portrait photography and mobile devices
+          query_cn: 面向人像摄影和移动端的神经网络虚化渲染
+          enabled: true
+          source: manual
+          note: ''
+        - query: deep learning based bokeh synthesis from single image
+          query_cn: 基于深度学习的单图像散景合成
+          enabled: true
+          source: manual
+          note: ''
+      updated_at: '2026-06-04T08:00:39.522Z'
+    - tag: cv-render
+      description: 服务于手机虚化 pipeline 的计算摄影和渲染算法，包括高性能模糊、空间可变卷积、点扩散函数合成、特殊滤镜、边缘优化、图像融合和实时渲染。
+      enabled: true
+      paper_sources:
+        - arxiv
+      keywords:
+        - keyword: efficient image filtering
+          keyword_cn: 高效图像滤波
+          query: efficient image filtering
+        - keyword: computational photography
+          keyword_cn: 计算摄影
+          query: computational photography for mobile blur pipeline
+        - keyword: point spread function
+          keyword_cn: 点扩散函数
+          query: point spread function synthesis for blur
+        - keyword: edge optimization
+          keyword_cn: 边缘优化
+          query: edge optimization in blur rendering
+        - keyword: image fusion
+          keyword_cn: 图像融合
+          query: image fusion for mobile photography
+        - keyword: real time rendering
+          keyword_cn: 实时渲染
+          query: real time rendering for blur effects
+      intent_queries:
+        - query: digital filter effects for portrait photography including pro mist glow diffusion and cinematic rendering
+          query_cn: 面向人像摄影的数字滤镜效果，包括黑柔、柔光、扩散和电影感渲染
+          enabled: true
+          source: manual
+          note: ''
+        - query: efficient defocus blur and bokeh rendering for mobile computational photography
+          query_cn: 面向移动端计算摄影的高性能离焦模糊和虚化渲染
+          enabled: true
+          source: manual
+          note: ''
+        - query: spatially varying convolution and point spread function synthesis for realistic bokeh effects
+          query_cn: 面向真实虚化效果的空间可变卷积和点扩散函数合成
+          enabled: true
+          source: manual
+          note: ''
+        - query: edge optimization in computational photography
+          query_cn: 计算摄影中的边缘优化
+          enabled: true
+          source: manual
+          note: ''
+      updated_at: '2026-06-04T08:10:44.422Z'
+source_backends:
+  arxiv:
+    papers_table: arxiv_papers
+    use_vector_rpc: true
+    vector_rpc: match_arxiv_papers
+    vector_rpc_exact: match_arxiv_papers_exact
+    use_bm25_rpc: true
+    bm25_rpc: match_arxiv_papers_bm25
+    sync_table: arxiv_sync_status
+    sync_success_value: success
+    schema: public
+    kind: supabase
+    enabled: true
+    url: https://lyucdwgefyfbmaiopjbk.supabase.co
+    anon_key: sb_publishable_lX-oi64Uxyd7SIVv3_w2Uw_MTOojeKq
