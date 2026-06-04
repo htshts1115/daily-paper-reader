@@ -295,3 +295,13 @@ jobs:
           git fetch origin "$branch"
           git rebase -X theirs "origin/$branch"
           git push origin HEAD:"$branch"
+
+      - name: Notify Feishu
+        if: success()
+        env:
+          FEISHU_BOT_WEBHOOK: ${{ secrets.FEISHU_BOT_WEBHOOK }}
+          FEISHU_BOT_SECRET: ${{ secrets.FEISHU_BOT_SECRET }}
+          FEISHU_NOTIFY_TOP_K: "5"
+          DAILY_PAPER_SITE_URL: "https://htshts1115.github.io/daily-paper-reader/"
+        run: |
+          python scripts/notify_feishu_daily.py
