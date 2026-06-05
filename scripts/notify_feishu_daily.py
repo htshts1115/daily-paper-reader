@@ -12,7 +12,7 @@ import os
 import time
 import urllib.error
 import urllib.request
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -22,14 +22,32 @@ MAX_PAYLOAD_CHARS = 15_000
 
 
 def find_latest_recommend_json(root: Path) -> Path:
-    """Return the most recently modified standard recommendation JSON."""
-    candidates = list(root.glob("archive/*/recommend/arxiv_papers_*.standard.json"))
+    """Return the recommendation JSON with the latest valid ``generated_at``."""
+    candidates = sorted(root.glob("archive/*/recommend/arxiv_papers_*.standard.json"))
     if not candidates:
         raise FileNotFoundError(
             "No recommendation JSON found: archive/*/recommend/"
             "arxiv_papers_*.standard.json"
         )
-    return max(candidates, key=lambda path: path.stat().st_mtime)
+
+    generated_candidates: list[tuple[datetime, Path]] = []
+    for path in candidates:
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            generated_at = data.get("generated_at")
+            if not isinstance(generated_at, str) or not generated_at:
+                continue
+            generated_time = datetime.fromisoformat(generated_at.replace("Z", "+00:00"))
+            if generated_time.tzinfo is None:
+                generated_time = generated_time.replace(tzinfo=timezone.utc)
+            generated_candidates.append((generated_time.astimezone(timezone.utc), path))
+        except (OSError, json.JSONDecodeError, ValueError, AttributeError):
+            # Keep unreadable or malformed files in the path-sorted fallback set.
+            continue
+
+    if generated_candidates:
+        return max(generated_candidates, key=lambda item: (item[0], str(item[1])))[1]
+    return candidates[-1]
 
 
 def extract_daily_brief(readme_path: Path) -> str:
