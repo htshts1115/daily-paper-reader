@@ -6,65 +6,56 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-06-04
-- 运行时间：2026-06-04 20:09:58 UTC
+- 最新运行日期：2026-06-05
+- 运行时间：2026-06-05 20:43:33 UTC
 - 运行状态：成功
-- 本次总论文数：15
-- 精读区：4
+- 本次总论文数：11
+- 精读区：0
 - 速读区：11
 
 ### 今日简报（AI）
-今日推荐15篇论文，精读聚焦参数高效微调与跨模态知识蒸馏两大方向。值得关注《Parameter-Efficient Fine-Tuning of Large Pretrained Models for Instance Segmentation Tasks》（9.0分）与《xModel-KD: Cross-modal Knowledge Distillation for 3D Scene Perception》（8.0分）。建议优先精读这两篇，快速掌握大模型微调与多模态融合的前沿方法。
-- 详情：[/202606/04/README](/202606/04/README)
+今日速读11篇论文，重点关注视觉基础模型的语义对应、视觉语言模型的对象选择以及3D时空分割。
+最值得看：《SOCO》建立语义对象对应基准，《MAOAM》实现视觉语言模型的统一对象与材料选择，两篇均为7.0分。
+建议后续关注这两篇在图像理解与交互中的应用，它们直接服务于更智能的视觉系统。
+- 详情：[/202606/05/README](/202606/05/README)
 
 ### 精读区论文标签
-1. [Parameter-Efficient Fine-Tuning of Large Pretrained Models for Instance Segmentation Tasks](/202606/04/2606.01947v1-parameter-efficient-fine-tuning-of-large-pretrained-models-for-instance-segmentation-tasks)  
-   标签：评分：9.0/10、query:seg
-   evidence：参数高效微调用于实例分割
-2. [xModel-KD: Cross-modal Knowledge Distillation for 3D Scene Perception using LiDAR](/202606/04/2605.30111v1-xmodel-kd-cross-modal-knowledge-distillation-for-3d-scene-perception-using-lidar)  
-   标签：评分：8.0/10、query:lite-vision
-   evidence：跨模态知识蒸馏用于3D场景感知
-3. [SWARD: Stochastic Window-Attention-Based Relational Distillation for Cross-Architectural Semantic Segmentation](/202606/04/2606.00999v1-sward-stochastic-window-attention-based-relational-distillation-for-cross-architectural-semantic-segmentation)  
-   标签：评分：8.0/10、query:lite-vision
-   evidence：从视觉基础模型到语义分割的知识蒸馏
-4. [$\text{VG}^2$GT: Voxel-Gaussian Splatting Visual Geometry Grounded Transformer](/202606/04/2606.01573v1-textvg2gt-voxel-gaussian-splatting-visual-geometry-grounded-transformer)  
-   标签：评分：8.0/10、query:vfm
-   evidence：利用冻结的预训练视觉基础模型进行深度和几何估计
+- 本次无精读推荐。
 
 ### 速读区论文标签
-1. [REST3D: Reconstructing Physically Stable 3D Scenes from a Single Image](/202606/04/2605.30338v1-rest3d-reconstructing-physically-stable-3d-scenes-from-a-single-image)  
-   标签：评分：7.0/10、query:mono-depth
-   evidence：单幅图像的单目深度估计用于三维场景重建
-2. [Hist2Style: Histogram-Guided Stylization with Bilateral Grids](/202606/04/2606.01819v1-hist2style-histogram-guided-stylization-with-bilateral-grids)  
-   标签：评分：7.0/10、query:cv-render
-   evidence：基于双边网格的快速边缘感知风格化
-3. [Multi-Teacher Knowledge Distillation via Teacher-Informed Mixture Priors](/202606/04/2605.27967v1-multi-teacher-knowledge-distillation-via-teacher-informed-mixture-priors)  
+1. [SOCO: Benchmarking Semantic Object Correspondence in Vision Foundation Models](/202606/05/2605.31597v2-soco-benchmarking-semantic-object-correspondence-in-vision-foundation-models)  
+   标签：评分：7.0/10、query:vfm
+   evidence：视觉基础模型语义对应基准
+2. [MAOAM: Unified Object and Material Selection with Vision-Language Models](/202606/05/2606.04880v1-maoam-unified-object-and-material-selection-with-vision-language-models)  
+   标签：评分：7.0/10、query:seg
+   evidence：利用视觉语言模型实现物体和材质的统一选择，支持开放词汇分割
+3. [GMOS: Grounding Moving Object Segmentation in 3D Space and Time](/202606/05/2605.30352v1-gmos-grounding-moving-object-segmentation-in-3d-space-and-time)  
+   标签：评分：6.0/10、query:seg
+   evidence：将移动物体分割融入3D时空信息，提供前景-背景变体用于快速部署。
+4. [VolFill: Single-View Amodal 3D Scene Reconstruction with Volumetric Flow Matching](/202606/05/2605.31466v1-volfill-single-view-amodal-3d-scene-reconstruction-with-volumetric-flow-matching)  
+   标签：评分：6.0/10、query:mono-depth
+   evidence：利用几何基础模型进行单视图几何重建
+5. [Rate-optimal neural boundary detection from unlabeled noisy images](/202606/05/2606.00715v1-rate-optimal-neural-boundary-detection-from-unlabeled-noisy-images)  
+   标签：评分：6.0/10、query:depth-refine
+   evidence：无标签噪声图像中的神经边界检测，与边缘感知深度精修相关
+6. [Reasmory: 3D Reconstruction as Explicit Memory for VLMs Spatial Reasoning](/202606/05/2606.00963v1-reasmory-3d-reconstruction-as-explicit-memory-for-vlms-spatial-reasoning)  
+   标签：评分：6.0/10、query:vfm
+   evidence：3D重建作为VLM空间推理的显式记忆
+7. [Tiny Collaborative Inference for Occlusion-Robust Object Detection](/202606/05/2606.02894v2-tiny-collaborative-inference-for-occlusion-robust-object-detection)  
    标签：评分：6.0/10、query:lite-vision
-   evidence：多教师知识蒸馏
-4. [One Click per Cell Type Suffices: Training-free Group Interaction for Cell Instance Segmentation](/202606/04/2605.29429v1-one-click-per-cell-type-suffices-training-free-group-interaction-for-cell-instance-segmentation)  
-   标签：评分：6.0/10、query:seg
-   evidence：利用预训练SAM和无训练分组提示的细胞实例分割
-5. [Rethinking Efficient Crack Segmentation with Task-Aligned Structural-Directional Modeling](/202606/04/2605.31048v1-rethinking-efficient-crack-segmentation-with-task-aligned-structural-directional-modeling)  
-   标签：评分：6.0/10、query:seg
-   evidence：裂缝分割方法可迁移至细长结构（如发丝）分割
-6. [VolFill: Single-View Amodal 3D Scene Reconstruction with Volumetric Flow Matching](/202606/04/2605.31466v1-volfill-single-view-amodal-3d-scene-reconstruction-with-volumetric-flow-matching)  
+   evidence：使用轻量MCUNet骨干和Lite量化的边缘设备遮挡鲁棒目标检测
+8. [BEAST3D: Animal behavioral analysis and neural encoding from multi-view video via Gaussian splatting](/202606/05/2606.02937v1-beast3d-animal-behavioral-analysis-and-neural-encoding-from-multi-view-video-via-gaussian-splatting)  
    标签：评分：6.0/10、query:vfm
-   evidence：利用几何基础模型进行单视图3D重建
-7. [Reasmory: 3D Reconstruction as Explicit Memory for VLMs Spatial Reasoning](/202606/04/2606.00963v1-reasmory-3d-reconstruction-as-explicit-memory-for-vlms-spatial-reasoning)  
+   evidence：从多视角视频自监督预训练3D视觉表示
+9. [Reliability-Guided Depth Fusion for Glare-Resilient Navigation Costmaps](/202606/05/2606.03421v1-reliability-guided-depth-fusion-for-glare-resilient-navigation-costmaps)  
+   标签：评分：6.0/10、query:depth-refine
+   evidence：基于深度可靠性引导的融合，以改进受污染的深度图
+10. [Learning Geometric Representations from Videos for Spatial Intelligent Multimodal Large Language Models](/202606/05/2606.05833v1-learning-geometric-representations-from-videos-for-spatial-intelligent-multimodal-large-language-models)  
    标签：评分：6.0/10、query:vfm
-   evidence：基于重建的视觉基础模型作为空间记忆
-8. [FlatVPR: Plug-and-play Geo-linear Residual Adapter for Geometric Rectification of Foundation Model Feature Manifolds](/202606/04/2606.01734v1-flatvpr-plug-and-play-geo-linear-residual-adapter-for-geometric-rectification-of-foundation-model-feature-manifolds)  
-   标签：评分：6.0/10、query:vfm
-   evidence：用于基础模型特征流形几何校正的即插即用适配器
-9. [Thinking in Blender: Staged Executable Inverse Graphics with Vision-Language Models](/202606/04/2606.02580v1-thinking-in-blender-staged-executable-inverse-graphics-with-vision-language-models)  
-   标签：评分：6.0/10、query:mono-depth
-   evidence：单图逆图形重建3D场景与单目深度相关
-10. [Wavelet as Tokenizer: Preliminary Results on a Shared Wavelet Token Schema for Natural Signals](/202606/04/2606.02631v1-wavelet-as-tokenizer-preliminary-results-on-a-shared-wavelet-token-schema-for-natural-signals)  
-   标签：评分：6.0/10、query:vfm
-   evidence：共享小波词元方案作为通用图像编码器
-11. [PixVOD: Pixel-Distributed Direct Visual Odometry and Depth Estimation](/202606/04/2606.03989v1-pixvod-pixel-distributed-direct-visual-odometry-and-depth-estimation)  
-   标签：评分：6.0/10、query:mono-depth
-   evidence：通过高斯信念传播的分布式深度估计
+   evidence：从3D基础模型蒸馏几何知识到多模态大语言模型
+11. [CamFlow+: Hybrid Motion Bases for 2D Camera Motion Estimation with Stabilization Applications](/202606/05/2606.05915v1-camflow-hybrid-motion-bases-for-2d-camera-motion-estimation-with-stabilization-applications)  
+   标签：评分：6.0/10、query:cv-render
+   evidence：计算摄影中基于深度平移基的相机运动估计
 
 
 <div class="dpr-home-promo-card">
