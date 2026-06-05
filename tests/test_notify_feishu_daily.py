@@ -79,6 +79,111 @@ class NotifyFeishuDailyTest(unittest.TestCase):
         serialized = json.dumps(payload, ensure_ascii=False)
         self.assertNotIn("很长的推荐理由", serialized)
 
+
+    def test_load_daily_report_prefers_current_docs_over_archive_json(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            docs = root / "docs"
+            report_dir = docs / "202606" / "04"
+            report_dir.mkdir(parents=True)
+            archive_recommend = (
+                root
+                / "archive"
+                / "old"
+                / "recommend"
+                / "arxiv_papers_old.standard.json"
+            )
+            archive_recommend.parent.mkdir(parents=True)
+            archive_recommend.write_text(
+                json.dumps(
+                    {
+                        "generated_at": "2026-06-05T00:00:00+00:00",
+                        "stats": {"deep_selected": 15, "quick_selected": 19},
+                        "deep_dive": [
+                            {
+                                "title": "Archive Paper",
+                                "llm_score": 10,
+                                "matched_query_tag": "query:archive",
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (docs / "README.md").write_text(
+                "\n".join(
+                    [
+                        "## 每次日报",
+                        "- 本次总论文数：34",
+                        "- 详情：[/202606/04/README](/202606/04/README)",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (report_dir / "README.md").write_text(
+                "\n".join(
+                    [
+                        "# 日报 · 2026-06-04",
+                        "",
+                        "- 生成时间：2026-06-04 00:00:00 UTC",
+                        "- 当次推荐总数：15",
+                        "- 精读区：4",
+                        "- 速读区：11",
+                        "",
+                        "## 今日简报（AI）",
+                        "详情页简报。",
+                        "",
+                        "## 精读区",
+                        "1. [Doc Paper One](/202606/04/paper-one) （9.5/10）",
+                        "2. [Doc Paper Two](/202606/04/paper-two) （8.0/10）",
+                        "",
+                        "## 速读区",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (report_dir / "paper-one.md").write_text(
+                "\n".join(
+                    [
+                        "---",
+                        'title: "Doc Paper One FM"',
+                        'pdf: "https://example.com/one.pdf"',
+                        'tags: ["query:mono-depth"]',
+                        "score: 9.5",
+                        "evidence: 来自论文详情一",
+                        "tldr: 摘要一",
+                        "---",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (report_dir / "paper-two.md").write_text(
+                "\n".join(
+                    [
+                        "---",
+                        'title: "Doc Paper Two FM"',
+                        'pdf: "https://example.com/two.pdf"',
+                        'tags: ["query:seg"]',
+                        "score: 8.0",
+                        "evidence: 来自论文详情二",
+                        "---",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            report = MOD.load_daily_report(root, 2)
+
+        self.assertEqual(report["source"], "docs/202606/04/README.md")
+        self.assertEqual(report["date"], "2026-06-04")
+        self.assertEqual(report["stats"], {"total": 15, "deep_selected": 4, "quick_selected": 11})
+        self.assertEqual(report["brief"], "详情页简报。")
+        self.assertEqual([paper["title"] for paper in report["papers"]], ["Doc Paper One FM", "Doc Paper Two FM"])
+        self.assertEqual([paper["score"] for paper in report["papers"]], ["9.5", "8.0"])
+        self.assertEqual([paper["tag"] for paper in report["papers"]], ["mono-depth", "seg"])
+        self.assertEqual(report["papers"][0]["evidence"], "来自论文详情一")
+        self.assertEqual(report["papers"][0]["link"], "https://example.com/one.pdf")
+
     def test_find_latest_recommend_json_prefers_generated_at_over_mtime(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
