@@ -79,23 +79,41 @@ class NotifyFeishuDailyTest(unittest.TestCase):
         serialized = json.dumps(payload, ensure_ascii=False)
         self.assertNotIn("很长的推荐理由", serialized)
 
-    def test_find_latest_recommend_json(self):
+    def test_find_latest_recommend_json_prefers_generated_at_over_mtime(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             old = root / "archive" / "20260101" / "recommend" / "arxiv_papers_old.standard.json"
             new = root / "archive" / "20260102" / "recommend" / "arxiv_papers_new.standard.json"
             old.parent.mkdir(parents=True)
             new.parent.mkdir(parents=True)
-            old.write_text(json.dumps({}), encoding="utf-8")
-            new.write_text(json.dumps({}), encoding="utf-8")
-            old.touch()
-            new.touch()
-            old_mtime = old.stat().st_mtime - 10
+            old.write_text(
+                json.dumps({"generated_at": "2026-01-01T12:00:00+00:00"}),
+                encoding="utf-8",
+            )
+            new.write_text(
+                json.dumps({"generated_at": "2026-01-02T12:00:00+00:00"}),
+                encoding="utf-8",
+            )
+            old_mtime = new.stat().st_mtime + 60
             os.utime(old, (old_mtime, old_mtime))
 
             latest = MOD.find_latest_recommend_json(root)
 
         self.assertEqual(latest.name, new.name)
+
+    def test_find_latest_recommend_json_falls_back_to_last_path(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            first = root / "archive" / "20260101" / "recommend" / "arxiv_papers_first.standard.json"
+            last = root / "archive" / "20260102" / "recommend" / "arxiv_papers_last.standard.json"
+            first.parent.mkdir(parents=True)
+            last.parent.mkdir(parents=True)
+            first.write_text("not json", encoding="utf-8")
+            last.write_text(json.dumps({"generated_at": "invalid"}), encoding="utf-8")
+
+            latest = MOD.find_latest_recommend_json(root)
+
+        self.assertEqual(latest.name, last.name)
 
 
 if __name__ == "__main__":
