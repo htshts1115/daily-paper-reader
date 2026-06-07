@@ -6,56 +6,50 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-06-06
-- 运行时间：2026-06-06 19:43:36 UTC
+- 最新运行日期：2026-06-07
+- 运行时间：2026-06-07 20:25:47 UTC
 - 运行状态：成功
-- 本次总论文数：12
-- 精读区：1
-- 速读区：11
+- 本次总论文数：10
+- 精读区：2
+- 速读区：8
 
 ### 今日简报（AI）
-今日阅读12篇，精读1篇主动场景重建，速读3篇涵盖去模糊、3D几何与视频全景分割。最值得关注精读《ActMVS》提出的单目多视图主动场景重建方法，速读中《FSM-Net》的频域-空间域联合去模糊也具实用价值。建议后续可重点探索主动重建与3D高斯泼溅结合的方向，以及去模糊算法在低光照场景的落地。
-- 详情：[/202606/06/README](/202606/06/README)
+今日筛选10篇论文，精读聚焦弱监督增量分割与鲁棒医学图像分割两大方向。最值得关注的是：通过语义锚点和空间仲裁实现增量分割，以及用有界噪声注入提升医学分割鲁棒性。建议普通读者优先了解噪声注入对抗干扰的思路，对实际应用更具参考价值。
+- 详情：[/202606/07/README](/202606/07/README)
 
 ### 精读区论文标签
-1. [ActMVS: Active Scene Reconstruction with Monocular Multi-View Stereo](/202606/06/2606.01367v1-actmvs-active-scene-reconstruction-with-monocular-multi-view-stereo)  
-   标签：评分：8.0/10、query:mono-depth
-   evidence：面向主动场景重建的单目深度估计
+1. [Weakly Supervised Incremental Segmentation via Semantic Anchors and Spatial Arbitration](/202606/07/2606.04060v1-weakly-supervised-incremental-segmentation-via-semantic-anchors-and-spatial-arbitration)  
+   标签：评分：8.0/10、query:seg
+   evidence：弱监督增量语义分割，提出语义锚点抵抗特征漂移
+2. [Implicit Fuzzification via Bounded Noise Injection for Robust Medical Image Segmentation](/202606/07/2606.04427v1-implicit-fuzzification-via-bounded-noise-injection-for-robust-medical-image-segmentation)  
+   标签：评分：8.0/10、query:seg
+   evidence：提出有界噪声注入用于鲁棒的医学图像分割，直接解决边界模糊问题
 
 ### 速读区论文标签
-1. [FSM-Net: An Efficient Frequency-Spatial Network for Real-World Deblurring](/202606/06/2605.31400v1-fsm-net-an-efficient-frequency-spatial-network-for-real-world-deblurring)  
-   标签：评分：7.0/10、query:cv-render
-   evidence：高效真实世界去模糊，适用于计算摄影
-2. [$\text{VG}^2$GT: Voxel-Gaussian Splatting Visual Geometry Grounded Transformer](/202606/06/2606.01573v2-textvg2gt-voxel-gaussian-splatting-visual-geometry-grounded-transformer)  
+1. [$A^2$: Smaller Self-Supervised ViTs Localize Better than Larger Ones](/202606/07/2606.03148v1-a2-smaller-self-supervised-vits-localize-better-than-larger-ones)  
    标签：评分：7.0/10、query:vfm
-   evidence：利用冻结的视觉基础模型进行几何和深度监督
-3. [Scene-Centric Unsupervised Video Panoptic Segmentation](/202606/06/2606.04925v1-scene-centric-unsupervised-video-panoptic-segmentation)  
+   evidence：自监督ViT前景定位缩放规律
+2. [Reliability-Guided Depth Fusion for Glare-Resilient Navigation Costmaps](/202606/07/2606.03421v1-reliability-guided-depth-fusion-for-glare-resilient-navigation-costmaps)  
+   标签：评分：7.0/10、query:depth-refine
+   evidence：基于深度可靠性引导的融合方法用于抗眩光成本图
+3. [PRISM: Synergizing Vision Foundation Models via Self-organized Expert Specialization](/202606/07/2606.03444v1-prism-synergizing-vision-foundation-models-via-self-organized-expert-specialization)  
+   标签：评分：7.0/10、query:vfm
+   evidence：MoE框架协同多种视觉基础模型，可迁移至分割等密集预测任务
+4. [OA-CutMix: Correcting the Label Bias of CutMix](/202606/07/2606.04820v1-oa-cutmix-correcting-the-label-bias-of-cutmix)  
    标签：评分：7.0/10、query:seg
-   evidence：利用深度线索的无监督视频全景分割
-4. [MS-DKC: A Dataset Knowledge Card Framework for Designing and Adapting Medical Image Segmentation Models](/202606/06/2606.06103v1-ms-dkc-a-dataset-knowledge-card-framework-for-designing-and-adapting-medical-image-segmentation-models)  
-   标签：评分：7.0/10、query:seg
-   evidence：用于医学图像分割模型设计的数据集知识卡片
-5. [SOCO: Benchmarking Semantic Object Correspondence in Vision Foundation Models](/202606/06/2605.31597v2-soco-benchmarking-semantic-object-correspondence-in-vision-foundation-models)  
-   标签：评分：6.0/10、query:vfm
-   evidence：视觉基础模型语义对应基准
-6. [UniVerse: A Unified Modulation Framework for Segmentation-Free,Disentangled Multi-Concept Personalization](/202606/06/2606.00351v1-universe-a-unified-modulation-framework-for-segmentation-freedisentangled-multi-concept-personalization)  
-   标签：评分：6.0/10、query:seg
-   evidence：免分割的多概念个性化与目标定位
-7. [An Effective Solution for the CVPR 2026 8th UG2+ Challenge Track 3: Dynamic Object Segmentation in Turbulence](/202606/06/2606.00522v1-an-effective-solution-for-the-cvpr-2026-8th-ug2-challenge-track-3-dynamic-object-segmentation-in-turbulence)  
-   标签：评分：6.0/10、query:seg
-   evidence：困难条件下的动态物体分割
-8. [An Open-Source Benchmark and Baseline for Multi-temporal Referring Segmentation](/202606/06/2606.00987v1-an-open-source-benchmark-and-baseline-for-multi-temporal-referring-segmentation)  
-   标签：评分：6.0/10、query:seg
-   evidence：多时相指代分割基准
-9. [LALE: Lightweight-Transformer Architecture for Land-Cover Estimation](/202606/06/2606.02092v1-lale-lightweight-transformer-architecture-for-land-cover-estimation)  
+   evidence：用于语义分割的感知分割数据增强
+5. [ETC: Extreme Token Compression via Task-aware Visual Information Distillation in VLMs](/202606/07/2606.00543v1-etc-extreme-token-compression-via-task-aware-visual-information-distillation-in-vlms)  
    标签：评分：6.0/10、query:lite-vision
-   evidence：轻量级transformer用于语义分割
-10. [$A^2$: Smaller Self-Supervised ViTs Localize Better than Larger Ones](/202606/06/2606.03148v1-a2-smaller-self-supervised-vits-localize-better-than-larger-ones)  
+   evidence：通过任务感知视觉信息蒸馏实现极端token压缩
+6. [PAI-Studio: Cinematic Video Background Replacement with Camera-Aware Motion](/202606/07/2606.01399v1-pai-studio-cinematic-video-background-replacement-with-camera-aware-motion)  
+   标签：评分：6.0/10、query:neural-bokeh
+   evidence：电影级视频背景替换，涉及人像虚化和深度/分割技术
+7. [Geometry-Preserving Unsupervised Alignment for Heterogeneous Foundation Models](/202606/07/2606.04385v1-geometry-preserving-unsupervised-alignment-for-heterogeneous-foundation-models)  
    标签：评分：6.0/10、query:vfm
-   evidence：自监督视觉Transformer的定位能力，可用于密集预测任务
-11. [TransTac: Visuo-Tactile Modality Transition via Ultraviolet-Encoded Transparent Elastomers](/202606/06/2606.04477v1-transtac-visuo-tactile-modality-transition-via-ultraviolet-encoded-transparent-elastomers)  
-   标签：评分：6.0/10、query:stereo-depth
-   evidence：双目立体匹配用于触觉传感
+   evidence：提出无监督对齐框架GPUA整合视觉基础模型与视觉语言模型，可作为即插即用模块
+8. [Who Needs Labels? Adapting Vision Foundation Models With the Metadata You Already Have](/202606/07/2606.05107v1-who-needs-labels-adapting-vision-foundation-models-with-the-metadata-you-already-have)  
+   标签：评分：6.0/10、query:vfm
+   evidence：利用元数据无标签适应视觉基础模型到新领域
 
 
 <div class="dpr-home-promo-card">
