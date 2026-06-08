@@ -6,50 +6,37 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-06-07
-- 运行时间：2026-06-07 20:25:47 UTC
+- 最新运行日期：2026-06-08
+- 运行时间：2026-06-08 20:15:55 UTC
 - 运行状态：成功
-- 本次总论文数：10
-- 精读区：2
-- 速读区：8
+- 本次总论文数：5
+- 精读区：1
+- 速读区：4
 
 ### 今日简报（AI）
-今日筛选10篇论文，精读聚焦弱监督增量分割与鲁棒医学图像分割两大方向。最值得关注的是：通过语义锚点和空间仲裁实现增量分割，以及用有界噪声注入提升医学分割鲁棒性。建议普通读者优先了解噪声注入对抗干扰的思路，对实际应用更具参考价值。
-- 详情：[/202606/07/README](/202606/07/README)
+今日精选5篇视觉与3D相关论文，精读聚焦视觉基础模型专家协作，速读覆盖3D重建、实时3D高斯与双视图优化。  
+最值得看PRISM（9.0分）的自组织专家专业化方法，可高效协同多种视觉模型；以及Reasmory（7.0分）将3D重建作为显式记忆增强VLM空间推理。  
+建议优先精读PRISM理解专家分工机制，若对3D空间推理感兴趣可辅以Reasmory探索显式记忆的应用。
+- 详情：[/202606/08/README](/202606/08/README)
 
 ### 精读区论文标签
-1. [Weakly Supervised Incremental Segmentation via Semantic Anchors and Spatial Arbitration](/202606/07/2606.04060v1-weakly-supervised-incremental-segmentation-via-semantic-anchors-and-spatial-arbitration)  
-   标签：评分：8.0/10、query:seg
-   evidence：弱监督增量语义分割，提出语义锚点抵抗特征漂移
-2. [Implicit Fuzzification via Bounded Noise Injection for Robust Medical Image Segmentation](/202606/07/2606.04427v1-implicit-fuzzification-via-bounded-noise-injection-for-robust-medical-image-segmentation)  
-   标签：评分：8.0/10、query:seg
-   evidence：提出有界噪声注入用于鲁棒的医学图像分割，直接解决边界模糊问题
+1. [PRISM: Synergizing Vision Foundation Models via Self-organized Expert Specialization](/202606/08/2606.03444v1-prism-synergizing-vision-foundation-models-via-self-organized-expert-specialization)  
+   标签：评分：9.0/10、query:vfm
+   evidence：提出MoE框架协同多个视觉基础模型，可直接应用于密集预测任务
 
 ### 速读区论文标签
-1. [$A^2$: Smaller Self-Supervised ViTs Localize Better than Larger Ones](/202606/07/2606.03148v1-a2-smaller-self-supervised-vits-localize-better-than-larger-ones)  
+1. [Reasmory: 3D Reconstruction as Explicit Memory for VLMs Spatial Reasoning](/202606/08/2606.00963v1-reasmory-3d-reconstruction-as-explicit-memory-for-vlms-spatial-reasoning)  
    标签：评分：7.0/10、query:vfm
-   evidence：自监督ViT前景定位缩放规律
-2. [Reliability-Guided Depth Fusion for Glare-Resilient Navigation Costmaps](/202606/07/2606.03421v1-reliability-guided-depth-fusion-for-glare-resilient-navigation-costmaps)  
-   标签：评分：7.0/10、query:depth-refine
-   evidence：基于深度可靠性引导的融合方法用于抗眩光成本图
-3. [PRISM: Synergizing Vision Foundation Models via Self-organized Expert Specialization](/202606/07/2606.03444v1-prism-synergizing-vision-foundation-models-via-self-organized-expert-specialization)  
-   标签：评分：7.0/10、query:vfm
-   evidence：MoE框架协同多种视觉基础模型，可迁移至分割等密集预测任务
-4. [OA-CutMix: Correcting the Label Bias of CutMix](/202606/07/2606.04820v1-oa-cutmix-correcting-the-label-bias-of-cutmix)  
-   标签：评分：7.0/10、query:seg
-   evidence：用于语义分割的感知分割数据增强
-5. [ETC: Extreme Token Compression via Task-aware Visual Information Distillation in VLMs](/202606/07/2606.00543v1-etc-extreme-token-compression-via-task-aware-visual-information-distillation-in-vlms)  
-   标签：评分：6.0/10、query:lite-vision
-   evidence：通过任务感知视觉信息蒸馏实现极端token压缩
-6. [PAI-Studio: Cinematic Video Background Replacement with Camera-Aware Motion](/202606/07/2606.01399v1-pai-studio-cinematic-video-background-replacement-with-camera-aware-motion)  
-   标签：评分：6.0/10、query:neural-bokeh
-   evidence：电影级视频背景替换，涉及人像虚化和深度/分割技术
-7. [Geometry-Preserving Unsupervised Alignment for Heterogeneous Foundation Models](/202606/07/2606.04385v1-geometry-preserving-unsupervised-alignment-for-heterogeneous-foundation-models)  
-   标签：评分：6.0/10、query:vfm
-   evidence：提出无监督对齐框架GPUA整合视觉基础模型与视觉语言模型，可作为即插即用模块
-8. [Who Needs Labels? Adapting Vision Foundation Models With the Metadata You Already Have](/202606/07/2606.05107v1-who-needs-labels-adapting-vision-foundation-models-with-the-metadata-you-already-have)  
-   标签：评分：6.0/10、query:vfm
-   evidence：利用元数据无标签适应视觉基础模型到新领域
+   evidence：利用重建型视觉基础模型作为显式空间记忆，涉及深度估计和密集预测
+2. [WebSpline: Structure-Informed Splines for Real-Time 3D Gaussians from Monocular Videos](/202606/08/2606.02096v1-webspline-structure-informed-splines-for-real-time-3d-gaussians-from-monocular-videos)  
+   标签：评分：6.0/10、query:mono-depth
+   evidence：单目视频动态三维重建，与单目深度估计和结构一致性相关
+3. [BA-T: An Iterative Transformer for Two-View Bundle Adjustment](/202606/08/2606.03287v1-ba-t-an-iterative-transformer-for-two-view-bundle-adjustment)  
+   标签：评分：6.0/10、query:depth-refine
+   evidence：迭代几何精化，适用于深度图精修和由粗到细深度估计
+4. [SAMatcher: Co-Visibility Modeling with Segment Anything for Robust Feature Matching](/202606/08/2606.03406v1-samatcher-co-visibility-modeling-with-segment-anything-for-robust-feature-matching)  
+   标签：评分：6.0/10、query:seg
+   evidence：使用SAM预测共视区域掩膜用于特征匹配
 
 
 <div class="dpr-home-promo-card">
