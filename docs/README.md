@@ -6,52 +6,47 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-06-12
-- 运行时间：2026-06-12 20:06:27 UTC
+- 最新运行日期：2026-06-13
+- 运行时间：2026-06-13 20:02:34 UTC
 - 运行状态：成功
-- 本次总论文数：10
+- 本次总论文数：9
 - 精读区：2
-- 速读区：8
+- 速读区：7
 
 ### 今日简报（AI）
-1) 今日精选10篇论文，重点精读机器人导航的度量感知视觉几何与跨模态感知基准。
-2) 最值得关注“VGP-Nav”的精确几何感知方法，以及“Cross-Modal Benchmarking”为野外机器人评估提供系统标准。
-3) 推荐后续尝试将自监督学习（如SMI）与弱监督草图分割技术结合，提升开放场景理解效率。
-- 详情：[/202606/12/README](/202606/12/README)
+今日研读9篇论文，精读聚焦树木实例分割与多模态二值分割两大前沿方向；最值得关注的是《SegmentAnyTreeV2》提出的跨传感器跨平台分割方案，以及《DifferSeg》的差异感知与频率引导技术；建议优先精读这两篇高分论文，其创新思路可迁移至同类场景理解任务。
+- 详情：[/202606/13/README](/202606/13/README)
 
 ### 精读区论文标签
-1. [VGP-Nav: Metric-Aware Visual Geometric Perception for Robot Navigation](/202606/12/2606.09268v1-vgp-nav-metric-aware-visual-geometric-perception-for-robot-navigation)  
-   标签：评分：8.0/10、query:mono-depth
-   evidence：从单目视觉系统进行度量深度估计
-2. [Cross-Modal Benchmarking for Robotic Perception in Natural Environments](/202606/12/2606.11563v1-cross-modal-benchmarking-for-robotic-perception-in-natural-environments)  
-   标签：评分：8.0/10、query:mono-depth
-   evidence：提供了自然环境中度量深度估计的基准
+1. [SegmentAnyTreeV2: Scaling Transformer-Based Tree Instance Segmentation Across Sensors, Platforms, and Forests](/202606/13/2606.08206v1-segmentanytreev2-scaling-transformer-based-tree-instance-segmentation-across-sensors-platforms-and-forests)  
+   标签：评分：9.0/10、query:seg
+   evidence：基于变压器的点云树木实例分割
+2. [DifferSeg: Towards Diverse Multimodal Binary Segmentation via Differential Perception and Frequency Guidance](/202606/13/2606.08906v1-differseg-towards-diverse-multimodal-binary-segmentation-via-differential-perception-and-frequency-guidance)  
+   标签：评分：8.0/10、query:seg
+   evidence：多模态二值分割，采用差分感知与频率引导
 
 ### 速读区论文标签
-1. [SMI: Efficient Self-Supervised Learning via Mutual-Information-Inspired Dependency Optimization](/202606/12/2606.08332v1-smi-efficient-self-supervised-learning-via-mutual-information-inspired-dependency-optimization)  
-   标签：评分：7.0/10、query:vfm
-   evidence：轻量级自监督预训练方法
-2. [Modeling the impact of filter-substrate refraction in the Roman point spread function](/202606/12/2606.11305v1-modeling-the-impact-of-filter-substrate-refraction-in-the-roman-point-spread-function)  
-   标签：评分：7.0/10、query:cv-render
-   evidence：建模色差点扩散函数扰动，类似散景中的离焦效应
-3. [LASA: A Weak Supervision Method for Open-Vocabulary Scene Sketch Semantic Segmentation](/202606/12/2606.11837v1-lasa-a-weak-supervision-method-for-open-vocabulary-scene-sketch-semantic-segmentation)  
+1. [CL-CLIP: CLIP-Based Continual Learning Framework with Cost-Volume Category Decoupling for Object Detection](/202606/13/2606.06978v1-cl-clip-clip-based-continual-learning-framework-with-cost-volume-category-decoupling-for-object-detection)  
    标签：评分：7.0/10、query:seg
-   evidence：利用多层ViT注意力进行草图的开放词汇语义分割
-4. [DSU-Net: An Attention-Enhanced Dense Skip U-Net for Breast Lesion Segmentation in Mammographic Images](/202606/12/2606.06537v1-dsu-net-an-attention-enhanced-dense-skip-u-net-for-breast-lesion-segmentation-in-mammographic-images)  
+   evidence：具有零样本泛化能力的开放词汇检测框架
+2. [DroneDAR: Long-Range Drone Distance Estimation Using Monocular Vision and Bounding-Box Features](/202606/13/2606.07756v1-dronedar-long-range-drone-distance-estimation-using-monocular-vision-and-bounding-box-features)  
+   标签：评分：7.0/10、query:mono-depth
+   evidence：使用单目视觉和边界框进行距离估计
+3. [Latent Spatial Memory for Video World Models](/202606/13/2606.09828v1-latent-spatial-memory-for-video-world-models)  
+   标签：评分：7.0/10、query:mono-depth
+   evidence：使用深度引导的反投影实现3D一致性
+4. [TEVI: Text-Conditioned Editing of Visual Representations via Sparse Autoencoders for Improved Vision-Language Alignment](/202606/13/2606.07451v1-tevi-text-conditioned-editing-of-visual-representations-via-sparse-autoencoders-for-improved-vision-language-alignment)  
+   标签：评分：6.0/10、query:vfm
+   evidence：即插即用模块用于改善视觉-语言对齐
+5. [HDRAgent: An Agentic Framework for Multi-Exposure HDR Imaging](/202606/13/2606.09110v1-hdragent-an-agentic-framework-for-multi-exposure-hdr-imaging)  
+   标签：评分：6.0/10、query:cv-render
+   evidence：智能体驱动的计算摄影用于HDR图像融合
+6. [Segment and Select: Vision-Language Segmentation in 3D Scenarios](/202606/13/2606.10594v1-segment-and-select-vision-language-segmentation-in-3d-scenarios)  
    标签：评分：6.0/10、query:seg
-   evidence：提出了注意力增强的密集跳跃U-Net用于乳腺病变分割
-5. [Lighting-Aware Representation Learning under Controllable Lighting Variation](/202606/12/2606.06899v1-lighting-aware-representation-learning-under-controllable-lighting-variation)  
-   标签：评分：6.0/10、query:vfm
-   evidence：光照感知的自监督表示学习方法
-6. [DRIFT: From Robustness Gaps to Invariance Manifolds for AI-Generated Image Detection](/202606/12/2606.06918v1-drift-from-robustness-gaps-to-invariance-manifolds-for-ai-generated-image-detection)  
-   标签：评分：6.0/10、query:vfm
-   evidence：使用冻结视觉基础模型和轻量投影头进行检测
-7. [MaskAlign: Token-Subset Representation Alignment for Efficient Diffusion Training](/202606/12/2606.08788v1-maskalign-token-subset-representation-alignment-for-efficient-diffusion-training)  
-   标签：评分：6.0/10、query:vfm
-   evidence：利用预训练视觉模型的令牌子集表示对齐加速扩散训练
-8. [Reason Twice: Segmentation via Candidate Discovery and Comparative Reasoning](/202606/12/2606.09303v1-reason-twice-segmentation-via-candidate-discovery-and-comparative-reasoning)  
-   标签：评分：6.0/10、query:seg
-   evidence：基于多模态大语言模型推理的开放词汇分割
+   evidence：使用语言指令进行3D开放词汇分割
+7. [ViT-FREE: Efficient Face Recognition via Early Exiting and Synthetic Adaptation](/202606/13/2606.12023v1-vit-free-efficient-face-recognition-via-early-exiting-and-synthetic-adaptation)  
+   标签：评分：6.0/10、query:lite-vision
+   evidence：通过早退实现轻量视觉骨干
 
 
 <div class="dpr-home-promo-card">
