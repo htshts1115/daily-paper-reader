@@ -6,43 +6,62 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-06-15
-- 运行时间：2026-06-15 20:41:01 UTC
+- 最新运行日期：2026-06-16
+- 运行时间：2026-06-16 20:59:37 UTC
 - 运行状态：成功
-- 本次总论文数：7
-- 精读区：2
+- 本次总论文数：14
+- 精读区：9
 - 速读区：5
 
 ### 今日简报（AI）
-今日推荐7篇论文，精读聚焦ViT特征上采样与立体相机标定新方法。
-最值得关注：《ViT-Up》提出高保真上采样提升ViT性能，《StereoGeo》实现端到端立体相机标定。
-建议普通读者优先从这两篇8分精读入手，关注上采样技术对视觉任务的增强效果及开源标定工具。
-- 详情：[/202606/15/README](/202606/15/README)
+今日14篇新论文中，视频分割与深度估计两篇获评9.0高分。最值得关注：开放世界视频分割（Open-World Video Segmentation）和自监督单目视频深度估计的3D一致性优化。建议优先精读这两篇9分论文，它们分别代表视频理解与3D感知的前沿突破。
+- 详情：[/202606/16/README](/202606/16/README)
 
 ### 精读区论文标签
-1. [ViT-Up: Faithful Feature Upsampling for Vision Transformers](/202606/15/2606.14024v1-vit-up-faithful-feature-upsampling-for-vision-transformers)  
+1. [Open-World Video Segmentation](/202606/16/2606.15632v1-open-world-video-segmentation)  
+   标签：评分：9.0/10、query:seg
+   evidence：开放世界视频分割
+2. [3D Consistency Optimization for Self-Supervised Monocular Video Depth Estimation](/202606/16/2606.15681v1-3d-consistency-optimization-for-self-supervised-monocular-video-depth-estimation)  
+   标签：评分：9.0/10、query:mono-depth
+   evidence：自监督单目视频深度估计，3D一致性优化
+3. [ActiveSAM: Image-Conditional Class Pruning for Fast and Accurate Open-Vocabulary Segmentation](/202606/16/2606.16996v1-activesam-image-conditional-class-pruning-for-fast-and-accurate-open-vocabulary-segmentation)  
+   标签：评分：9.0/10、query:seg
+   evidence：基于SAM 3的无训练类别剪枝的开放词汇分割
+4. [Pano3D: Unified 3D Reconstruction and Panoptic Segmentation](/202606/16/2606.14307v1-pano3d-unified-3d-reconstruction-and-panoptic-segmentation)  
+   标签：评分：8.0/10、query:mono-depth
+   evidence：基于图像的统一三维重建与全景分割
+5. [Texture-Shape Bias Balancing for Robust Synthetic-to-Real Semantic Segmentation in Automotive NIR Imagery](/202606/16/2606.15072v1-texture-shape-bias-balancing-for-robust-synthetic-to-real-semantic-segmentation-in-automotive-nir-imagery)  
+   标签：评分：8.0/10、query:seg
+   evidence：合成到真实的语义分割领域自适应
+6. [Unlocking Diffusion Hierarchies: Adaptive Timestep Selection for Zero-Shot Segmentation](/202606/16/2606.15590v1-unlocking-diffusion-hierarchies-adaptive-timestep-selection-for-zero-shot-segmentation)  
+   标签：评分：8.0/10、query:seg
+   evidence：利用扩散模型自适应时间步选择的零样本分割
+7. [Task-Instructed Causal Routing of Vision Foundation Models for Multi-Task Learning](/202606/16/2606.15765v1-task-instructed-causal-routing-of-vision-foundation-models-for-multi-task-learning)  
    标签：评分：8.0/10、query:vfm
-   evidence：用于深度和分割等密集预测任务的任务无关特征上采样器
-2. [StereoGeo: an end-to-end stereo camera calibration method](/202606/15/2606.14619v1-stereogeo-an-end-to-end-stereo-camera-calibration-method)  
-   标签：评分：8.0/10、query:stereo-depth
-   evidence：端到端立体标定方法，无需校正即可估计内外参数
+   evidence：任务指导的多个视觉基础模型路由用于多任务密集预测
+8. [GOOSE-M2F: Adapting Mask2Former for High-Fidelity, Long-Tailed Fine-Grained Semantic Segmentation in Unstructured Outdoor Terrain](/202606/16/2606.15937v1-goose-m2f-adapting-mask2former-for-high-fidelity-long-tailed-fine-grained-semantic-segmentation-in-unstructured-outdoor-terrain)  
+   标签：评分：8.0/10、query:seg
+   evidence：非结构化室外地形上的细粒度语义分割
+9. [MMDiff: Extending Diffusion Transformers for Multi-Modal Generation](/202606/16/2606.16673v1-mmdiff-extending-diffusion-transformers-for-multi-modal-generation)  
+   标签：评分：8.0/10、query:vfm
+   evidence：在冻结的扩散变换器上添加轻量解码头实现多模态密集预测
 
 ### 速读区论文标签
-1. [How do Self-Supervised Remote Sensing Vision Models Transfer to Downstream Tasks?](/202606/15/2606.13896v1-how-do-self-supervised-remote-sensing-vision-models-transfer-to-downstream-tasks)  
-   标签：评分：7.0/10、query:vfm
-   evidence：分析自监督遥感基础模型在分割和回归等下游任务上的迁移表现
-2. [SED:Lightweight Saliency prediction for Event-based data via Distillation](/202606/15/2606.14631v1-sedlightweight-saliency-prediction-for-event-based-data-via-distillation)  
+1. [High-Fidelity Two-Step Image Generation via Teacher-Aligned End-to-End Distillation](/202606/16/2606.12575v1-high-fidelity-two-step-image-generation-via-teacher-aligned-end-to-end-distillation)  
    标签：评分：7.0/10、query:lite-vision
-   evidence：基于知识蒸馏的轻量级显著性模型用于边缘设备
-3. [OmniGen-AR: AutoRegressive Any-to-Image Generation](/202606/15/2606.09156v1-omnigen-ar-autoregressive-any-to-image-generation)  
-   标签：评分：6.0/10、query:vfm
-   evidence：支持深度到图像和分割到图像生成，表明对深度和分割的理解
-4. [MooMIns -- Monocular 3D Reconstruction and Object Pose Estimation from Multiple Instances](/202606/15/2606.14389v1-moomins----monocular-3d-reconstruction-and-object-pose-estimation-from-multiple-instances)  
-   标签：评分：6.0/10、query:mono-depth
-   evidence：单张图像的单目3D重建，与深度估计相关
-5. [HumP-KD: A Hybrid Uncertainty-Aware Multi-Stage Progressive Knowledge Distillation Framework for Efficient Fire Classification](/202606/15/2606.14684v1-hump-kd-a-hybrid-uncertainty-aware-multi-stage-progressive-knowledge-distillation-framework-for-efficient-fire-classification)  
-   标签：评分：6.0/10、query:lite-vision
-   evidence：用于高效火灾分类的知识蒸馏框架
+   evidence：用于图像生成的知识蒸馏
+2. [Spatial Priors via Space Filling Curves for Small and Limited Data Vision Transformers](/202606/16/2606.14757v1-spatial-priors-via-space-filling-curves-for-small-and-limited-data-vision-transformers)  
+   标签：评分：7.0/10、query:lite-vision
+   evidence：轻量级掩码注意力用于高效密集预测
+3. [Mask Proposal Voting Based on Geodesic Framework for Robust Image Segmentation](/202606/16/2606.14912v1-mask-proposal-voting-based-on-geodesic-framework-for-robust-image-segmentation)  
+   标签：评分：7.0/10、query:seg
+   evidence：基于掩码提议投票和测地线框架的鲁棒图像分割
+4. [SurroundNEXO: Ego-Centric Metric Bridging for Spatially Consistent Geometry in Autonomous Driving](/202606/16/2606.16960v1-surroundnexo-ego-centric-metric-bridging-for-spatially-consistent-geometry-in-autonomous-driving)  
+   标签：评分：7.0/10、query:mono-depth
+   evidence：面向自动驾驶的多相机度量深度预测，基于自我中心几何
+5. [From 2D Grids to 1D Tokens: Reforming Shared Representations for Multimodal Image Fusion](/202606/16/2606.12303v1-from-2d-grids-to-1d-tokens-reforming-shared-representations-for-multimodal-image-fusion)  
+   标签：评分：6.0/10、query:cv-render
+   evidence：多模态图像融合用于移动摄影
 
 
 <div class="dpr-home-promo-card">
