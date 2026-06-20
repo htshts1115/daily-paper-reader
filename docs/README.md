@@ -6,50 +6,40 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-06-19
-- 运行时间：2026-06-19 20:20:09 UTC
+- 最新运行日期：2026-06-20
+- 运行时间：2026-06-20 20:02:39 UTC
 - 运行状态：成功
-- 本次总论文数：10
+- 本次总论文数：6
 - 精读区：3
-- 速读区：7
+- 速读区：3
 
 ### 今日简报（AI）
-今日精读3篇、速读7篇，覆盖计算机视觉核心方向。最值得关注的是《MoonSplat》在单目在线3D高斯泼溅中引入Sim(3)全局优化，《LEAP》通过自适应层跳过改进ViT蒸馏，均获8.0高分。建议优先精读这两篇论文，理解其在实时性与精度平衡上的创新。
-- 详情：[/202606/19/README](/202606/19/README)
+1) 今日推荐6篇论文，精读两篇9分高分工作聚焦医学体积分割与细粒度语义分割。  
+2) 最值得关注方向：DINO-Med3D通过渐进适应弥合维度与领域间隙，SAM3利用自蒸馏提升2D语义分割细节精度。  
+3) 建议优先精读这两篇9分论文，将其跨域适应与自蒸馏思路迁移至自身分割任务中。
+- 详情：[/202606/20/README](/202606/20/README)
 
 ### 精读区论文标签
-1. [MoonSplat: Monocular Online Gaussian Splatting with Sim(3) Global Optimization](/202606/19/2606.17935v1-moonsplat-monocular-online-gaussian-splatting-with-sim3-global-optimization)  
-   标签：评分：8.0/10、query:mono-depth
-   evidence：单目在线三维重建，通过高斯泼溅进行单目深度估计
-2. [LEAP: Layer-skipping Efficiency via Adaptive Progression for Vision Transformer Distillation](/202606/19/2606.19483v1-leap-layer-skipping-efficiency-via-adaptive-progression-for-vision-transformer-distillation)  
-   标签：评分：8.0/10、query:lite-vision
-   evidence：基于层跳过课程的知识蒸馏方法
-3. [SA-VIS: Sparse frame Annotations for training Video Instance Segmentation](/202606/19/2606.20140v1-sa-vis-sparse-frame-annotations-for-training-video-instance-segmentation)  
-   标签：评分：8.0/10、query:seg
-   evidence：稀疏帧标注训练视频实例分割
+1. [DINO-Med3D: Bridging Dimension and Domain Gaps in Volumetric Segmentation via Progressive Adaptation](/202606/20/2606.18886v1-dino-med3d-bridging-dimension-and-domain-gaps-in-volumetric-segmentation-via-progressive-adaptation)  
+   标签：评分：9.0/10、query:vfm
+   evidence：通过渐进适应和即插即用适配器将DINOv3视觉基础模型迁移到3D医学分割
+2. [SAM3 Self-Distillation for Fine-Grained GOOSE 2D Semantic Segmentation](/202606/20/2606.20130v1-sam3-self-distillation-for-fine-grained-goose-2d-semantic-segmentation)  
+   标签：评分：9.0/10、query:seg
+   evidence：使用SAM3自蒸馏进行细粒度语义分割
+3. [Occ-VLM: Occupancy Grounded Vision Language Model for Indoor Scene Understanding](/202606/20/2606.19776v1-occ-vlm-occupancy-grounded-vision-language-model-for-indoor-scene-understanding)  
+   标签：评分：8.0/10、query:vfm
+   evidence：从2D图像进行3D场景理解的视觉语言模型，与视觉基础模型相关
 
 ### 速读区论文标签
-1. [PP-OCRv6: From 1.5M to 34.5M Parameters, Surpassing Billion-Scale VLMs on OCR Tasks](/202606/19/2606.13108v1-pp-ocrv6-from-15m-to-345m-parameters-surpassing-billion-scale-vlms-on-ocr-tasks)  
+1. [STAR-NT: Spatiotemporal Acceleration of Real-Time Neural Transparency Rendering](/202606/20/2606.16747v1-star-nt-spatiotemporal-acceleration-of-real-time-neural-transparency-rendering)  
+   标签：评分：7.0/10、query:neural-bokeh
+   evidence：面向移动端的神经透明渲染时空加速
+2. [Spatial-Aware Reduction Framework: Towards Efficient and Faithful Visual State Space Models](/202606/20/2606.19932v1-spatial-aware-reduction-framework-towards-efficient-and-faithful-visual-state-space-models)  
    标签：评分：7.0/10、query:lite-vision
-   evidence：轻量OCR系统，包含模型压缩和高效架构设计
-2. [RT-VLA: Real-Time Vision-Language-Action Models via Knowledge Distillation](/202606/19/2606.14010v1-rt-vla-real-time-vision-language-action-models-via-knowledge-distillation)  
-   标签：评分：7.0/10、query:lite-vision
-   evidence：视觉模型的知识蒸馏技术
-3. [MambaCount: Efficient Text-guided Open-vocabulary Object Counting with Spatial Sparse State Space Duality Block](/202606/19/2606.17650v1-mambacount-efficient-text-guided-open-vocabulary-object-counting-with-spatial-sparse-state-space-duality-block)  
-   标签：评分：7.0/10、query:seg
-   evidence：开放词汇计数方法
-4. [HilDA: Hierarchical Distillation with Diffusion for Advancing Self-Supervised LiDAR Pre-trainin](/202606/19/2606.20189v1-hilda-hierarchical-distillation-with-diffusion-for-advancing-self-supervised-lidar-pre-trainin)  
-   标签：评分：7.0/10、query:lite-vision
-   evidence：从视觉基础模型到LiDAR主干的知识蒸馏
-5. [Comparing Commercial Depth Sensor Accuracy for Medical Applications](/202606/19/2606.13028v1-comparing-commercial-depth-sensor-accuracy-for-medical-applications)  
-   标签：评分：6.0/10、query:stereo-depth
-   evidence：针对医疗应用中的立体和深度传感器精度进行基准测试
-6. [Selective Synergistic Learning for Video Object-Centric Learning](/202606/19/2606.15527v1-selective-synergistic-learning-for-video-object-centric-learning)  
-   标签：评分：6.0/10、query:seg
-   evidence：视频对象中心学习用于实例分割
-7. [CSWinUNETR: Segmentation of Thin Anatomical Structures in Medical Images](/202606/19/2606.19824v1-cswinunetr-segmentation-of-thin-anatomical-structures-in-medical-images)  
-   标签：评分：6.0/10、query:seg
-   evidence：使用交叉条形自注意力分割薄解剖结构
+   evidence：空间感知token缩减用于高效视觉状态空间模型
+3. [Toward 360-Degree Indoor Panorama Editing via Tuning-Free Diffusion Model with Refocusing Cross-Attention](/202606/20/2606.14035v1-toward-360-degree-indoor-panorama-editing-via-tuning-free-diffusion-model-with-refocusing-cross-attention)  
+   标签：评分：6.0/10、query:neural-bokeh
+   evidence：使用分割和选择性模糊进行图像编辑，与学习式散焦模糊相关
 
 
 <div class="dpr-home-promo-card">
