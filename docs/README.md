@@ -6,40 +6,41 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-06-20
-- 运行时间：2026-06-20 20:02:39 UTC
+- 最新运行日期：2026-06-21
+- 运行时间：2026-06-21 19:50:25 UTC
 - 运行状态：成功
 - 本次总论文数：6
-- 精读区：3
-- 速读区：3
+- 精读区：0
+- 速读区：6
 
 ### 今日简报（AI）
-1) 今日推荐6篇论文，精读两篇9分高分工作聚焦医学体积分割与细粒度语义分割。  
-2) 最值得关注方向：DINO-Med3D通过渐进适应弥合维度与领域间隙，SAM3利用自蒸馏提升2D语义分割细节精度。  
-3) 建议优先精读这两篇9分论文，将其跨域适应与自蒸馏思路迁移至自身分割任务中。
-- 详情：[/202606/20/README](/202606/20/README)
+1) 今日速读6篇论文，3篇7分高光：遥感图像免训练视觉定位、人机协同3D资产分割、统一多模态自回归建模。
+2) 最值得关注两个方向：无需开集训练的遥感视觉定位方法，以及共享上下文-视觉分词器的多模态统一框架。
+3) 建议优先阅读前两篇，分别适用于遥感交互式分析场景和3D资产内容工作流，实用价值高。
+- 详情：[/202606/21/README](/202606/21/README)
 
 ### 精读区论文标签
-1. [DINO-Med3D: Bridging Dimension and Domain Gaps in Volumetric Segmentation via Progressive Adaptation](/202606/20/2606.18886v1-dino-med3d-bridging-dimension-and-domain-gaps-in-volumetric-segmentation-via-progressive-adaptation)  
-   标签：评分：9.0/10、query:vfm
-   evidence：通过渐进适应和即插即用适配器将DINOv3视觉基础模型迁移到3D医学分割
-2. [SAM3 Self-Distillation for Fine-Grained GOOSE 2D Semantic Segmentation](/202606/20/2606.20130v1-sam3-self-distillation-for-fine-grained-goose-2d-semantic-segmentation)  
-   标签：评分：9.0/10、query:seg
-   evidence：使用SAM3自蒸馏进行细粒度语义分割
-3. [Occ-VLM: Occupancy Grounded Vision Language Model for Indoor Scene Understanding](/202606/20/2606.19776v1-occ-vlm-occupancy-grounded-vision-language-model-for-indoor-scene-understanding)  
-   标签：评分：8.0/10、query:vfm
-   evidence：从2D图像进行3D场景理解的视觉语言模型，与视觉基础模型相关
+- 本次无精读推荐。
 
 ### 速读区论文标签
-1. [STAR-NT: Spatiotemporal Acceleration of Real-Time Neural Transparency Rendering](/202606/20/2606.16747v1-star-nt-spatiotemporal-acceleration-of-real-time-neural-transparency-rendering)  
-   标签：评分：7.0/10、query:neural-bokeh
-   evidence：面向移动端的神经透明渲染时空加速
-2. [Spatial-Aware Reduction Framework: Towards Efficient and Faithful Visual State Space Models](/202606/20/2606.19932v1-spatial-aware-reduction-framework-towards-efficient-and-faithful-visual-state-space-models)  
-   标签：评分：7.0/10、query:lite-vision
-   evidence：空间感知token缩减用于高效视觉状态空间模型
-3. [Toward 360-Degree Indoor Panorama Editing via Tuning-Free Diffusion Model with Refocusing Cross-Attention](/202606/20/2606.14035v1-toward-360-degree-indoor-panorama-editing-via-tuning-free-diffusion-model-with-refocusing-cross-attention)  
-   标签：评分：6.0/10、query:neural-bokeh
-   evidence：使用分割和选择性模糊进行图像编辑，与学习式散焦模糊相关
+1. [Training-Free Open-Vocabulary Visual Grounding for Remote Sensing Images and Videos](/202606/21/2606.16124v1-training-free-open-vocabulary-visual-grounding-for-remote-sensing-images-and-videos)  
+   标签：评分：7.0/10、query:seg
+   evidence：使用冻结基础模型进行免训练开放词汇视觉定位
+2. [Human-in-the-Loop Atlas-Based 3D Asset Segmentation for Interactive Content Workflows](/202606/21/2606.17824v1-human-in-the-loop-atlas-based-3d-asset-segmentation-for-interactive-content-workflows)  
+   标签：评分：7.0/10、query:seg
+   evidence：使用SAM2进行开放词汇分割的3D资产分割管线
+3. [Unified Multimodal Autoregressive Modeling with Shared Context-Visual Tokenizer is Key to Unification](/202606/21/2606.18249v1-unified-multimodal-autoregressive-modeling-with-shared-context-visual-tokenizer-is-key-to-unification)  
+   标签：评分：7.0/10、query:vfm
+   evidence：共享视觉分词器作为密集预测任务的编码器
+4. [DINO-Med3D: Bridging Dimension and Domain Gaps in Volumetric Segmentation via Progressive Adaptation](/202606/21/2606.18886v1-dino-med3d-bridging-dimension-and-domain-gaps-in-volumetric-segmentation-via-progressive-adaptation)  
+   标签：评分：7.0/10、query:vfm
+   evidence：将预训练DINOv3编码器用于3D医学分割
+5. [ARTEMIS: Agent-guided Reliability-aware Temporal Mask Evolution for Imperfectly Supervised Video Polyp Segmentation](/202606/21/2606.20161v1-artemis-agent-guided-reliability-aware-temporal-mask-evolution-for-imperfectly-supervised-video-polyp-segmentation)  
+   标签：评分：7.0/10、query:seg
+   evidence：不完全监督的视频息肉分割
+6. [3D-DLP: Self-Supervised 3D Object-Centric Scene Representation Learning](/202606/21/2606.19451v1-3d-dlp-self-supervised-3d-object-centric-scene-representation-learning)  
+   标签：评分：6.0/10、query:vfm
+   evidence：使用RGB-D的自监督3D表征学习
 
 
 <div class="dpr-home-promo-card">
