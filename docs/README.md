@@ -6,41 +6,43 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-06-21
-- 运行时间：2026-06-21 19:50:25 UTC
+- 最新运行日期：2026-06-22
+- 运行时间：2026-06-22 20:15:21 UTC
 - 运行状态：成功
 - 本次总论文数：6
 - 精读区：0
 - 速读区：6
 
 ### 今日简报（AI）
-1) 今日速读6篇论文，3篇7分高光：遥感图像免训练视觉定位、人机协同3D资产分割、统一多模态自回归建模。
-2) 最值得关注两个方向：无需开集训练的遥感视觉定位方法，以及共享上下文-视觉分词器的多模态统一框架。
-3) 建议优先阅读前两篇，分别适用于遥感交互式分析场景和3D资产内容工作流，实用价值高。
-- 详情：[/202606/21/README](/202606/21/README)
+今日速读6篇论文，重点聚焦三项7.0分研究：医学分割通用几何先验框架HadBalance、面向防碰撞系统的实例感知知识蒸馏、以及机器人人行道单目3D占用感知。
+
+推荐关注HadBalance提供的即插即用几何先验思路，以及实例感知蒸馏在多任务密集预测中的高效性，两者均具实际落地潜力。
+
+普通读者可进一步探索这些方法在各自领域的公开代码或数据集，以动手验证其效果。
+- 详情：[/202606/22/README](/202606/22/README)
 
 ### 精读区论文标签
 - 本次无精读推荐。
 
 ### 速读区论文标签
-1. [Training-Free Open-Vocabulary Visual Grounding for Remote Sensing Images and Videos](/202606/21/2606.16124v1-training-free-open-vocabulary-visual-grounding-for-remote-sensing-images-and-videos)  
-   标签：评分：7.0/10、query:seg
-   evidence：使用冻结基础模型进行免训练开放词汇视觉定位
-2. [Human-in-the-Loop Atlas-Based 3D Asset Segmentation for Interactive Content Workflows](/202606/21/2606.17824v1-human-in-the-loop-atlas-based-3d-asset-segmentation-for-interactive-content-workflows)  
-   标签：评分：7.0/10、query:seg
-   evidence：使用SAM2进行开放词汇分割的3D资产分割管线
-3. [Unified Multimodal Autoregressive Modeling with Shared Context-Visual Tokenizer is Key to Unification](/202606/21/2606.18249v1-unified-multimodal-autoregressive-modeling-with-shared-context-visual-tokenizer-is-key-to-unification)  
+1. [HadBalance: A Plug-and-Play Unified Global Geometric Prior Framework for Generalizable Biomedical Segmentation](/202606/22/2606.15976v1-hadbalance-a-plug-and-play-unified-global-geometric-prior-framework-for-generalizable-biomedical-segmentation)  
    标签：评分：7.0/10、query:vfm
-   evidence：共享视觉分词器作为密集预测任务的编码器
-4. [DINO-Med3D: Bridging Dimension and Domain Gaps in Volumetric Segmentation via Progressive Adaptation](/202606/21/2606.18886v1-dino-med3d-bridging-dimension-and-domain-gaps-in-volumetric-segmentation-via-progressive-adaptation)  
-   标签：评分：7.0/10、query:vfm
-   evidence：将预训练DINOv3编码器用于3D医学分割
-5. [ARTEMIS: Agent-guided Reliability-aware Temporal Mask Evolution for Imperfectly Supervised Video Polyp Segmentation](/202606/21/2606.20161v1-artemis-agent-guided-reliability-aware-temporal-mask-evolution-for-imperfectly-supervised-video-polyp-segmentation)  
-   标签：评分：7.0/10、query:seg
-   evidence：不完全监督的视频息肉分割
-6. [3D-DLP: Self-Supervised 3D Object-Centric Scene Representation Learning](/202606/21/2606.19451v1-3d-dlp-self-supervised-3d-object-centric-scene-representation-learning)  
+   evidence：提出可插拔的全局几何先验框架，用于通用生物医学分割
+2. [Instance-Aware Knowledge Distillation for Semi-Supervised Learning of an On-Board Multi-Task Dense Prediction Model for Collision Avoidance System](/202606/22/2606.16414v1-instance-aware-knowledge-distillation-for-semi-supervised-learning-of-an-on-board-multi-task-dense-prediction-model-for-collision-avoidance-system)  
+   标签：评分：7.0/10、query:lite-vision
+   evidence：提出实例感知知识蒸馏用于半监督多任务密集预测模型
+3. [Monocular 3D Occupancy Perception for Robots on Sidewalks via Hybrid 2D-3D Learning](/202606/22/2606.19122v1-monocular-3d-occupancy-perception-for-robots-on-sidewalks-via-hybrid-2d-3d-learning)  
+   标签：评分：7.0/10、query:mono-depth
+   evidence：单目3D占用感知与单目深度估计密切相关
+4. [AIGS-Net: Compact Illumination Field Modeling via 2D Gaussian Splatting for Fast Low-Light Image Enhancement](/202606/22/2606.17998v1-aigs-net-compact-illumination-field-modeling-via-2d-gaussian-splatting-for-fast-low-light-image-enhancement)  
+   标签：评分：6.0/10、query:lite-vision
+   evidence：用于快速低光图像增强的超轻量架构
+5. [Unified Multimodal Autoregressive Modeling with Shared Context-Visual Tokenizer is Key to Unification](/202606/22/2606.18249v1-unified-multimodal-autoregressive-modeling-with-shared-context-visual-tokenizer-is-key-to-unification)  
    标签：评分：6.0/10、query:vfm
-   evidence：使用RGB-D的自监督3D表征学习
+   evidence：统一的视觉分词器用于理解与生成
+6. [Unified Multimodal Autoregressive Modeling with Shared Context-Visual Tokenizer is Key to Unification](/202606/22/2606.18249v2-unified-multimodal-autoregressive-modeling-with-shared-context-visual-tokenizer-is-key-to-unification)  
+   标签：评分：6.0/10、query:vfm
+   evidence：统一的视觉分词器用于理解与生成
 
 
 <div class="dpr-home-promo-card">
