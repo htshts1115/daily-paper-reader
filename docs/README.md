@@ -6,68 +6,84 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-06-24
-- 运行时间：2026-06-24 19:52:26 UTC
+- 最新运行日期：2026-06-25
+- 运行时间：2026-06-25 19:54:35 UTC
 - 运行状态：成功
-- 本次总论文数：16
+- 本次总论文数：20
 - 精读区：5
-- 速读区：11
+- 速读区：15
 
 ### 今日简报（AI）
-今日精读5篇速读11篇，焦点落在RaysUp几何感知光线上采样与开放词汇BEV分割两项9分工作。最值得深耕的是Raysup的通用特征上采样新范式及3D感知约束下的BEV分割。下一步可结合速读中的3D-DLP自监督场景表示与HilDA层次蒸馏，强化3D几何理解。
-- 详情：[/202606/24/README](/202606/24/README)
+今日推荐论文20篇，精读聚焦电影级视频合成与高效立体匹配两大技术突破。
+
+最值得关注的两项成果：Cinematic Compositing实现角色-环境和谐视频生成（9.0分），LinStereo以线性复杂度全局注意力革新多尺度迭代立体匹配（9.0分）。
+
+普通读者建议：可优先精读上述两篇高分论文，把握AI视频合成与3D视觉前沿交叉方向。
+- 详情：[/202606/25/README](/202606/25/README)
 
 ### 精读区论文标签
-1. [RaysUp: Ultra-light Universal Feature Upsampling via Geometry-Aware Ray Representation](/202606/24/2606.22749v1-raysup-ultra-light-universal-feature-upsampling-via-geometry-aware-ray-representation)  
-   标签：评分：9.0/10、query:vfm
-   evidence：超轻量特征上采样，使VFM支持密集预测
-2. [Open-Vocabulary BEV Segmentation with 3D-Aware Geometric Constraints](/202606/24/2606.24353v1-open-vocabulary-bev-segmentation-with-3d-aware-geometric-constraints)  
-   标签：评分：9.0/10、query:seg
-   evidence：开放词汇BEV分割，使用视觉语言模型
-3. [Lite Any Stereo V2: Faster and Stronger Efficient Zero-Shot Stereo Matching](/202606/24/2606.24457v1-lite-any-stereo-v2-faster-and-stronger-efficient-zero-shot-stereo-matching)  
+1. [Cinematic Compositing Using Character-Environment-Harmonized Video Generation Models](/202606/25/2606.20233v1-cinematic-compositing-using-character-environment-harmonized-video-generation-models)  
+   标签：评分：9.0/10、query:neural-bokeh
+   evidence：使用三掩码和RGB-D联合去噪进行人像散景渲染
+2. [LinStereo: Linear-Complexity Global Attention for Multi-Scale Iterative Stereo Matching](/202606/25/2606.25437v1-linstereo-linear-complexity-global-attention-for-multi-scale-iterative-stereo-matching)  
    标签：评分：9.0/10、query:stereo-depth
-   evidence：轻量级立体匹配，适用于移动设备实时深度估计
-4. [Heterogeneous Knowledge Distillation via Geometry Decoupling and Momentum-Aware Gradient Regulation](/202606/24/2606.24557v1-heterogeneous-knowledge-distillation-via-geometry-decoupling-and-momentum-aware-gradient-regulation)  
-   标签：评分：9.0/10、query:lite-vision
-   evidence：异构知识蒸馏
-5. [Boosting Text-Driven Video Segmentation via Geometry-Aware Distillation](/202606/24/2606.24464v1-boosting-text-driven-video-segmentation-via-geometry-aware-distillation)  
-   标签：评分：8.0/10、query:lite-vision
-   evidence：通过蒸馏将单目深度估计用作视频分割的预训练
+   evidence：基于线性注意力和Depth Anything V3的立体匹配
+3. [AISPO: Enhancing Depth Reliability for Robotic Manipulation of Non-Lambertian Objects via Affine-Invariant Shape Prior](/202606/25/2606.25503v1-aispo-enhancing-depth-reliability-for-robotic-manipulation-of-non-lambertian-objects-via-affine-invariant-shape-prior)  
+   标签：评分：9.0/10、query:depth-refine
+   evidence：RGB-D融合与形状先验的引导深度补全
+4. [RaysUp: Ultra-light Universal Feature Upsampling via Geometry-Aware Ray Representation](/202606/25/2606.22749v1-raysup-ultra-light-universal-feature-upsampling-via-geometry-aware-ray-representation)  
+   标签：评分：8.0/10、query:vfm
+   evidence：面向视觉基础模型的超轻量通用特征上采样，可用于密集预测任务
+5. [Cross-View Variance Correlation in Path-Traced Stereo:A Hidden Shortcut in Synthetic Training Data](/202606/25/2606.25483v1-cross-view-variance-correlation-in-path-traced-stereoa-hidden-shortcut-in-synthetic-training-data)  
+   标签：评分：8.0/10、query:stereo-depth
+   evidence：揭示了路径追踪合成立体数据中影响视差估计训练的隐藏方差相关性
 
 ### 速读区论文标签
-1. [3D-DLP: Self-Supervised 3D Object-Centric Scene Representation Learning](/202606/24/2606.19451v1-3d-dlp-self-supervised-3d-object-centric-scene-representation-learning)  
-   标签：评分：7.0/10、query:vfm
-   evidence：用于密集预测任务的自监督视觉表示学习
-2. [HilDA: Hierarchical Distillation with Diffusion for Advancing Self-Supervised LiDAR Pre-training](/202606/24/2606.20189v3-hilda-hierarchical-distillation-with-diffusion-for-advancing-self-supervised-lidar-pre-training)  
-   标签：评分：7.0/10、query:vfm
-   evidence：基于视觉基础模型的自监督预训练
-3. [Neural Architecture Distributions: A New Paradigm for Stochastic Segmentation](/202606/24/2606.21061v1-neural-architecture-distributions-a-new-paradigm-for-stochastic-segmentation)  
+1. [Curvature-aware 3D length estimation of greenhouse cucumbers using RGB-D imaging and cubic spline arc-length integration](/202606/25/2606.22439v1-curvature-aware-3d-length-estimation-of-greenhouse-cucumbers-using-rgb-d-imaging-and-cubic-spline-arc-length-integration)  
    标签：评分：7.0/10、query:seg
-   evidence：随机分割方法生成多个合理掩码，适用于语义分割任务
-4. [$φ$-Scene: Physically Grounded Image-to-3D Scene Reconstruction](/202606/24/2606.21596v1--scene-physically-grounded-image-to-3d-scene-reconstruction)  
-   标签：评分：7.0/10、query:mono-depth
-   evidence：单图3D场景重建依赖于单目深度估计
-5. [Denoising-Enhanced Coarse-to-Fine Infrared Small Target Detection with Attention Prior-Guided Knowledge Distillation](/202606/24/2606.21956v1-denoising-enhanced-coarse-to-fine-infrared-small-target-detection-with-attention-prior-guided-knowledge-distillation)  
-   标签：评分：7.0/10、query:lite-vision
-   evidence：用于视觉检测的注意力先验引导知识蒸馏
-6. [The Professor: Multi-Teacher Unsupervised Prompt Distillation for Vision-Language Models](/202606/24/2606.23897v1-the-professor-multi-teacher-unsupervised-prompt-distillation-for-vision-language-models)  
-   标签：评分：7.0/10、query:lite-vision
-   evidence：视觉语言模型的提示知识蒸馏
-7. [Flood Mapping from RGB imagery using a Vision Foundation Model](/202606/24/2606.24120v1-flood-mapping-from-rgb-imagery-using-a-vision-foundation-model)  
+   evidence：使用YOLO和SAM进行黄瓜实例分割
+2. [Training-free Cross-domain Few-shot Segmentation via Robust Semantic Representation and Matching](/202606/25/2606.24297v1-training-free-cross-domain-few-shot-segmentation-via-robust-semantic-representation-and-matching)  
+   标签：评分：7.0/10、query:seg
+   evidence：利用鲁棒语义表示的无训练跨域少样本分割
+3. [Structural Kolmogorov-Arnold Convolutions: Learnable Function on the Values or the Filter Shape as Parameter-Efficient Alternative to Per-Edge Convolutional KANs](/202606/25/2606.24371v1-structural-kolmogorov-arnold-convolutions-learnable-function-on-the-values-or-the-filter-shape-as-parameter-efficient-alternative-to-per-edge-convolutional-kans)  
    标签：评分：7.0/10、query:vfm
-   evidence：应用视觉基础模型进行水体分割，展示了VFM在密集预测任务上的泛化能力
-8. [Spherical-to-ERP Epipolar Rectification for Single-Axis Disparity in 360 Stereo](/202606/24/2606.24847v1-spherical-to-erp-epipolar-rectification-for-single-axis-disparity-in-360-stereo)  
-   标签：评分：7.0/10、query:stereo-depth
-   evidence：针对全景图像的双目深度估计与对极校正
-9. [Domain Generalizable Adaptation of 3D Vision-Language Models via Regularized Fine-Tuning](/202606/24/2606.18472v1-domain-generalizable-adaptation-of-3d-vision-language-models-via-regularized-fine-tuning)  
+   evidence：新型卷积层作为密集预测任务的即插即用模块
+4. [Boosting Text-Driven Video Segmentation via Geometry-Aware Distillation](/202606/25/2606.24464v1-boosting-text-driven-video-segmentation-via-geometry-aware-distillation)  
+   标签：评分：7.0/10、query:mono-depth
+   evidence：单目几何预训练用于视频分割
+5. [Compact Object-Level Representations with Open-Vocabulary Understanding for Indoor Visual Relocalization](/202606/25/2606.24767v1-compact-object-level-representations-with-open-vocabulary-understanding-for-indoor-visual-relocalization)  
+   标签：评分：7.0/10、query:seg
+   evidence：用于视觉重定位的开放词汇物体级表示
+6. [Heterogeneous and Adept Snapshot Distillation for 3D Semantic Segmentation](/202606/25/2606.25278v1-heterogeneous-and-adept-snapshot-distillation-for-3d-semantic-segmentation)  
+   标签：评分：7.0/10、query:lite-vision
+   evidence：从多模态到单模态的知识蒸馏用于3D语义分割
+7. [CABLE: Cloud-Assisted Bandwidth-efficient LMM-based Encoding for V2X Systems](/202606/25/2606.19258v1-cable-cloud-assisted-bandwidth-efficient-lmm-based-encoding-for-v2x-systems)  
+   标签：评分：6.0/10、query:seg
+   evidence：用于V2X高效通信的分割掩码传播
+8. [3D-DLP: Self-Supervised 3D Object-Centric Scene Representation Learning](/202606/25/2606.19451v1-3d-dlp-self-supervised-3d-object-centric-scene-representation-learning)  
    标签：评分：6.0/10、query:vfm
-   evidence：面向3D多模态模型的领域泛化微调
-10. [FrequencyFormer: A Co-Designed Sensor-to-Processor Pipeline for Frequency-Domain Vision Transformer Inference](/202606/24/2606.19574v1-frequencyformer-a-co-designed-sensor-to-processor-pipeline-for-frequency-domain-vision-transformer-inference)  
+   evidence：自监督3D物体中心表示学习可用于密集预测任务
+9. [Occ-VLM: Occupancy Grounded Vision Language Model for Indoor Scene Understanding](/202606/25/2606.19776v1-occ-vlm-occupancy-grounded-vision-language-model-for-indoor-scene-understanding)  
+   标签：评分：6.0/10、query:mono-depth
+   evidence：从单张RGB图像预测3D占有网格
+10. [Lightweight 3D Feature Pretraining by Bayesian Inversion of 2D Foundation Models](/202606/25/2606.21292v1-lightweight-3d-feature-pretraining-by-bayesian-inversion-of-2d-foundation-models)  
+   标签：评分：6.0/10、query:vfm
+   evidence：轻量级概率框架将2D基础模型嵌入转换为3D语义表示，支持开放词汇理解
+11. [ScalePredictor: Instance-aware Scale Learning for Accurate Quantization of Vision Transformers](/202606/25/2606.21947v1-scalepredictor-instance-aware-scale-learning-for-accurate-quantization-of-vision-transformers)  
    标签：评分：6.0/10、query:lite-vision
-   evidence：面向边缘设备的高效视觉Transformer推理方法
-11. [Training-free Cross-domain Few-shot Segmentation via Robust Semantic Representation and Matching](/202606/24/2606.24297v1-training-free-cross-domain-few-shot-segmentation-via-robust-semantic-representation-and-matching)  
+   evidence：量化方法用于边缘设备高效部署，与轻量视觉模型相关
+12. [Structured Hyperedge Adaptation for Parameter-Efficient Fine-Tuning of Vision Transformers](/202606/25/2606.22383v1-structured-hyperedge-adaptation-for-parameter-efficient-fine-tuning-of-vision-transformers)  
    标签：评分：6.0/10、query:vfm
-   evidence：使用视觉基础模型进行无训练的小样本分割
+   evidence：参数高效微调方法用于ViT，实现即插即用地适应下游密集预测任务
+13. [C^2GR: Coupled Comprehensive Generative Replay for a Continually Learnable Universal Segmentation Model](/202606/25/2606.23473v1-c2gr-coupled-comprehensive-generative-replay-for-a-continually-learnable-universal-segmentation-model)  
+   标签：评分：6.0/10、query:seg
+   evidence：通用分割模型的持续学习生成回放
+14. [Beyond Bayer: Task-Optimal Sensor Co-Design for Robust Autonomous-Driving Segmentation](/202606/25/2606.24096v1-beyond-bayer-task-optimal-sensor-co-design-for-robust-autonomous-driving-segmentation)  
+   标签：评分：6.0/10、query:seg
+   evidence：面向语义分割的任务最优传感器协同设计
+15. [Efficient Remote Sensing Instance Segmentation with Linear-Time State Space Distilled Visual Foundation Models](/202606/25/2606.25324v1-efficient-remote-sensing-instance-segmentation-with-linear-time-state-space-distilled-visual-foundation-models)  
+   标签：评分：6.0/10、query:lite-vision
+   evidence：知识蒸馏用于高效实例分割
 
 
 <div class="dpr-home-promo-card">
