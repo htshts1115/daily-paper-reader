@@ -6,53 +6,46 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-06-27
-- 运行时间：2026-06-27 20:13:58 UTC
+- 最新运行日期：2026-06-29
+- 运行时间：2026-06-29 20:06:49 UTC
 - 运行状态：成功
-- 本次总论文数：11
-- 精读区：3
-- 速读区：8
+- 本次总论文数：8
+- 精读区：2
+- 速读区：6
 
 ### 今日简报（AI）
-今日共处理11篇论文，精读2篇高分工作，速读3篇亮点研究。最值得关注的是《Cross-View Variance Correlation》揭示合成训练数据中的捷径问题，以及《SAM2Matting》实现通用图像与视频抠图，均达9.0分。建议普通读者优先阅读这两篇的全文，把握数据偏差与通用抠图的最新突破。
-- 详情：[/202606/27/README](/202606/27/README)
+今日推荐聚焦几何感知表示与高效鲁棒匹配，精读两篇8分论文。  
+最值得关注：RaysUp用射线表示实现超轻量通用上采样；REDI-Match通过旋转等变蒸馏提升密集匹配效率。  
+建议进一步探索这两项技术在自动驾驶与图像处理中的实际部署潜力。
+- 详情：[/202606/29/README](/202606/29/README)
 
 ### 精读区论文标签
-1. [Cross-View Variance Correlation in Path-Traced Stereo:A Hidden Shortcut in Synthetic Training Data](/202606/27/2606.25483v1-cross-view-variance-correlation-in-path-traced-stereoa-hidden-shortcut-in-synthetic-training-data)  
-   标签：评分：9.0/10、query:stereo-depth
-   evidence：揭示了路径追踪立体数据中隐藏的相关性，影响视差估计训练
-2. [SAM2Matting: Generalized Image and Video Matting](/202606/27/2606.27339v1-sam2matting-generalized-image-and-video-matting)  
-   标签：评分：9.0/10、query:matting
-   evidence：视频抠图无需trimap，使用SAM追踪器
-3. [Heterogeneous and Adept Snapshot Distillation for 3D Semantic Segmentation](/202606/27/2606.25278v1-heterogeneous-and-adept-snapshot-distillation-for-3d-semantic-segmentation)  
-   标签：评分：8.0/10、query:seg
-   evidence：用于3D语义分割的知识蒸馏
+1. [RaysUp: Ultra-light Universal Feature Upsampling via Geometry-Aware Ray Representation](/202606/29/2606.22749v1-raysup-ultra-light-universal-feature-upsampling-via-geometry-aware-ray-representation)  
+   标签：评分：8.0/10、query:vfm
+   evidence：用于视觉基础模型的超轻量任务无关特征上采样
+2. [REDI-Match: Rotation-Equivariant Distillation for Efficient and Robust Dense Matching](/202606/29/2606.24330v1-redi-match-rotation-equivariant-distillation-for-efficient-and-robust-dense-matching)  
+   标签：评分：8.0/10、query:lite-vision
+   evidence：面向密集匹配的知识蒸馏，轻量化视觉模型
 
 ### 速读区论文标签
-1. [Lightweight 3D Feature Pretraining by Bayesian Inversion of 2D Foundation Models](/202606/27/2606.21292v1-lightweight-3d-feature-pretraining-by-bayesian-inversion-of-2d-foundation-models)  
+1. [OmniSpace: Efficient Geometry Awareness for Autonomous Vehicles MLLMs](/202606/29/2606.22617v1-omnispace-efficient-geometry-awareness-for-autonomous-vehicles-mllms)  
    标签：评分：7.0/10、query:vfm
-   evidence：从2D基础模型进行轻量级3D特征预训练，适用于密集预测
-2. [ScalePredictor: Instance-aware Scale Learning for Accurate Quantization of Vision Transformers](/202606/27/2606.21947v1-scalepredictor-instance-aware-scale-learning-for-accurate-quantization-of-vision-transformers)  
-   标签：评分：7.0/10、query:lite-vision
-   evidence：实例感知量化用于轻量视觉模型
-3. [RaysUp: Ultra-light Universal Feature Upsampling via Geometry-Aware Ray Representation](/202606/27/2606.22749v1-raysup-ultra-light-universal-feature-upsampling-via-geometry-aware-ray-representation)  
-   标签：评分：7.0/10、query:vfm
-   evidence：超轻量特征上采样用于视觉基础模型，辅助密集预测
-4. [Hierarchical Spatial and Channel Aggregation for Cross-domain Few-shot Segmentation](/202606/27/2606.24296v1-hierarchical-spatial-and-channel-aggregation-for-cross-domain-few-shot-segmentation)  
+   evidence：即插即用的几何感知模块提升深度估计
+2. [From Reconstruction to Decision: A Post-Encoder Plug-in Adapter for Curvilinear Segmentation](/202606/29/2606.23486v1-from-reconstruction-to-decision-a-post-encoder-plug-in-adapter-for-curvilinear-segmentation)  
    标签：评分：7.0/10、query:seg
-   evidence：跨域小样本分割方法
-5. [REDI-Match: Rotation-Equivariant Distillation for Efficient and Robust Dense Matching](/202606/27/2606.24330v1-redi-match-rotation-equivariant-distillation-for-efficient-and-robust-dense-matching)  
-   标签：评分：7.0/10、query:vfm
-   evidence：从视觉基础模型进行旋转等变蒸馏用于密集匹配
-6. [SEMIR: Topology-Preserving Graph Minors for Thin-Structure Segmentation](/202606/27/2606.24935v1-semir-topology-preserving-graph-minors-for-thin-structure-segmentation)  
+   evidence：曲线分割的后编码器即插即用适配器
+3. [Shift Variant Image Degradation and Restoration Using Singular Value Decomposition](/202606/29/2606.25818v1-shift-variant-image-degradation-and-restoration-using-singular-value-decomposition)  
+   标签：评分：7.0/10、query:cv-render
+   evidence：利用点扩散函数和奇异值分解进行移变图像复原
+4. [There and Back Again: A Flexible-Frame Transformer for Multi-Exposure Fusion](/202606/29/2606.27905v1-there-and-back-again-a-flexible-frame-transformer-for-multi-exposure-fusion)  
+   标签：评分：7.0/10、query:cv-render
+   evidence：支持可变帧数的多曝光融合Transformer
+5. [Toward Robust In-Context Segmentation via Concept Guidance](/202606/29/2606.28149v1-toward-robust-in-context-segmentation-via-concept-guidance)  
    标签：评分：7.0/10、query:seg
-   evidence：细结构分割拓扑保持
-7. [Liquid Fusion of Heterogeneous Representations Towards General Salient Object Detection](/202606/27/2606.26849v1-liquid-fusion-of-heterogeneous-representations-towards-general-salient-object-detection)  
-   标签：评分：7.0/10、query:seg
-   evidence：通用显著性目标检测与异构表示融合
-8. [Structured Hyperedge Adaptation for Parameter-Efficient Fine-Tuning of Vision Transformers](/202606/27/2606.22383v1-structured-hyperedge-adaptation-for-parameter-efficient-fine-tuning-of-vision-transformers)  
-   标签：评分：6.0/10、query:vfm
-   evidence：视觉Transformer的参数高效微调，可用于下游任务
+   evidence：基于概念引导的开放词汇上下文分割
+6. [Depth-Semantic Alignment and Affinity-Guided Fusion for Structured Radar Point Cloud Generation](/202606/29/2606.26743v1-depth-semantic-alignment-and-affinity-guided-fusion-for-structured-radar-point-cloud-generation)  
+   标签：评分：6.0/10、query:depth-refine
+   evidence：利用RGB引导进行深度语义对齐以生成雷达点云
 
 
 <div class="dpr-home-promo-card">
