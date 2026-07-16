@@ -6,70 +6,50 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-07-15
-- 运行时间：2026-07-15 22:11:00 UTC
+- 最新运行日期：2026-07-16
+- 运行时间：2026-07-16 21:57:02 UTC
 - 运行状态：成功
-- 本次总论文数：16
-- 精读区：9
-- 速读区：7
+- 本次总论文数：10
+- 精读区：2
+- 速读区：8
 
 ### 今日简报（AI）
-今日共推荐16篇论文，精读9篇，速读7篇，其中两篇精读文章均获得9.0高分。
-最值得关注两个方向：像素空间密集预测的文本到图像模型，以及基于不确定性引导的实时立体匹配。
-建议优先精读这两篇高分论文，尤其是对生成式模型与3D视觉交叉感兴趣的读者。
-- 详情：[/202607/15/README](/202607/15/README)
+今日论文日报共10篇，精读2篇，重点关注视觉语言模型与单视图新视角合成。最值得精读的为《Let RGB Be the Language of Vision》（9.0分）和《MetaView》（8.0分），分别探索RGB作为视觉语言和尺度感知的隐式几何先验。建议优先精读这两篇高分论文，再快速浏览《LoCA》的低秩卷积适配与《TOLiD》的LiDAR预训练方法。
+- 详情：[/202607/16/README](/202607/16/README)
 
 ### 精读区论文标签
-1. [From RGB Generation to Dense Field Readout: Pixel-Space Dense Prediction with Text-to-Image Models](/202607/15/2607.06553v2-from-rgb-generation-to-dense-field-readout-pixel-space-dense-prediction-with-text-to-image-models)  
-   标签：评分：9.0/10、query:vfm
-   evidence：用于深度、alpha抠图等密集预测的视觉基础模型
-2. [URS-Stereo: Uncertainty-Guided Residual Search for Real-Time Stereo Matching](/202607/15/2607.06779v1-urs-stereo-uncertainty-guided-residual-search-for-real-time-stereo-matching)  
-   标签：评分：9.0/10、query:stereo-depth
-   evidence：实时立体匹配与粗细粒度精化
-3. [ARDepth: Auto-regressive Monocular Depth Estimation with Progressive Visual Conditioning](/202607/15/2607.12433v1-ardepth-auto-regressive-monocular-depth-estimation-with-progressive-visual-conditioning)  
+1. [Let RGB Be the Language of Vision](/202607/16/2607.12450v1-let-rgb-be-the-language-of-vision)  
    标签：评分：9.0/10、query:mono-depth
-   evidence：自回归单目深度估计
-4. [X-Lens: Real-Time Metric Depth Estimation with Heterogeneous Cameras](/202607/15/2607.12993v1-x-lens-real-time-metric-depth-estimation-with-heterogeneous-cameras)  
-   标签：评分：9.0/10、query:mono-depth
-   evidence：直接度量深度估计，异构相机
-5. [StereoSplat+: Feed-Forward Stereo Gaussian Splatting with Diffusion-Assisted Progressive Inference](/202607/15/2607.08808v1-stereosplat-feed-forward-stereo-gaussian-splatting-with-diffusion-assisted-progressive-inference)  
-   标签：评分：8.0/10、query:stereo-depth
-   evidence：前馈立体深度估计
-6. [Revisiting Matching Response and Swept Feature Volumes for Wide-baseline Omnidirectional Stereo](/202607/15/2607.11097v1-revisiting-matching-response-and-swept-feature-volumes-for-wide-baseline-omnidirectional-stereo)  
-   标签：评分：8.0/10、query:stereo-depth
-   evidence：全向相机立体匹配，与双目深度估计相关
-7. [When Depth Is Better Told Than Shown: Depth-Ordinal Prompting for Vision-Language Spatial Reasoning](/202607/15/2607.11173v1-when-depth-is-better-told-than-shown-depth-ordinal-prompting-for-vision-language-spatial-reasoning)  
+   evidence：RINO：用RGB统一表示深度、分割、抠图等任务，零样本迁移
+2. [MetaView: Monocular Novel View Synthesis with Scale-Aware Implicit Geometry Priors](/202607/16/2607.12000v1-metaview-monocular-novel-view-synthesis-with-scale-aware-implicit-geometry-priors)  
    标签：评分：8.0/10、query:mono-depth
-   evidence：单目深度用于序数空间推理
-8. [UMSS: Towards Unsupervised Multi-modal Semantic Segmentation](/202607/15/2607.12372v1-umss-towards-unsupervised-multi-modal-semantic-segmentation)  
-   标签：评分：8.0/10、query:seg
-   evidence：无监督多模态语义分割
-9. [Let RGB Be the Language of Vision](/202607/15/2607.12450v1-let-rgb-be-the-language-of-vision)  
-   标签：评分：8.0/10、query:vfm
-   evidence：统一视觉表示用于深度、分割和抠图
+   evidence：通过隐式几何进行单目深度估计以支持新视角合成
 
 ### 速读区论文标签
-1. [MobileWan: Closing the Quality Gap for Mobile Video Diffusion](/202607/15/2607.06173v1-mobilewan-closing-the-quality-gap-for-mobile-video-diffusion)  
+1. [LoCA: Spatially-Aware Low-Rank Convolutional Adaptation of Vision Foundation Models](/202607/16/2607.06918v1-loca-spatially-aware-low-rank-convolutional-adaptation-of-vision-foundation-models)  
+   标签：评分：7.0/10、query:vfm
+   evidence：针对视觉基础模型的空间感知低秩卷积适配方法，可迁移至深度、分割等密集预测任务
+2. [TOLiD: Bridging the Architecture Gap in Vision Foundation Model to LiDAR Pretraining via Token Lifting for Distillation](/202607/16/2607.10762v1-tolid-bridging-the-architecture-gap-in-vision-foundation-model-to-lidar-pretraining-via-token-lifting-for-distillation)  
    标签：评分：7.0/10、query:lite-vision
-   evidence：通过循环蒸馏和结构化压缩实现移动端部署
-2. [LoCA: Spatially-Aware Low-Rank Convolutional Adaptation of Vision Foundation Models](/202607/15/2607.06918v1-loca-spatially-aware-low-rank-convolutional-adaptation-of-vision-foundation-models)  
-   标签：评分：7.0/10、query:vfm
-   evidence：适用于密集预测任务的视觉基础模型参数高效微调方法
-3. [What VGGT Knows About Overlap: Probing Geometric Foundation Models for Co-Visibility](/202607/15/2607.09503v1-what-vggt-knows-about-overlap-probing-geometric-foundation-models-for-co-visibility)  
-   标签：评分：7.0/10、query:vfm
-   evidence：探测VGGT几何基础模型的涌现共视能力
-4. [CoSAG: Compact Semantic Anchor Gaussians via Training-Free Rate-Distortion Coding](/202607/15/2607.10237v1-cosag-compact-semantic-anchor-gaussians-via-training-free-rate-distortion-coding)  
-   标签：评分：7.0/10、query:seg
-   evidence：通过CLIP嵌入实现开放词汇3D场景理解
-5. [GFR-SAM: Training-Free Referring Camouflaged Object Segmentation via Cross-Image Prompting](/202607/15/2607.11732v1-gfr-sam-training-free-referring-camouflaged-object-segmentation-via-cross-image-prompting)  
-   标签：评分：7.0/10、query:vfm
-   evidence：利用视觉基础模型进行无训练分割
-6. [GaussFusion: Towards Multimodal 3D Gaussian Pretraining](/202607/15/2607.05906v1-gaussfusion-towards-multimodal-3d-gaussian-pretraining)  
+   evidence：通过令牌提升从视觉基础模型到LiDAR骨干的知识蒸馏
+3. [Revisiting Matching Response and Swept Feature Volumes for Wide-baseline Omnidirectional Stereo](/202607/16/2607.11097v1-revisiting-matching-response-and-swept-feature-volumes-for-wide-baseline-omnidirectional-stereo)  
+   标签：评分：7.0/10、query:stereo-depth
+   evidence：全向立体置信度估计与特征体重采样
+4. [HSA: Hierarchical Slot Attention for Multi-granularity Scene-Decomposition](/202607/16/2607.08249v1-hsa-hierarchical-slot-attention-for-multi-granularity-scene-decomposition)  
+   标签：评分：6.0/10、query:seg
+   evidence：分层槽注意力用于前景背景分离
+5. [TSR-Ego: Temporally Guided Stereo Refinement Framework for Egocentric 3D Human Pose Estimation](/202607/16/2607.09169v1-tsr-ego-temporally-guided-stereo-refinement-framework-for-egocentric-3d-human-pose-estimation)  
+   标签：评分：6.0/10、query:stereo-depth
+   evidence：时间引导的立体精化用于自我中心姿态估计
+6. [SigLIP-HD by Fine-to-Coarse Supervision](/202607/16/2607.09488v1-siglip-hd-by-fine-to-coarse-supervision)  
    标签：评分：6.0/10、query:vfm
-   evidence：多模态预训练用于3D高斯表示
-7. [The Devil Is in the Leakage: A Disentangled Dual-Purification Framework for High-Fidelity Hairstyle Transfer](/202607/15/2607.11281v1-the-devil-is-in-the-leakage-a-disentangled-dual-purification-framework-for-high-fidelity-hairstyle-transfer)  
-   标签：评分：6.0/10、query:matting
-   evidence：高保真发型迁移需要精细发丝抠图
+   evidence：细到粗监督的视觉表示，可迁移到密集预测
+7. [Slot-RAE: Streamlining Object-Centric Learning via Direct Representation Auto-Encoders](/202607/16/2607.11196v1-slot-rae-streamlining-object-centric-learning-via-direct-representation-auto-encoders)  
+   标签：评分：6.0/10、query:vfm
+   evidence：在DINOv3特征上操作进行对象中心学习
+8. [DeGuNet: Depth-Guided Ultra-Compact Backbones for Efficient LiDAR-Camera 3D Detection](/202607/16/2607.12419v1-degunet-depth-guided-ultra-compact-backbones-for-efficient-lidar-camera-3d-detection)  
+   标签：评分：6.0/10、query:lite-vision
+   evidence：深度引导的超紧凑骨干用于高效表示
 
 
 <div class="dpr-home-promo-card">
