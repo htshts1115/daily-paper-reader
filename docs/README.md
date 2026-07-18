@@ -6,58 +6,46 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-07-17
-- 运行时间：2026-07-17 21:57:26 UTC
+- 最新运行日期：2026-07-18
+- 运行时间：2026-07-18 21:53:08 UTC
 - 运行状态：成功
-- 本次总论文数：12
+- 本次总论文数：8
 - 精读区：3
-- 速读区：9
+- 速读区：5
 
 ### 今日简报（AI）
-今日共推荐12篇论文，精读两篇高评分工作。  
-最值得关注的是宽基线全景立体匹配（9.0分）与视觉语言模型（8.0分）两个方向。  
-建议普通读者优先精读这两篇，并留意速读中光场视差估计与3D人体姿态估计的实践价值。
-- 详情：[/202607/17/README](/202607/17/README)
+今日论文研究聚焦于宽基线立体视觉与结构光形状修复，并探索SAM3遥感分割及视觉基础模型预训练等前沿方法。  
+最值得关注的是精读两篇8分论文：宽基线立体视觉中的匹配响应与扫频特征体，以及长距离条纹投影轮廓术中的形状先验修复。  
+建议普通读者优先阅读这两篇精读文章，了解其核心方法对所涉领域的实际改进，后续可关注其开源代码或数据集。
+- 详情：[/202607/18/README](/202607/18/README)
 
 ### 精读区论文标签
-1. [Revisiting Matching Response and Swept Feature Volumes for Wide-baseline Omnidirectional Stereo](/202607/17/2607.11097v1-revisiting-matching-response-and-swept-feature-volumes-for-wide-baseline-omnidirectional-stereo)  
-   标签：评分：9.0/10、query:stereo-depth
-   evidence：全向立体匹配的置信度估计与扫描特征体素
-2. [Let RGB Be the Language of Vision](/202607/17/2607.12450v1-let-rgb-be-the-language-of-vision)  
-   标签：评分：8.0/10、query:vfm
-   evidence：统一公式将深度图和掩码视为RGB图像，实现向密集预测任务的零样本迁移
-3. [Variational Inference for Bird's Eye View Segmentation in Autonomous Driving](/202607/17/2607.14710v1-variational-inference-for-birds-eye-view-segmentation-in-autonomous-driving)  
-   标签：评分：8.0/10、query:seg
-   evidence：基于Transformer的变分推断BEV分割
+1. [Revisiting Matching Response and Swept Feature Volumes for Wide-baseline Omnidirectional Stereo](/202607/18/2607.11097v1-revisiting-matching-response-and-swept-feature-volumes-for-wide-baseline-omnidirectional-stereo)  
+   标签：评分：8.0/10、query:stereo-depth
+   evidence：针对全向立体匹配中的置信度估计和扫描特征体用于深度估计
+2. [Repairing Shape-Prior Shortcuts in Long-Range Single-Shot Fringe Projection Profilometry](/202607/18/2607.11928v1-repairing-shape-prior-shortcuts-in-long-range-single-shot-fringe-projection-profilometry)  
+   标签：评分：8.0/10、query:mono-depth
+   evidence：通过条纹投影进行单目深度估计，解决形状先验捷径
+3. [WAVE-Stereo: Warp-Aligned Volume Encoding for Stereo Matching](/202607/18/2607.13674v1-wave-stereo-warp-aligned-volume-encoding-for-stereo-matching)  
+   标签：评分：8.0/10、query:stereo-depth
+   evidence：立体匹配结合相关体和特征扭曲
 
 ### 速读区论文标签
-1. [Frequency-Structured Field Learning for Light-Field Disparity Estimation](/202607/17/2607.14941v1-frequency-structured-field-learning-for-light-field-disparity-estimation)  
-   标签：评分：7.0/10、query:mono-depth
-   evidence：光场视差估计处理薄结构和遮挡边界
-2. [TSR-Ego: Temporally Guided Stereo Refinement Framework for Egocentric 3D Human Pose Estimation](/202607/17/2607.09169v1-tsr-ego-temporally-guided-stereo-refinement-framework-for-egocentric-3d-human-pose-estimation)  
-   标签：评分：6.0/10、query:stereo-depth
-   evidence：时间引导立体精化用于深度估计
-3. [Decoupling Language Guidance from Backbones for Text-Guided Medical Segmentation](/202607/17/2607.09481v1-decoupling-language-guidance-from-backbones-for-text-guided-medical-segmentation)  
-   标签：评分：6.0/10、query:vfm
-   evidence：可迁移主干的文本引导分割适配器
-4. [What VGGT Knows About Overlap: Probing Geometric Foundation Models for Co-Visibility](/202607/17/2607.09503v1-what-vggt-knows-about-overlap-probing-geometric-foundation-models-for-co-visibility)  
-   标签：评分：6.0/10、query:vfm
-   evidence：探究几何基础模型的共视性能力
-5. [Align and Segment: Unsupervised Learning for Building Segmentation From Misaligned Labels](/202607/17/2607.10841v1-align-and-segment-unsupervised-learning-for-building-segmentation-from-misaligned-labels)  
-   标签：评分：6.0/10、query:seg
-   evidence：从错误标注标签进行无监督建筑分割
-6. [GFR-SAM: Training-Free Referring Camouflaged Object Segmentation via Cross-Image Prompting](/202607/17/2607.11732v1-gfr-sam-training-free-referring-camouflaged-object-segmentation-via-cross-image-prompting)  
-   标签：评分：6.0/10、query:seg
-   evidence：无训练指向性伪装目标分割
-7. [Emergent Region-Level Facial Correspondence in Frozen Vision Foundation Models](/202607/17/2607.14423v1-emergent-region-level-facial-correspondence-in-frozen-vision-foundation-models)  
-   标签：评分：6.0/10、query:vfm
-   evidence：冻结的DINOv3特征在人脸区域级别实现了语义对应，无需针对人脸训练即可进行分割
-8. [Weakly-Supervised RGB-D Salient Object Detection via SAM-driven Pseudo Annotation and State Space Interaction-based Diffusion](/202607/17/2607.15041v1-weakly-supervised-rgb-d-salient-object-detection-via-sam-driven-pseudo-annotation-and-state-space-interaction-based-diffusion)  
-   标签：评分：6.0/10、query:seg
-   evidence：基于SAM伪标签的弱监督RGB-D显著物体检测
-9. [MAGiSt3R: Multi-Agent Feed-forward 3D Reconstruction from Monocular RGB Videos](/202607/17/2607.15211v1-magist3r-multi-agent-feed-forward-3d-reconstruction-from-monocular-rgb-videos)  
-   标签：评分：6.0/10、query:mono-depth
-   evidence：从单目RGB视频进行3D重建，输出点图
+1. [Promptable Concept Segmentation from Above: Evaluating SAM 3's Zero-Shot and One-Shot Capabilities in Remote Sensing](/202607/18/2607.09583v1-promptable-concept-segmentation-from-above-evaluating-sam-3s-zero-shot-and-one-shot-capabilities-in-remote-sensing)  
+   标签：评分：7.0/10、query:seg
+   evidence：评估SAM 3在遥感中的零样本分割能力
+2. [TOLiD: Bridging the Architecture Gap in Vision Foundation Model to LiDAR Pretraining via Token Lifting for Distillation](/202607/18/2607.10762v1-tolid-bridging-the-architecture-gap-in-vision-foundation-model-to-lidar-pretraining-via-token-lifting-for-distillation)  
+   标签：评分：7.0/10、query:vfm
+   evidence：从视觉基础模型到激光雷达的知识蒸馏
+3. [Let RGB Be the Language of Vision](/202607/18/2607.12450v1-let-rgb-be-the-language-of-vision)  
+   标签：评分：7.0/10、query:vfm
+   evidence：统一RGB表示用于深度和分割任务
+4. [CVKD-UDA: Cross-View Knowledge Distillation for 3D Unsupervised Domain Adaptive Segmentation](/202607/18/2607.10087v1-cvkd-uda-cross-view-knowledge-distillation-for-3d-unsupervised-domain-adaptive-segmentation)  
+   标签：评分：6.0/10、query:lite-vision
+   evidence：用于3D分割域自适应的知识蒸馏
+5. [ScanFocus: A Coarse-to-Fine Framework for Spatio-Temporal Video Grounding](/202607/18/2607.13421v1-scanfocus-a-coarse-to-fine-framework-for-spatio-temporal-video-grounding)  
+   标签：评分：6.0/10、query:depth-refine
+   evidence：用于时空视频定位的由粗到精框架，可应用于深度精修
 
 
 <div class="dpr-home-promo-card">
