@@ -6,46 +6,60 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-07-18
-- 运行时间：2026-07-18 21:53:08 UTC
+- 最新运行日期：2026-07-19
+- 运行时间：2026-07-19 21:43:26 UTC
 - 运行状态：成功
-- 本次总论文数：8
-- 精读区：3
-- 速读区：5
+- 本次总论文数：12
+- 精读区：4
+- 速读区：8
 
 ### 今日简报（AI）
-今日论文研究聚焦于宽基线立体视觉与结构光形状修复，并探索SAM3遥感分割及视觉基础模型预训练等前沿方法。  
-最值得关注的是精读两篇8分论文：宽基线立体视觉中的匹配响应与扫频特征体，以及长距离条纹投影轮廓术中的形状先验修复。  
-建议普通读者优先阅读这两篇精读文章，了解其核心方法对所涉领域的实际改进，后续可关注其开源代码或数据集。
-- 详情：[/202607/18/README](/202607/18/README)
+今日精选12篇论文，聚焦多模态预训练与视觉语言模型，其中两部高分精读作品引人注目。
+
+最值得关注的是两项9.0分工作：《SynCLIP》用同义词一致性提升开放词汇密集感知鲁棒性，《Let RGB Be the Language of Vision》探索以RGB为视觉语言的新范式；速读中《AspectCLIP》与《SceneBind》也值得一读。
+
+建议重点关注CLIP表征空间的优化策略（如方面引导一致性正则）以及跨模态（视觉、音频、语言）融合的新范式，适合想跟进多模态前沿的研究者。
+- 详情：[/202607/19/README](/202607/19/README)
 
 ### 精读区论文标签
-1. [Revisiting Matching Response and Swept Feature Volumes for Wide-baseline Omnidirectional Stereo](/202607/18/2607.11097v1-revisiting-matching-response-and-swept-feature-volumes-for-wide-baseline-omnidirectional-stereo)  
+1. [SynCLIP: Synonym-Coherent Language-Image Pretraining for Robust Open-Vocabulary Dense Perception](/202607/19/2607.11008v1-synclip-synonym-coherent-language-image-pretraining-for-robust-open-vocabulary-dense-perception)  
+   标签：评分：9.0/10、query:seg
+   evidence：开放词汇密集感知, 同义词不一致
+2. [Let RGB Be the Language of Vision](/202607/19/2607.12450v1-let-rgb-be-the-language-of-vision)  
+   标签：评分：9.0/10、query:vfm
+   evidence：统一的RGB表示支持深度、掩码和分割
+3. [Fine-grained CLIP fine-tuning with self-annotated region alignment](/202607/19/2607.13661v1-fine-grained-clip-fine-tuning-with-self-annotated-region-alignment)  
+   标签：评分：8.0/10、query:vfm
+   evidence：CLIP微调获得细粒度密集特征，可迁移至深度/分割/抠图等任务
+4. [WAVE-Stereo: Warp-Aligned Volume Encoding for Stereo Matching](/202607/19/2607.13674v1-wave-stereo-warp-aligned-volume-encoding-for-stereo-matching)  
    标签：评分：8.0/10、query:stereo-depth
-   evidence：针对全向立体匹配中的置信度估计和扫描特征体用于深度估计
-2. [Repairing Shape-Prior Shortcuts in Long-Range Single-Shot Fringe Projection Profilometry](/202607/18/2607.11928v1-repairing-shape-prior-shortcuts-in-long-range-single-shot-fringe-projection-profilometry)  
-   标签：评分：8.0/10、query:mono-depth
-   evidence：通过条纹投影进行单目深度估计，解决形状先验捷径
-3. [WAVE-Stereo: Warp-Aligned Volume Encoding for Stereo Matching](/202607/18/2607.13674v1-wave-stereo-warp-aligned-volume-encoding-for-stereo-matching)  
-   标签：评分：8.0/10、query:stereo-depth
-   evidence：立体匹配结合相关体和特征扭曲
+   evidence：基于扭曲对齐体积编码的立体匹配
 
 ### 速读区论文标签
-1. [Promptable Concept Segmentation from Above: Evaluating SAM 3's Zero-Shot and One-Shot Capabilities in Remote Sensing](/202607/18/2607.09583v1-promptable-concept-segmentation-from-above-evaluating-sam-3s-zero-shot-and-one-shot-capabilities-in-remote-sensing)  
-   标签：评分：7.0/10、query:seg
-   evidence：评估SAM 3在遥感中的零样本分割能力
-2. [TOLiD: Bridging the Architecture Gap in Vision Foundation Model to LiDAR Pretraining via Token Lifting for Distillation](/202607/18/2607.10762v1-tolid-bridging-the-architecture-gap-in-vision-foundation-model-to-lidar-pretraining-via-token-lifting-for-distillation)  
+1. [AspectCLIP: Optimizing CLIP Representation Space via Aspect-Guided Consistency Regularization](/202607/19/2607.13805v1-aspectclip-optimizing-clip-representation-space-via-aspect-guided-consistency-regularization)  
    标签：评分：7.0/10、query:vfm
-   evidence：从视觉基础模型到激光雷达的知识蒸馏
-3. [Let RGB Be the Language of Vision](/202607/18/2607.12450v1-let-rgb-be-the-language-of-vision)  
+   evidence：优化CLIP表示以适用于通用视觉任务
+2. [SceneBind: Binding What and Where Across Vision, Audio and Language](/202607/19/2607.15265v1-scenebind-binding-what-and-where-across-vision-audio-and-language)  
    标签：评分：7.0/10、query:vfm
-   evidence：统一RGB表示用于深度和分割任务
-4. [CVKD-UDA: Cross-View Knowledge Distillation for 3D Unsupervised Domain Adaptive Segmentation](/202607/18/2607.10087v1-cvkd-uda-cross-view-knowledge-distillation-for-3d-unsupervised-domain-adaptive-segmentation)  
-   标签：评分：6.0/10、query:lite-vision
-   evidence：用于3D分割域自适应的知识蒸馏
-5. [ScanFocus: A Coarse-to-Fine Framework for Spatio-Temporal Video Grounding](/202607/18/2607.13421v1-scanfocus-a-coarse-to-fine-framework-for-spatio-temporal-video-grounding)  
-   标签：评分：6.0/10、query:depth-refine
-   evidence：用于时空视频定位的由粗到精框架，可应用于深度精修
+   evidence：全模态表示兼具空间理解
+3. [Revisiting Matching Response and Swept Feature Volumes for Wide-baseline Omnidirectional Stereo](/202607/19/2607.11097v1-revisiting-matching-response-and-swept-feature-volumes-for-wide-baseline-omnidirectional-stereo)  
+   标签：评分：6.0/10、query:stereo-depth
+   evidence：面向宽基线全向立体的置信度与扫描特征体素方法
+4. [CASA-SDF: Curriculum-Aware Spatial Adaptation with Curvature-Guided Density for Neural Implicit Surface Reconstruction](/202607/19/2607.13492v1-casa-sdf-curriculum-aware-spatial-adaptation-with-curvature-guided-density-for-neural-implicit-surface-reconstruction)  
+   标签：评分：6.0/10、query:mono-depth
+   evidence：处理3D重建中的薄结构，与单目深度估计中的薄结构相关
+5. [Screening Is Effective for Visual Recognition](/202607/19/2607.13983v1-screening-is-effective-for-visual-recognition)  
+   标签：评分：6.0/10、query:vfm
+   evidence：筛选机制通过排除无关块改进视觉识别
+6. [SeeSE3: Emergence of 3D Space in Vision Features](/202607/19/2607.14228v1-seese3-emergence-of-3d-space-in-vision-features)  
+   标签：评分：6.0/10、query:vfm
+   evidence：探测视觉特征的3D意识，与深度基础模型相关
+7. [XCT-SAM: Sequential Parameter-Efficient Domain Adaptation of SAM for Industrial XCT Defect Segmentation](/202607/19/2607.14287v1-xct-sam-sequential-parameter-efficient-domain-adaptation-of-sam-for-industrial-xct-defect-segmentation)  
+   标签：评分：6.0/10、query:vfm
+   evidence：SAM领域自适应用于缺陷分割
+8. [Emergent Region-Level Facial Correspondence in Frozen Vision Foundation Models](/202607/19/2607.14423v1-emergent-region-level-facial-correspondence-in-frozen-vision-foundation-models)  
+   标签：评分：6.0/10、query:vfm
+   evidence：冻结的DINOv3提供区域级人脸对应关系
 
 
 <div class="dpr-home-promo-card">
