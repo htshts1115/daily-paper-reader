@@ -6,60 +6,50 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-07-19
-- 运行时间：2026-07-19 21:43:26 UTC
+- 最新运行日期：2026-07-20
+- 运行时间：2026-07-20 22:07:12 UTC
 - 运行状态：成功
-- 本次总论文数：12
+- 本次总论文数：10
 - 精读区：4
-- 速读区：8
+- 速读区：6
 
 ### 今日简报（AI）
-今日精选12篇论文，聚焦多模态预训练与视觉语言模型，其中两部高分精读作品引人注目。
-
-最值得关注的是两项9.0分工作：《SynCLIP》用同义词一致性提升开放词汇密集感知鲁棒性，《Let RGB Be the Language of Vision》探索以RGB为视觉语言的新范式；速读中《AspectCLIP》与《SceneBind》也值得一读。
-
-建议重点关注CLIP表征空间的优化策略（如方面引导一致性正则）以及跨模态（视觉、音频、语言）融合的新范式，适合想跟进多模态前沿的研究者。
-- 详情：[/202607/19/README](/202607/19/README)
+今日推荐10篇论文，精读2篇9分高分作，速读3篇7分研究。最值得关注的是《Let RGB Be the Language of Vision》中的视觉语言统一范式，以及《WAVE-Stereo》提出的立体匹配卷对齐编码。建议优先精读这两篇，从中把握多模态与3D视觉的前沿方向。
+- 详情：[/202607/20/README](/202607/20/README)
 
 ### 精读区论文标签
-1. [SynCLIP: Synonym-Coherent Language-Image Pretraining for Robust Open-Vocabulary Dense Perception](/202607/19/2607.11008v1-synclip-synonym-coherent-language-image-pretraining-for-robust-open-vocabulary-dense-perception)  
-   标签：评分：9.0/10、query:seg
-   evidence：开放词汇密集感知, 同义词不一致
-2. [Let RGB Be the Language of Vision](/202607/19/2607.12450v1-let-rgb-be-the-language-of-vision)  
+1. [Let RGB Be the Language of Vision](/202607/20/2607.12450v1-let-rgb-be-the-language-of-vision)  
    标签：评分：9.0/10、query:vfm
-   evidence：统一的RGB表示支持深度、掩码和分割
-3. [Fine-grained CLIP fine-tuning with self-annotated region alignment](/202607/19/2607.13661v1-fine-grained-clip-fine-tuning-with-self-annotated-region-alignment)  
+   evidence：统一RGB表示用于深度图和掩码，跨任务迁移
+2. [WAVE-Stereo: Warp-Aligned Volume Encoding for Stereo Matching](/202607/20/2607.13674v1-wave-stereo-warp-aligned-volume-encoding-for-stereo-matching)  
+   标签：评分：9.0/10、query:stereo-depth
+   evidence：立体匹配中的扭曲体积编码
+3. [Geometric Distillation from Rectified Stereo: Leveraging Epipolar Cues for Monocular Depth](/202607/20/2607.15600v1-geometric-distillation-from-rectified-stereo-leveraging-epipolar-cues-for-monocular-depth)  
+   标签：评分：9.0/10、query:mono-depth
+   evidence：利用双目几何线索蒸馏提升单目深度估计的度量精度
+4. [Emergent Region-Level Facial Correspondence in Frozen Vision Foundation Models](/202607/20/2607.14423v1-emergent-region-level-facial-correspondence-in-frozen-vision-foundation-models)  
    标签：评分：8.0/10、query:vfm
-   evidence：CLIP微调获得细粒度密集特征，可迁移至深度/分割/抠图等任务
-4. [WAVE-Stereo: Warp-Aligned Volume Encoding for Stereo Matching](/202607/19/2607.13674v1-wave-stereo-warp-aligned-volume-encoding-for-stereo-matching)  
-   标签：评分：8.0/10、query:stereo-depth
-   evidence：基于扭曲对齐体积编码的立体匹配
+   evidence：冻结的DINOv3特征无需微调即可实现人脸区域级对应
 
 ### 速读区论文标签
-1. [AspectCLIP: Optimizing CLIP Representation Space via Aspect-Guided Consistency Regularization](/202607/19/2607.13805v1-aspectclip-optimizing-clip-representation-space-via-aspect-guided-consistency-regularization)  
+1. [MAC-Splat: Multi-Attribute Consistency for High-Fidelity Sparse-View Reconstruction](/202607/20/2607.10792v1-mac-splat-multi-attribute-consistency-for-high-fidelity-sparse-view-reconstruction)  
    标签：评分：7.0/10、query:vfm
-   evidence：优化CLIP表示以适用于通用视觉任务
-2. [SceneBind: Binding What and Where Across Vision, Audio and Language](/202607/19/2607.15265v1-scenebind-binding-what-and-where-across-vision-audio-and-language)  
+   evidence：使用DINOv3编码器和多属性一致性损失进行几何监督，可迁移至深度任务。
+2. [Revisiting Matching Response and Swept Feature Volumes for Wide-baseline Omnidirectional Stereo](/202607/20/2607.11097v1-revisiting-matching-response-and-swept-feature-volumes-for-wide-baseline-omnidirectional-stereo)  
+   标签：评分：7.0/10、query:stereo-depth
+   evidence：全向立体匹配与置信度估计
+3. [Attention-Free and Lightweight Token Reduction for Efficient Vision-Language Models](/202607/20/2607.13500v1-attention-free-and-lightweight-token-reduction-for-efficient-vision-language-models)  
+   标签：评分：7.0/10、query:lite-vision
+   evidence：无注意力轻量令牌减少作为即插即用模块，适用于高效部署
+4. [Fine-grained CLIP fine-tuning with self-annotated region alignment](/202607/20/2607.13661v1-fine-grained-clip-fine-tuning-with-self-annotated-region-alignment)  
    标签：评分：7.0/10、query:vfm
-   evidence：全模态表示兼具空间理解
-3. [Revisiting Matching Response and Swept Feature Volumes for Wide-baseline Omnidirectional Stereo](/202607/19/2607.11097v1-revisiting-matching-response-and-swept-feature-volumes-for-wide-baseline-omnidirectional-stereo)  
-   标签：评分：6.0/10、query:stereo-depth
-   evidence：面向宽基线全向立体的置信度与扫描特征体素方法
-4. [CASA-SDF: Curriculum-Aware Spatial Adaptation with Curvature-Guided Density for Neural Implicit Surface Reconstruction](/202607/19/2607.13492v1-casa-sdf-curriculum-aware-spatial-adaptation-with-curvature-guided-density-for-neural-implicit-surface-reconstruction)  
+   evidence：自标注区域对齐提升CLIP细粒度特征，有利于密集预测迁移
+5. [Instance-Enriched Semantic Maps for Visual Language Navigation](/202607/20/2607.12630v1-instance-enriched-semantic-maps-for-visual-language-navigation)  
+   标签：评分：6.0/10、query:seg
+   evidence：使用深度进行开放词汇全景分割
+6. [G$^2$SR: Geometric Methods for Fast and Memory-Efficient Gaussian-based Surface Reconstruction](/202607/20/2607.14470v1-g2sr-geometric-methods-for-fast-and-memory-efficient-gaussian-based-surface-reconstruction)  
    标签：评分：6.0/10、query:mono-depth
-   evidence：处理3D重建中的薄结构，与单目深度估计中的薄结构相关
-5. [Screening Is Effective for Visual Recognition](/202607/19/2607.13983v1-screening-is-effective-for-visual-recognition)  
-   标签：评分：6.0/10、query:vfm
-   evidence：筛选机制通过排除无关块改进视觉识别
-6. [SeeSE3: Emergence of 3D Space in Vision Features](/202607/19/2607.14228v1-seese3-emergence-of-3d-space-in-vision-features)  
-   标签：评分：6.0/10、query:vfm
-   evidence：探测视觉特征的3D意识，与深度基础模型相关
-7. [XCT-SAM: Sequential Parameter-Efficient Domain Adaptation of SAM for Industrial XCT Defect Segmentation](/202607/19/2607.14287v1-xct-sam-sequential-parameter-efficient-domain-adaptation-of-sam-for-industrial-xct-defect-segmentation)  
-   标签：评分：6.0/10、query:vfm
-   evidence：SAM领域自适应用于缺陷分割
-8. [Emergent Region-Level Facial Correspondence in Frozen Vision Foundation Models](/202607/19/2607.14423v1-emergent-region-level-facial-correspondence-in-frozen-vision-foundation-models)  
-   标签：评分：6.0/10、query:vfm
-   evidence：冻结的DINOv3提供区域级人脸对应关系
+   evidence：面向移动设备的轻量快速三维重建
 
 
 <div class="dpr-home-promo-card">
