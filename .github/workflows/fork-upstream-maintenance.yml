@@ -1,0 +1,101 @@
+name: Fork Upstream Maintenance
+
+permissions:
+  contents: write
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 在每日论文任务（UTC 18:30）之前同步，缩短与上游的分叉时间。
+    - cron: "0 17 * * *"
+
+concurrency:
+  # 与上游自带的手动同步 workflow 共用并发组，避免同时写 main。
+  group: upstream-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    if: ${{ github.event.repository.fork }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout fork main
+        uses: actions/checkout@v5
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Merge upstream safely
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config merge.ours.driver true
+          git remote add upstream https://github.com/ziwenhahaha/daily-paper-reader.git
+          git fetch --prune upstream main
+
+          resolve_runtime_conflicts() {
+            mapfile -d '' conflicts < <(git diff --name-only --diff-filter=U -z)
+            unresolved=()
+
+            for path in "${conflicts[@]}"; do
+              case "$path" in
+                config.yaml|secret.private|archive/*|docs/config.yaml|docs/README.md|docs/_sidebar.md|docs/_home_notice.md|docs/_home_promo.md|docs/.repo-owner.json|docs/[0-9]*/*|docs/conference/*|docs/assets/figures/*|docs/assets/tables/*)
+                  echo "[auto-resolve] keep fork runtime data: $path"
+                  if git checkout --ours -- "$path" 2>/dev/null; then
+                    git add -- "$path"
+                  else
+                    git rm --ignore-unmatch -- "$path"
+                  fi
+                  ;;
+                *)
+                  unresolved+=("$path")
+                  ;;
+              esac
+            done
+
+            if [ "${#unresolved[@]}" -gt 0 ]; then
+              {
+                echo "## Upstream sync needs review"
+                echo
+                echo "Only code/template conflicts remain; runtime data conflicts were handled automatically."
+                printf -- '- `%s`\n' "${unresolved[@]}"
+              } >> "$GITHUB_STEP_SUMMARY"
+              printf 'Unresolved code conflict: %s\n' "${unresolved[@]}" >&2
+              return 1
+            fi
+
+            git commit --no-edit
+          }
+
+          for attempt in 1 2 3; do
+            git fetch origin main
+            git reset --hard origin/main
+
+            if git merge-base --is-ancestor upstream/main HEAD; then
+              echo "Fork main already contains upstream/main."
+              exit 0
+            fi
+
+            if ! git merge --no-edit -m "[sync] merge upstream/main" upstream/main; then
+              if ! resolve_runtime_conflicts; then
+                git merge --abort || true
+                exit 1
+              fi
+            fi
+
+            if git push origin HEAD:main; then
+              echo "[OK] upstream/main synchronized on attempt $attempt"
+              exit 0
+            fi
+
+            echo "[WARN] main advanced during sync; retrying from latest origin/main"
+            sleep "$((attempt * 3))"
+          done
+
+          echo "::error::Failed to push synchronized main after 3 attempts"
+          exit 1
