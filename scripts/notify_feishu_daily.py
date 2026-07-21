@@ -198,21 +198,24 @@ def load_daily_report_from_docs(root: Path, top_k: int) -> dict[str, Any]:
         "stats": stats,
         "brief": brief,
         "papers": _parse_deep_dive_entries(root, detail_markdown, top_k),
-        "source": str(detail_path.relative_to(root)),
+        "source": detail_path.relative_to(root).as_posix(),
     }
 
 
 def load_daily_report_from_archive(root: Path, top_k: int) -> dict[str, Any]:
     """Load the notification source from archive JSON as a fallback."""
     recommend_path = find_latest_recommend_json(root)
-    print(f"Using fallback recommendation JSON: {recommend_path.relative_to(root)}")
+    print(
+        "Using fallback recommendation JSON: "
+        f"{recommend_path.relative_to(root).as_posix()}"
+    )
     data = json.loads(recommend_path.read_text(encoding="utf-8"))
     return {
         "date": _generated_date(data.get("generated_at")),
         "stats": data.get("stats") or {},
         "brief": extract_daily_brief(root / "docs" / "README.md"),
         "papers": select_top_papers(data.get("deep_dive") or [], top_k),
-        "source": str(recommend_path.relative_to(root)),
+        "source": recommend_path.relative_to(root).as_posix(),
     }
 
 
