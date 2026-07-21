@@ -11,6 +11,8 @@ class ForkUpstreamMaintenanceContractTest(unittest.TestCase):
         text = WORKFLOW.read_text(encoding="utf-8")
 
         self.assertIn("workflow_dispatch:", text)
+        self.assertIn("push:", text)
+        self.assertIn('".github/workflows/fork-upstream-maintenance.yml"', text)
         self.assertIn("schedule:", text)
         self.assertIn('cron: "0 17 * * *"', text)
         self.assertIn("ref: main", text)
