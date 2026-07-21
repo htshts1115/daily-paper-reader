@@ -5,52 +5,61 @@
   </ul>
 </div>
 
-## 每次日报
-- 最新运行日期：2026-07-20
-- 运行时间：2026-07-20 22:07:12 UTC
-- 运行状态：成功
-- 本次总论文数：10
-- 精读区：4
-- 速读区：6
-
-### 今日简报（AI）
-今日推荐10篇论文，精读2篇9分高分作，速读3篇7分研究。最值得关注的是《Let RGB Be the Language of Vision》中的视觉语言统一范式，以及《WAVE-Stereo》提出的立体匹配卷对齐编码。建议优先精读这两篇，从中把握多模态与3D视觉的前沿方向。
-- 详情：[/202607/20/README](/202607/20/README)
-
-### 精读区论文标签
-1. [Let RGB Be the Language of Vision](/202607/20/2607.12450v1-let-rgb-be-the-language-of-vision)  
-   标签：评分：9.0/10、query:vfm
-   evidence：统一RGB表示用于深度图和掩码，跨任务迁移
-2. [WAVE-Stereo: Warp-Aligned Volume Encoding for Stereo Matching](/202607/20/2607.13674v1-wave-stereo-warp-aligned-volume-encoding-for-stereo-matching)  
-   标签：评分：9.0/10、query:stereo-depth
-   evidence：立体匹配中的扭曲体积编码
-3. [Geometric Distillation from Rectified Stereo: Leveraging Epipolar Cues for Monocular Depth](/202607/20/2607.15600v1-geometric-distillation-from-rectified-stereo-leveraging-epipolar-cues-for-monocular-depth)  
-   标签：评分：9.0/10、query:mono-depth
-   evidence：利用双目几何线索蒸馏提升单目深度估计的度量精度
-4. [Emergent Region-Level Facial Correspondence in Frozen Vision Foundation Models](/202607/20/2607.14423v1-emergent-region-level-facial-correspondence-in-frozen-vision-foundation-models)  
-   标签：评分：8.0/10、query:vfm
-   evidence：冻结的DINOv3特征无需微调即可实现人脸区域级对应
-
-### 速读区论文标签
-1. [MAC-Splat: Multi-Attribute Consistency for High-Fidelity Sparse-View Reconstruction](/202607/20/2607.10792v1-mac-splat-multi-attribute-consistency-for-high-fidelity-sparse-view-reconstruction)  
-   标签：评分：7.0/10、query:vfm
-   evidence：使用DINOv3编码器和多属性一致性损失进行几何监督，可迁移至深度任务。
-2. [Revisiting Matching Response and Swept Feature Volumes for Wide-baseline Omnidirectional Stereo](/202607/20/2607.11097v1-revisiting-matching-response-and-swept-feature-volumes-for-wide-baseline-omnidirectional-stereo)  
-   标签：评分：7.0/10、query:stereo-depth
-   evidence：全向立体匹配与置信度估计
-3. [Attention-Free and Lightweight Token Reduction for Efficient Vision-Language Models](/202607/20/2607.13500v1-attention-free-and-lightweight-token-reduction-for-efficient-vision-language-models)  
-   标签：评分：7.0/10、query:lite-vision
-   evidence：无注意力轻量令牌减少作为即插即用模块，适用于高效部署
-4. [Fine-grained CLIP fine-tuning with self-annotated region alignment](/202607/20/2607.13661v1-fine-grained-clip-fine-tuning-with-self-annotated-region-alignment)  
-   标签：评分：7.0/10、query:vfm
-   evidence：自标注区域对齐提升CLIP细粒度特征，有利于密集预测迁移
-5. [Instance-Enriched Semantic Maps for Visual Language Navigation](/202607/20/2607.12630v1-instance-enriched-semantic-maps-for-visual-language-navigation)  
-   标签：评分：6.0/10、query:seg
-   evidence：使用深度进行开放词汇全景分割
-6. [G$^2$SR: Geometric Methods for Fast and Memory-Efficient Gaussian-based Surface Reconstruction](/202607/20/2607.14470v1-g2sr-geometric-methods-for-fast-and-memory-efficient-gaussian-based-surface-reconstruction)  
-   标签：评分：6.0/10、query:mono-depth
-   evidence：面向移动设备的轻量快速三维重建
-
+<div class="dpr-home-dashboard-grid">
+<section class="dpr-home-dashboard-card dpr-home-report-card">
+  <div class="dpr-home-dashboard-header">
+    <div>
+      <span class="dpr-home-dashboard-kicker">2026-07-21</span>
+      <h3 class="dpr-home-dashboard-title">今日汇总</h3>
+    </div>
+    <strong class="dpr-home-dashboard-count">共 14 篇</strong>
+  </div>
+  <dl class="dpr-home-dashboard-stats">
+    <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>7</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>7</dd></div>
+  </dl>
+  <p class="dpr-home-dashboard-body">最近更新：2026-07-21 22:18:37 UTC<br>状态：成功</p>
+</section>
+<section class="dpr-home-dashboard-card dpr-home-brief-card">
+  <div class="dpr-home-dashboard-header">
+    <div>
+      <span class="dpr-home-dashboard-kicker">合并后生成</span>
+      <h3 class="dpr-home-dashboard-title">今日简报</h3>
+    </div>
+    <strong class="dpr-home-dashboard-count">AI</strong>
+  </div>
+  <div class="dpr-home-dashboard-body">
+<p>今日共推荐14篇论文，精读7篇，速读7篇。最值得关注的是深度估计方向的两篇高分论文：《DROID-ANCHOR》提出里程计锚定的递归度量深度估计（9.0分），《DepthART》实现将基础单目深度模型缩放到微型模型（9.0分）。建议优先精读这两篇，重点关注深度估计在移动设备上的部署优化与递归网络设计。</p>
+  </div>
+</section>
+<section class="dpr-home-dashboard-card dpr-home-deep-card">
+  <div class="dpr-home-dashboard-header">
+    <div>
+      <span class="dpr-home-dashboard-kicker">今日累计</span>
+      <h3 class="dpr-home-dashboard-title">精读推荐</h3>
+    </div>
+    <strong class="dpr-home-dashboard-count">7 篇</strong>
+  </div>
+  <div class="dpr-home-dashboard-body">
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="DROID-ANCHOR: Odometry-Anchored Recurrent Metric Depth Estimation">DROID-ANCHOR: Odometry-Anchored Recurrent Metric Depth Estimation</span></li><li><span class="dpr-home-dashboard-paper-title" title="DepthART: Scaling Foundation Monocular Depth to Tiny Models">DepthART: Scaling Foundation Monocular Depth to Tiny Models</span></li><li><span class="dpr-home-dashboard-paper-title" title="Fine-Detail Monocular Geometry Estimation with Self-Guided Sparse Volumetric Refinement">Fine-Detail Monocular Geometry Estimation with Self-Guided Sparse Volumetric Refinement</span></li></ul>
+  </div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">mono-depth <strong>3</strong></span><span class="dpr-home-dashboard-tag">seg <strong>3</strong></span><span class="dpr-home-dashboard-tag">vfm <strong>1</strong></span></div>
+</section>
+<section class="dpr-home-dashboard-card dpr-home-skim-card">
+  <div class="dpr-home-dashboard-header">
+    <div>
+      <span class="dpr-home-dashboard-kicker">今日累计</span>
+      <h3 class="dpr-home-dashboard-title">速读推荐</h3>
+    </div>
+    <strong class="dpr-home-dashboard-count">7 篇</strong>
+  </div>
+  <div class="dpr-home-dashboard-body">
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="AspectCLIP: Optimizing CLIP Representation Space via Aspect-Guided Consistency Regularization">AspectCLIP: Optimizing CLIP Representation Space via Aspect-Guided Consistency Regularization</span></li><li><span class="dpr-home-dashboard-paper-title" title="DAUPNet: Domain-Aware Uncertainty Modeling for Reliable Prototype Discrimination in Cross-Domain Few-Shot Semantic Segmentation">DAUPNet: Domain-Aware Uncertainty Modeling for Reliable Prototype Discrimination in Cross-Domain Few-Shot Semantic Segmentation</span></li><li><span class="dpr-home-dashboard-paper-title" title="Eddy-VL 1.9B: Structural Pruning and Layered Distillation for Edge-Deployable Multimodal Embedding">Eddy-VL 1.9B: Structural Pruning and Layered Distillation for Edge-Deployable Multimodal Embedding</span></li></ul>
+  </div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">lite-vision <strong>2</strong></span><span class="dpr-home-dashboard-tag">seg <strong>2</strong></span><span class="dpr-home-dashboard-tag">vfm <strong>2</strong></span><span class="dpr-home-dashboard-tag">mono-depth <strong>1</strong></span></div>
+</section>
+</div>
 
 <div class="dpr-home-promo-card">
   <h3 class="dpr-home-promo-title">💬 社区与支持</h3>
