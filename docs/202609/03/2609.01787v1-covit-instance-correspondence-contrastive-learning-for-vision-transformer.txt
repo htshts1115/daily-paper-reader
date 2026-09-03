@@ -1,0 +1,209 @@
+Title: CoViT: Instance-Correspondence Contrastive Learning for Vision Transformer
+
+URL Source: https://arxiv.org/pdf/2609.01787v1
+
+Published Time: Thu, 03 Sep 2026 00:09:01 GMT
+
+Number of Pages: 12
+
+Markdown Content:
+# CoViT: Instance-Correspondence Contrastive Learning for Vision Transformer 
+
+Yisen Wang Zhirong Wu Limin Wang 
+
+State Key Laboratory for Novel Software Technology Nanjing University, China 
+
+yswang@smail.nju.edu.cn 
+
+# Abstract 
+
+Vision Transformers (ViT) excel in semantic understanding but fail to discriminate between object instances (e.g., identical embeddings for two dogs), limiting their use in instance-level tasks such as object detection and instance segmentation. We propose Co ntrastive Vi sion Transformer (CoViT), a self-supervised learning frame-work that injects instance-awareness into ViT through geometry-guided contrastive learning. CoViT uniquely coordinates ViT’s attention maps and embeddings by constructing triplets: (1) Attention-guided masking: Refine multi-head attention via adaptive thresholding and morphological operations to generate instance masks, identifying foreground anchors; (2) Hardest contrastive mining: For each anchor, computing pairwise embedding similarities to select the intra-instance hardest positive (least similar patch within its mask) and inter-instance hardest negative (most similar patch from other instances), with intra-instance regions masked dur-ing negative search. These triplets drive a contrastive loss that simultaneously compresses intra-instance variance and expands inter-instance margins, forcing ViT to discern subtle geometric and appearance differences between instances. CoViT consistently achieves stable performance gains of over 2 AP points across multiple instance-level perception tasks by using ViT as backbone architecture. Notably, CoViT requires no extra decoders or labels, demonstrating that a pure ViT can learn instance-aware representations via inherent attention priors and targeted contrastive constraints. Code and models will be released. 
+
+# 1 Introduction 
+
+Vision Transformers (ViT) [1] have emerged as cornerstones in modern computer vision, demon-strating exceptional capabilities in semantic understanding through pre-training paradigms such as DeiT [2], MAE [3], and DINO [4]. These methods excel at tasks requiring holistic scene interpre-tation, including image classification and semantic segmentation, by learning representations that emphasize semantic coherence across image regions. However, a critical gap remains unaddressed. ViT inherently lacks the ability to distinguish between individual instances of the same semantic category. For example, when there are multiple different instances with the same semantics in the image that the ViT needs to process, such as two dogs, the embedding output of the ViT will produce roughly the same representation. This limitation fundamentally restricts their utility in instance-centric applications like instance segmentation, where precise discrimination between objects is paramount. The underlying issue stems from the semantic-driven nature of existing pre-training objectives. Methods like MAE prioritize reconstructing masked patches through global context aggregation, while DINO enforces consistency between augmented views of an image. Although effective for learning invariant semantic features, such strategies inadvertently suppress fine-grained instance-specific cues. Consequently, the self-attention mechanisms in ViTs tend to capture broad semantic 
+
+39th Conference on Neural Information Processing Systems (NeurIPS 2025). arXiv:2609.01787v1 [cs.CV] 1 Sep 2026 relationships rather than delineating boundaries between adjacent instances. Even state-of-the-art models struggle to maintain intra-instance feature consistency while maximizing inter-instance disparity, leading to ambiguous embeddings that hinder downstream instance-level tasks. To bridge this gap, we introduce Contrastive Vision Transformer (CoViT), a contrastive learning framework designed to endow pre-trained ViTs with instance discrimination capabilities without architectural modifications. Our approach is grounded in two pivotal observations. First, thresholded and morphologically refined attention maps, despite their imperfections, provide spatial cues that approximate instance regions. Second, analyzing embedding similarities reveals systematic errors: embeddings of distinct instances often exhibit unexpectedly high similarity, while patches within the same instance may show undesirably low similarity. Leveraging these insights, CoViT constructs informative triplets by identifying intra-instance hard positives (regions within the same instance with minimal similarity to the anchor) and inter-instance hard negatives (regions from different instances with maximal similarity to the anchor). These triplets are derived through a synergistic analysis of attention maps and embedding similarities, enabling targeted contrastive optimization. The CoViT framework imposes dual objectives: reducing feature distance between anchors and their intra-instance hard positives to enhance instance cohesion, while increasing the margin between anchors and inter-instance hard negatives to mitigate cross-instance confusion. This strategy directly addresses the limitations of conventional contrastive learning, which typically operates on image-level or patch-level pairs without explicit instance guidance. Experiments demonstrate that CoViT significantly enhances the instance awareness of pre-trained ViTs. When applied to DINO-Base, our method improves mask AP on COCO instance segmentation by 3.2% and boosts few-shot instance recognition accuracy on PASCAL VOC by 12.7%, all while preserving the model’s original semantic representation strength. Our work makes three core contributions. First, we systematically identify and analyze the inability of semantic-focused ViTs to discriminate instances, linking this limitation to the objectives of mainstream pre-training paradigms. Second, we propose CoViT, a novel framework that jointly exploits attention maps and embedding similarities to mine instance-aware triplets for contrastive fine-tuning. Third, we empirically validate CoViT’s versatility across multiple instance-level tasks and ViT architectures, providing insights into the interplay between semantic and instance-level feature learning. By reconciling the semantic richness of pre-trained ViTs with instance-sensitive adaptation, this work opens new avenues for deploying ViTs in scenarios requiring precise instance discrimination. 
+
+# 2 Related Work 
+
+The rapid evolution of vision transformers has fundamentally transformed semantic understanding in computer vision, yet the nuanced challenge of distinguishing between object instances remains inadequately addressed. Current self-supervised paradigms like MAE [3] achieve remarkable se-mantic reconstruction through masked patch prediction, but their pixel-level optimization inherently overlooks fine-grained instance boundaries. While subsequent variants like DINO [4, 5] enhance feature uniformity by integrating multi-task objectives from iBOT [6] and SwAV [7], and ViTDet [8] demonstrates the latent detection potential of standard ViT architectures through strategic multi-scale convolution, these methods remain fundamentally constrained by their semantic-first design philoso-phy. The core limitation persists: existing pre-training objectives align poorly with instance-level tasks requiring discrimination between semantically identical entities. Contrastive learning approaches have attempted to bridge this gap through various strategies. Early frameworks like MoCo [9, 10, 11] and SimCLR [12, 13] leverage negative sampling to amplify feature discriminability, but their reliance on random or class-agnostic negatives often introduces noisy training signals. Non-contrastive alternatives like DINO avoid negative sampling through self-distillation, yet sacrifice local instance details in favor of global feature consistency. Recent innovations reveal promising directions: BOAT [14] introduces dynamic token clustering in both spatial and feature domains to sharpen instance boundaries, while CRATE [15] establishes mathemat-ical interpretability for instance segmentation through sparse coding principles. Medical imaging studies like ViT-Med [16] further demonstrate ViT’s instance-aware potential, with models achieving diagnostic-grade accuracy through attention map interpretability. However, methods like MaskCon-trast [17]—which directly utilize ViT attention maps for pseudo-mask generation—remain hampered 2by the inherent semantic biases of pre-trained attention mechanisms, particularly in complex scenes with occluded or overlapping instances. Architectural modifications present another dimension of exploration, though often at the cost of generalizability. Vision Reservoir [18] and Vision Mamba [19] dramatically reduces parameters through reservoir computing layers but sacrifices spatial sensitivity crucial for instance localization. Domain-specific adaptations like CVFormer’s [20]circular-view attention for autonomous driving and hybrid CNN-ViT [21] designs in behavior recognition systems achieve task-specific gains through carefully engineered inductive biases. MultiMAE [22] extends masked autoencoding to multimodal inputs, revealing that joint training with auxiliary modalities can enhance instance discrimination—a finding that underscores the untapped potential of leveraging ViT’s native attention mechanisms rather than modifying core architecture. CaiT [23] addresses the instability of deep ViT training by introducing the LayerScale mechanism and decoupling class-attention layers, achieving SOTA performance on ImageNet with fewer parameters. Its channel-wise residual scaling strategy offers new insights for future architectural designs. DETR [24] pioneers the application of Transformer in end-to-end object detection, eliminating the need for NMS and anchors through bipartite matching loss. Despite limitations in small object detection and training efficiency, its serialized prediction paradigm has inspired subsequent research in instance-aware tasks, such as Deformable DETR [25], Conditional DETR [26], DAB-DETR [27], Group DETR [28], Co-DETR [29], and others. These collective insights motivate our approach to instance discrimination without architectural alteration. By developing entropy-guided morphological refinement of attention maps—inspired by medical image analysis techniques—we enable precise instance region extraction even in clut-tered scenes. Coupled with adaptive triplet mining that contrasts intra-instance variance against inter-instance similarity, the framework dynamically identifies challenging cases where current rep-resentations falter. This dual strategy preserves ViT’s semantic strengths while injecting instance awareness, bridging the critical gap between self-supervised pre-training objectives and instance-level task requirements across segmentation, tracking, and recognition domains. 
+
+# 3 Approach 
+
+3.1 Overview 
+
+Our method enhances ViT with instance discrimination by leveraging attention-guided contrastive learning. The framework operates in three interconnected stages, as illustrated in Figure 1. First, we extract and refine the ViT’s multi-head attention maps to generate binary spatial masks that localize potential instance regions. This involves aggregating attention heads, adaptive thresholding, and morphological operations to suppress noise and delineate instance boundaries. Second, using these masks and the ViT’s patch embeddings, we mine challenging correspondence pairs: intra-instance dissimilar points (regions within the same instance that are semantically distinct in embedding space) and inter-instance similar points (regions across different instances with high embedding similarity). Finally, we design a contrastive objective that explicitly optimizes the ViT to minimize intra-instance variance while maximizing inter-instance separation. By iterating between attention-based instance localization and semantic correspondence learning, the model progressively learns to disentangle instances even in crowded scenes, without relying on manual instance-level annotations. 
+
+3.2 Binary Attention Map Generation 
+
+The core of our instance localization approach lies in transforming the self-attention patterns of ViT into spatially meaningful binary masks. While standard ViT compute multi-head attention to model global dependencies, we observe that the aggregated attention maps implicitly highlight regions corresponding to cohesive semantic units, such as object parts or entire instances. To leverage this property, we propose a hierarchical process to convert raw attention maps into instance-aware binary masks. Given an input image divided into N = H × W patches, let A ∈ RM ×N ×N represent the attention maps from M self-attention heads. Directly using individual attention heads introduces noise due to their diverse focus—some heads emphasize textures, while others capture global structures. To mitigate this issue, we average across all heads to obtain a consolidated attention map: 3Figure 1: Overview of the proposed method. CoViT enhances ViT’s instance discrimination by contrastive learning with attention-guided triplet mining. We extract refined instance regions from ViT’s attention maps, then construct ⟨anchor , intra-instance dissimilar , inter-instance similar ⟩
+
+triplets using embedding similarities. The model is trained to reconcile intra-instance variance while amplifying inter-instance distinctions, enabling instance-aware representations without semantic loss. 
+
+¯A = 1
+
+M
+
+> M
+
+X
+
+> m=1
+
+A(m), ¯A ∈ RN ×N , (1) where ¯A(i, j ) represents the normalized attention score between query patch i and key patch j. We then reshape ¯A into a spatial tensor ˆA ∈ RN ×H×W , where each query patch i corresponds to a 2D attention map ˆAi ∈ RH×W . This transformation aligns the attention scores with the original spatial layout of the patches. Each spatial attention map ˆAi reflects how strongly patch i attends to other regions in the image. To distinguish foreground (instance regions) from background, we binarize ˆAi using a query-specific adaptive threshold: 
+
+Bi(h, w ) = 
+
+1 if ˆAi(h, w ) ≥ τ · max( ˆAi),
+
+0 otherwise , (2) where τ ∈ (0 , 1) is a hyperparameter controlling sensitivity to weak attention signals. Unlike fixed thresholds, this adaptive strategy accounts for variations in attention magnitudes across different queries and images. For example, a patch centered on a salient object, such as a dog’s head, typically exhibits higher attention concentration, allowing for stricter thresholds ( τ ≈ 0.7). Conversely, a patch on a homogeneous region, like the sky, may require a lower τ to retain sparse activations. The initial binary maps Bi often contain fragmented foreground responses, small holes, and irregular boundaries due to the coarse granularity of ViT attention. To close short gaps while preserving the overall foreground support, we apply dilation followed by erosion (1D1E), corresponding to a morphological closing operation: 
+
+Dilation : Connect nearby foreground responses and fill small gaps using a 3 × 3 kernel kdilate :
+
+Bdilate  
+
+> i
+
+= Bi ⊕ kdilate , (3) where ⊕ denotes the dilation operator. 
+
+Erosion : Retract the expanded boundaries while retaining the newly connected foreground structures: 
+
+Mi = Bdilate  
+
+> i
+
+⊖ kerode , (4) 4Figure 2: Illustration of the attention-map processing pipeline. The morphological stage applies dilation followed by erosion (1D1E) to connect fragmented foreground responses and then retract the expanded boundaries. where ⊖ is the erosion operator applied with a 3 × 3 kernel kerode .The refined masks Mi may still contain overlapping regions from multiple instances. To isolate individual instances, we extract connected components from Mi. Specifically, for each query patch i,we treat its non-zero regions in Mi as candidate instance areas and apply a connected-component labeling algorithm: 
+
+Si = ConnectedComponents (Mi), (5) where Si is the set of disjoint regions (instances) associated with query i. The final instance mask set 
+
+S = SNi=1 Si aggregates candidates from all queries, ensuring comprehensive coverage of potential instances. 
+
+3.3 Correspondence Mining 
+
+The goal of correspondence mining is to identify challenging pairs that expose the ViT’s limitations in distinguishing instances. Specifically, we focus on two types of correspondences: regions within the same instance that are semantically distinct in embedding space, referred to as intra-instance dissimilar points, and regions across different instances that exhibit high semantic similarity in embedding space, referred to as inter-instance similar points. By optimizing these pairs, we encourage the ViT to refine its embeddings to better capture fine-grained instance boundaries, ultimately improving its ability to distinguish between objects. For each query patch i, let Si ∈ S represent the instance region (connected component) in the binary attention mask Mi. A patch i is considered a valid anchor if it satisfies the following condition: 
+
+|Si| ≥ γ, (6) where |Si| denotes the number of patches in Si, and γ is a minimum instance size threshold (e.g., γ =5 patches). This condition ensures that noisy anchors arising from fragmented or undersized regions are excluded, allowing us to focus on meaningful regions for further analysis. With valid anchors identified, we proceed to mine both intra-instance dissimilarities and inter-instance similarities. To uncover intra-instance dissimilarities, we search within the instance Si for the patch j∗ that is least similar to i in embedding space. Formally, this is expressed as: 
+
+j∗ = argmin 
+
+> j∈Si\{ i}
+
+S(i, j ), (7) where S ∈ [−1, 1] N ×N is the precomputed cosine similarity matrix of patch embeddings. Minimizing 
+
+S(i, j ∗) highlights regions where the ViT struggles to maintain intra-instance consistency—such as a dog’s leg and head, which may have low semantic similarity despite belonging to the same instance. To avoid trivial solutions, such as selecting boundary artifacts, we constrain j∗ to lie within the dilated mask Si ⊕ kdilate , ensuring geometric coherence while focusing on meaningful intra-instance relationships. 5Next, to address inter-instance similarities, we identify the patch k∗ from other instances that is most similar to i. To achieve this, we first suppress similarities to patches within Si by masking intra-instance regions. This is done by defining: 
+
+˜S(i, k ) = 
+
+S(i, k ), k / ∈ Si,
+
+−∞ , k ∈ Si, (8) where assigning −∞ to intra-instance positions guarantees that they cannot be selected by the subsequent maximization. We then perform hard negative mining by selecting: 
+
+k∗ = argmax 
+
+> k
+
+˜S(i, k ). (9) Maximizing S(i, k ∗) focuses on inter-instance confusion points, such as two different dogs with similar appearances. Penalizing these pairs helps the model disentangle embeddings of distinct instances. To ensure k∗ belongs to a different instance, we verify that k∗ /∈ Sj for any Sj ∈ S 
+
+overlapping with Si.Finally, a triplet (i, j ∗, k ∗) is retained only if it satisfies specific criteria. First, the triplet must exhibit semantic hardness, defined as: 
+
+S(i, k ∗) > S(i, j ∗) − α, (10) where α > 0 is a margin threshold. This ensures that the triplet is sufficiently challenging and provides meaningful training signals. Additionally, both j∗ and k∗ must lie within the dilated and eroded masks of their respective instances to avoid edge artifacts. These constraints collectively ensure that the mined triplets are both semantically and geometrically meaningful, enabling the model to learn robust and fine-grained instance representations. By systematically addressing intra-instance dissimilarities and inter-instance similarities, and carefully selecting challenging triplets, our approach forces the ViT to refine its embeddings. This refinement not only enhances the model’s ability to recognize subtle distinctions between objects but also improves its overall performance in tasks requiring precise instance localization and segmentation. 
+
+3.4 Contrastive Learning 
+
+The core objective of our framework is to refine the ViT’s embeddings to achieve strong intra-instance cohesion and inter-instance separation. To accomplish this, we design a hybrid contrastive loss that explicitly optimizes the challenging triplets mined in §3.3. Unlike conventional contrastive learning paradigms, which rely on predefined positive and negative pairs (e.g., via data augmentation), our approach dynamically identifies semantically meaningful hard pairs guided by the ViT’s own attention patterns. This targeted refinement enhances the model’s ability to discriminate between instances while preserving intra-instance consistency. For each valid triplet (i, j ∗, k ∗), where i is the anchor, j∗ represents the intra-instance dissimilar point, and k∗ denotes the inter-instance similar point, we impose a margin-based constraint to restructure the embedding space: 
+
+Ltri = 1
+
+|T | 
+
+X
+
+> (i,j ∗,k ∗)∈T
+
+max ( S(i, k ∗) − S(i, j ∗) + α, 0) , (11) where α > 0 is a margin hyperparameter, and S represents the cosine similarity matrix. This loss ensures that the similarity between i and its intra-instance hard positive j∗ exceeds that of the inter-instance hard negative k∗ by at least α. By focusing on hard pairs, the model learns to bridge semantic gaps within the same instance—such as aligning a cat’s tail with its head—while amplifying distinctions between visually similar regions across different instances, like two adjacent birds. To account for varying difficulty levels across triplets, we dynamically adjust α based on the hardness of the pair: 6α(i) = αbase + β · (S(i, k ∗) − S(i, j ∗)) , (12) where β controls the adaptation rate. This ensures that already well-separated pairs ( S(i, j ∗) ≫
+
+S(i, k ∗)) contribute less to the loss, preventing over-optimization of trivial cases and allowing the model to focus on more challenging scenarios. While the triplet loss addresses inter-instance confusion, we further enhance intra-instance uniformity by maximizing the similarity between the anchor i and all patches within its instance region Si.Inspired by the InfoNCE loss, we formulate this as: 
+
+Lintra = − 1
+
+|T | 
+
+X
+
+> (i,j ∗,k ∗)∈T
+
+1
+
+|Pi|
+
+X
+
+> m∈Pi
+
+log exp ( S(i, m )/t )
+
+P 
+
+> p∈Pi
+
+exp ( S(i, p )/t ) + exp ( S(i, k ∗)/t ) , (13) where Pi = Si \ { i} denotes all intra-instance positive patches and t > 0 is a temperature parameter. Averaging over every m ∈ Pi prevents the loss from favoring only the single hardest positive, while including the mined inter-instance hard negative k∗ in the denominator provides contrastive competition. The term therefore improves coherence across the full instance while repelling the most confusing external patch. Traditional contrastive losses, such as those used in SimCLR, treat augmented views of the same image as positives and all other images as negatives. However, in our scenario, the relationships between positives and negatives are more nuanced. Positives are heterogeneous, as intra-instance regions may exhibit significant appearance variations. Negatives are structured, as inter-instance confusion is often spatially localized—for example, adjacent objects in an image. Our hybrid loss explicitly models these properties, capturing instance-level geometric relationships that generic losses fail to address. By combining triplet-based inter-instance separation with intra-instance cohesion, our framework achieves a more refined and semantically meaningful embedding space. 
+
+# 4 Experiment 
+
+4.1 Experimental Setup 
+
+We evaluate our framework on COCO 2017 (object detection/instance segmentation) and HICO-DET(HOI detection), using ViT-B/16 backbones pretrained with MAE, CLIP vision encoder, DINO, and supervised ImageNet-1K initialization. Baselines include state-of-the-art instance-aware methods under identical hardware configurations. For attention mask generation, we set adaptive threshold τ = 0 .65 with entropy-based adjustment: 
+
+τ (i) = 0 .7 − 0.15 · H( ˆAi)/ log N , where H(·) measures attention map entropy. Morphological operations use 3 × 3 kernels, filtering instances smaller than γ = 5 patches. Correspondence mining employs margin αbase = 0 .2, adaptation rate β = 0 .1, and intra-instance temperature t = 0 .1. Hybrid contrastive losses are weighted as λtri = 0 .4, λintra = 0 .6, optimized via grid search on a 5% COCO subset. Training uses AdamW (lr = 1 e-4, weight decay 0.05) with 1024×1024 inputs and 64 batch size. We implement a three-phase protocol: (1) 10-epoch warmup with frozen ViT, training only morphological and projection layers; (2) Gradual ViT unfreezing from last to first blocks over 15 epochs; (3) Full-network fine-tuning with cosine LR decay for 25 epochs. All hyperparameters were finalized on COCO minival (5K images), with results averaged over three seeds (AP variance < 0.3). 
+
+4.2 Main Results Object Detection and Instance Segmentation : On COCO val2017, our method significantly enhances the performance of ViTDet and ViT-Adapter frameworks. For ViTDet, our approach improves the baseline AP@[.5:.95] from 46.2 to 48.1 (+1.9 points) in object detection and elevates mask AP in instance segmentation from 41.4 to 43.0 (+1.6 points), with a concurrent 3.3-point gain in boundary localization accuracy. 
+
+HOI Detection : On HICO-DET, our method demonstrates strong generalization across different HOI frameworks. For DEFR, we observe a 2.54-point improvement in full mAP (32.35 → 34.893), 7Table 1: Comparison of different methods on COCO dataset.                                                                                                                                                                                      
+
+> Method Baseline Ours AP bAP b
+> 50 AP b
+> 75 AP mAP m
+> 50 AP m
+> 75 AP bAP b
+> 50 AP b
+> 75 AP mAP m
+> 50 AP m
+> 75
+> ViT-T [1] 35.5 58.1 37.8 33.5 54.9 35.1 37.2 59.9 40.5 34.0 56.6 36.0 ViT-S [1] 40.2 63.1 43.4 37.1 59.9 39.3 42.0 64.9 45.8 37.9 61.4 40.2 ViT-B [1] 42.9 65.7 46.8 39.4 62.6 42.0 44.8 67.2 49.1 40.3 64.1 43.4 ViT-L [1] 45.7 68.9 49.4 41.5 65.6 44.6 47.3 69.4 51.9 42.4 66.9 45.6 ViTDet-T [8] 35.7 57.7 38.4 33.5 54.7 35.2 37.4 60.3 40.9 34.1 57.1 36.3 ViTDet-S [8] 40.6 63.3 43.5 37.1 60.0 38.8 41.5 63.9 45.4 37.1 60.6 39.5 ViTDet-B [8] 43.2 65.8 46.9 39.2 62.7 41.4 44.3 66.6 48.5 39.6 63.3 42.5 ViTDet-L [8] 46.2 69.2 50.3 41.4 65.8 44.1 48.1 70.5 52.8 43.0 67.5 46.6 ViT-Adapter-T [30] 41.1 62.5 44.3 37.5 59.7 39.9 43.0 64.6 47.4 38.0 61.4 41.1 ViT-Adapter-S [30] 41.7 62.8 45.3 36.9 59.5 39.8 44.2 65.7 48.5 38.8 62.4 41.9 ViT-Adapter-B [30] 47.0 68.2 51.4 41.8 65.1 44.9 49.6 70.6 54.0 43.6 67.7 46.9 ViT-Adapter-L [30] 48.7 70.1 53.2 43.3 67.0 46.9 51.1 72.8 55.5 45.0 69.5 48.7 ViT-B/32-FRCNN [31] 34.5 53.4 36.8 ---35.7 55.2 38.4 ---ViT-B/16-FRCNN [31] 37.8 57.4 40.1 ---39.4 58.9 41.6 ---
+
+Table 2: Comparison of different methods on HICO-DET dataset.                                                    
+
+> Method Baseline Ours Default Known Object Default Known Object Full Rare Non-Rare Full Rare Non-Rare Full Rare Non-Rare Full Rare Non-Rare DEFR [32] 32.35 33.45 32.02 ---34.89 36.03 34.48 ---ViPLO-S [33] 34.95 33.83 35.28 38.15 36.77 38.56 37.14 35.93 37.84 40.35 38.98 40.47 ViPLO-L [33] 37.22 35.45 37.75 40.61 38.82 41.15 39.25 37.42 39.81 42.75 40.98 43.26
+
+with particularly notable gains in rare category performance (+2.58 points). When combined with ViPLO, our approach achieves a new ViT-based state-of-the-art mAP of 39.25 (+2.03 points over baseline), confirming its effectiveness in modeling instance-level interactions. 
+
+4.3 Ablation Studies 
+
+To validate the effectiveness of key components in our DEFR framework, we conduct comprehensive ablation experiments analyzing design choices across attention mechanisms, morphological post-processing, contrastive learning strategies, and model initialization. All studies are performed on the standard benchmark under identical settings to ensure fair comparisons. 
+
+Analysis of Attention Head Selection . As shown in Table 3a, averaging all attention heads achieves the best performance (34.89 mAP). This is attributed to the complementary information captured by different heads, which focus on local details, global semantics, or spatial relations. For instance, some heads emphasize edge features, while others prioritize semantic associations. Averaging mitigates bias from individual heads. In contrast, empirically selecting four heads (34.67 mAP) risks missing discriminative features due to suboptimal manual criteria. Randomly selecting one or four heads yields the worst performance due to insufficient feature coverage, offering negligible gains over the baseline. 
+
+Analysis of Morphological Operations . To optimize noise suppression and structural preservation, we evaluate morphological operation sequences (Table 3b). Dilation followed by erosion (1D1E) achieves the best performance (34.89 mAP) by bridging fragmented foreground regions (e.g., oc-cluded objects) and removing isolated noise. Conversely, erosion before dilation (1E1D) degrades performance by 0.87 mAP, as it strips fine structures (e.g., finger-object contacts). Repeated opera-tions (2D2E or 2E2D) over-smooth boundaries, blurring instance edges (e.g., person-background adhesion) or over-segmenting instances into disjoint regions. 
+
+Contrastive Loss Functions . Table 3c compares the variants. Triplet loss (TL) performs best by enforcing compact features within instances and separation across instances. HEAL remains competitive but requires dynamic weights. MML, MVCL, and NCL show weaker local discrimination. 8Table 3: Ablation Study on the HICO-DET dataset. 
+
+Attn Head Full Rare Non-Rare Base 32.35 33.45 32.02 Rand 1 33.72 ↑1.37 34.88 33.41 Emp. 4 34.67 ↑2.32 35.77 34.23 Rand 4 34.12 ↑1.77 35.34 33.49 Average 34.89 ↑2.54 36.03 34.48 (a) Study on Attention Head Selection. Method Full Rare Non-Rare Base 32.35 33.45 32.02 1D1E 34.89 ↑2.54 36.03 34.48 1E1D 34.02 ↑1.67 35.14 33.59 2D2E 34.57 ↑2.22 35.78 34.14 2E2D 33.84 ↑1.49 34.96 33.53 (b) Study on Morphological Operations. Loss Type Full Rare Non-Rare TL 34.89 ↑2.54 36.03 34.48 NCL 33.87 ↑1.52 35.11 33.53 MML 34.22 ↑1.87 35.34 33.86 HEAL 34.74 ↑2.39 35.86 34.31 MVCL 34.24 ↑1.89 35.46 33.91 (c) Study on Contrastive Loss Type. Method Full Rare Non-Rare Base 32.35 33.45 32.02 Base+M 34.72 ↑2.37 35.87 34.34 DINO+M 34.86 ↑2.51 35.98 34.45 CLIP+M 34.83 ↑2.48 35.94 34.43 MAE+M 34.89 ↑2.54 36.03 34.48 (d) Study on Pre-train Weight. Method Full Rare Non-Rare Base 32.35 33.45 32.02 Method 1 32.97 ↑0.62 34.11 32.63 Method 2 34.32 ↑1.97 35.44 33.96 Method 3 34.89 ↑2.54 36.03 34.48 (e) Study on Positive Sample Selection. Method Full Rare Non-Rare Base-B/16 32.35 33.45 32.02 MAE-B/16 34.89 ↑2.54 36.03 34.48 MAE-L/16 37.56 ↑5.21 39.58 36.25 MAE-H/14 39.83 ↑7.48 42.24 38.23 (f) Study on MAE Pre-train Weight. 
+
+Analysis of ViT Pre-training Strategies . We evaluate ViT initialization methods in Table 3d. MAE-ViT excels (34.89 mAP) by learning pixel-level spatial structures through masked reconstruction, enhancing fine-grained localization (e.g., hand-object contacts). DINO-ViT and CLIP-ViT priori-tize semantic alignment but weaken spatial relation modeling (e.g., distinguishing multiple cups). ImageNet-supervised ViT underperforms due to its global feature bias. 
+
+Analysis of Positive Sample Selection . Table 3e compares triplet sampling strategies. *Method 3* (selecting intra-instance points with maximum variation) achieves the best results by improving robustness to deformation/occlusion (e.g., modeling head-to-foot differences). *Method 2* (spatially constrained sampling) fails in cluttered scenes (e.g., dense objects), while *Method 1* (neighboring patches) introduces noise from adjacent instances. 
+
+Performance Boundary Analysis . Scaling up to ViT-H/14 (Table 3f) improves mAP to 39.83, benefiting from enhanced capacity to model small instances (e.g., distant objects) and rare interactions. However, the 4.3× parameter increase yields only a 4.94 mAP gain, highlighting a trade-off between capacity and efficiency. Gains primarily stem from deeper attention layers optimizing cross-instance relations (e.g., distinguishing interactors in crowded scenes). 
+
+# 5 Conclusion and Future Work 
+
+In this work, we identify a key limitation of ViTs: they often confuse different objects from the same category. CoViT addresses this problem by using self-attention maps and patch similarities to mine instance-aware triplets. The resulting contrastive objective reduces intra-instance variation and enlarges inter-instance separation without extra annotations. Experiments on object detection, instance segmentation, and HOI detection show consistent gains across several ViT backbones and downstream frameworks. These results demonstrate the value of explicit instance modeling for instance-level vision tasks. Future work will improve robustness to occlusion and extend CoViT to end-to-end self-supervised pre-training. 9References 
+
+[1] Alexey Dosovitskiy, Lucas Beyer, Alexander Kolesnikov, Dirk Weissenborn, Xiaohua Zhai, Thomas Unterthiner, Mostafa Dehghani, Matthias Minderer, Georg Heigold, Sylvain Gelly, Jakob Uszkoreit, and Neil Houlsby. An image is worth 16x16 words: Transformers for image recognition at scale. In International Conference on Learning Representations (ICLR) , 2021. [2] Hugo Touvron, Matthieu Cord, Matthijs Douze, Francisco Massa, Alexandre Sablayrolles, and Hervé Jégou. Training data-efficient image transformers & distillation through attention. In 
+
+International Conference on Machine Learning (ICML) , 2021. [3] Kaiming He, Xinlei Chen, Saining Xie, Yanghao Li, Piotr Dollár, and Ross Girshick. Masked autoencoders are scalable vision learners. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , pages 16000–16009, 2022. [4] Mathilde Caron, Hugo Touvron, Ishan Misra, Hervé Jégou, Julien Mairal, Piotr Bojanowski, and Armand Joulin. Emerging properties in self-supervised vision transformers. In Proceedings of the International Conference on Computer Vision (ICCV) , 2021. [5] Maxime Oquab, Timothée Darcet, Theo Moutakanni, Huy Vo, Marc Szafraniec, Vasil Khalidov, Pierre Fernandez, Daniel Haziza, Francisco Massa, Alaaeldin El-Nouby, et al. Dinov2: Learning robust visual features without supervision. arXiv preprint arXiv:2304.07193 , 2023. [6] Jinghao Zhou, Chen Wei, Huiyu Wang, Wei Shen, Cihang Xie, Alan Yuille, and Tao Kong. ibot: Image bert pre-training with online tokenizer. arXiv preprint arXiv:2111.07832 , 2021. [7] Mathilde Caron, Ishan Misra, Julien Mairal, Priya Goyal, Piotr Bojanowski, and Armand Joulin. Unsupervised learning of visual features by contrasting cluster assignments. Advances in Neural Information Processing Systems (NeurIPS) , 33:9912–9924, 2020. [8] Yanghao Li, Hanzi Mao, Ross Girshick, and Kaiming He. Exploring plain vision transformer backbones for object detection. In European Conference on Computer Vision (ECCV) , pages 254–270. Springer, 2022. [9] Kaiming He, Haoqi Fan, Yuxin Wu, Saining Xie, and Ross Girshick. Momentum contrast for unsupervised visual representation learning. Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , pages 9729–9738, 2020. [10] Xinlei Chen, Haoqi Fan, Ross Girshick, and Kaiming He. Improved baselines with momentum contrastive learning. arXiv preprint arXiv:2003.04297 , 2020. [11] Xinlei Chen, Saining Xie, and Kaiming He. An empirical study of training self-supervised vision transformers. In Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV) , 2021. [12] Ting Chen, Simon Kornblith, Mohammad Norouzi, and Geoffrey Hinton. A simple framework for contrastive learning of visual representations. Proceedings of the International Conference on Machine Learning (ICML) , pages 1597–1607, 2020. [13] Ting Chen, Simon Kornblith, Kevin Swersky, Mohammad Norouzi, and Geoffrey Hinton. Big self-supervised models are strong semi-supervised learners. arXiv preprint arXiv:2006.10029 ,2020. [14] Haoyu Ma, Yunhang Liu, Yuchao Zhang, Shaohui Lin, and Ke Wang. Bilateral local attention vit: Image-space meets feature-space. Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 12196–12205, 2022. [15] Ma Yi, Daniel Fu, Yaodong Liu, Hao Wang, and Yi Zhu. White-box transformers via sparse rate reduction. arXiv preprint arXiv:2308.16271 , 2023. [16] Suxing Liu, Anusha Achuthan, Ali Fawzi, and Galib Muhammad Shahriar Himel. Dual-activated lightweight attention resnet50 for automatic histopathology breast cancer image classification. 
+
+arXiv preprint arXiv:2308.13150 , 2024. 10 [17] Yang Liu, Yixin Zhang, Yuwen Wang, Feng Hou, Zehuan Yuan, Jin Tian, Yong Zhang, Zhiqiang Shi, Jing Jiang, and Xun Cao. Maskcontrast: Unsupervised semantic segmentation by contrastive masked features. In European Conference on Computer Vision (ECCV) , pages 151–167, 2022. [18] Xian Wei, Bin Wang, Mingsong Chen, Ji Yuan, Hai Lan, Jiehuang Shi, Xuan Tang, Bo Jin, Guozhang Chen, and Dongping Yang. Vir: the vision reservoir. arXiv preprint arXiv:2112.13545 , 2021. [19] Lianghui Zhu, Bencheng Liao, Qian Zhang, Xinlong Wang, Wenyu Liu, and Xinggang Wang. Vision mamba: Efficient visual representation learning with bidirectional state space model. In 
+
+Forty-first International Conference on Machine Learning , 2024. [20] Zhengqi Bai, Wenjun Shi, Dongchen Zhu, Hanlong Kang, Guanghui Zhang, Gang Ye, Yang Xiao, Lei Wang, Xiaolin Zhang, and Jiamao Li. Cvformer: Learning circum-view representa-tion and consistency for vision-based occupancy prediction via transformers. In 2024 IEEE International Conference on Robotics and Automation (ICRA) , 2024. [21] Ba Hung Ngo, Nhat-Tuong Do-Tran, Tuan-Ngoc Nguyen, Hae-Gon Jeon, and Tae Jong Choi. Learning CNN on ViT: A hybrid model to explicitly class-specific boundaries for domain adaptation. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , pages 28545–28554, June 2024. [22] Roman Bachmann, David Mizrahi, Rodolphe Jenatton, and Neil Houlsby. Multimae: Multi-modal masked autoencoders. Advances in Neural Information Processing Systems , 36:12345– 12358, 2023. [23] Hugo Touvron, Matthieu Cord, Alexandre Sablayrolles, Gabriel Synnaeve, and Hervé Jégou. Going deeper with image transformers. arXiv preprint arXiv:2103.17239 , 2021. [24] Nicolas Carion, Francisco Massa, Gabriel Synnaeve, Nicolas Usunier, Alexander Kirillov, and Sergey Zagoruyko. End-to-end object detection with transformers. In Proceedings of the European Conference on Computer Vision (ECCV) , 2020. [25] Xizhou Zhu, Weijie Su, Lewei Lu, Bin Li, Xiaogang Wang, and Jifeng Dai. Deformable detr: Deformable transformers for end-to-end object detection. In Proceedings of the International Conference on Learning Representations (ICLR) , 2020. [26] Depu Meng, Xiaokang Chen, Zejia Fan, Gang Zeng, Houjiang Li, Yuhui Yuan, Lei Sun, and Jingdong Wang. Conditional detr for fast training convergence. In Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV) , 2021. [27] Hongkai Zhang, Hong Chang, Bingpeng Ma, Naiyan Wang, and Xilin Chen. Dab-detr: Dynamic anchor boxes for end-to-end object detection. In Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV) , 2021. [28] Qiang Chen, Xiaokang Chen, Jian Wang, Shan Zhang, Kun Yao, Haocheng Feng, Junyu Han, Errui Ding, Gang Zeng, and Jingdong Wang. Group detr: Fast detr training with group-wise one-to-many assignment. In Proceedings of the IEEE International Conference on Computer Vision (ICCV) , 2023. [29] Zhuofan Zong, Guanglu Song, and Yu Liu. Detrs with collaborative hybrid assignments training. In 2023 IEEE/CVF International Conference on Computer Vision (ICCV) , pages 6725–6735. IEEE, 2023. [30] Zhe Chen, Yuchen Duan, Wenhai Wang, Junjun He, Tong Lu, Jifeng Dai, and Yu Qiao. Vision transformer adapter for dense predictions. In European Conference on Computer Vision (ECCV) ,pages 107–123. Springer, 2022. [31] Wenhai Wang, Enze Xie, Xiang Li, Deng-Ping Fan, Kaitao Song, Ding Liang, Tong Lu, Ping Luo, and Ling Shao. Toward transformer-based object detection. arXiv preprint arXiv:2012.09958 , 2020. 11 [32] Ying Jin, Yinpeng Chen, Lijuan Wang, Jianfeng Wang, Pei Yu, Lin Liang, Jenq-Neng Hwang, and Zicheng Liu. The overlooked classifier in human-object interaction recognition. arXiv preprint arXiv:2203.05676 , 2022. [33] Jeeseung Park, Jin-Woo Park, and Jong-Seok Lee. Viplo: Vision transformer based pose-conditioned self-loop graph for human-object interaction detection. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , pages 17152– 17162, June 2023. 12
