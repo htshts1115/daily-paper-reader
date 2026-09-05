@@ -1,0 +1,742 @@
+Title: ENEAS: Embedding-guided Neural Ensemble for Adaptive Segmentation
+
+URL Source: https://arxiv.org/pdf/2609.03756v1
+
+Published Time: Fri, 04 Sep 2026 01:11:40 GMT
+
+Number of Pages: 19
+
+Markdown Content:
+## speridlabs       
+
+> P R E P R I N T ·T E C H N I C A L R E P O R T 2 0 2 6 ·S P E R I D L A B S R E S E A R C H
+
+T E XT P R O M P TA B L E S E G M E N TAT I O N 
+
+# ENEAS: Embedding-guided Neural Ensemble for Adaptive Segmentation. 
+
+Javier del Pino †, Salvador Rodríguez , Alejandro Garabito , Javier Álvarez , Chema Garabito 
+
+SperidLabs · †Project lead · Code and models: github.com/speridlabs/eneas 
+
+A B S T R A C T 
+
+We present ENEAS, a unified, text-promptable method for instance tracking and semantic discovery. Text-promptable segmentation models, including the latest foundation models such as SAM 3 [6], still suffer from temporal hallucinations, spatial fragmentation, and semantic misclassification: they fail to report target absence when an object leaves the field of view, segment local textures instead of the complete object during extreme close-ups, and prioritize visual features over ontological reality, so that visually similar artifacts such as statues, paintings, or reflections are segmented as target entities. ENEAS works two ways from a single method: precise tracking and high-quality segmentation of a unique instance, and open-concept discovery of every instance a text query names, resolved by a semantic verifi-cation layer. For tracking, we extend the geometrically robust SeC architecture, previously limited to point interactions, with a text-prompting adapter and leverage its temporal memory, so that the target is held through disappearance without drifting to distractors and kept whole even when it fills the entire view. For discovery, the verification layer combines high-speed visual embedding matching with conditional VLM refinement, invoking semantic reasoning only for ambiguous candidates, which filters out the ontological errors that visual-only models cannot distinguish while keeping latency low. Designed with 3D reconstruc-tion in mind, where a single misclassified distractor corrupts the asset, ENEAS unlocks high-quality se-mantic tracking and segmentation of video, of broad libraries, and of collections of temporally or spatially unordered data, together with the discrimination to tell true instances from their doppelgangers: things that look alike but are not the same. The code and models are available at github.com/speridlabs/eneas.         
+
+> P R E P R I N T ·2 0 2 6 ·S P E R I D L A B S R E S E A R C H E N E A S ·1arXiv:2609.03756v1 [cs.CV] 3 Sep 2026
+
+# 01 · Introduction 
+
+Text-guided segmentation has become a cen-tral primitive of modern visual understanding. Auser names what they care about, and a model is expected to return pixel-accurate masks for it, either following one specific object across a video or discovering every instance of a concept as the scene evolves. Foundation models such as SAM [30], SAM 2 [54] and, most recently, SAM 3 [6], together with open-vocabulary detec-tors [41, 69] and multimodal language models [42, 3], have made both capabilities broadly acces-sible, unifying promptable tracking and open-vocabulary discovery in a single family of models. Despite this progress, two failure modes persist on uncurated video. Detection-driven trackers lack a notion of identity: when the target dis-appears they re-detect the prompt on whatever looks similar, and under extreme close-ups they fragment it into its parts. Semantic discovery, in turn, resolves “what is this” through visual priors alone, so a hyper-realistic statue or a pop-art por-trait is segmented as a person. The segmentation is geometrically correct and semantically wrong. We argue that these failures have a common root: strong perception coupled with weak ver-ification. We met them while building 3D re-construction pipelines, where a specific object must be isolated across unordered, partially oc-cluded views, and where every visitor must be removed without touching the sculptures being reconstructed. Existing models such as SAM 3 returned several paintings when asked for one, or masked statues as people, and were not us-able for the task. This paper presents ENEAS 
+
+Embedding-guided Neural Ensemble for Adap-tive Segmentation), a unified method that closes this gap. It takes a natural-language prompt and a sequence of frames, which may be an ordered video or an unordered image collection, and re-turns binary masks. When the prompt refers to a specific instance, the method anchors it once on a reference frame and propagates it through time with a memory-based tracker that maintains identity and reports absence. When the prompt names a category, it re-evaluates every frame, proposes candidate regions, scores them with a vision-language embedding, and routes only the ambiguous ones to a vision-language model VLM acting as a semantic judge. Both be-haviours share the same grounding and segmen-tation components and are exposed through the same interface. Our contributions are the following: 
+
+A unified text-guided segmentation method 
+
+that handles instance tracking and semantic discovery within one framework, applicable to ordered video and unordered image collections alike. 
+
+Text-driven initialization for memory-based tracking. We extend the SeC tracker [85], previously limited to point interaction, with an open-vocabulary grounding stage, obtaining a text-prompted tracker that handles disappear-ance without drifting and preserves spatial in-tegrity under extreme scale changes. 
+
+Semantic verification only where it is needed. 
+
+We combine sigmoid-based embedding matching with prompt ensembles and a con-ditional VLM judge invoked only inside an un-certainty interval, with contextual neighbour masking to isolate each candidate. This yields high semantic precision while keeping the VLM activation rate, and hence latency, low. 
+
+An empirical study of ontological robustness. 
+
+On a real capture of hyper-realistic statues, our method removes the false positives that SAM 3 produces while preserving most of its re-call, and a set of ablations quantifies the con-tribution of each component and the accuracy– latency trade-off of the uncertainty interval. The code and models are publicly available. 
+
+# 02 · Related Work 
+
+Promptable and universal segmentation. In-stance and panoptic segmentation matured through closed-set detectors and mask heads such as Faster RCNN [55] and Mask RCNN [25], and later through set-prediction transformers such as DETR [5], DINO [83], Mask2Former [10], and OneFormer [26], all of which segment a fixed vocabulary of classes. The Segment Anything Model [30] broke with this by making segmenta-tion promptable from points, boxes, and masks, trained on a billion-mask corpus, and spawned         
+
+> P R E P R I N T ·2 0 2 6 ·S P E R I D L A B S R E S E A R C H E N E A S ·2
+
+variants that improve mask quality [28], effi-ciency [70], granularity [39], and prompt diver-sity [90]. SAM 2 [54] extended the paradigm to video with a Hiera backbone [59] and a streaming memory bank that conditions the current frame on past predictions, enabling object tracking from a single annotation. SAM 3 [6] adds Promptable Concept Segmentation: given a noun phrase, it detects, segments, and tracks every matching instance. ENEAS builds on this family for mask generation, using SAM 2.1 as its segmentation head, but targets the reliability gap that remains once prompts become linguistic: identity under absence and occlusion, and ontological correct-ness under visual ambiguity. 
+
+Open-vocabulary detection and segmentation. 
+
+Transferring vision-language knowledge into de-tectors began with distillation from CLIP-like mod-els [22] and image-level supervision [88], and continued with grounded pre-training that treats detection as phrase grounding [33]. Transformer detectors were then made open-vocabulary at scale [46, 47], Grounding DINO [41] and its suc-cessor [57] fused language and vision features for open-set detection, and YOLOWorld [15] brought the capability to real-time regimes. On the segmentation side, LSeg [34] aligned per-pixel embeddings with text and OpenSeg [21] aligned caption words with predicted masks, ODISE [72] exploited the representations of text-to-image diffusion models, SAN [73] attached a light side network to a frozen CLIP, and X Decoder [89] and OpenSeeD [84] unified seg-mentation with other vision-language or detection tasks in a single decoder. Grounded SAM [56] chains an open-set detector with SAM to ob-tain text-conditioned masks. These detect-then-segment systems are strong per-frame detec-tors but have no memory, which produces the identity drift we analyse in Section 4.4. Flo-rence [79] introduced a vision foundation model adaptable to detection, retrieval, and captioning, and Florence-2 [69] recast it as a sequence-to-sequence model that solves detection, phrase grounding, and captioning through task prompts. Our method uses Florence-2 as its region pro-posal component in both modes. 
+
+Referring and reasoning segmentation. Refer-ring segmentation localises the single object de-scribed by an expression, in images [75] and in video [68], with recent benchmarks stressing motion expressions [18]. A newer line couples multimodal large language models with mask de-coders so that the language model itself emits a segmentation token: LISA [32] and GLaMM [53] for images, and VISA [74], VideoLISA [1], and Sa2VA [80] for video. These models put the lan-guage model in charge of answering the prompt. SeC [85], on which our tracking mode builds, uses a large vision-language model differently: not to answer the prompt, but to maintain aconcept-level memory of the tracked object once a spatial prompt has been given. 
+
+Video object segmentation with memory. 
+
+Memory-based video object segmentation prop-agates a mask from an annotated frame through space-time memory [48], long-term memory models [11], object-level readout [12], and hier-archical propagation [76]. SAM 2 adopted the same principle, and follow-ups extend its mem-ory for long videos [19], make it motion-aware for tracking [77], or add distractor-aware mem-ory [64]. DEVA [14] and SAMTrack [13] decouple an image-level open-vocabulary segmenter from temporal propagation, and multi-object trackers associate detections over time with [38] or with-out [82] language. These systems either propa-gate a visual prompt through appearance mem-ory or fuse per-frame detections; none maintains a model of what the target is. SeC [85] augments SAM 2 with a vision-language model that pro-gressively builds a concept-level representation of the target from past keyframes and injects it into the mask decoder when a scene change is detected. Our method provides the missing text interface and inherits SeC’s robustness to disap-pearance and scale change. 
+
+Vision-language embeddings. CLIP [52] and ALIGN [27] established contrastive image-text pre-training with a softmax objective over the pairs in a batch, and open reproductions at scale followed with LAION5B [62]. SigLIP [81] replaced the softmax with a pairwise sigmoid loss, so that each image-text pair is scored independently, and SigLIP 2 [63] improved semantic understand-ing and localisation, adding a NaFlex variant that processes images at their native aspect ratio in the spirit of NaViT [16]. Prompt ensembles were         
+
+> P R E P R I N T ·2 0 2 6 ·S P E R I D L A B S R E S E A R C H E N E A S ·3
+
+introduced with CLIP itself and later learned [87], and calibrating the resulting scores is a long-standing concern [23]. Section 4.2 shows why sigmoid independence matters for filtering can-didate crops. 
+
+Vision-language models as judges. Instruction-tuned vision-language models such as LLaVA [42], BLIP2 [36], InternVL [9], PaliGemma [4], and the Qwen-VL series [65, 2, 3] can answer open questions about an image. Lan-guage models are increasingly used to judge the outputs of other models [86], but vision-language models are themselves prone to object hallucina-tion [37], and eliciting explicit reasoning [66] im-proves accuracy at the cost of generating many additional tokens. Constrained decoding [67] makes their verdicts machine-readable, and cas-cades that reserve expensive models for hard in-puts [8], or abstain when uncertain [20], trade ac-curacy against cost. ENEAS applies these ideas to segmentation: a small Qwen3VL acts as a conditional judge, restricted to the cases where embeddings alone are indecisive and answering through a constrained schema without free-form reasoning. 
+
+Distractors in 3D reconstruction. Neural radi-ance fields [45] and 3D Gaussian Splatting [29] assume a static scene, and transient objects such as passers-by leave floaters and ghosts. NeRF in the Wild [44] models transients with per-image la-tents, RobustNeRF [60] and NeRF On-the-go [58] down-weight them with robust losses and un-certainty, and SpotlessSplats [61] and WildGaus-sians [31] bring the same ideas to Gaussian splat-ting. A complementary line lifts 2D segmenta-tion and language features into the 3D represen-tation [78, 7, 51]. These methods handle distrac-tors inside the reconstruction, from photometric residuals, uncertainty, or generic visual features, without assuming what a distractor is. ENEAS in-stead removes them semantically before recon-struction, with explicit masks and an explicit no-tion of what a distractor is, which is what allows it to spare a statue while removing the visitor next to it. 
+
+# 03 · Method 
+
+ENEAS is a single method that takes a natural-language prompt and a set of frames and returns binary masks. It is built on shared components: Florence-2Large [69] grounds the prompt into image regions, and a Segment Anything model produces the final masks. Depending on whether the prompt refers to a specific instance (e.g., “the blue painting”) or to a category (e.g., “person”), the method either propagates a single initializa-tion through time or verifies every candidate re-gion semantically. 
+
+Problem statement. Given a collection of frames 
+
+{It}Nt=1 , It ∈ RH×W ×3, which may or may not be temporally ordered, and a natural-language prompt p, ENEAS returns binary masks. When p
+
+designates a specific instance, the output is one mask per frame, Mt ∈ { 0, 1}H×W , with Mt = 0
+
+whenever the object is not visible. When p names a category, the output is a set of masks per frame, 
+
+{M(i) 
+
+> t
+
+}nt
+
+> i=1
+
+, one per instance, where the number of instances nt varies from frame to frame. Both cases share a grounding operator G(I, p ) that re-turns image regions matching p, and a segmen-tation operator S(I, r) that turns a region r into a mask. 
+
+3.1 Instance Tracking 
+
+For tracking a specific object defined by the user (e.g., “the blue car”), ENEAS builds upon the SeC architecture [85], which extends SAM 2 with a concept-level memory of the target. Rather than matching appearance alone, the tracker main-tains a high-level representation of what the ob-ject is, which makes it robust to drastic viewpoint changes and to the target leaving and re-entering the view. Since SeC natively supports only point-based interaction, we add a text-driven initializa-tion: on a reference frame It0 , the grounding op-erator locates the object described by the prompt, 
+
+r0 = G(It0 , p ), and this single region initializes the tracker. Every other mask is then obtained by propagation, 
+
+Mt = T (It | r0, Ht
+
+), 1) where T is the SeC tracker and Ht its memory of the frames already processed, so that identity is enforced throughout: when the object is not visi-ble, Mt is empty rather than drifting to a look-alike.         
+
+> P R E P R I N T ·2 0 2 6 ·S P E R I D L A B S R E S E A R C H E N E A S ·4
+
+Two interaction modes are supported, points for maximum precision and natural language for ease of use, and the reference frame may be chosen anywhere in the sequence. 
+
+3.2 Semantic Discovery 
+
+For semantic discovery, ENEAS re-evaluates ev-ery frame, so that new instances entering the scene are found without re-prompting. It is or-ganised as a cascade of stages of increasing cost, each applied only to the candidates the pre-vious one could not resolve. The complete deci-sion flow is visualized in Figure 1. 
+
+Region proposal. The grounding operator, in-stantiated with Florence-2 [69], proposes a set of candidate regions for the requested category on every frame, Rt = G(It, p ), and duplicate propos-als are merged. This stage is deliberately permis-sive: it should miss nothing, at the cost of propos-ing distractors that later stages must remove. 
+
+Embedding verification. Each candidate is scored against the category with a vision-language embedding model, SigLIP 2 [63], that judges every image-text pair independently, so that the presence of other objects in the crop does not suppress the score of the target. To make the scores robust to the difference between the whole images the model was trained on and the crops it sees here, several phrasings of the cate-gory are averaged into a single score s(r) ∈ [0 , 1] 
+
+per candidate. Two thresholds, τrej < τ acc , split the candidates into three groups: 
+
+r 7 →
+
+
+
+accept if s(r) ≥ τacc ,
+
+discard if s(r) < τ rej ,
+
+verify otherwise ,
+
+2) so that clearly matching candidates are accepted, clearly non-matching ones are discarded, and the remainder, the 
+
+uncertainty interval , is deferred to the next stage. The two thresholds are the knobs that trade latency against semantic rigor Sec-tion 5.2). 
+
+Semantic verification. Only candidates in the un-certainty interval are shown to a vision-language model, Qwen3VL [3], acting as a judge that re-turns a binary verdict v(r) ∈ { 0, 1}. It is asked whether the region truly is an instance of the cate-gory and not a look-alike such as a statue, a man-nequin, or a picture. Pixels belonging to neigh-bouring candidates are masked out so that the judgement concerns the candidate alone, and the model answers in a fixed format without free-form reasoning, which keeps the cost of each verdict low. Because this stage is reached only by gen-uinely ambiguous candidates, its cost scales with the ambiguity of the scene rather than with the number of objects in it. 
+
+Mask generation. The accepted set At, made of the candidates accepted directly and those with 
+
+v(r) = 1 , is passed to the segmentation opera-tor, instantiated with SAM 2 [54] from the Seg-ment Anything family [30], giving one mask per instance, M(i) 
+
+> t
+
+= S(It, ri) for ri ∈ A t.
+
+# 04 · Experiments & Results 
+
+Before detailing the experimental results, we out-line the evolution of our architecture. It is impor-tant to note that while ENEAS addresses both in-stance tracking and semantic discovery, the ma-jority of our design analysis and ablation studies focus on semantic discovery. This is where our method introduces its novel cascaded verification involving embeddings and VLMs, which requires rigorous justification. Instance tracking, being a direct adaptation of the SeC tracker, is evaluated primarily on its comparative robustness in tempo-ral tracking scenarios. 
+
+4.1 Target Scenario and Datasets 
+
+ENEAS was designed with 3D reconstruction and novel view synthesis [45, 29] in mind. A capture for these tasks is a collection of photographs or a video, often at low frame rates, whose views differ widely in viewpoint, frequently lack a tem-poral order, and occlude the subject to varying degrees. Before reconstruction, two questions must be answered for every view: what to keep and what to remove. Instance tracking answers the first, isolating the object being reconstructed across all views. Semantic discovery answers the second, removing every distractor of a class, typ-ically people, so that no ghost remains in the re-constructed scene. The costs of the two errors are asymmetric: a false positive masks part of the asset and destroys it, whereas a false negative leaves a visible artifact. This asymmetry is what                                 
+
+> P R E P R I N T ·2 0 2 6 ·S P E R I D L A B S R E S E A R C H E N E A S ·5Inputs
+> frame It
+> prompt p
+> Region Proposal
+> candidate regions Rt
+> Embedding Verification
+> score s(r)∈[0 ,1]
+> Mask Generation
+> At→M(i)
+> t
+> Output
+> masks
+> {M(i)
+> t}nt
+> i=1
+> Semantic Verification
+> verdict v(r)∈ { 0,1}
+> discarded threshold τrej , τ acc
+> Rts(r)s(r)≥τacc
+> accept
+> τrej ≤s(r)< τ acc
+> verify
+> s(r)< τ rej
+> v(r) = 1
+> v(r) = 0 F I G . 1
+
+ENEAS decision flow for semantic discovery. For every frame It and prompt p, region proposal yields candidate regions 
+
+Rt; embedding verification scores each candidate with s(r). Candidates above τacc are accepted directly and those below τrej 
+
+are discarded; only the uncertainty interval in between is routed to semantic verification, where a vision-language model re-turns a verdict v(r). The accepted set At is turned into one binary mask per instance by mask generation. Each stage is costlier than the previous one and sees fewer candidates. 
+
+motivates the precision-first design of Section 3. The capture regime also makes the design afford-able: most views contain few or no distractors, so the embedding filter resolves them and the VLM is rarely invoked, and the process is offline, so a few seconds per image amounts to minutes for a collection of hundreds of views, negligible next to the reconstruction itself. 
+
+Church Statues is such a capture. It consists of frames extracted from a low frame rate record-ing of a church interior, acquired for a 3D recon-struction, in which hyper-realistic religious sculp-tures stand alongside visitors. The sculptures are what must be preserved and the visitors what must be removed, so the capture naturally maxi-mizes ontological ambiguity for the prompt “per-son”. Ground-truth instance annotations were produced manually by the authors. The remain-ing sequences, Moving Boxes (an indoor scene in which people carry and stack boxes among furniture, occluding each other and the chairs) and Blue Painting (a dynamic indoor sequence in which a single painting undergoes viewpoint changes, occlusions, and close-ups), together with the external SACo/VEval benchmark, are conventional video and are used to verify that the robustness obtained for the capture scenario holds beyond it. 
+
+4.2 Design Evolution and Justification 
+
+The architecture proposed in this work is the re-sult of a rigorous iterative process aimed at re-solving specific trade-offs between recall , pre-cision , and computational latency. In the con-text of this study, we define recall as the sys-tem’s capacity to detect every instance of the tar-get category, thereby minimizing false negatives. Conversely, precision denotes the ability to rig-orously distinguish the target concept from se-mantic distractors, ensuring that false positives are eliminated. In this section, we detail the evo-lution of our method through four distinct devel-opment phases, analyzing the theoretical limita-tions of prior approaches that necessitated our fi-nal design. 
+
+Phase 1 Limitations of Exhaustive Scene Pars-ing and Composite Visual Prompting. Our initial approach employed a detect-filter-validate strat-egy designed to maximize semantic understand-ing. We implemented an exhaustive dense object captioning mechanism aiming to generate bound-ing boxes accompanied by rich textual descrip-tions for all salient elements within the scene. Subsequently, to alleviate the load on the valida-tion stage, we applied an intermediate textual fil-ter, involving the computation of semantic simi-larity between the generated descriptions and the target prompt using text-only embeddings. For the final validation, we attempted to optimize throughput using a composite visual prompting strategy. Instead of processing crops individu-ally, we constructed a single query image con-taining the full frame annotated with color-coded, numbered bounding boxes, supplemented by a         
+
+> P R E P R I N T ·2 0 2 6 ·S P E R I D L A B S R E S E A R C H E N E A S ·6
+
+grid of spatially clustered crops to preserve res-olution. The downstream vision-language model was queried with a complex, multi-step prompt instructed to iterate through and validate each numbered instance sequentially. While theoretically efficient, this approach exhib-ited critical failure modes inherent to the dense description paradigm. First, the textual filter was strictly dependent on the generative fidelity of the region proposal network, suffering from 
+
+Open-Set Hallucinations . For instance, the generation module would frequently assign arbitrary proper nouns (e.g., labeling a statue as “Saint Christian”) to generic objects, effectively bypassing the se-mantic filter. Furthermore, this approach suf-fered from spatial aggregation, frequently merg-ing distinct semantic entities, such as a chair and a surrounding table, into single bounding boxes. This rendered precise instance segmentation im-possible. Ultimately, the high cognitive load of the multi-target association task within a single prompt necessitated the activation of deep rea-soning capabilities to prevent attention drift. This dependency introduced prohibitive latency, start-ing at a minimum of 15 seconds per frame and escalating significantly in dense scenes. Conse-quently, this approach proved inviable for video processing. 
+
+Phase 2 The Softmax Bottleneck in Contrastive Filtering. To address the spatial aggregation and recall issues encountered in the previous phase, we transitioned to a text-conditioned region pro-posal strategy. By explicitly prompting the de-tector with the target category, we improved in-stance separation but introduced a high rate of false positives. We attempted to filter these can-didates using contrastive vision-language em-bedding matching. Initially, we computed the softmax probability of the target text against generic negative classes such as “background” and “other object.” To improve granularity, we implemented a secondary object detection pass to identify specific objects present in the scene (e.g., “microphone”, “table”) and included these dynamic labels in the softmax computation. However, this approach revealed the fundamental deficiency of applying global softmax normaliza-tion to this task. The mutual exclusivity constraint inherent in the softmax function forces class probabilities to compete. In scenarios where a target object co-occurred with highly salient at-tributes identified in the secondary pass, such as a person holding a microphone, the model sup-pressed the target class probability in favor of the accessory’s label. This phenomenon resulted in score suppression that made it impossible to de-fine a stable acceptance threshold. 
+
+Phase 3 Sigmoidal Independence and Aspect Ratio Optimization. To resolve the score sup-pression issue, we implemented a sigmoid-based vision-language embedding matching. Crucially, this architecture employs a pairwise sigmoid loss, treating each image-text pair as an independent binary classification problem. This formulation effectively decouples the target object’s score from the presence of other semantic concepts in the crop. We specifically utilized an encoder op-timized for native aspect ratios, which preserves the dense features of our variable-size crops bet-ter than standard fixed-resolution encoders. Despite these architectural improvements, we ob-served a performance degradation caused by the domain shift between the model’s full-image pre-training and our crop-level inference inputs. To mitigate this, we implemented a prompt ensem-ble strategy, averaging embeddings across mul-tiple template variations to enforce robustness in the visual signal. 
+
+Phase 4 Optimization of the Semantic Judge. 
+
+Despite the improved embedding filter, a 
+
+zone of uncertainty persisted where visual embeddings alone failed to resolve ontological ambiguities, such as hyper-realistic statues. To address this, we integrated a lightweight VLM. Initially, exe-cuting the model with its native deep reasoning capability proved accurate but incurred signifi-cant latency due to extensive token generation. Furthermore, the model struggled with contextual interference from neighboring objects within the crop. To mitigate this, we apply black masking to iso-late the target pixel-wise. Subsequently, we dis-abled the deep reasoning mechanism in favor of a structured analytic prompt with explicit critical thinking constraints. This approach forces the model to verify the ontology without the overhead of generating internal reasoning tokens. By re-        
+
+> P R E P R I N T ·2 0 2 6 ·S P E R I D L A B S R E S E A R C H E N E A S ·7
+
+stricting this validation to the uncertainty interval, we achieve high semantic precision while reduc-ing verification latency to approximately one sec-ond on resource-constrained hardware. 
+
+4.3 Hardware and Evaluation Setup 
+
+All efficiency and latency experiments reported in this study were conducted in a standardized cloud inference environment to ensure repro-ducibility. The hardware configuration consisted of a single NVIDIA L4 GPU based on the Ada Lovelace architecture with 24 GB of VRAM, paired with an Intel Xeon CPU running 12 virtual cores at 2.20 GHz. This setup was selected to simu-late a realistic, cost-effective production scenario rather than a high-end high-performance com-puting environment. It is important to note that the reported latency figures encompass the full end-to-end pipeline, including data loading from stor-age and CPU-bound preprocessing steps such as normalization and resizing, which constitutes a non-negligible portion of the execution time in virtualized cloud environments. 
+
+4.4 Robustness in Instance Tracking 
+
+We evaluate the efficacy of ENEAS in handling in-stance disappearance, occlusion, and scale vari-ation, which are critical failure modes for prior text-guided trackers. We conducted a qualitative analysis on the Blue Painting sequence, targeting a specific object defined as “blue painting” that undergoes severe viewpoint changes and partial occlusions. 
+
+Robustness to Target Absence. As illustrated in Figure 2 Row 1, baselines relying on per-frame detection such as Grounded SAM [56] (using Grounding DINO [41] and SAM 2.1 [54]) exhibit significant identity drift. When the target object exits the field of view or is heavily occluded, the model hallucinates positive detections on back-ground elements such as curtains or distractor objects like the subject’s hair to satisfy the text prompt. In contrast, ENEAS Row 3 leverages the propagated temporal memory of the SeC ar-chitecture to enforce identity constraints. It cor-rectly reports a True Negative (zero mask) when the specific instance is not visible. This capabil-ity prevents the accumulation of false positives in long-term tracking. 
+
+Spatial Integrity under Scale Change. We fur-ther observed limitations in the spatial coherence of foundational models during extreme close-ups Figure 2, Column 5. Both Grounded SAM and SAM 3 [6] suffer from 
+
+spatial fragmentation as they segment only high-frequency details such as specific brushstrokes or figures within the paint-ing rather than the object as a holistic entity. Our approach maintains the semantic integrity of the “painting” object and provides a complete mask even when the object occupies the entire view. This demonstrates that our approach effec-tively bridges the gap between high-level seman-tic prompts and low-level temporal consistency. 
+
+4.5 Discovery of New Instances 
+
+We evaluate the ability of the system to contin-uously discover and segment multiple instances of a category in cluttered environments. This ca-pability is essential for real-world video analysis. To this end, we utilize two sequences: Church Statues targeting “real person” and Moving Boxes targeting “chair,” which features high geometric clutter due to stacked boxes and furniture. As demonstrated in Figure 3, baseline methods such as Grounded SAM [56] Rows 1 and 3 ex-hibit severe semantic drift in multi-instance sce-narios. In Moving Boxes Row 3, when prompted for “chair,” the baseline fails to distinguish be-tween the target object and the surrounding clut-ter. It incorrectly segments tables, cardboard boxes, and walls as positive instances. This over-segmentation renders the output unusable for automated inventory or analysis. Conversely, ENEAS Row 4 demonstrates surgical precision. By leveraging VLM verification, it successfully identifies valid chairs (marked in blue) while con-sistently rejecting geometrically similar distrac-tors such as stacked boxes, even under partial occlusion. Furthermore, unlike propagation-only models such as SAM 2.1 or its grounded variant, which are limited to instances annotated in the initial frame, our method continuously re-evaluates the scene. This approach allows for the seamless detection of new instances entering the field of view, such as a new person walking in or a chair being re-vealed, without requiring user re-prompting. This effectively solves the static initialization bottle-           
+
+> P R E P R I N T ·2 0 2 6 ·S P E R I D L A B S R E S E A R C H E N E A S ·8F I G . 2Temporal Robustness and Spatial Integrity Comparison. The target is the “blue painting”. Row 1 Grounded SAM Suf-fers from severe drift when the target is occluded or absent, incorrectly segmenting curtains and hair (red crosses). It also fails to capture the full object during close-ups (last column). Row 2 SAM 3 Improves temporal stability but suffers from spatial fragmentation in the close-up, segmenting internal details instead of the full object instance. Row 3 ENEAS correctly handles target absence by outputting no mask and maintains spatial coherence, capturing the entire object even under extreme scale changes.
+
+neck inherent in previous state-of-the-art track-ers. 
+
+4.6 Semantic Rigor: Direct Comparison to SAM 3 
+
+We benchmark our system directly against SAM 3 [6], the newly released state-of-the-art foun-dation model for Promptable Concept Segmenta-tion. While SAM 3 represents a significant leap in open-vocabulary localization, we evaluate its performance in scenarios dominated by ontologi-cal ambiguity, where the challenge lies not in de-tecting a shape but in verifying its essence, such as distinguishing real humans from artistic repre-sentations. 
+
+Qualitative Analysis. Figures 4 and 5 illustrate two distinct failure modes inherent to visual-only foundation models. In the Pop-Art Test de-picted in Figure 4, a large-scale painting domi-nates the background. Despite the clear seman-tic distinction between a flat artwork and a three-dimensional human, SAM 3 consistently seg-ments the painted figure as a valid person driven by the strong visual similarity of the facial fea-tures. Similarly, in the Statue Test shown in Fig-ure 5, SAM 3 fails to distinguish between hyper-realistic religious sculptures and living humans. The model generates high-confidence masks for nearly every statue in the scene. In contrast, ENEAS demonstrates superior se-mantic reasoning in both scenarios. By rout-ing ambiguous crops to the vision-language model referee, the system successfully rejects both the two-dimensional painting and the three-dimensional sculptures in the majority of frames, focusing exclusively on the living subjects. It is worth noting that in extreme close-ups where context is entirely absent (e.g., Figure 4, Col-umn 4, our method can exhibit similar leakage to the baseline due to the lack of surrounding visual cues for the VLM, but crucially, it significantly re-duces the frequency and severity of these false positives across the sequence compared to SAM 3. This validates that our approach effectively bridges the gap between visual perception and cognitive understanding. 
+
+Quantitative Benchmark. To quantify this perfor-mance gap, we evaluated all models on the full Church Statues capture. This benchmark rigor-ously tests the ability to distinguish between living subjects and realistic artifacts under the prompt “person”. The results, summarized in Table 1, re-veal a stark contrast between visual foundation models and our proposed architecture. Unlike tracking-oriented benchmarks, this set-ting is designed to measure 
+
+ontological correct-ness (i.e., whether each predicted instance truly belongs to the target concept). For this rea-son, we report Precision/Recall/F1 instead of HOTA-style metrics in this subsection. Preci-sion captures semantic purity (how many pre-dicted instances are truly valid), Recall captures recovery of valid targets, and F1 summarizes their balance. The complementary tracking met-          
+
+> P R E P R I N T ·2 0 2 6 ·S P E R I D L A B S R E S E A R C H E N E A S ·9F I G . 3
+
+Continuous Discovery and Robustness to Clutter. Comparison of Grounded SAM versus ENEAS in multi-instance dis-covery. Top Rows Prompt: “real person”): Grounded SAM hallucinates masks on the background curtains and fails to maintain consistent IDs. ENEAS correctly segments only the valid subjects throughout the sequence. Bottom Rows Prompt: “chair”): In a highly cluttered moving scene, Grounded SAM suffers from catastrophic over-segmentation by labeling boxes and tables as chairs. ENEAS exhibits superior semantic filtering, exclusively segmenting the target objects while ignoring significant geomet-ric clutter.   
+
+> T A B . 1
+
+Comparison against Foundation Models on Church Statues       
+
+> M O D E L P R E C I S I O N ( % ) R E C A L L ( % ) F 1 - S C O R E ( % )
+
+SAM 3 11.1 83.7 19.5 ENEAS2B Ours 94.7 73.5 82.8 ENEAS4B Ours 97.5 79.6 87.6 
+
+rics ( HOTA/DetA/AssA/LocA/TETA ) are reported separately in the SACo/VEval analysis below. As detailed in Table 1, SAM 3 achieves the high-est recall, confirming its status as an exception-ally powerful detector capable of identifying in-stances that other visual backbones miss. How-ever, this sensitivity comes with a catastrophic False Positive rate, resulting in a precision of just 11.1%. In practical terms, for every correct de-tection of a person, SAM 3 hallucinates approx-imately eight artifacts. Our default configuration ENEAS2B accepts a trade-off in recall to enforce a strict precision of 94.7%. The resulting F1Score represents a four-fold improvement over the state-of-the-art base-line. Furthermore, scaling the semantic judge to the 4B parameter variant yields a substantial per-formance boost. By recovering valid instances that were ambiguous to the smaller model, the 4B variant improves recall while maintaining near-perfect semantic purity. The resulting F1Score of 87.6% confirms that our architecture scales ef-fectively with model capacity, offering a config-urable trade-off where the 2B model serves as a highly efficient baseline and the 4B model pro-vides maximum rigor for offline processing. 
+
+Discussion: Visual Priors versus Ontological Reasoning. The performance gap observed in the quantitative results and qualitative figures highlights a fundamental limitation in current foundation models like SAM 3, which is the dom-inance of 
+
+visual priors over 
+
+ontological reason-ing . Having been trained on massive datasets to maximize mask quality and recall, SAM 3 de-velops strong priors for structural coherence. Consequently, when prompted with a concept such as “person”, the model activates on high-level features including facial symmetry, limb           
+
+> P R E P R I N T ·2 0 2 6 ·S P E R I D L A B S R E S E A R C H E N E A S ·1 0 F I G . 4
+
+Semantic Ambiguity Challenge I – Artistic Representations. The prompt is “real person”. Row 1 SAM 3 Lacks onto-logical filtering, repeatedly segmenting the large pop-art painting as a person due to visual similarity. Row 2 ENEAS leverages VLM verification to correctly identify the painting as a non-living representation, focusing only on real human subjects. Note that both models struggle in the extreme close-up (last column) due to the lack of surrounding context, but ENEAS minimizes false positives across the full sequence.   
+
+> F I G . 5
+
+Semantic Ambiguity Challenge II – Hyper-Realistic Statues. The prompt is “person”. Row 1 SAM 3 Fails to distinguish between statues and humans, generating masks for all sculptures. Row 2 ENEAS Demonstrates semantic rigor by rejecting the statues. Note that both models exhibit minor False Negatives (red crosses) on background pedestrians, but ENEAS elimi-nates the massive False Positive noise present in the SOTA baseline. 
+
+structure, and skin-like textures. This reliance causes hyper-realistic statues or large-scale por-traits, which perfectly satisfy these structural constraints, to become indistinguishable from real humans within the model’s latent space. Es-sentially, the model effectively solves the seg-mentation task by identifying the object’s bound-ary, yet fails the grounding task by misidentifying the nature of the object. Our method addresses this deficiency by struc-turally decoupling geometric proposal from se-mantic verification. In this framework, the em-bedding filter serves as a fast visual gate, han-dling the coarse rejection of non-conforming shapes and background elements. Crucially, the integration of a VLM introduces a necessary cog-nitive layer that transcends simple visual match-ing. Unlike segmentation models that process lo-cal texture cues, the vision-language model an-alyzes the global context and material properties of the crop, such as identifying the flatness of a pop-art painting or the granular texture of a stone statue, to make a high-level ontological judgment regarding the subject’s animacy. This design en-sures that the system does not merely locate shapes that visually resemble the target category but successfully verifies entities that ontologically belong to it. By explicitly enforcing this reason-ing step, our approach effectively bridges the se-mantic gap where 
+
+visual-only foundation models         
+
+> P R E P R I N T ·2 0 2 6 ·S P E R I D L A B S R E S E A R C H E N E A S ·1 1
+
+inevitably drift. 
+
+SACo/VEval Benchmark SAV Test). In addi-tion to Church Statues, we evaluate ENEAS and SAM 3 on an SAV Test subsample from SA Co/VEval. We adopt a prompt-based split: sam-ples whose prompt refers to a specific object in-stance (e.g., “a gold watch”) are assigned to 
+
+In-stance Tracking , while prompts that may match multiple objects are assigned to 
+
+Semantic Discov-ery . Both methods are evaluated with the official SAM 3 SACo/VEval evaluator under identical set-tings. We report HOTA together with its standard de-composition DetA, AssA, LocA, as well as TETA; all metrics are 
+
+higher-is-better . HOTA summa-rizes overall tracking quality, DetA captures de-tection quality, AssA captures temporal associa-tion consistency, and LocA measures localization quality [43, 35]. Results are reported in Tables 2 and 3. Overall, the comparison reveals a consistent trade-off across both splits. ENEAS improves end-to-end tracking metrics HOTA and TETA primarily through stronger association quality AssA, with comparable detection quality DetA, whereas SAM 3 remains slightly better in local-ization LocA. Since HOTA jointly reflects detec-tion, association, and localization, the gains in AssA are sufficient for our method to obtain a bet-ter overall tracking profile. This behavior is es-pecially relevant for language-conditioned video segmentation, where 
+
+temporal identity consis-tency is often the dominant failure mode. 
+
+# 05 · Ablation Study 
+
+To validate our architectural decisions, we con-ducted a series of rigorous ablation studies fo-cusing on component necessity , threshold sen-sitivity , and computational efficiency. To en-sure these tests meaningfully challenge the se-mantic reasoning capabilities of the system, all experiments were performed on Church Statues. This capture comes from a real acquisition for 3D reconstruction Section 4.1) and naturally maxi-mizes ontological ambiguity, containing high den-sities of hyper-realistic sculptures alongside real human subjects. We posit that standard bench-marks such as COCO [40], LVIS [24], or the video object segmentation suites DAVIS [49], YouTube-VOS [71], MOSE [17], and OVIS [50] lack the se-mantic complexity required to isolate the contri-bution of the VLM referee. Consequently, this do-main serves as the optimal testbed for evaluating the robustness of our proposed architecture. 
+
+5.1 Component Necessity Analysis 
+
+To demonstrate the necessity of the VLM as a semantic referee, we evaluated distinct config-urations of our method on Church Statues. The quantitative results are summarized in Table 4. As observed, the baseline utilizing only a region proposal network achieves the highest theoreti-cal recall but suffers from catastrophic precision ,rendering it unusable for uncurated environments due to its inability to distinguish ontological differ-ences. Integrating embedding matching as a vi-sual filter introduces a critical trade-off: a permis-sive threshold fails to filter hyper-realistic statues, while a strict threshold successfully removes arti-facts but aggressively discards valid instances in challenging lighting or occlusion. Our approach resolves this dilemma. By utiliz-ing the 2B VLM solely for the uncertainty interval, we recover True Positives rejected by the strict embedding matching while maintaining a minimal False Positive rate. Furthermore, deploying the larger 4B model variant fully recovers the recall to the baseline level while achieving near-perfect precision, yielding the highest overall F1Score. However, as discussed in Section 5.4, this per-formance gain comes with a significant latency penalty. It is important to note that the system’s recall is inherently bounded by the initial region pro-posal network. The False Negatives observed in the baseline persist across all configurations be-cause the detector failed to generate candidate bounding boxes for these instances. Qualitative analysis reveals that these missed instances were primarily located in the background or heavily oc-cluded, highlighting the proposal bottleneck in-herent in two-stage architectures. Our contribu-tion focuses on maximizing the precision of the detected proposals, ensuring that the final output is semantically reliable.           
+
+> P R E P R I N T ·2 0 2 6 ·S P E R I D L A B S R E S E A R C H E N E A S ·1 2 T A B . 2
+
+SACo/VEval — Instance Tracking    
+
+> M E T R I C E N E A S S A M 3
+
+HOTA % 26.70 26.51 DetA % 7.92 7.84 AssA % 90.77 90.18 LocA % 87.86 89.22 
+
+TETA % 17.86 16.65   
+
+> T A B . 3
+
+SACo/VEval — Semantic Discovery    
+
+> M E T R I C E N E A S S A M 3
+
+HOTA % 9.23 9.19 DetA % 6.16 6.21 
+
+AssA % 14.28 13.85 LocA % 74.25 75.38 
+
+TETA % 9.53 9.10   
+
+> T A B . 4
+
+Impact of Semantic Verification Modules on Church Statues                                                
+
+> M E T H O D C O N F I G U R A T I O N V E R I F I C A T I O N L O G I C P R E C I S I O N ( % ) R E C A L L ( % ) F 1 - S C O R E ( % ) B E H A V I O R
+> RPN Baseline) Text Prompt Only 10.5 79.6 18.6 Severe hallucination of artifacts RPN + Embeddings Flex Thresh. T >0.50 55.7 79.6 65.5 Filters noise, keeps realistic statues RPN + Embeddings Strict Thresh. T >0.80 94.3 67.4 78.6 Misses valid instances ENEAS2B Ours Adaptive 0.10 <T<0.90 94.7 73.5 82.8 Optimal balance (speed vs performance) ENEAS4B Ours Adaptive 0.10 <T<0.90 97.5 79.6 87.6 Best performance, slower
+
+Note: RPN = Region Proposal Network Florence-2; Embeddings = Embedding Matching SigLIP; ENEAS includes the VLM Referee. 
+
+5.2 Threshold Sensitivity and Trade-off Anal-ysis 
+
+The acceptance and rejection thresholds for the visual embedding filter are configurable parame-ters that allow adaptation to different latency and precision targets. We analyzed their sensitivity using the 2B model variant on Church Statues to identify a practical “Robust Mode” preset. As detailed in Table 5, the choice of uncertainty interval dictates the operational profile of the sys-tem, creating a distinct trade-off between seman-tic purity and instance recovery. The Aggressive configuration offers the lowest latency by resolv-ing the majority of cases via high-speed visual embeddings. However, this efficiency comes at the cost of significant semantic leakage, admit-ting false positives that yield mid-range visual confidence scores. Expanding the interval to a Balanced configuration effectively maximizes re-call, successfully recovering instances that are visually ambiguous, but at the cost of admitting high-confidence artifacts and increasing latency. Our recommended Robust configuration 0.10– 0.90 prioritizes semantic reliability and repre-sents the Pareto-optimal solution for ontologically ambiguous domains. By enforcing a strict accep-tance threshold, it successfully rejects nearly all artifacts, achieving the highest overall F1Score. Crucially, this hybrid approach reduces latency by approximately 35% compared to the VLM Only baseline. The degradation in accuracy ob-served in the VLMOnly setting F1 dropping from 82.8% to 79.1% suggests a phenomenon of over-reasoning: by forcing the 2B model to adjudicate unambiguous samples (often small or heavily oc-cluded crops where visual cues are sparse) the system introduces stochastic errors that the sim-pler, robust visual embedding filter would have correctly handled. For applications where this trade-off is unacceptable and maximum verifica-tion rigor is required regardless of latency, up-grading to the 4B model variant (as discussed in Section 5.4) mitigates these stochastic errors, al-beit at a higher computational cost. This confirms that reserving the 2B VLM solely for genuinely ambiguous semantic cases maximizes both effi-ciency and global accuracy in the default config-uration. 
+
+5.3 Scenario Adaptability and Efficiency 
+
+A key advantage of ENEAS is its adaptability to scene complexity. While the Robust Config-uration is essential in ontologically ambiguous scenes such as Church Statues to filter seman-tic decoys, standard scenarios allow for relaxed thresholds to maximize throughput. To quan-tify this efficiency gain, we evaluated the sys-                     
+
+> P R E P R I N T ·2 0 2 6 ·S P E R I D L A B S R E S E A R C H E N E A S ·1 3 T A B . 5Impact of Uncertainty Interval on Accuracy and Latency
+> C O N F I G U R A T I O N P R O F I L E I N T E R V A L V L M A C T I V A T I O N R A T E ( % ) A V G . L A T E N C Y ( S ) F 1 - S C O R E ( % )
+
+Aggressive / Fast 0.40–0.60 16.2 1.04 74.3 Balanced 0.15–0.75 59.4 2.48 79.6 Robust 0.10–0.90 78.1 3.29 82.8 
+
+VLMOnly 0.00–1.00 100 5.05 79.1 
+
+tem on the Moving Boxes sequence. This sce-nario represents a realistic indoor environment which, while ontologically standard, presents visual challenges such as dynamic occlusions where subjects are partially hidden by large boxes. For this experiment, we utilized a Fast Mode con-figuration by lowering the acceptance threshold to 0.40. Under these conditions, the system achieved a latency of 1.14 seconds per frame, rep-resenting a three-fold speedup compared to the robust execution on Church Statues 3.29 sec-onds). This efficiency gain stems from the re-duction in vision-language model activation rate, which dropped from 78.1% on Church Statues to 27.0% on Moving Boxes. Crucially, despite the relaxed threshold and the presence of oc-clusions, the visual embeddings successfully re-solved the majority of instances, maintaining a near-perfect F1Score of 98.0% with zero False Positives. This confirms that the method is content-aware, dynamically allocating computa-tional resources only when ontological ambiguity is strictly present, and behaving as a lightweight filter in standard processing workflows. 
+
+5.4 VLM Size Analysis 
+
+Finally, we assessed the impact of the vision-language model capacity on system latency and accuracy. We compared the default 2B model against the larger 4B variant on Church Statues using the robust configuration. As illustrated in Table 6, the 4B model acts as a semantic upper bound, achieving a remarkable F1Score of 87.6% by successfully resolving the remaining ambiguous cases that challenged the smaller model. However, this gain comes with a severe computational penalty: latency increases by 52%, reaching 5.02 seconds per frame. Consequently, we establish the 2B model as the default configuration of ENEAS, as it repre-sents the optimal efficiency-accuracy trade-off for general video processing. However, since our architecture is modular, we expose the 4B model as a configurable option for offline ap-plications where maximum semantic rigor takes precedence over runtime latency. This flexibility ensures the framework addresses both real-time constraints and high-fidelity segmentation needs. 
+
+# 06 · Conclusion 
+
+We presented ENEAS, a unified method for text-guided segmentation that handles both specific instance tracking and semantic discovery over ordered video and unordered image collections. For instance tracking, a text-driven initialization stage turns the memory-based SeC tracker into a text-prompted one, and the resulting system re-ports target absence instead of drifting and keeps the target whole under extreme scale changes. For semantic discovery, the method decouples geometric proposal from semantic verification: an open-vocabulary region proposal, a sigmoid-based embedding filter with prompt ensembles, and a conditional VLM judge that is consulted only inside an uncertainty interval. On Church Statues, a real capture of hyper-realistic sculptures, this design raises F1 from 19.5% for SAM 3 to 82.8% with a 2B judge and 87.6% with a 4B judge, while keeping precision above 94%; on SACo/VEval it matches or improves the overall tracking profile of SAM 3. The ablations show that the embedding filter alone cannot be thresholded into both high precision and high recall, that the VLM is neces-sary precisely in the interval where embeddings are indecisive, and that consulting it everywhere is both slower and slightly less accurate than con-sulting it selectively.           
+
+> P R E P R I N T ·2 0 2 6 ·S P E R I D L A B S R E S E A R C H E N E A S ·1 4 T A B . 6
+
+Impact of VLM Model Size on Efficiency and Accuracy         
+
+> M O D E L V A R I A N T A V G . L A T E N C Y ( S ) F 1 - S C O R E ( % ) S P E E D F A C T O R
+
+2B 3.29 82.8 1.0x Baseline) 4B 5.02 87.6 1.5x Slower 
+
+Limitations. The recall of semantic discovery is bounded by the region proposal stage: instances that Florence-2 never proposes, typically small, distant, or heavily occluded ones, cannot be re-covered downstream. The VLM judge relies on context; in extreme close-ups where the crop contains no cues about material or scene, it can accept the same artifacts as visual-only models; the same holds for small or low-resolution crops, such as distant objects, where the judge has little to judge. The cost of verification grows with the number of candidates per view, so dense scenes such as crowded streets fall outside the regime the method was designed for. Semantic discov-ery is performed per frame and does not assign persistent identities to instances across frames, and the method does not produce confidence scores, which limits its use in score-based eval-uation protocols. Finally, the robust configuration costs about three seconds per frame on a sin-gle L4 GPU; while the cascade adapts this cost to scene ambiguity, it is not real time. 
+
+Future work. Natural extensions are to link per-frame discoveries into temporally consistent in-stances by reusing the same memory-based propagation employed for instance tracking, to derive calibrated confidence scores from the em-bedding and VLM stages, and to distil the judge-ments of the VLM into the embedding filter so that the uncertainty interval, and with it the latency, shrinks over time. 
+
+# References  
+
+> [01]
+
+Zechen Bai, Tong He, Haiyang Mei, Pichao Wang, Ziteng Gao, Joya Chen, Lei Liu, Zheng Zhang, and Mike Zheng Shou. One Token to Seg Them All: Language Instructed Reasoning Segmentation in Videos. In NeurIPS, 2024.  
+
+> [02]
+
+Shuai Bai, Keqin Chen, Xuejing Liu, Jialin Wang, Wenbin Ge, Sibo Song, Kai Dang, Peng Wang, Shijie Wang, Jun Tang, Humen Zhong, Yuanzhi Zhu, Mingkun Yang, Zhao-hai Li, Jianqiang Wan, Pengfei Wang, Wei Ding, Zheren Fu, Yiheng Xu, Jiabo Ye, Xi Zhang, Tianbao Xie, Zesen Cheng, Hang Zhang, Zhibo Yang, Haiyang Xu, and Jun-yang Lin. Qwen2.5VL Technical Report. arXiv preprint arXiv:2502.13923, 2025.  
+
+> [03]
+
+Shuai Bai, Yuxuan Cai, Ruizhe Chen, Keqin Chen, Xionghui Chen, Zesen Cheng, Lianghao Deng, Wei Ding, Chang Gao, Chunjiang Ge, Wenbin Ge, Zhifang Guo, Qi-dong Huang, Jie Huang, Fei Huang, Binyuan Hui, Shu-tong Jiang, Zhaohai Li, Mingsheng Li, Mei Li, Kaixin Li, Zicheng Lin, Junyang Lin, Xuejing Liu, Jiawei Liu, Chen-glong Liu, Yang Liu, Dayiheng Liu, Shixuan Liu, Dun-jie Lu, Ruilin Luo, Chenxu Lv, Rui Men, Lingchen Meng, Xuancheng Ren, Xingzhang Ren, Sibo Song, Yuchong Sun, Jun Tang, Jianhong Tu, Jianqiang Wan, Peng Wang, Pengfei Wang, Qiuyue Wang, Yuxuan Wang, Tianbao Xie, Yiheng Xu, Haiyang Xu, Jin Xu, Zhibo Yang, Mingkun Yang, Jianxin Yang, An Yang, Bowen Yu, Fei Zhang, Hang Zhang, Xi Zhang, Bo Zheng, Humen Zhong, Jingren Zhou, Fan Zhou, Jing Zhou, Yuanzhi Zhu, and Ke Zhu. Qwen3 VL Technical Report. arXiv preprint arXiv:2511.21631, 2025.  
+
+> [04]
+
+Lucas Beyer, Andreas Steiner, André Susano Pinto, Alexander Kolesnikov, Xiao Wang, Daniel Salz, Maxim Neumann, Ibrahim Alabdulmohsin, Michael Tschannen, Emanuele Bugliarello, Thomas Unterthiner, Daniel Key-sers, Skanda Koppula, Fangyu Liu, Adam Grycner, Alexey Gritsenko, Neil Houlsby, Manoj Kumar, Keran Rong, Ju-lian Eisenschlos, Rishabh Kabra, Matthias Bauer, Matko Bošnjak, Xi Chen, Matthias Minderer, Paul Voigtlaender, Ioana Bica, Ivana Balazevic, Joan Puigcerver, Pinelopi Papalampidi, Olivier Henaff, Xi Xiong, Radu Soricut, Jeremiah Harmsen, and Xiaohua Zhai. PaliGemma: A versatile 3B VLM for transfer. arXiv preprint arXiv:2407.07726, 2024.  
+
+> [05]
+
+Nicolas Carion, Francisco Massa, Gabriel Synnaeve, Nicolas Usunier, Alexander Kirillov, and Sergey Zagoruyko. End-to-End Object Detection with Trans-formers. In ECCV, 2020.  
+
+> [06]
+
+Nicolas Carion, Laura Gustafson, Yuan-Ting Hu, Shoub-hik Debnath, Ronghang Hu, Didac Suris, Chaitanya Ryali, Kalyan Vasudev Alwala, Haitham Khedr, Andrew Huang, Jie Lei, Tengyu Ma, Baishan Guo, Arpit Kalla, Markus Marks, Joseph Greer, Meng Wang, Peize Sun, Roman Rädle, Triantafyllos Afouras, Effrosyni Mavroudi, Kather-        
+
+> P R E P R I N T ·2 0 2 6 ·S P E R I D L A B S R E S E A R C H E N E A S ·1 5
+
+ine Xu, Tsung-Han Wu, Yu Zhou, Liliane Momeni, Rishi Hazra, Shuangrui Ding, Sagar Vaze, Francois Porcher, Feng Li, Siyuan Li, Aishwarya Kamath, Ho Kei Cheng, Pi-otr Dollár, Nikhila Ravi, Kate Saenko, Pengchuan Zhang, and Christoph Feichtenhofer. SAM 3 Segment Anything with Concepts. arXiv preprint arXiv:2511.16719, 2025.  
+
+> [07]
+
+Jiazhong Cen, Jiemin Fang, Chen Yang, Lingxi Xie, Xi-aopeng Zhang, Wei Shen, and Qi Tian. Segment Any 3D Gaussians. In AAAI, 2025.  
+
+> [08]
+
+Lingjiao Chen, Matei Zaharia, and James Zou. Frugal-GPT How to Use Large Language Models While Reduc-ing Cost and Improving Performance. arXiv preprint arXiv:2305.05176, 2023.  
+
+> [09]
+
+Zhe Chen, Jiannan Wu, Wenhai Wang, Weijie Su, Guo Chen, Sen Xing, Muyan Zhong, Qinglong Zhang, Xizhou Zhu, Lewei Lu, Bin Li, Ping Luo, Tong Lu, Yu Qiao, and Jifeng Dai. InternVL Scaling up Vision Foundation Mod-els and Aligning for Generic Visual-Linguistic Tasks. In CVPR, 2024.  
+
+> [10]
+
+Bowen Cheng, Ishan Misra, Alexander G. Schwing, Alexander Kirillov, and Rohit Girdhar. Masked-attention Mask Transformer for Universal Image Segmentation. In CVPR, 2022.  
+
+> [11]
+
+Ho Kei Cheng and Alexander G. Schwing. XMem: Long-Term Video Object Segmentation with an Atkinson-Shiffrin Memory Model. In ECCV, 2022.  
+
+> [12]
+
+Ho Kei Cheng, Seoung Wug Oh, Brian Price, Joon-Young Lee, and Alexander Schwing. Putting the Object Back into Video Object Segmentation. In CVPR, 2024.  
+
+> [13]
+
+Yangming Cheng, Liulei Li, Yuanyou Xu, Xiaodi Li, Zongxin Yang, Wenguan Wang, and Yi Yang. Segment and Track Anything. arXiv preprint arXiv:2305.06558, 2023.  
+
+> [14]
+
+Ho Kei Cheng, Seoung Wug Oh, Brian Price, Alexander Schwing, and Joon-Young Lee. Tracking Anything with Decoupled Video Segmentation. In ICCV, 2023.  
+
+> [15]
+
+Tianheng Cheng, Lin Song, Yixiao Ge, Wenyu Liu, Xing-gang Wang, and Ying Shan. YOLOWorld: Real-Time Open-Vocabulary Object Detection. In CVPR, 2024.  
+
+> [16]
+
+Mostafa Dehghani, Basil Mustafa, Josip Djolonga, Jonathan Heek, Matthias Minderer, Mathilde Caron, An-dreas Steiner, Joan Puigcerver, Robert Geirhos, Ibrahim Alabdulmohsin, Avital Oliver, Piotr Padlewski, Alexey Gritsenko, Mario Lučić, and Neil Houlsby. Patch n’ Pack: NaViT, a Vision Transformer for any Aspect Ratio and Resolution. In NeurIPS, 2023.  
+
+> [17]
+
+Henghui Ding, Chang Liu, Shuting He, Xudong Jiang, Philip H. S. Torr, and Song Bai. MOSE A New Dataset for Video Object Segmentation in Complex Scenes. In ICCV, 2023.  
+
+> [18]
+
+Henghui Ding, Chang Liu, Shuting He, Xudong Jiang, and Chen Change Loy. MeViS A Large-scale Benchmark for Video Segmentation with Motion Expressions. In ICCV, 2023.  
+
+> [19]
+
+Shuangrui Ding, Rui Qian, Xiaoyi Dong, Pan Zhang, Yuhang Zang, Yuhang Cao, Yuwei Guo, Dahua Lin, and Jiaqi Wang. SAM2Long: Enhancing SAM 2 for Long Video Segmentation with a Training-Free Memory Tree. In ICCV, 2025.  
+
+> [20]
+
+Yonatan Geifman and Ran El-Yaniv. Selective Classifica-tion for Deep Neural Networks. In NeurIPS, 2017.  
+
+> [21]
+
+Golnaz Ghiasi, Xiuye Gu, Yin Cui, and Tsung-Yi Lin. Scal-ing Open-Vocabulary Image Segmentation with Image-Level Labels. In ECCV, 2022.  
+
+> [22]
+
+Xiuye Gu, Tsung-Yi Lin, Weicheng Kuo, and Yin Cui. Open-vocabulary Object Detection via Vision and Lan-guage Knowledge Distillation. In ICLR, 2022.  
+
+> [23]
+
+Chuan Guo, Geoff Pleiss, Yu Sun, and Kilian Q. Wein-berger. On Calibration of Modern Neural Networks. In ICML, 2017.  
+
+> [24]
+
+Agrim Gupta, Piotr Dollár, and Ross Girshick. LVIS A Dataset for Large Vocabulary Instance Segmentation. In CVPR, 2019.  
+
+> [25]
+
+Kaiming He, Georgia Gkioxari, Piotr Dollár, and Ross Gir-shick. Mask RCNN. In ICCV, 2017.  
+
+> [26]
+
+Jitesh Jain, Jiachen Li, MangTik Chiu, Ali Hassani, Nikita Orlov, and Humphrey Shi. OneFormer: One Transformer to Rule Universal Image Segmentation. In CVPR, 2023.  
+
+> [27]
+
+Chao Jia, Yinfei Yang, Ye Xia, Yi-Ting Chen, Zarana Parekh, Hieu Pham, Quoc V. Le, Yunhsuan Sung, Zhen Li, and Tom Duerig. Scaling Up Visual and Vision-Language Representation Learning With Noisy Text Supervision. In ICML, 2021.  
+
+> [28]
+
+Lei Ke, Mingqiao Ye, Martin Danelljan, Yifan Liu, Yu-Wing Tai, Chi-Keung Tang, and Fisher Yu. Segment Anything in High Quality. In NeurIPS, 2023.  
+
+> [29]
+
+Bernhard Kerbl, Georgios Kopanas, Thomas Leimkühler, and George Drettakis. 3D Gaussian Splatting for Real-Time Radiance Field Rendering. ACM Transactions on Graphics, 2023.  
+
+> [30]
+
+Alexander Kirillov, Eric Mintun, Nikhila Ravi, Hanzi Mao, Chloe Rolland, Laura Gustafson, Tete Xiao, Spencer Whitehead, Alexander C. Berg, Wan-Yen Lo, Piotr Dollár, and Ross Girshick. Segment Anything. In ICCV, 2023.  
+
+> [31]
+
+Jonas Kulhanek, Songyou Peng, Zuzana Kukelova, Marc Pollefeys, and Torsten Sattler. WildGaussians: 3D Gaus-sian Splatting in the Wild. In NeurIPS, 2024.  
+
+> [32]
+
+Xin Lai, Zhuotao Tian, Yukang Chen, Yanwei Li, Yuhui Yuan, Shu Liu, and Jiaya Jia. LISA Reasoning Segmen-tation via Large Language Model. In CVPR, 2024.  
+
+> [33]
+
+Liunian Harold Li, Pengchuan Zhang, Haotian Zhang, Jianwei Yang, Chunyuan Li, Yiwu Zhong, Lijuan Wang, Lu Yuan, Lei Zhang, Jenq-Neng Hwang, Kai-Wei Chang, and Jianfeng Gao. Grounded Language-Image Pre-training. In CVPR, 2022.  
+
+> [34]
+
+Boyi Li, Kilian Q. Weinberger, Serge Belongie, Vladlen Koltun, and René Ranftl. Language-driven Semantic Segmentation. In ICLR, 2022.  
+
+> [35]
+
+Siyuan Li, Martin Danelljan, Henghui Ding, Thomas E. Huang, and Fisher Yu. Tracking Every Thing in the Wild.         
+
+> P R E P R I N T ·2 0 2 6 ·S P E R I D L A B S R E S E A R C H E N E A S ·1 6
+
+In ECCV, 2022.  
+
+> [36]
+
+Junnan Li, Dongxu Li, Silvio Savarese, and Steven Hoi. BLIP2 Bootstrapping Language-Image Pre-training with Frozen Image Encoders and Large Lan-guage Models. In ICML, 2023.  
+
+> [37]
+
+Yifan Li, Yifan Du, Kun Zhou, Jinpeng Wang, Wayne Xin Zhao, and Ji-Rong Wen. Evaluating Object Hallucination in Large Vision-Language Models. In EMNLP, 2023.  
+
+> [38]
+
+Siyuan Li, Tobias Fischer, Lei Ke, Henghui Ding, Martin Danelljan, and Fisher Yu. OVTrack: Open-Vocabulary Multiple Object Tracking. In CVPR, 2023.  
+
+> [39]
+
+Feng Li, Hao Zhang, Peize Sun, Xueyan Zou, Shilong Liu, Jianwei Yang, Chunyuan Li, Lei Zhang, and Jianfeng Gao. Semantic-SAM Segment and Recognize Anything at Any Granularity. arXiv preprint arXiv:2307.04767, 2023.  
+
+> [40]
+
+Tsung-Yi Lin, Michael Maire, Serge Belongie, Lubomir Bourdev, Ross Girshick, James Hays, Pietro Perona, Deva Ramanan, C. Lawrence Zitnick, and Piotr Dollár. Mi-crosoft COCO Common Objects in Context. In ECCV, 2014.  
+
+> [41]
+
+Shilong Liu, Zhaoyang Zeng, Tianhe Ren, Feng Li, Hao Zhang, Jie Yang, Qing Jiang, Chunyuan Li, Jianwei Yang, Hang Su, Jun Zhu, and Lei Zhang. Grounding DINO Mar-rying DINO with Grounded Pre-Training for Open-Set Ob-ject Detection. In ECCV, 2024.  
+
+> [42]
+
+Haotian Liu, Chunyuan Li, Qingyang Wu, and Yong Jae Lee. Visual Instruction Tuning. In NeurIPS, 2023.  
+
+> [43]
+
+Jonathon Luiten, Aljosa Osep, Patrick Dendorfer, Philip Torr, Andreas Geiger, Laura Leal-Taixe, and Bastian Leibe. HOTA A Higher Order Metric for Evaluating Multi-Object Tracking. IJCV, 2021.  
+
+> [44]
+
+Ricardo Martin-Brualla, Noha Radwan, Mehdi S. M. Saj-jadi, Jonathan T. Barron, Alexey Dosovitskiy, and Daniel Duckworth. NeRF in the Wild: Neural Radiance Fields for Unconstrained Photo Collections. In CVPR, 2021.  
+
+> [45]
+
+Ben Mildenhall, Pratul P. Srinivasan, Matthew Tancik, Jonathan T. Barron, Ravi Ramamoorthi, and Ren Ng. NeRF Representing Scenes as Neural Radiance Fields for View Synthesis. In ECCV, 2020.  
+
+> [46]
+
+Matthias Minderer, Alexey Gritsenko, Austin Stone, Maxim Neumann, Dirk Weissenborn, Alexey Dosovitskiy, Aravindh Mahendran, Anurag Arnab, Mostafa Dehghani, Zhuoran Shen, Xiao Wang, Xiaohua Zhai, Thomas Kipf, and Neil Houlsby. Simple Open-Vocabulary Object De-tection with Vision Transformers. In ECCV, 2022.  
+
+> [47]
+
+Matthias Minderer, Alexey Gritsenko, and Neil Houlsby. Scaling Open-Vocabulary Object Detection. In NeurIPS, 2023.  
+
+> [48]
+
+Seoung Wug Oh, Joon-Young Lee, Ning Xu, and Seon Joo Kim. Video Object Segmentation using Space-Time Memory Networks. In ICCV, 2019.  
+
+> [49]
+
+Jordi Pont-Tuset, Federico Perazzi, Sergi Caelles, Pablo Arbeláez, Alex Sorkine-Hornung, and Luc Van Gool. The 2017 DAVIS Challenge on Video Object Segmentation. arXiv preprint arXiv:1704.00675, 2017.  
+
+> [50]
+
+Jiyang Qi, Yan Gao, Yao Hu, Xinggang Wang, Xiaoyu Liu, Xiang Bai, Serge Belongie, Alan Yuille, Philip H. S. Torr, and Song Bai. Occluded Video Instance Segmentation: A Benchmark. IJCV, 2022.  
+
+> [51]
+
+Minghan Qin, Wanhua Li, Jiawei Zhou, Haoqian Wang, and Hanspeter Pfister. LangSplat: 3D Language Gaus-sian Splatting. In CVPR, 2024.  
+
+> [52]
+
+Alec Radford, Jong Wook Kim, Chris Hallacy, Aditya Ramesh, Gabriel Goh, Sandhini Agarwal, Girish Sastry, Amanda Askell, Pamela Mishkin, Jack Clark, Gretchen Krueger, and Ilya Sutskever. Learning Transferable Vi-sual Models From Natural Language Supervision. In ICML, 2021.  
+
+> [53]
+
+Hanoona Rasheed, Muhammad Maaz, Sahal Shaji Mul-lappilly, Abdelrahman Shaker, Salman Khan, Hisham Cholakkal, Rao M. Anwer, Erix Xing, Ming-Hsuan Yang, and Fahad S. Khan. GLaMM Pixel Grounding Large Mul-timodal Model. In CVPR, 2024.  
+
+> [54]
+
+Nikhila Ravi, Valentin Gabeur, Yuan-Ting Hu, Ronghang Hu, Chaitanya Ryali, Tengyu Ma, Haitham Khedr, Roman Rädle, Chloe Rolland, Laura Gustafson, Eric Mintun, Junt-ing Pan, Kalyan Vasudev Alwala, Nicolas Carion, Chao-Yuan Wu, Ross Girshick, Piotr Dollár, and Christoph Fe-ichtenhofer. SAM 2 Segment Anything in Images and Videos. In ICLR, 2025.  
+
+> [55]
+
+Shaoqing Ren, Kaiming He, Ross Girshick, and Jian Sun. Faster RCNN Towards Real-Time Object Detection with Region Proposal Networks. In NeurIPS, 2015.  
+
+> [56]
+
+Tianhe Ren, Shilong Liu, Ailing Zeng, Jing Lin, Kunchang Li, He Cao, Jiayu Chen, Xinyu Huang, Yukang Chen, Feng Yan, Zhaoyang Zeng, Hao Zhang, Feng Li, Jie Yang, Hongyang Li, Qing Jiang, and Lei Zhang. Grounded SAM Assembling Open-World Models for Diverse Visual Tasks. arXiv preprint arXiv:2401.14159, 2024.  
+
+> [57]
+
+Tianhe Ren, Qing Jiang, Shilong Liu, Zhaoyang Zeng, Wenlong Liu, Han Gao, Hongjie Huang, Zhengyu Ma, Xi-aoke Jiang, Yihao Chen, Yuda Xiong, Hao Zhang, Feng Li, Peijun Tang, Kent Yu, and Lei Zhang. Grounding DINO 1.5 Advance the ”Edge” of Open-Set Object Detection. arXiv preprint arXiv:2405.10300, 2024.  
+
+> [58]
+
+Weining Ren, Zihan Zhu, Boyang Sun, Jiaqi Chen, Marc Pollefeys, and Songyou Peng. NeRF On-the-go: Exploit-ing Uncertainty for Distractor-free NeRFs in the Wild. In CVPR, 2024.  
+
+> [59]
+
+Chaitanya Ryali, Yuan-Ting Hu, Daniel Bolya, Chen Wei, Haoqi Fan, Po-Yao Huang, Vaibhav Aggarwal, Arka-bandhu Chowdhury, Omid Poursaeed, Judy Hoffman, Ji-tendra Malik, Yanghao Li, and Christoph Feichtenhofer. Hiera: A Hierarchical Vision Transformer without the Bells-and-Whistles. In ICML, 2023.  
+
+> [60]
+
+Sara Sabour, Suhani Vora, Daniel Duckworth, Ivan Krasin, David J. Fleet, and Andrea Tagliasacchi. RobustNeRF Ignoring Distractors with Robust Losses. In CVPR, 2023.  
+
+> [61]
+
+Sara Sabour, Lily Goli, George Kopanas, Mark Matthews, Dmitry Lagun, Leonidas Guibas, Alec Jacobson, David J. Fleet, and Andrea Tagliasacchi. SpotlessSplats: Ignor-        
+
+> P R E P R I N T ·2 0 2 6 ·S P E R I D L A B S R E S E A R C H E N E A S ·1 7
+
+ing Distractors in 3D Gaussian Splatting. arXiv preprint arXiv:2406.20055, 2024.  
+
+> [62]
+
+Christoph Schuhmann, Romain Beaumont, Richard Vencu, Cade Gordon, Ross Wightman, Mehdi Cherti, Theo Coombes, Aarush Katta, Clayton Mullis, Mitchell Wortsman, Patrick Schramowski, Srivatsa Kundurthy, Katherine Crowson, Ludwig Schmidt, Robert Kaczmar-czyk, and Jenia Jitsev. LAION5B An open large-scale dataset for training next generation image-text models. In NeurIPS, 2022.  
+
+> [63]
+
+Michael Tschannen, Alexey Gritsenko, Xiao Wang, Muhammad Ferjad Naeem, Ibrahim Alabdulmohsin, Nikhil Parthasarathy, Talfan Evans, Lucas Beyer, Ye Xia, Basil Mustafa, Olivier Hénaff, Jeremiah Harmsen, Andreas Steiner, and Xiaohua Zhai. SigLIP 2 Multilingual Vision-Language Encoders with Improved Semantic Un-derstanding, Localization, and Dense Features. arXiv preprint arXiv:2502.14786, 2025.  
+
+> [64]
+
+Jovana Videnovic, Alan Lukezic, and Matej Kristan. ADistractor-Aware Memory for Visual Object Tracking with SAM2. In CVPR, 2025.  
+
+> [65]
+
+Peng Wang, Shuai Bai, Sinan Tan, Shijie Wang, Zhi-hao Fan, Jinze Bai, Keqin Chen, Xuejing Liu, Jialin Wang, Wenbin Ge, Yang Fan, Kai Dang, Mengfei Du, Xu-ancheng Ren, Rui Men, Dayiheng Liu, Chang Zhou, Jin-gren Zhou, and Junyang Lin. Qwen2VL Enhancing Vision-Language Model’s Perception of the World at Any Resolution. arXiv preprint arXiv:2409.12191, 2024.  
+
+> [66]
+
+Jason Wei, Xuezhi Wang, Dale Schuurmans, Maarten Bosma, Brian Ichter, Fei Xia, Ed Chi, Quoc Le, and Denny Zhou. Chain-of-Thought Prompting Elicits Reasoning in Large Language Models. In NeurIPS, 2022.  
+
+> [67]
+
+Brandon T. Willard and Rémi Louf. Efficient Guided Generation for Large Language Models. arXiv preprint arXiv:2307.09702, 2023.  
+
+> [68]
+
+Jiannan Wu, Yi Jiang, Peize Sun, Zehuan Yuan, and Ping Luo. Language as Queries for Referring Video Object Segmentation. In CVPR, 2022.  
+
+> [69]
+
+Bin Xiao, Haiping Wu, Weijian Xu, Xiyang Dai, Houdong Hu, Yumao Lu, Michael Zeng, Ce Liu, and Lu Yuan. Florence-2 Advancing a Unified Representation for a Variety of Vision Tasks. In CVPR, 2024.  
+
+> [70]
+
+Yunyang Xiong, Bala Varadarajan, Lemeng Wu, Xiaoyu Xiang, Fanyi Xiao, Chenchen Zhu, Xiaoliang Dai, Dilin Wang, Fei Sun, Forrest Iandola, Raghuraman Krish-namoorthi, and Vikas Chandra. EfficientSAM Lever-aged Masked Image Pretraining for Efficient Segment Anything. In CVPR, 2024.  
+
+> [71]
+
+Ning Xu, Linjie Yang, Yuchen Fan, Dingcheng Yue, Yuchen Liang, Jianchao Yang, and Thomas Huang. YouTube-VOS A Large-Scale Video Object Segmenta-tion Benchmark. arXiv preprint arXiv:1809.03327, 2018.  
+
+> [72]
+
+Jiarui Xu, Sifei Liu, Arash Vahdat, Wonmin Byeon, Xi-aolong Wang, and Shalini De Mello. Open-Vocabulary Panoptic Segmentation with Text-to-Image Diffusion Models. In CVPR, 2023.  
+
+> [73]
+
+Mengde Xu, Zheng Zhang, Fangyun Wei, Han Hu, and Xiang Bai. Side Adapter Network for Open-Vocabulary Semantic Segmentation. In CVPR, 2023.  
+
+> [74]
+
+Cilin Yan, Haochen Wang, Shilin Yan, Xiaolong Jiang, Yao Hu, Guoliang Kang, Weidi Xie, and Efstratios Gavves. VISA Reasoning Video Object Segmentation via Large Language Models. In ECCV, 2024.  
+
+> [75]
+
+Zhao Yang, Jiaqi Wang, Yansong Tang, Kai Chen, Heng-shuang Zhao, and Philip H. S. Torr. LAVT Language-Aware Vision Transformer for Referring Image Segmen-tation. In CVPR, 2022.  
+
+> [76]
+
+Zongxin Yang and Yi Yang. Decoupling Features in Hier-archical Propagation for Video Object Segmentation. In NeurIPS, 2022.  
+
+> [77]
+
+Cheng-Yen Yang, Hsiang-Wei Huang, Wenhao Chai, Zhongyu Jiang, and Jenq-Neng Hwang. SAMURAI Adapting Segment Anything Model for Zero-Shot Visual Tracking with Motion-Aware Memory. arXiv preprint arXiv:2411.11922, 2024.  
+
+> [78]
+
+Mingqiao Ye, Martin Danelljan, Fisher Yu, and Lei Ke. Gaussian Grouping: Segment and Edit Anything in 3D Scenes. In ECCV, 2024.  
+
+> [79]
+
+Lu Yuan, Dongdong Chen, Yi-Ling Chen, Noel Codella, Xiyang Dai, Jianfeng Gao, Houdong Hu, Xuedong Huang, Boxin Li, Chunyuan Li, Ce Liu, Mengchen Liu, Zicheng Liu, Yumao Lu, Yu Shi, Lijuan Wang, Jianfeng Wang, Bin Xiao, Zhen Xiao, Jianwei Yang, Michael Zeng, Lu-owei Zhou, and Pengchuan Zhang. Florence: A New Foundation Model for Computer Vision. arXiv preprint arXiv:2111.11432, 2021.  
+
+> [80]
+
+Haobo Yuan, Xiangtai Li, Tao Zhang, Yueyi Sun, Zilong Huang, Shilin Xu, Shunping Ji, Yunhai Tong, Lu Qi, Jiashi Feng, and Ming-Hsuan Yang. Sa2VA Marrying SAM2 with MLLM for Dense Grounded Understanding of Im-ages and Videos. IEEE TPAMI, 2025.  
+
+> [81]
+
+Xiaohua Zhai, Basil Mustafa, Alexander Kolesnikov, and Lucas Beyer. Sigmoid Loss for Language Image Pre-Training. In ICCV, 2023.  
+
+> [82]
+
+Yifu Zhang, Peize Sun, Yi Jiang, Dongdong Yu, Fucheng Weng, Zehuan Yuan, Ping Luo, Wenyu Liu, and Xinggang Wang. ByteTrack: Multi-Object Tracking by Associating Every Detection Box. In ECCV, 2022.  
+
+> [83]
+
+Hao Zhang, Feng Li, Shilong Liu, Lei Zhang, Hang Su, Jun Zhu, Lionel M. Ni, and Heung-Yeung Shum. DINO DETR with Improved DeNoising Anchor Boxes for End-to-End Object Detection. In ICLR, 2023.  
+
+> [84]
+
+Hao Zhang, Feng Li, Xueyan Zou, Shilong Liu, Chunyuan Li, Jianfeng Gao, Jianwei Yang, and Lei Zhang. A Sim-ple Framework for Open-Vocabulary Segmentation and Detection. In ICCV, 2023.  
+
+> [85]
+
+Zhixiong Zhang, Shuangrui Ding, Xiaoyi Dong, Songxin He, Jianfan Lin, Junsong Tang, Yuhang Zang, Yuhang Cao, Dahua Lin, and Jiaqi Wang. Advancing Com-plex Video Object Segmentation via Progressive Concept Construction. arXiv preprint arXiv:2507.15852, 2025.          
+
+> P R E P R I N T ·2 0 2 6 ·S P E R I D L A B S R E S E A R C H E N E A S ·1 8 [86]
+
+Lianmin Zheng, Wei-Lin Chiang, Ying Sheng, Siyuan Zhuang, Zhanghao Wu, Yonghao Zhuang, Zi Lin, Zhuo-han Li, Dacheng Li, Eric P. Xing, Hao Zhang, Joseph E. Gonzalez, and Ion Stoica. Judging LLM-as-a-Judge with MTBench and Chatbot Arena. In NeurIPS, 2023.  
+
+> [87]
+
+Kaiyang Zhou, Jingkang Yang, Chen Change Loy, and Zi-wei Liu. Learning to Prompt for Vision-Language Models. IJCV, 2022.  
+
+> [88]
+
+Xingyi Zhou, Rohit Girdhar, Armand Joulin, Philipp Krähenbühl, and Ishan Misra. Detecting Twenty-thousand Classes using Image-level Supervision. In ECCV, 2022.  
+
+> [89]
+
+Xueyan Zou, Zi-Yi Dou, Jianwei Yang, Zhe Gan, Linjie Li, Chunyuan Li, Xiyang Dai, Harkirat Behl, Jianfeng Wang, Lu Yuan, Nanyun Peng, Lijuan Wang, Yong Jae Lee, and Jianfeng Gao. Generalized Decoding for Pixel, Image, and Language. In CVPR, 2023.  
+
+> [90]
+
+Xueyan Zou, Jianwei Yang, Hao Zhang, Feng Li, Linjie Li, Jianfeng Wang, Lijuan Wang, Jianfeng Gao, and Yong Jae Lee. Segment Everything Everywhere All at Once. In NeurIPS, 2023.

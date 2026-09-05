@@ -1,0 +1,54 @@
+{
+  "label": "2026-09-05",
+  "date": "2026-09-05",
+  "generated_at": "2026-09-05T22:43:53",
+  "count": 3,
+  "papers": [
+    {
+      "paper_id": "202609/05/2609.03756v1-eneas-embedding-guided-neural-ensemble-for-adaptive-segmentation",
+      "section": "deep",
+      "title_en": "ENEAS: Embedding-guided Neural Ensemble for Adaptive Segmentation",
+      "authors": "Javier del Pino, Salvador Rodríguez, Alejandro Garabito, Javier Álvarez, Chema Garabito",
+      "date": "2026-09-03",
+      "pdf": "https://arxiv.org/pdf/2609.03756v1",
+      "score": "8.0",
+      "evidence": "文本提示的自适应分割与开放概念语义发现",
+      "tldr": "文本提示分割模型常把消失当存在、局部纹理当整体、视觉相似产物当真体，难以可靠跟踪。ENEAS以文本适配SeC保持目标记忆，对同一查询支持单实例追踪和开放发现；验证层先视觉匹配，再仅对歧义候选启用条件VLM。由此能锁定实例不漂移不碎片、揭示所有查询对象，并识别“分身”，面向严谨的重建和视频库提供可靠语义输出。",
+      "tags": "query:seg",
+      "abstract_en": "We present ENEAS, a unified, text-promptable method for instance tracking and semantic discovery. Text-promptable segmentation models, including the latest foundation models such as SAM 3, still suffer from temporal hallucinations, spatial fragmentation, and semantic misclassification: they fail to report target absence when an object leaves the field of view, segment local textures instead of the complete object during extreme close-ups, and prioritize visual features over ontological reality, so that visually similar artifacts such as statues, paintings, or reflections are segmented as target entities.   ENEAS works two ways from a single method: precise tracking and high-quality segmentation of a unique instance, and open-concept discovery of every instance a text query names, resolved by a semantic verification layer. For tracking, we extend the geometrically robust SeC architecture, previously limited to point interactions, with a text-prompting adapter and leverage its temporal memory, so that the target is held through disappearance without drifting to distractors and kept whole even when it fills the entire view. For discovery, the verification layer combines high-speed visual embedding matching with conditional VLM refinement, invoking semantic reasoning only for ambiguous candidates, which filters out the ontological errors that visual-only models cannot distinguish while keeping latency low. Designed with 3D reconstruction in mind, where a single misclassified distractor corrupts the asset, ENEAS unlocks high-quality semantic tracking and segmentation of video, of broad libraries, and of collections of temporally or spatially unordered data, together with the discrimination to tell true instances from their doppelgangers: things that look alike but are not the same. The code and models are available at https://github.com/speridlabs/eneas",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202609/05/2608.28933v1-nbs-no-bias-stereo",
+      "section": "quick",
+      "title_en": "NBS: No Bias Stereo",
+      "authors": "Vage Taamazyan, Zhuowen Shen, Stefan Hinterstoisser, Alberto Dall'Olio, Agastya Kalra, Aarrushi Shandilya, Xin Li, Wenping Wang, Kartik Venkataraman",
+      "date": "2026-08-28",
+      "pdf": "https://arxiv.org/pdf/2608.28933v1",
+      "score": "7.0",
+      "evidence": "无归纳偏置的端到端ViT立体深度估计，用大规模合成数据训练，挑战传统立体匹配设计",
+      "tldr": "立体匹配长期依赖显式几何归纳偏置，尽管通用方法可行但被视为必需。本文提出完全去除架构归纳偏置的端到端Vision Transformer模型，仅凭海量合成数据训练，即取得超越显式几何方法的精度与更优的运行时效率。结果证明纯数据驱动足以取代人工设计几何，为3D重建的持续改进打开了真正的扩展之路。",
+      "tags": "query:stereo-depth",
+      "abstract_en": "Stereo reconstruction is one of the last remaining Computer Vision tasks where all state-of-the-art methods employ a heavy architectural inductive bias. Even though it has been demonstrated that the task can be solved using general-purpose methods, it is widely believed that inductive biases in stereo are strictly necessary for both high-quality results and computational efficiency. We challenge this paradigm. In this paper, we demonstrate that both state-of-the-art accuracy and superior runtime efficiency are achievable with a model completely devoid of architectural inductive biases, relying instead on a simple, end-to-end Vision Transformer. By training on massive synthetic datasets, we show that pure data-driven learning can surpass explicitly engineered geometry. This work proves that explicit inductive biases are no longer a prerequisite for stereo matching, ultimately unlocking true scaling laws for continuous improvement in 3D reconstruction.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202609/05/2608.29819v1-phasornet-learning-structure-from-frequency-for-real-time-stereo-matching",
+      "section": "quick",
+      "title_en": "PhasorNet: Learning Structure from Frequency for Real-Time Stereo Matching",
+      "authors": "Md Raqib Khan, Santosh Kumar Vipparthi, Subrahmanyam Murala",
+      "date": "2026-08-30",
+      "pdf": "https://arxiv.org/pdf/2608.29819v1",
+      "score": "7.0",
+      "evidence": "实时立体匹配方法，针对精细结构与透明反射等困难区域，与双目深度估计主题相关",
+      "tldr": "立体匹配在精细结构、反射或透明物体等病态区域，常因外观线索模糊而失败。为此，PhasorNet通过频域线索增强几何判别性，利用Phase-Augmented Transformer在注意力中注入傅里叶相位信息，并配合GCFRM模块融合全分辨率卷积与轻量级注意力以保持细节。训练时采用多尺度EHR损失聚焦高误差和边界区域。方法仅5.3M参数，就在ETH3D上取得领先性能，且在KITTI上展示了出色的跨域泛化能力，为实时立体匹配提供了高效实用的新方案。",
+      "tags": "query:stereo-depth",
+      "abstract_en": "Accurate stereo matching remains challenging in ill-posed regions such as fine structures, reflective, or transparent objects, where appearance cues are often ambiguous or unreliable. To tackle this, we propose PhasorNet, a lightweight yet powerful framework that boosts geometric discrimination via frequency-domain cues. At its core, the Phase-Augmented Transformer (PAT) injects Fourier-derived phase information into the attention mechanism, yielding photometrically robust, structure-preserving features that prioritize structural consistency in difficult areas. Additionally, we develop a Geometry-Context Fusion Refinement Module (GCFRM) that combines a full-resolution convolutional stream with a lightweight attention-based stream (leveraging WQA and CDGA blocks) to efficiently preserve fine details and object boundaries without excessive overhead. Training is further enhanced by a multi-scale Edge-guided High-Error Region (EHR) loss that adaptively focuses optimization on high-error and edge regions, guiding hierarchical cost volume refinement. With only 5.3M parameters, PhasorNet achieves state-of-the-art performance on the challenging ETH3D benchmark while exhibiting excellent cross-domain generalization on KITTI, delivering an efficient and practical solution for accurate real-time stereo matching.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    }
+  ],
+  "errors": []
+}
