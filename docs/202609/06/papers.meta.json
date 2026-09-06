@@ -1,0 +1,54 @@
+{
+  "label": "2026-09-06",
+  "date": "2026-09-06",
+  "generated_at": "2026-09-06T22:25:59",
+  "count": 3,
+  "papers": [
+    {
+      "paper_id": "202609/06/2608.28933v1-nbs-no-bias-stereo",
+      "section": "quick",
+      "title_en": "NBS: No Bias Stereo",
+      "authors": "Vage Taamazyan, Zhuowen Shen, Stefan Hinterstoisser, Alberto Dall'Olio, Agastya Kalra, Aarrushi Shandilya, Xin Li, Wenping Wang, Kartik Venkataraman",
+      "date": "2026-08-28",
+      "pdf": "https://arxiv.org/pdf/2608.28933v1",
+      "score": "7.0",
+      "evidence": "无架构归纳偏置的立体深度估计方法，可支撑双目深度与移动双摄场景",
+      "tldr": "立体匹配长期依赖重架构归纳偏置，虽已有通用方法可解，但普遍认为偏置是高质量与效率所必需。本文挑战该范式，提出完全无架构偏置的端到端视觉Transformer模型，仅靠大规模合成数据训练，即可达到最先进精度并具有更优运行效率。结果表明纯数据驱动可超越显式几何设计，证明归纳偏置不再是立体匹配前提，为3D重建持续改进解锁真正缩放定律。",
+      "tags": "query:stereo-depth",
+      "abstract_en": "Stereo reconstruction is one of the last remaining Computer Vision tasks where all state-of-the-art methods employ a heavy architectural inductive bias. Even though it has been demonstrated that the task can be solved using general-purpose methods, it is widely believed that inductive biases in stereo are strictly necessary for both high-quality results and computational efficiency. We challenge this paradigm. In this paper, we demonstrate that both state-of-the-art accuracy and superior runtime efficiency are achievable with a model completely devoid of architectural inductive biases, relying instead on a simple, end-to-end Vision Transformer. By training on massive synthetic datasets, we show that pure data-driven learning can surpass explicitly engineered geometry. This work proves that explicit inductive biases are no longer a prerequisite for stereo matching, ultimately unlocking true scaling laws for continuous improvement in 3D reconstruction.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202609/06/2608.29819v1-phasornet-learning-structure-from-frequency-for-real-time-stereo-matching",
+      "section": "quick",
+      "title_en": "PhasorNet: Learning Structure from Frequency for Real-Time Stereo Matching",
+      "authors": "Md Raqib Khan, Santosh Kumar Vipparthi, Subrahmanyam Murala",
+      "date": "2026-08-30",
+      "pdf": "https://arxiv.org/pdf/2608.29819v1",
+      "score": "7.0",
+      "evidence": "面向细小结构与透明区域的实时立体匹配，契合双目深度估计的综合主题",
+      "tldr": "立体匹配在细结构反射或透明等病态区域中常因外观线索模糊而困难。PhasorNet利用频域相位信息增强几何判别能力，通过相位增强Transformer将傅里叶相位注入注意力，并设计几何上下文融合模块结合全分辨率卷积与轻量注意力以保持细节。训练采用边缘引导的高误差区域损失进行多尺度优化。仅五点三万参数的模型在ETH3D上取得最高精度，并在KITTI上展现良好的跨域迁移能力。该工作为实时立体匹配提供了兼顾效率与精度的新方案。",
+      "tags": "query:stereo-depth",
+      "abstract_en": "Accurate stereo matching remains challenging in ill-posed regions such as fine structures, reflective, or transparent objects, where appearance cues are often ambiguous or unreliable. To tackle this, we propose PhasorNet, a lightweight yet powerful framework that boosts geometric discrimination via frequency-domain cues. At its core, the Phase-Augmented Transformer (PAT) injects Fourier-derived phase information into the attention mechanism, yielding photometrically robust, structure-preserving features that prioritize structural consistency in difficult areas. Additionally, we develop a Geometry-Context Fusion Refinement Module (GCFRM) that combines a full-resolution convolutional stream with a lightweight attention-based stream (leveraging WQA and CDGA blocks) to efficiently preserve fine details and object boundaries without excessive overhead. Training is further enhanced by a multi-scale Edge-guided High-Error Region (EHR) loss that adaptively focuses optimization on high-error and edge regions, guiding hierarchical cost volume refinement. With only 5.3M parameters, PhasorNet achieves state-of-the-art performance on the challenging ETH3D benchmark while exhibiting excellent cross-domain generalization on KITTI, delivering an efficient and practical solution for accurate real-time stereo matching.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202609/06/2609.01530v1-revisiting-cross-view-completion-self-supervised-pre-training-via-reconstruction-error-comparison",
+      "section": "quick",
+      "title_en": "Revisiting Cross-View Completion: Self-Supervised Pre-Training via Reconstruction Error Comparison",
+      "authors": "Thibaut Loiseau, Guillaume Bourmaud, Vincent Lepetit",
+      "date": "2026-09-01",
+      "pdf": "https://arxiv.org/pdf/2609.01530v1",
+      "score": "6.0",
+      "evidence": "利用图像对的跨视角补全与共视性代理，可作为双目深度预训练方法",
+      "tldr": "跨视角补全自监督预训练依赖图像对共视区域，但对非共视区域仅产生单目信号。Gekko将跨视角重建误差与掩码自编码误差的相对差异作为共视性代理，联合训练补全、自编码和相对改进预测，为所有掩码区域提供双目信号。在一致架构和数据下，Gekko在零样本匹配、相对位姿和点图回归上全面超越CroCo，ETH3D端点误差降低22%。额外学到的共视性通道本身也是强检测器，且可直接从原始视频训练，去除3D预处理。",
+      "tags": "query:stereo-depth",
+      "abstract_en": "Self-supervised pre-training via cross-view completion learns strong features for 3D vision from co-visible regions of image pairs. However, the reference view provides little information for reconstructing non-co-visible patches, implicitly yielding a monocular training signal in these regions. We introduce Gekko, which turns this limitation into a useful signal. The relative improvement of the cross-view reconstruction error over a masked-autoencoder error is a self-supervised proxy for co-visibility: large improvements indicate co-visible regions, negligible ones non-co-visible areas. Gekko is a network, trained from scratch, that jointly performs cross-view completion, masked autoencoding, and per-pixel prediction of this relative improvement, providing an additional binocular signal for all masked regions without any ground-truth 3D annotation. Under identical architectures and training data, Gekko consistently outperforms CroCo on zero-shot correspondence estimation, relative pose estimation, and pointmap regression, with up to 6 times higher accuracy at the strictest relative-pose threshold and a 22% drop in end-point error on ETH3D. The extra channel it learns is itself a strong co-visibility detector on unseen scenes, and Gekko's frozen features outperform released cross-view backbones of comparable or larger size. It can also be trained directly from raw videos with a simple stride-based curriculum, removing the cumbersome 3D preprocessing prior methods require while matching models trained on curated data. Code and pre-trained models are publicly available.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    }
+  ],
+  "errors": []
+}
