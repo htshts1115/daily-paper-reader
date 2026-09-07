@@ -1,0 +1,416 @@
+Title: DART: Depth-as-Target Pretraining for Surgical Vision Foundation Models
+
+URL Source: https://arxiv.org/pdf/2609.04555v1
+
+Published Time: Mon, 07 Sep 2026 00:25:31 GMT
+
+Number of Pages: 26
+
+Markdown Content:
+> arXiv:2609.04555v1 [cs.CV] 3 Sep 2026
+
+HAN ET AL.: DEPTH-AS-TARGET SURGICAL VFM 1
+
+# DART: Depth-as-Target Pretraining for Surgical Vision Foundation Models 
+
+John Han 1
+
+john.j.han@vanderbilt.edu 
+
+Adam Schmidt 2
+
+Muhammad Abdullah Jamal 2
+
+Jie Ying Wu 1
+
+Omid Mohareri 21 Vanderbilt University 2305 West End Ave Nashville, Tennessee, USA  
+
+> 2
+
+Intuitive Surgical, Inc. 1020 Kifer Rd, Sunnyvale, California, USA 
+
+Abstract 
+
+Vision foundation models (VFMs) are valuable in data-scarce domains such as surgery, where a single pretrained backbone can provide rich representations for many downstream tasks. Yet the dominant self-supervised pretraining paradigm uses only RGB images, leaving readily available complementary signals, such as depth maps, unused. This is a particular missed opportunity in surgery, where natural-image VFMs transfer poorly while the scene geometry is rich and informative. With strong off-the-shelf models now able to produce pseudo-labeled dense depth for any image corpus, we hypothesize that such signals can be folded into pretraining to learn better representations. We present DART, an RGB-D pretraining recipe that builds on DINOv2 with a simple modification: a pixel-space depth reconstruction objective applied to masked iBOT patches, supervised by pseudo-labeled depth. Depth is used only during pretraining, so fine-tuning and inference remain RGB-only. We find that this pixel-level reconstruction head improves representation quality rather than disrupting it. We further show that depth, which encodes scene geometry, is more effective as a target than alternative dense signals such as Canny edges, confirming that the gains stem from depth rather than added supervision alone. Across eight surgical benchmarks spanning segmentation, depth estimation, and image-level recognition, DART outperforms both natural-image and in-domain baselines, including a vanilla DINOv2 trained on identical data, improving dense prediction while also strengthening image-level understanding. More broadly, DART shows that freely available geometric pseudo-labels can strengthen foundation model pretraining without extra labels or added inference cost, pointing toward stronger backbones for surgery. We will release our code and models upon acceptance. 
+
+© 2026. The copyright of this document resides with its authors. It may be distributed unchanged freely in print or electronic forms. 2 HAN ET AL.: DEPTH-AS-TARGET SURGICAL VFM 
+
+# 1 Introduction 
+
+In recent years, artificial intelligence (AI) has become a driving force in novel surgical systems, powering a wide range of intraoperative systems for gesture recognition [6], instrument and anatomy segmentation [3], tissue tracking [44], automated skill assessment [30], and more [15]. Robot-assisted surgery in particular benefits from AI for higher-order capabilities such as 3D reconstruction for improved spatial awareness [47], natural-language interfaces between surgeon and system [36, 37], and surgical autonomy [1, 11, 28, 29]. A common prerequisite to all of these tasks is robust visual understanding that simultaneously captures high-level image semantics, fine-grained semantic detail, and spatial structure. Building a model that learns such a representation is a foundational step toward intelligent surgical systems which can reduce surgeon workload, streamline surgical workflows, and improve patient outcomes [15]. Visual foundation models (VFMs) have emerged as the dominant paradigm for represen-tation learning, due to their scalability to large unlabeled video data, generalization across downstream tasks, and practicality as universal feature extractors. Recent efforts in surgical computer vision [26] therefore focus on compiling large-scale surgical video corpora and adapting established self-supervised recipes such as DINOv2 [33] and MAE [17]. The re-sulting backbones have been adopted for tasks including phase recognition [18, 39], triplet recognition [8, 52], and instrument segmentation [20]. Because surgical data is expensive to label while requiring expert domain knowledge, a single generalist backbone that serves many downstream tasks is especially valuable. Among these recipes, DINOv2 [33] is a particularly strong backbone for dense prediction. It learns through a self-distillation objective, enforcing consistency between different views of an image under heavy data augmentations and predicting masked patches’ representations, all entirely in latent space without any pixel-level reconstruction. The resulting features have been used for a variety of downstream tasks [45], making DINOv2 exactly the kind of generalist that label-scarce surgical vision calls for. However, we observed that off-the-shelf DINOv2 and DINOv3 [45] models do not generalize well to surgical images, with limited performance on dense pixel and image-level tasks. In fact, a MAE [17] and a DINOv2 minimally trained on surgical images tended to outperform even the released DINOv3 checkpoint on segmentation and recognition tasks. The real need, then, is not a better off-the-shelf model but a better pre-training recipe for surgical vision foundation models. One particular approach to improve self-supervised ViT backbones, established in the MAE family, has been to incorporate additional modalities, e.g., depth maps. For instance, MultiMAE [7] and Mask3D [23] both add depth map modalities to the pixel reconstruction objective for improved performance in downstream tasks, particularly in dense pixel tasks. By adding explicit geometry in the form of pseudo-labeled depth maps, these ViT backbones produce better features for semantic and spatial understanding. Two obstacles, however, make this paradigm a poor fit for surgery. First, these methods take depth as an encoder 
+
+input and therefore expect depth at inference, which is operationally restrictive in clinical pipelines where intraoperative depth sensing is rare or computationally expensive. Second, MAE-family pretraining underperforms DINOv2 on dense prediction in our surgical setting, and the RGB-D variant does not close the gap: MultiMAE pretrained on surgical images actually underperforms a single-modality MAE baseline. This suggests the path forward is not more MAE, but bringing depth supervision to DINOv2. We present DART (Depth-as-tARgeT), a DINOv2-based framework for RGB-D pre-training in the surgical domain. We choose DINOv2 over other popular models such as HAN ET AL.: DEPTH-AS-TARGET SURGICAL VFM 3
+
+I-JEPA [5] precisely because the iBOT [56] objective, which already supervises masked patches, offers a natural insertion point for additional pixel-space supervision that latent-only frameworks otherwise lack. In short, we add a lightweight head to reconstruct depth maps from masked iBOT patch tokens, supervised by pseudo-labeled depth, while maintaining all other loss terms and objectives as the original DINOv2. Crucially, we require no depth maps at runtime/fine-tuning, which we ensure by only adding depth as a supervisory target rather than an input. By enforcing the model to reconstruct depth patches at masked iBOT locations, we encourage the model to learn better spatial features for both dense pixel and image-level tasks. The depth head is discarded after pre-training; at fine-tuning and inference, DART operates purely in RGB, thus improving its practicality and deployment usability. Although our application is in surgery, our proposed method is generalizable to any specific domain. Across five segmentation benchmarks, one depth estimation benchmark, and two image-level surgical benchmarks, DART simultaneously outperforms its baselines on dense predic-tion while maintaining strong performance on image-level surgical understanding. We further provide controlled ablations, isolating the depth objective from in-domain pre-training and characterizing design choices. Our contributions are as follows: • We propose DART, a RGB-D self-supervised pretraining recipe that incorporates pseudo-depth as a target, requiring only RGB at fine-tuning and inference. • We pre-train DART and other self-supervised vision models on the surgical LEMON dataset [10]. We demonstrate that DART outperforms other models trained on the same data and their publicly released checkpoints. • We also demonstrate that depth is the preferred supervisory target in our framework. By exchanging the target with other auxiliary signals (e.g., Canny edges), we observe that depth maps generally lead to superior results than other auxiliary targets. 
+
+# 2 Related Work 
+
+## 2.1 Surgical Vision Foundation Models 
+
+The scarcity of large annotated datasets in surgery has motivated several efforts to develop domain-specific vision foundation models via self-supervised pretraining on unlabeled surgi-cal video. EndoViT [8] pretrains a ViT with masked image modeling on a large endoscopic corpus, while EndoFM [48] and its long-video extension EndoFM-LV [49] adopt masked video modeling within a teacher-student framework. GSViT [43] instead pretrains via next-frame prediction with a focus on real-time deployment, and Hirsch et al. [19] apply Masked Siamese Networks [4] to endoscopic video. More recent work scales both data and supervision. SurgeNetXL [12] pretrains DINO-style models on 4.7M surgical frames, and SurgFM [10] applies DINO-based self-distillation with an augmented teacher-student scheme. A separate line explores vision-language pre-training, aligning surgical video with narration transcripts [54, 55]. Others adapt off-the-shelf models to surgical tasks; Surgical-DINO [9], for instance, uses LoRA-based adaptation of DINOv2 for surgical depth estimation. Our work is most directly comparable to image-based surgical self-supervised learn-ing (SSL) methods that pretrain a general-purpose backbone for diverse downstream tasks (EndoViT, SurgeNetXL, SurgFM). We differ in two ways: (i) we build on DINOv2 rather 4 HAN ET AL.: DEPTH-AS-TARGET SURGICAL VFM Student ViT     
+
+> Teacher ViT
+> ℒ𝐷𝐼𝑁𝑂 ℒ𝑖𝐵𝑂𝑇 ℒ𝑘𝑜𝑙𝑒𝑜 ℒ𝑑𝑒𝑝𝑡ℎ
+> Masked Tokens
+> EMA Tokens
+> Pseudo Depth
+> sg sg
+> Depth
+> Head
+> DINOv2 DART
+> Global
+> Crop
+
+Figure 1: An overview of our method for a single global crop example. We build on the DINOv2 framework and maintain all components and loss terms. In DINOv2, global crops are 50%-masked and enter the student backbone. The iBOT objective enforces student patch features to match the teacher’s patch at the masked locations. DART adds a lightweight head that regresses pixel-wise depth from the student’s patch features. A reconstruction ℓ1 loss is minimized to match pseudo-labeled depth maps. Loss is computed only at masked patch locations, similar to iBOT. This simple modification lends itself to a RGB-D pre-training recipe that improves downstream tasks without requiring depth maps at fine-tuning/runtime. Local crops are processed identically to the DINOv2 recipe. “sg” stands for stop-gradient. than MAE or DINO, retaining its strong dense prediction capabilities, and (ii) we introduce auxiliary depth supervision that leverages the geometric structure of surgical scenes. 
+
+## 2.2 RGB-D Pretraining 
+
+Leveraging geometric or multimodal supervision during pretraining has been studied exten-sively for indoor scene understanding under the masked-image-modeling paradigm. Pri3D [22] uses multi-view RGB-D contrastive constraints to embed 3D priors into 2D representations, and Mask3D [23] brings this into the masked-image-modeling framework by masking and reconstructing depth alongside RGB. Both establish that depth, used as a pretraining signal, transfers geometric inductive biases to RGB-only finetuning. A related line of work treats multiple modalities jointly. MultiMAE [7] extends MAE to accept and predict RGB, depth, and semantic segmentation, and can be finetuned with any subset of these modalities. Subsequent work combines contrastive and reconstructive objectives for RGB-D [25, 50] or scales to many modalities via tokenization [24, 31]. Across this MAE-family of work, depth typically serves as both encoder input and reconstruction target, so the resulting backbone expects depth at inference. However, this is a requirement that is impractical in domains without depth sensors, including most clinical pipelines. DINO-family self-distillation has seen comparatively little exploration with depth or multimodal supervision, and existing work differs from our setting. DeFM [35] pretrains a DINOv2-style model entirely on depth images, yielding a depth encoder used on depth inputs at inference. The Omnivorous Vision Encoder [27] adapts a frozen DINOv2 backbone post-HAN ET AL.: DEPTH-AS-TARGET SURGICAL VFM 5RGB  Pseudo Depth  Depth Pred.  RGB  Pseudo Depth  Depth Pred. 
+
+Figure 2: Samples from the RGB-D dataset and qualitative results displaying the depth reconstruction quality of DART. Each sample is ordered as RGB, pseudo-labeled depth, and reconstructed depth of DART. Note that the objective of our approach is not for good depth estimation but rather improving representation learning for downstream tasks. hoc to produce modality-agnostic features, rather than modifying the pretraining objective. To the best of our knowledge, no prior work incorporates depth as a target within the DINOv2 pretraining objective itself, with depth never entering the encoder input. Finally, concurrent surgical work has begun using monocular depth for self-supervised representation learning, though not within a DINOv2 framework: EndoUFM [53] uses Depth Anything [51] as a frozen prior to improve depth estimation, but does not modify the backbone’s pretraining objective. In contrast, we use pseudo-depth during pretraining itself, baking geometric awareness into the encoder. 
+
+# 3 Methods 
+
+We propose a depth-reconstruction objective for self-supervised pretraining of vision trans-formers on surgical images. Our method takes RGB images as input during both pretraining and downstream finetuning; depth is used only as a supervision target during pretraining, sup-plied as pseudo-labels from an off-the-shelf depth predictor. The resulting encoder produces representations that improve dense surgical prediction tasks (segmentation, depth estimation) and image-level tasks (classification, recognition) without requiring depth at inference time. We build on DINOv2 [33] as our base self-supervised framework, adding a lightweight depth decoder that predicts pseudo-depth from masked patch features. We first provide details about the pre-training RGB-D dataset (Sec. 3.1), review the relevant components of DINOv2 (Sec. 3.2), describe our additions (Sec. 3.3), and provide implementation details (Sec. 3.4). An overview of our method can be seen in Fig. 1. 
+
+## 3.1 Data Preprocessing 
+
+We use the recently released LEMON dataset [10], which consists of 938 hours of surgical video collected from YouTube. We sample each frame at 1 Hz to generate a pre-training 6 HAN ET AL.: DEPTH-AS-TARGET SURGICAL VFM 
+
+dataset of 3.4M images. There is no overlap between LEMON and any of the downstream datasets that we use. Due to physical constraints of the clinical endoscope, depth sensors (e.g., LiDAR) are not currently available to collect ground-truth depth in surgical scenes. We therefore use an off-the-shelf model, Depth Anything V2-Large [51], to generate a relative pseudo-depth map for each image, which we standardize to zero mean and unit variance per image. These depth maps are used only during pre-training and discarded at fine-tuning and inference. We display visualizations of some RGB-D samples in Fig. 2. 
+
+## 3.2 Preliminaries: DINOv2 
+
+DINOv2 trains a vision transformer by self-distillation between a student and an architecturally identical teacher, whose parameters are an exponential moving average (EMA) of the student’s: 
+
+θT ← m · θT + ( 1 − m) · θS. Three losses operate on the student’s outputs. The DINO loss produces two global and several local views of each image via random crops and color jitter, projects each view’s class token through a shared head g(·) into a distribution over 
+
+K prototypes, and trains the student to match the teacher’s distributions across the other views; the student processes all views while the teacher processes only the global ones. The 
+
+iBOT [56] loss adds patch-level supervision: a subset M of the student’s global-view input patches is replaced by a learned mask token, and the student’s patch tokens pSi for i ∈ M are trained, through the same head g, to match the teacher’s tokens pTi at those positions, where the teacher sees the unmasked image. Both are cross-entropies between the student distribution at temperature τS and the centered-and-sharpened teacher distribution at temperature τT . The 
+
+KoLeo regularizer is a repulsive term on student class tokens that penalizes each sample’s distance to its nearest neighbor within the batch, encouraging spread on the unit hypersphere. The full DINOv2 objective is 
+
+LDINOv2 = LDINO + LiBOT + λKoLeo LKoLeo . (1) Notably, neither DINO nor iBOT requires any pixel-level reconstruction; both operate in the latent space. Despite this, DINOv2 produces useful features for semantic and spatial understanding as a result of the multi-view consistency objective. We retain this entire framework unchanged in our method. 
+
+## 3.3 Depth-Aware Pretraining 
+
+We add a single auxiliary objective: a lightweight decoder predicts pseudo-depth at iBOT-masked patch positions from the student’s patch features. We elaborate on each design choice below. 
+
+Pseudo-depth as supervision target. We use the pseudo-depth maps from Sec. 3.1 purely as a supervision target : depth never enters the encoder’s input, so the student must recover geometry from RGB-derived features alone. 
+
+Depth decoder. A shallow depth head h(·) maps each student patch feature pSi ∈ RD to a 
+
+P × P depth patch (where P is the encoder’s patch size): ˆdi = h(pSi ) ∈ RP×P. (2) HAN ET AL.: DEPTH-AS-TARGET SURGICAL VFM 7
+
+We experimented with different h(·) designs and empirically determined that a 3-layer MLP with hidden dim 512 produced the best performance. We use the student’s post-encoder, pre-projection patch features (i.e., the same features iBOT operates on, before the projection head g). This decoder only exists for the student network. 
+
+Depth reconstruction loss. The decoder is supervised at iBOT-masked positions only, using the same masks M as the iBOT loss: 
+
+Ldepth = 1
+
+|M| ∑
+
+> i∈M
+
+ˆdi − di 1 (3) where di is the standardized pseudo-labeled depth patch at position i. Restricting the loss to masked positions matches iBOT’s design: the encoder must produce features at masked positions sufficient to recover both semantic content (via iBOT distillation) and geometric content (via depth reconstruction). 
+
+Combined objective. The final pretraining loss is 
+
+L = LDINO + LiBOT + λKoLeo LKoLeo + λdepth Ldepth (4) where λdepth is a single hyperparameter governing the strength of depth supervision relative to DINOv2’s existing losses. We choose λdepth = 0.1, as it led to the best results and report sweeps over λdepth values in section 4.5. Visualizations of depth reconstructions can be seen in Fig. 2. 
+
+## 3.4 Implementation Details 
+
+Pretraining. We pretrain ViT-B/16 [13] from scratch as our backbone, matching DINOv2’s reference configuration, and follow DINOv2 hyperparameters except where noted. We train at a global crop resolution of 224 × 224 (yielding 14 × 14 patch tokens) with 8 local crops at 96 × 96; iBOT masks 50% of the global-view patches. We optimize with AdamW using a 1.5e-3 base learning rate under a cosine schedule with 62,500 warmup iterations, weight decay 0.04, and teacher EMA momentum 0.996. The KoLeo weight is λKoLeo = 0.1 and our depth weight is λdepth = 0.1. The depth decoder h(·) is a 3-layer MLP with hidden dimension 512 and GELU activations, regressing each masked patch feature to a 16 × 16 depth patch under an 
+
+ℓ1 loss. Due to computational constraints, we train DART for 187,500 iterations at batch size 1024, which we use as the common training budget across our in-domain baselines for fair comparison. Pseudo-depth targets are precomputed once with Depth Anything V2-Large [51] prior to training. 
+
+Fine-tuning. For all downstream tasks we freeze the backbone and train only the task-specific head, so depth supervision affects evaluation solely through the learned features. Fine-tuning implementation details are given in the appendices. 
+
+Compute. Pretraining runs on 8 ×H200 GPUs; fine-tuning experiments use A100s. 8 HAN ET AL.: DEPTH-AS-TARGET SURGICAL VFM 
+
+# 4 Results 
+
+## 4.1 Experimental Design 
+
+We evaluate DART on a variety of surgical downstream tasks spanning dense pixel prediction (segmentation and depth estimation) and image-level recognition. Dataset details are provided in the appendix. In all experiments we freeze the backbone and train only the task-specific heads, so every reported gain is attributable to the learned features alone. We note that all downstream tasks are out-of-domain with respect to the pre-training corpus. 
+
+Baselines. We compare against two families of models. First, we evaluate publicly available VFMs: DINOv2 [33], DINOv3 [45], MAE (IN-1k) [17], and MultiMAE (IN-1k) [7]. The DINO models were distilled from a ViT-g and a 7B-parameter model pre-trained on 142M and 1.7B images, respectively, while the ImageNet-1k models were trained from scratch for 1600 epochs on 1.3M natural images. Additionally, we also compare with LEMON-FM [10], which was trained with the DINO framework with a ConvNeXt-L backbone on the LEMON dataset. Second, we train each of these models on the LEMON dataset for a controlled in-domain comparison. Due to computational constraints, MAE and MultiMAE are trained for 400 epochs. The original MultiMAE was pre-trained with three modalities (RGB, depth, and semantic maps); we use only RGB and depth to match our setting. Finally, and most importantly, we train a vanilla DINOv2 on the same data with identical training parameters to our method, isolating the effect of the depth objective. Unless specified otherwise, we use ViT-B for all models and fine-tune at 224 × 224 resolution. Implementation details for pre-training and fine-tuning these models are in the appendix. 
+
+## 4.2 Dense Pixel Tasks 
+
+We first report the performance of DART against its baselines on dense pixel tasks: segmen-tation and monocular depth estimation. We additionally report ViT-S experiments in the appendix, showing that the gains are not specific to a single model scale. 
+
+Segmentation. We consider two setups following previous work [33]. The first is a linear (lin.) head, which probes the class separability of the features with a lightweight linear operation on the final layer’s features: the low-resolution patch features are projected to per-class logits, which are then bilinearly upsampled to the full-resolution map. The second is a multi-scale (+ms.) head, where we concatenate patch features along the embedding dimension from the standard probing layers [2,5,8,11] and train a linear layer on top. Using intermediate features alongside final features provides additional context for the task and generally boosts performance. All experiments share the same training parameters and use a cross-entropy loss. We report mean Intersection over Union (mIoU), averaged over three seeds; due to space constraints, per-cell standard deviations are reported in the appendix. We evaluate on five established surgical segmentation datasets: EndoVis18 [3], CholecIn-stanceSeg [2], SAR-RARP50 [38], CholecSeg8k [21], and PhaKIR [42]. We use the standard train-test splits provided in the original datasets. Because PhaKIR does not provide a public test set, we use Video_13 as the test set and exclude it from training. For these experiments we also include MultiMAE RGB-D, a variant that additionally receives depth as input at fine-tuning, since the original authors report that providing extra modalities at fine-tuning improves downstream performance [7]. These results are shown in Table 1. HAN ET AL.: DEPTH-AS-TARGET SURGICAL VFM 9                                                                                                                              
+
+> EndoVis18 CholecISeg SARRARP50 CholecSeg8k PhaKIR Data Method Depth lin. +ms. lin. +ms. lin. +ms. lin. +ms. lin. +ms. Natural DINOv2 –28.8 31.8 48.3 52.6 53.5 62.0 36.7 38.5 10.3 10.4 DINOv3 –30.1 32.5 53.5 55.2 58.0 64.0 50.0 43.7 11.6 10.6 MAE –26.0 28.0 37.1 47.1 52.7 55.1 37.9 38.9 7.6 8.8 MultiMAE PT 26.6 27.0 40.7 48.7 51.2 56.1 36.0 36.7 8.3 10.1 LEMON LEMON-FM –25.7 31.2 40.6 51.0 52.0 66.6 33.9 42.4 8.7 11.0 MAE –31.9 32.6 41.1 56.2 65.7 67.1 44.3 46.0 12.0 13.2 MultiMAE PT 30.8 32.6 59.5 55.1 62.7 66.0 43.4 43.1 11.7 12.2 DINOv2 –34.1 34.9 58.2 59.7 63.9 64.4 49.7 50.5 14.1 15.7
+> Ours PT 34.9 36.8 66.2 68.9 68.7 70.2 52.4 50.5 14.5 16.2
+> MultiMAE PT+FT 29.4 28.8 54.7 49.9 70.4 71.8 44.3 45.2 11.0 11.9
+
+Table 1: Semantic segmentation with frozen features , linear (lin.) and multiscale (+ms). 
+
+Depth marks whether depth is used in pre-training (PT) and/or fine-tuning (FT). Bold is best and underline is second best among the RGB-only fine-tuning settings; the RGB-D fine-tuning row (gray) is excluded from the ranking. Mean over 3 seeds; per-cell std reported in the appendix. CholecISeg = CholecInstanceSeg. Natural images refer to LVD for DINO models and IN-1k for MAE models. We report the mean over 3 seeds; standard deviations are in the appendices due to space constraints. DART shows notable gains over the RGB-only DINOv2 baseline trained on identical data, demonstrating that adding depth supervision during pre-training reliably improves downstream performance. For instance, our method outperforms the DINOv2 baseline by +9.2 mIoU on CholecInstanceSeg (+ms.). In some settings the gains are modest or on par, such as CholecSeg8k multiscale and PhaKIR linear. Our method also surpasses LEMON-FM [10], a strong in-domain surgical foundation model, on dense prediction. This is notable given that LEMON-FM is a larger ConvNeXt-L backbone with over twice as many parameters. More generally, publicly available VFM backbones are not competitive on surgical segmentation. MAE and MultiMAE trained for 1600 epochs on natural images do not outperform their in-domain counterparts trained for only 400 epochs on surgical images, underscoring a significant gap between the natural and surgical domains. Surprisingly, MAE is superior to MultiMAE across most benchmarks when fine-tuning with RGB only, despite MultiMAE having been pre-trained with RGB-D; for instance, MAE reaches 31.9 mIoU on EndoVis18 linear, whereas MultiMAE reaches 30.8. This suggests that masked image modeling is a limited paradigm for RGB-D learning in the surgical domain. In some cases, however, MultiMAE is comparable to or even outperforms MAE (59.5 vs 41.1 mIoU on CholecInstanceSeg linear). MultiMAE can also be fine-tuned with depth as input (RGB-D segmentation), shown in the last row of Table 1, and we find that performance actually degrades with the depth modality on most benchmarks. While we do not test this directly, we speculate that this unexpected discrepancy stems from two factors: (1) MAE-family models are far more competitive under end-to-end fine-tuning than the frozen setting evaluated here, and (2) adding depth as input introduces an additional domain shift between pre-training and fine-tuning. Notably, DART outperforms RGB-D MultiMAE on 8 of 10 benchmark settings while using only RGB at fine-tuning. We visualize selected qualitative results in Fig. 3 for 3 segmentation datasets over the 5 LEMON-trained models. In general, DART produces cripser instrument boundaries with less false positive regions. Other models tend to produce noisy semantic maps with small incorrectly classified regions compared. In particular, even DINOv2 produces noisy semantic 10 HAN ET AL.: DEPTH-AS-TARGET SURGICAL VFM EndoVis18      
+
+> CholecISeg
+> CholecSeg8k
+> Ground Truth LEMON-FM MAE MultiMAE DINOv2 DART
+
+Figure 3: Qualitative results displaying segmentation results on EndoVis18, CholecIn-stanceSeg, and CholecSeg8k under the multiscale setting. We only display results for models pretrained on the surgical data. We refer the reader to the appendices for more qualitative results. 
+
+Pretrain. data Method Depth Linear DPT LEMON LEMON-FM – 0.485 ±0.005 0.608 ±0.006 
+
+MAE – 0.512 ±0.003 0.609 ±0.026 
+
+MultiMAE PT 0.498 ±0.004 0.605 ±0.007 
+
+DINOv2 – 0.542 ±0.003 0.626 ±0.009 
+
+Ours PT 0.557 ±0.008 0.653 ±0.009 
+
+Natural DINOv2 – 0.506 ±0.011 0.613 ±0.037 
+
+DINOv3 – 0.500 ±0.011 0.623 ±0.009 
+
+MAE – 0.499 ±0.006 0.598 ±0.003 
+
+MultiMAE PT 0.487 ±0.004 0.630 ±0.005 
+
+Table 2: Depth estimation on SCARED-C ( δ1 ↑). Mean ±std over 3 seeds. Bold is best and underline is second best across all rows. We exclude MultiMAE RGB-D since it would be a trivial task to regress depth from RGB-D. Depth marks whether depth is used in pre-training (PT). Natural images refer to LVD and IN-1k for DINO and MAE models respectively. maps, despite the fact that the only difference between DART and DINOv2 is the depth-as-target supervision. 
+
+Depth Estimation. We again consider two setups: a linear head that regresses a single channel from the final layer’s patch features, and the DPT [40] head (where we take features from encoder layers [2,5,8,11]). We train both heads with an ℓ1 loss and do not use the class token. Because ground-truth depth is difficult to acquire in surgical scenes, labeled surgical depth datasets are scarce; most public datasets either consist of simulated/phantom data [14, 34] or rely on off-the-shelf stereo matching [41]. For our evaluation, we use the corrected SCARED-C dataset [16], which provides ex-vivo porcine scenes with sparse depth labels acquired via structured light. We perform relative depth estimation by predicting normalized depth maps and report δ1 in Table 2. We observe a trend similar to the segmentation results: our method outperforms its HAN ET AL.: DEPTH-AS-TARGET SURGICAL VFM 11 RGB  Ground Truth  LEMON-FM  MAE  MultiMAE  DINOv2  DART 
+
+Figure 4: Qualitative results displaying depth estimation results on the SCARED-C dataset under the DPT setting. We only display results for models pretrained on the surgical data. We refer the reader to the appendices for more qualitative results. baselines under both the linear and DPT heads. Here, however, publicly available VFMs are far more competitive, with DINOv3-DPT rivaling many models trained on surgical images. We attribute this to SCARED-C consisting of ex-vivo porcine scenes rather than in-vivo surgical images, which likely widens the gap between pre-training and fine-tuning data and limits models pre-trained on surgical video. Nonetheless, DART still achieves the highest accuracy, with a δ1 of 0.653 versus 0.630 for the next-best model. As before, simply adding depth during pre-training does not by itself help depth estimation: MultiMAE lags behind MAE regardless of training data. In contrast, our depth-as-target objective improves over the DINOv2 baseline. We visualize some qualitative results on the SCARED-C dataset across the five surgical models in Fig. 4. LEMON-FM and DINOv2 tend to produce smoother depth maps. However, DART has finer delineations and boundaries, such as the small protruding regions in the bottom of both images. MultiMAE seems to display the worst results, despite the fact that it was trained with the depth modality during pre-training. 
+
+## 4.3 Image-level Tasks 
+
+We report two tasks: surgical phase recognition with Cholec80 [46] and triplet recognition with CholecT50 [32]. Results are shown in Table 3. 
+
+Cholec80. Surgical phase recognition is the task of classifying which stage of the surgery an image depicts (e.g., preparation, dissection, cleaning). We treat this as a simple classification task: a linear layer over the class token produces the logits, trained with a cross-entropy loss, and we report F1 score. Our method again shows significant gains over its baselines. While depth is most intuitively useful for dense pixel tasks, we find it also benefits image-level understanding and classification. Specifically, our method outperforms the MAE models, the DINOv2 baseline (+0.7 F1), and the DINO-based LEMON-FM (+4.4 F1). 
+
+CholecT50. Surgical triplet recognition is the task of classifying the ⟨instrument, action, target ⟩ tuple in a given image. Each frame may contain zero, one, or multiple triplets, making this a multi-label classification problem. We found that concatenating the cls token and the mean of the patch features worked better than using the class token alone, and that three independent linear heads (one per label) trained with a multi-label binary cross-entropy loss outperformed a single linear layer. For metrics, we use the ivtmetrics library and report average precision following previous work [32]. Triplet recognition diverges from the trends above. While our method beats most baselines, the DINO-based LEMON-FM outperforms it by a notable margin (7.9 vs 6.9 AP ivt ). We note 12 HAN ET AL.: DEPTH-AS-TARGET SURGICAL VFM 
+
+Cholec80 CholecT50 Triplet Recognition Pretrain. data Method F1 Score AP i AP v AP t AP it AP iv AP ivt 
+
+LEMON MAE 45.0 ±0.4 36.4 ±0.1 23.9 ±0.2 15.8 ±0.5 5.9 ±0.1 9.6 ±0.2 3.6 ±0.1 
+
+MultiMAE 43.9 ±0.3 37.8 ±0.3 23.7 ±0.2 15.7 ±0.4 5.2 ±0.2 9.5 ±0.1 3.5 ±0.3 
+
+DINOv2 70.8 ±0.1 58.8 ±0.5 34.6 ±0.2 25.9 ±0.1 10.4 ±0.5 15.4 ±0.1 6.4 ±0.1 
+
+Ours 71.5 ±0.1 62.1 ±0.2 37.0 ±0.1 28.2 ±0.2 11.6 ±0.1 16.2 ±0.5 6.9 ±0.1 
+
+LEMON-FM 67.1 ±0.1 73.6 ±0.4 44.6 ±0.2 30.0 ±0.1 13.3 ±0.4 20.0 ±0.1 7.9 ±0.3 
+
+Natural DINOv2 60.7 ±0.3 55.9 ±0.2 34.8 ±0.2 26.4 ±0.2 10.3 ±0.1 15.1 ±0.0 6.2 ±0.0 
+
+DINOv3 56.6 ±0.0 46.7 ±0.2 29.0 ±0.1 20.6 ±0.2 8.0 ±0.0 13.0 ±0.0 4.8 ±0.0 
+
+MAE 25.9 ±0.4 33.1 ±0.2 19.6 ±0.5 11.9 ±0.1 4.2 ±0.1 8.0 ±0.2 2.5 ±0.4 
+
+MultiMAE 44.2 ±0.3 39.7 ±0.2 25.3 ±0.3 17.6 ±0.1 5.6 ±0.1 10.2 ±0.1 3.5 ±0.0 
+
+Table 3: Image-level surgical understanding. Cholec80 phase recognition F1 Score (%) and CholecT50 triplet recognition (AP, %). Mean ±std over 3 seeds. Bold = best and underline = second best per column, across all rows. Natural image datasets are LVD for DINO models and IN-1k for MAE models. 
+
+EndoVis18 CholecISeg SARRARP50 CholecSeg8k PhaKIR Aux. signal lin. +ms. lin. +ms. lin. +ms. lin. +ms. lin. +ms. None (DINOv2) 30.4 30.9 48.5 50.9 57.4 54.6 39.9 42.7 10.3 9.5 Canny edges 29.1 30.9 48.6 49.9 56.3 55.3 38.5 43.7 10.6 8.7 Blurred grayscale 28.2 29.2 45.4 50.0 55.9 53.8 38.4 44.2 10.4 9.3 Depth (ours) 31.4 31.2 48.5 47.4 57.8 55.6 41.0 42.7 10.7 10.7 
+
+Table 4: Auxiliary reconstruction signal ablation (ViT-S; linear (lin.) and multiscale (+ms.) mIoU, mean over 3 seeds). Bold = best and underline = second best per column. We report mIoU. CholecISeg = CholecInstanceSeg. that LEMON-FM is a ConvNeXt-L backbone with more than twice the parameters, and that it was trained with a temporally augmented distillation strategy that draws positive views from similar procedures in other videos. This improves its invariance to minor instrument and tissue motion and to appearance changes across patients, benefiting fine-grained tasks like triplet recognition. Even so, DART improves over all baselines of comparable model size despite not utilizing a domain-specific image sampling strategy. 
+
+## 4.4 Auxiliary Targets 
+
+Our results suggest that depth supervision during pre-training provides significant downstream gains. Intuitively, encoding the 3D structure of the scene should yield better semantic and image-level understanding. But this raises a natural question: do the gains come from regularizing with any auxiliary image, or from depth specifically? To answer this, we swap the depth maps for other spatial targets during pre-training: Canny edges and blurred grayscale images. Both alternatives contain information that could plausibly aid segmentation. For computational efficiency, we train ViT-S variants of the DINOv2 baseline and our method, each with a different supervisory target, and evaluate on the five segmentation tasks in Table 4. Across 7 of the 10 segmentation settings, depth is the most useful target in our framework, outperforming Canny or grayscale reconstruction by up to 2.5 mIoU points. There are a few HAN ET AL.: DEPTH-AS-TARGET SURGICAL VFM 13                     
+
+> Depth decoder dwEV18 (mIoU) Cholec80 (F1) –029.3 62.4 MLP 0.025 29.2 62.2 0.05 29.6 64.0 0.1 30.6 65.5
+> 0.25 7.8 17.2 Transformer 0.05 18.5 37.2 0.1 31.2 64.3 0.15 26.7 56.4
+
+Table 5: Depth decoder and loss-weight sweep. EndoVis18 (EV18) linear (lin.) mIoU as a function of the depth decoder architecture and the depth-loss weight dw. The top row ( dw = 0) is the depth-free baseline; the Transformer decoder follows the MAE decoder design. outliers: plain DINOv2 is best on CholecInstanceSeg multiscale, while Canny edges leads on the same dataset under linear probing. Overall, depth is the most consistent reconstruction target, yielding the greatest improvement over to the DINOv2 baseline. This indicates that the improvements in DART are not simply a product of more data; rather, asking the model to predict the distance from the camera to each pixel is a reliable way to improve representation learning for surgical scenes. 
+
+## 4.5 Ablations and Sweeps 
+
+Our main modification to DINOv2 is regressing depth from masked iBOT patches during pre-training. We therefore perform experiments to sweep different λdepth and the depth decoder architecture. For compute efficiency, these experiments use ViT-B models trained for a reduced budget of 115k iterations at batch size 256; results are reported in Table 5. An MLP (3 layers, hidden dim 512, GELU) gives the best phase recognition on Cholec80 (65.5 F1), while a transformer decoder (4 layers, embed_dim=384, num_heads=6) gives the best segmentation on EndoVis18 (31.2 mIoU). Performance is also sensitive to λdepth : too large a weight (0.25) destabilizes training, confirming 0.1 as a robust choice. We adopt the MLP for its simplicity. We report sweep experiments over different MLP hidden dims in the appendices. 
+
+## 4.6 PCA Visualization 
+
+To probe what DART’s features look like qualitatively, we visualize the first three principal components of the patch features (projected to RGB) for DART and the vanilla DINOv2 baseline trained on identical data in Fig. 5. Two differences are visible. First, DART’s projections are spatially more coherent within object regions: instruments and tissue each appear as contiguous color blobs, whereas the baseline’s projections show finer-grained speckle within what should be a single region. Second, boundaries between instruments, tissue, and background are crisper in DART, with higher robustness to specularities and bright spots. Both observations are consistent with the depth-reconstruction objective: requiring the encoder to predict pseudo-depth at masked patch positions encourages features that carry both region-level consistency and geometric discontinuity at boundaries. 14 HAN ET AL.: DEPTH-AS-TARGET SURGICAL VFM RGB  DINOv2  DART RGB  DINOv2  DART 
+
+Figure 5: PCA visualization of the features learned by DINOv2 compared to DART at 640 × 640 resolution. Generally, DART has smoother features which is reflected in its superior quantitative results. Because we do not incorporate registers in our ViTs, we clip outliers outside of 95% for improved visualization. 
+
+# 5 Conclusion and Future Work 
+
+In this work, we propose DART, an RGB-D pretraining recipe for surgical scenes. We find that reconstructing pixel-wise depth at masked iBOT positions within the DINOv2 recipe improves performance on both dense pixel and image-level tasks. Notably, this holds even though DINOv2 otherwise operates entirely in latent space, suggesting that a targeted pixel-space objective can complement rather than disrupt self-distillation. Our auxiliary-target ablation further shows that depth provides useful regularization in ways that other spatial maps, such as Canny edges and blurred grayscale, do not. Across a wide range of tasks spanning segmentation, depth estimation, classification, and recognition, DART delivers consistent gains over comparable baselines. Our method only uses RGB at fine-tuning and inference, improving our model’s practicality for deployment. Our method also has limitations. Its supervision relies on pseudo-labeled depth from off-the-shelf monocular estimators, which output imperfect depth. We do not characterize how sensitive the learned representations are to depth quality or the choice of the estimator. Nonetheless, there are still gains despite the noisy depth targets. Our evidence is also confined to surgical data and to ViT-{S,B} backbones, so whether DART is effective at larger scales or in other domains remains an open question. This motivates several directions for future work. Scaling to larger backbones and more data is a natural next step, as is studying robustness to the depth source. We also plan to incorporate further modalities during pretraining for richer scene understanding, such as semantic maps or robot kinematics. More broadly, our findings suggest that combining latent-space objectives (DINO, I-JEPA) with pixel-space reconstruction (MAE) is a promising direction for self-supervised pretraining, especially in specialized domains where publicly available backbones do not generalize well. HAN ET AL.: DEPTH-AS-TARGET SURGICAL VFM 15 
+
+# References 
+
+[1] Ayberk Acar, Mariana Smith, Lidia Al-Zogbi, Tanner Watts, Fangjie Li, Hao Li, Nural Yilmaz, Paul Maria Scheikl, Jesse F d’Almeida, Susheela Sharma, et al. From monocular vision to autonomous action: Guiding tumor resection via 3d reconstruction. In 2025 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , pages 21714–21720. IEEE, 2025. [2] Oluwatosin Alabi, Ko Ko Zayar Toe, Zijian Zhou, Charlie Budd, Nicholas Raison, Miaojing Shi, and Tom Vercauteren. Cholecinstanceseg: A tool instance segmentation dataset for laparoscopic surgery. Scientific Data , 12(1):825, 2025. [3] Max Allan, Satoshi Kondo, Sebastian Bodenstedt, Stefan Leger, Rahim Kadkho-damohammadi, Imanol Luengo, Felix Fuentes, Evangello Flouty, Ahmed Mohammed, Marius Pedersen, et al. 2018 robotic scene segmentation challenge. arXiv preprint arXiv:2001.11190 , 2020. [4] Mahmoud Assran, Mathilde Caron, Ishan Misra, Piotr Bojanowski, Florian Bordes, Pascal Vincent, Armand Joulin, Mike Rabbat, and Nicolas Ballas. Masked siamese networks for label-efficient learning. In European conference on computer vision , pages 456–473. Springer, 2022. [5] Mahmoud Assran, Quentin Duval, Ishan Misra, Piotr Bojanowski, Pascal Vincent, Michael Rabbat, Yann LeCun, and Nicolas Ballas. Self-supervised learning from images with a joint-embedding predictive architecture. arXiv preprint arXiv:2301.08243 , 2023. [6] Jumanh Atoum, Garrison LH Johnston, Nabil Simaan, and Jie Ying Wu. Motion invariant and variant kinematic features in surgical gesture recognition. Journal of Medical Robotics Research , page 2650003, 2026. [7] Roman Bachmann, David Mizrahi, Andrei Atanov, and Amir Zamir. Multimae: Multi-modal multi-task masked autoencoders. In European conference on computer vision ,pages 348–367. Springer, 2022. [8] Dominik Bati´ c, Felix Holm, Ege Özsoy, Tobias Czempiel, and Nassir Navab. Endovit: pretraining vision transformers on a large collection of endoscopic images. International Journal of Computer Assisted Radiology and Surgery , 19(6):1085–1091, 2024. [9] Cui Beilei, Islam Mobarakol, Bai Long, and Ren Hongliang. Surgical-dino: Adapter learning of foundation model for depth estimation in endoscopic surgery. arXiv e-prints ,pages arXiv–2401, 2024. [10] Chengan Che, Chao Wang, Tom Vercauteren, Sophia Tsoka, and Luis C Garcia-Peraza-Herrera. Lemon: A large endoscopic monocular dataset and foundation model for perception in surgical settings. arXiv preprint arXiv:2503.19740 , 2025. [11] Tommaso Da Col, Guido Caccianiga, Michele Catellani, Andrea Mariani, Matteo Ferro, Giovanni Cordima, Elena De Momi, Giancarlo Ferrigno, and Ottavio De Cobelli. Automating endoscope motion in robotic surgery: A usability study on da vinci-assisted ex vivo neobladder reconstruction. Frontiers in Robotics and AI , 8:707704, 2021. 16 HAN ET AL.: DEPTH-AS-TARGET SURGICAL VFM 
+
+[12] Ronald de Jong, HJ Carolus, HA Franciscus, Romy C van Jaarsveld, Richard van Hillegersberg, PW Josien, Peter HN de With, Yasmina al Khalil, Fons van Der Sommen, et al. Scaling up self-supervised learning for improved surgical foundation models. 
+
+Medical Image Analysis , page 103873, 2025. [13] Alexey Dosovitskiy, Lucas Beyer, Alexander Kolesnikov, Dirk Weissenborn, Xiaohua Zhai, Thomas Unterthiner, Mostafa Dehghani, Matthias Minderer, Georg Heigold, Sylvain Gelly, et al. An image is worth 16x16 words: Transformers for image recognition at scale. 2020. [14] Mayank V Golhar, Lucas Sebastian Galeano Fretes, Loren Ayers, Venkata S Akshintala, Taylor L Bobrow, and Nicholas J Durr. C3vdv2–colonoscopy 3d video dataset with enhanced realism. arXiv preprint arXiv:2506.24074 , 2025. [15] Ahmad Guni, Piyush Varma, Joe Zhang, Matyas Fehervari, and Hutan Ashrafian. Ar-tificial intelligence in surgery: the future is now. European Surgical Research , 65(1): 22–39, 2024. [16] John J Han, Adam Schmidt, Max Allan, Jie Ying Wu, and Omid Mohareri. Scared-c: Cor-rected camera poses for endoscopic depth estimation. arXiv preprint arXiv:2605.16628 ,2026. [17] Kaiming He, Xinlei Chen, Saining Xie, Yanghao Li, Piotr Dollár, and Ross Girshick. Masked autoencoders are scalable vision learners. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , pages 16000–16009, 2022. [18] Roy Hirsch, Mathilde Caron, Regev Cohen, Amir Livne, Ron Shapiro, Tomer Golany, Roman Goldenberg, Daniel Freedman, and Ehud Rivlin. Self-supervised learning for endoscopic video analysis. In International Conference on Medical Image Computing and Computer-Assisted Intervention , pages 569–578. Springer, 2023. [19] Roy Hirsch, Mathilde Caron, Regev Cohen, Amir Livne, Ron Shapiro, Tomer Golany, Roman Goldenberg, Daniel Freedman, and Ehud Rivlin. Self-supervised learning for endoscopic video analysis. In International conference on medical image Computing and computer-assisted intervention , pages 569–578. Springer, 2023. [20] Felix Holm, Ghazal Ghazaei, Tobias Czempiel, Ege Özsoy, Stefan Saur, and Nassir Navab. Dynamic scene graph representation for surgical video. In Proceedings of the IEEE/CVF international conference on computer vision , pages 81–87, 2023. [21] W-Y Hong, C-L Kao, Y-H Kuo, J-R Wang, W-L Chang, and C-S Shih. Cholecseg8k: a semantic segmentation dataset for laparoscopic cholecystectomy based on cholec80. 
+
+arXiv preprint arXiv:2012.12453 , 2020. [22] Ji Hou, Saining Xie, Benjamin Graham, Angela Dai, and Matthias Nießner. Pri3d: Can 3d priors help 2d representation learning? In Proceedings of the IEEE/CVF International Conference on Computer Vision , pages 5693–5702, 2021. [23] Ji Hou, Xiaoliang Dai, Zijian He, Angela Dai, and Matthias Nießner. Mask3d: Pre-training 2d vision transformers by learning masked 3d priors. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 13510– 13519, 2023. HAN ET AL.: DEPTH-AS-TARGET SURGICAL VFM 17 
+
+[24] Muhammad Abdullah Jamal and Omid Mohareri. M33d: Learning 3d priors using multi-modal masked autoencoders for 2d image and video understanding. pages 2544–2554, 2024. [25] Muhammad Abdullah Jamal and Omid Mohareri. Multi-modal contrastive masked autoencoders: A two-stage progressive pre-training approach for rgbd datasets. In 
+
+Proceedings of the Computer Vision and Pattern Recognition Conference , pages 17947– 17957, 2025. [26] Tim JM Jaspers, Ronald LPD de Jong, Yiping Li, Carolus HJ Kusters, Franciscus HA Bakker, Romy C van Jaarsveld, Gino M Kuiper, Richard van Hillegersberg, Jelle P Ruurda, Willem M Brinkman, et al. Scaling up self-supervised learning for improved surgical foundation models. arXiv preprint arXiv:2501.09436 , 2025. [27] Rishabh Kabra, Maks Ovsjanikov, Drew A Hudson, Ye Xia, Skanda Koppula, Andre Araujo, Joao Carreira, and Niloy J Mitra. A mixed diet makes dino an omnivorous vision encoder. arXiv preprint arXiv:2602.24181 , 2026. [28] Ji Woong Kim, Tony Z Zhao, Samuel Schmidgall, Anton Deguet, Marin Kobilarov, Chelsea Finn, and Axel Krieger. Surgical robot transformer (srt): Imitation learning for surgical tasks. arXiv preprint arXiv:2407.12998 , 2024. [29] Ji Woong Kim, Juo-Tung Chen, Pascal Hansen, Lucy Xiaoyang Shi, Antony Goldenberg, Samuel Schmidgall, Paul Maria Scheikl, Anton Deguet, Brandon M White, De Ru Tsai, et al. Srt-h: A hierarchical framework for autonomous surgery via language-conditioned imitation learning. Science robotics , 10(104):eadt5254, 2025. [30] Daochang Liu, Qiyue Li, Tingting Jiang, Yizhou Wang, Rulin Miao, Fei Shan, and Ziyu Li. Towards unified surgical skill assessment. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , pages 9522–9531, 2021. [31] David Mizrahi, Roman Bachmann, Oguzhan Kar, Teresa Yeo, Mingfei Gao, Afshin Dehghan, and Amir Zamir. 4m: Massively multimodal masked modeling. volume 36, pages 58363–58408, 2023. [32] Chinedu Innocent Nwoye and Nicolas Padoy. Data splits and metrics for method benchmarking on surgical action triplet datasets. arXiv preprint arXiv:2204.05235 ,2022. [33] Maxime Oquab, Timothée Darcet, Théo Moutakanni, Huy Vo, Marc Szafraniec, Vasil Khalidov, Pierre Fernandez, Daniel Haziza, Francisco Massa, Alaaeldin El-Nouby, et al. Dinov2: Learning robust visual features without supervision. arXiv preprint arXiv:2304.07193 , 2023. [34] Kutsev Bengisu Ozyoruk, Guliz Irem Gokceler, Taylor L Bobrow, Gulfize Coskun, Kagan Incetan, Yasin Almalioglu, Faisal Mahmood, Eva Curto, Luis Perdigoto, Marina Oliveira, et al. Endoslam dataset and an unsupervised monocular visual odometry and depth estimation approach for endoscopic videos. Medical image analysis , 71:102058, 2021. 18 HAN ET AL.: DEPTH-AS-TARGET SURGICAL VFM 
+
+[35] Manthan Patel, Jonas Frey, Mayank Mittal, Fan Yang, Alexander Hansson, Amir Bar, Cesar Cadena, and Marco Hutter. Defm: Learning foundation representations from depth for robotics. arXiv preprint arXiv:2601.18923 , 2026. [36] Alejandra Perez, Chinedu Nwoye, Ramtin Raji Kermani, Omid Mohareri, and Muham-mad Abdullah Jamal. Surglavi: Large-scale hierarchical dataset for surgical vision-language representation learning. arXiv preprint arXiv:2509.10555 , 2025. [37] Alejandra Perez, Anita Rau, Lee White, Busisiwe Mlambo, Chinedu Nwoye, Muham-mad Abdullah Jamal, and Omid Mohareri. Sureon: A benchmark and vision-language-model for surgical reasoning. arXiv preprint arXiv:2603.06570 , 2026. [38] Dimitrios Psychogyios, Emanuele Colleoni, Beatrice Van Amsterdam, Chih-Yang Li, Shu-Yu Huang, Yuchong Li, Fucang Jia, Baosheng Zou, Guotai Wang, Yang Liu, et al. Sar-rarp50: Segmentation of surgical instrumentation and action recognition on robot-assisted radical prostatectomy challenge. arXiv preprint arXiv:2401.00496 , 2023. [39] Sanat Ramesh, Vinkle Srivastav, Deepak Alapatt, Tong Yu, Aditya Murali, Luca Sestini, Chinedu Innocent Nwoye, Idris Hamoud, Saurav Sharma, Antoine Fleurentin, et al. Dissecting self-supervised learning methods for surgical computer vision. Medical Image Analysis , 88:102844, 2023. [40] René Ranftl, Alexey Bochkovskiy, and Vladlen Koltun. Vision transformers for dense prediction. In Proceedings of the IEEE/CVF international conference on computer vision , pages 12179–12188, 2021. [41] David Recasens, José Lamarca, José M Fácil, JMM Montiel, and Javier Civera. Endo-depth-and-motion: Reconstruction and tracking in endoscopic videos using depth net-works and photometric constraints. IEEE Robotics and Automation Letters , 6(4): 7225–7232, 2021. [42] Tobias Rueckert, Raphaela Maerkl, David Rauber, Leonard Klausmann, Max Gutbrod, Daniel Rueckert, Hubertus Feussner, Dirk Wilhelm, and Christoph Palm. Video dataset for surgical phase, keypoint, and instrument recognition in laparoscopic surgery (phakir). 
+
+arXiv preprint arXiv:2511.06549 , 2025. [43] Samuel Schmidgall, Ji Woong Kim, Jeffrey Jopling, and Axel Krieger. General surgery vision transformer: A video pre-trained foundation model for general surgery. arXiv preprint arXiv:2403.05949 , 2024. [44] Adam Schmidt, Omid Mohareri, Simon DiMaio, Michael C Yip, and Septimiu E Salcudean. Tracking and mapping in medical computer vision: A review. Medical Image Analysis , 94:103131, 2024. [45] Oriane Siméoni, Huy V Vo, Maximilian Seitzer, Federico Baldassarre, Maxime Oquab, Cijo Jose, Vasil Khalidov, Marc Szafraniec, Seungeun Yi, Michaël Ramamonjisoa, et al. Dinov3. arXiv preprint arXiv:2508.10104 , 2025. [46] Andru P. Twinanda, Sherif Shehata, Didier Mutter, Jacques Marescaux, Michel de Math-elin, and Nicolas Padoy. Endonet: A deep architecture for recognition tasks on laparoscopic videos. IEEE Transactions on Medical Imaging , 36, 02 2016. doi: 10.1109/TMI.2016.2593957. HAN ET AL.: DEPTH-AS-TARGET SURGICAL VFM 19 
+
+[47] Yuehao Wang, Yonghao Long, Siu Hin Fan, and Qi Dou. Neural rendering for stereo 3d reconstruction of deformable tissues in robotic surgery. In International conference on medical image computing and computer-assisted intervention , pages 431–441. Springer, 2022. [48] Zhao Wang, Chang Liu, Shaoting Zhang, and Qi Dou. Foundation model for endoscopy video analysis via large-scale self-supervised pre-train. In International conference on medical image computing and computer-assisted intervention , pages 101–111. Springer, 2023. [49] Zhao Wang, Chang Liu, Lingting Zhu, Tongtong Wang, Shaoting Zhang, and Qi Dou. Improving foundation model for endoscopy video analysis via representation learning on long sequences. IEEE Journal of Biomedical and Health Informatics , 2025. [50] Jiange Yang, Sheng Guo, Gangshan Wu, and Limin Wang. Comae: Single model hybrid pre-training on small-scale rgb-d datasets. In Proceedings of the AAAI Conference on Artificial Intelligence , volume 37, pages 3145–3154, 2023. [51] Lihe Yang, Bingyi Kang, Zilong Huang, Zhen Zhao, Xiaogang Xu, Jiashi Feng, and Hengshuang Zhao. Depth anything v2. Advances in Neural Information Processing Systems , 37:21875–21911, 2024. [52] Shu Yang, Fengtao Zhou, Leon Mayer, Fuxiang Huang, Yiliang Chen, Yihui Wang, Sunan He, Yuxiang Nie, Xi Wang, Ömer Sümer, et al. Large-scale self-supervised video foundation model for intelligent surgery. arXiv preprint arXiv:2506.02692 , 2025. [53] Xinning Yao, Bo Liu, Bojian Li, Jingjing Wang, Jinghua Yue, and Fugen Zhou. Endoufm: Utilizing foundation models for monocular depth estimation of endoscopic images. arXiv preprint arXiv:2508.17916 , 2025. [54] Kun Yuan, Vinkle Srivastav, Nassir Navab, and Nicolas Padoy. Hecvl: Hierarchical video-language pretraining for zero-shot surgical phase recognition. In International Conference on Medical Image Computing and Computer-Assisted Intervention , pages 306–316. Springer, 2024. [55] Kun Yuan, Vinkle Srivastav, Tong Yu, Joel L Lavanchy, Jacques Marescaux, Pietro Mascagni, Nassir Navab, and Nicolas Padoy. Learning multi-modal representations by watching hundreds of surgical video lectures. Medical Image Analysis , 105:103644, 2025. [56] Jinghao Zhou, Chen Wei, Huiyu Wang, Wei Shen, Cihang Xie, Alan Yuille, and Tao Kong. ibot: Image bert pre-training with online tokenizer. arXiv preprint arXiv:2111.07832 , 2021. HAN ET AL.: DEPTH-AS-TARGET SURGICAL VFM S1 
+
+Table S1: Pre-training configurations for in-domain baselines and DART, all trained on the LEMON corpus. “—” denotes parameters not applicable to a given method. 
+
+Config MAE MultiMAE † DINOv2 DART 
+
+Optimization 
+
+Optimizer AdamW Base LR 1e −4 1e −4 1.5e −3 1.5e −3Weight decay 0.05 0.05 0.04 0.04 
+
+β1, β2 0.9, 0.95 0.9, 0.95 0.9, 0.999 0.9, 0.999 Batch size 4096 2048 1024 1024 
+
+Schedule 
+
+LR schedule Cosine decay Warmup 40 ep. 20 ep. 62.5k it. 62.5k it. Duration 400 ep. 400 ep. 187.5k it. 187.5k it. Augmentations RRC RRC DINOv2 ‡ DINOv2 ‡
+
+DINOv2-specific 
+
+Prototypes — — 65k 65k Crop size (G / L) — — 224 / 96 224 / 96 Num. crops (G / L) — — 2 / 8 2 / 8 Teacher momentum — — 0.996 → 1 0.996 → 1
+
+Multimodal supervision 
+
+Modalities RGB RGB + D RGB RGB + D 
+
+λdepth — — — 0.1   
+
+> †Pre-trained with RGB and depth; fine-tuned with RGB only unless otherwise specified.
+> ‡RandomResizedCrop (RRC) plus DINOv2’s standard augmentation stack.
+
+# Supplementary Material 
+
+## DART: Depth-as-Target Pretraining for Surgical Vision Foundation Models 
+
+# S1 Implementation Details 
+
+In this section, we describe the implementation details of pre-training and fine-tuning the models used in our work. Due to computational constraints, we could not match the scale of prior work, e.g., training MAE for 1,600 epochs. However, our “undertrained” models outperform publicly available off-the-shelf models due to the domain gap between surgical and natural images. Pretraining implementation details are outlined in Table S1 and finetuning details are outlined in Table S2. 
+
+## S1.1 LEMON and RGB-D Dataset Generation 
+
+The LEMON dataset is a surgical video dataset comprised of 938 hours curated from YouTube. We sample frames at 1 Hz from every video, which results in 3.4M images. We use the ViT-L variant of Depth Anything V2 to extract relative depth maps for each image. These RGB-D pairs are compressed into shards for efficient training with the webdataset library. Because Depth Anything is a monocular model, the estimated depth maps are natively inverse depth, or disparity. The authors do this to account for different scales between datasets, e.g., indoor S2 HAN ET AL.: DEPTH-AS-TARGET SURGICAL VFM 
+
+Table S2: Fine-tuning configuration used across downstream segmentation experiments. The backbone is frozen and only the task head is trained, so depth supervision affects evaluation solely through the learned representations. Input resolution is 224 × 224 with patch size 16. We normalize images based on the pre-training data source, e.g., ImageNet-pretrained models undergoes ImageNet normalization.                                      
+
+> Config lin. + ms. DPT Image-level Tasks
+> Optimization
+> Optimizer AdamW AdamW SGD Learning rate 1e −31e-3 1e-3
+> β1,β20.9, 0.999 0.9, 0.999 –Weight decay 0.05 0.05 0.0 Batch size 64 64 256
+> Schedule
+> Training duration 50 epochs 100 epochs 20 epochs LR schedule Constant Constant Cosine Decay
+> Augmentations (training)
+> Random horizontal flip p=0.5p=0.5p=0.5Photometric distortion Color jitter Color jitter None
+
+Table S3: Downstream evaluation datasets used in this work. “In/Ex” denotes in-vivo versus 
+
+ex-vivo . “Classes” refers to the number of label categories used in this work. Lap. = laparoscopy.                                                          
+
+> Dataset Task Procedure Modality In/Ex Cls. Size
+> Cholec80 Phase recog. Cholecystectomy Manual lap. In 780 videos CholecT50 Triplet recog. Cholecystectomy Manual lap. In 100 ∗50 vid. / ∼100k fr. SCARED-C Depth estimation Porcine abdomen Robotic Ex —17,135 RGB-D fr. EndoVis18 Scene seg. Porcine nephrectomy Robotic Ex 12 19 video seq. CholecInstanceSeg Instrument seg. Cholecystectomy Manual lap. In 841,933 fr. / 85 proc. SAR-RARP50 Instrument seg. Radical prostatectomy Robotic In 10 50 vid. / ∼16k fr. CholecSeg8k Scene seg. Cholecystectomy Manual lap. In 13 8,080 fr. / 17 clips PhaKIR Instrument seg. Cholecystectomy Manual lap. In 20 19,435 fr.
+> ∗100 valid action triplets formed from 6 instruments, 10 verbs, and 15 targets.
+
+and outdoor. As can be seen in our qualitative results, we maintain inverse depth during pre-training; higher values are closer to the camera. Although we did not experiment with inverting to relative depth, we do not believe it would lead to significant results since our framework does not require physically meaningful depth values during training. This approach is not without limitations. For instance, the LEMON dataset contains frames with black borders, common in endoscopic video feed. Although the depth values should be invalid in these zones, we use the raw depth outputs in these border areas. This may be included in future work. Furthermore, monocular depth estimation is inherently ill-posed; we saw that a minority of depth samples were inaccurate due to unclean images, blurring, or bloody scenes. Nonetheless, we see that noisy depth maps are still a valuable source for improving representation quality. HAN ET AL.: DEPTH-AS-TARGET SURGICAL VFM S3                                                             
+
+> EndoVis18 CholecISeg SARRARP50 CholecSeg8k PhaKIR Data Method Depth lin. +ms. lin. +ms. lin. +ms. lin. +ms. lin. +ms. LEMON DINOv2 ViT-S –30.4 30.9 48.5 50.9 57.4 54.6 39.9 42.7 10.3 9.5
+> Ours ViT-S PT 31.4 31.2 48.5 47.4 57.8 55.6 41.0 42.7 10.7 10.7
+> DINOv2 ViT-B –32.1 31.8 52.8 56.3 61.5 65.1 41.6 46.1 11.8 12.8
+> Ours ViT-B PT 32.1 32.2 57.2 63.5 63.5 67.0 43.9 50.3 12.3 13.6
+
+Table S4: ViT-S semantic segmentation with frozen features , linear (lin.) and multiscale (+ms), with ViT-B counterparts for reference. Depth marks whether depth is used in pre-training (PT) and/or fine-tuning (FT). Mean over 3 seeds. CholecISeg = CholecInstanceSeg. For these experiments, we use batch size = 256 due to compute constraints. 
+
+## S1.2 Downstream Task Datasets 
+
+We use 8 labeled datasets for downstream tasks in our work. We give some dataset details in Table S3. 
+
+# S2 ViT-B vs ViT-S Experiments 
+
+We also provide results for ViT-S. However, due to computational constraints, we train these with batch size 256 rather than 1024, which explains the worse results of ViT-B in this table compared to the main results. Similar to previous work, we noticed that batch size was a major contributing factor to good performance of DINOv2, since the centering mechanism and Koleo regularization depends on a large minibatch for good statistics. ViT-S vs. ViT-B results are reported in Table S4. 
+
+# S3 ViT-S Depth Decoder Sweeps 
+
+We noticed in our experiments that the ViT-S models did not perform expectedly with the same depth decoder size as the ViT-B models. As a result, we perform a small sweep of smaller MLP decoder to get the best ViT-S results for DART. Specifically, we sweep over hidden dim sizes {128 , 256 , 512 }, shown in Table S5. 
+
+# S4 Full Segmentation Results 
+
+In this section, we provide the standard deviation values in addition to the mean of the segmentation results from the main results. For all runs, we ran with 3 different seeds which we’ve reported the mean of. We could not include the standard deviation due to space constraints, so we provide them here in Table S6 and Table S7. 
+
+# S5 Depth Anything v2 Comparison Study 
+
+Intuitively, a foundational depth model initialized with DINOv2 weights and subsequently trained on depth data should be competitive in dense pixel tasks. To empirically validate this, we take the ViT-B variant of DAv2, discard the depth head, freeze the backbone, and train S4 HAN ET AL.: DEPTH-AS-TARGET SURGICAL VFM 
+
+Table S5: Depth-head hidden dimension sweep (ViT-S). Linear (lin.) and multiscale (+ms.) frozen-feature mIoU on four surgical segmentation benchmarks. Hidden dimensions are reported in ascending order; the leftmost column is the depth-free DINOv2 baseline. Best per row in bold .
+
+Dataset Head DINOv2 DART-128 DART-256 DART-512 
+
+EndoVis18 lin. 30.4 29.6 31.4 29.5 +ms. 30.9 31.4 31.2 30.8 CholecInstanceSeg lin. 48.5 47.2 48.5 46.8 +ms. 50.9 47.2 47.4 46.4 CholecSeg8k lin. 39.9 42.9 41.0 39.1 +ms. 42.7 42.5 42.7 40.3 PhaKIR lin. 10.3 11.6 10.7 10.0 +ms. 9.5 10.5 10.7 10.4 EndoVis18 CholecInstanceSeg SARRARP50 Data Method Depth lin. +ms. lin. +ms. lin. +ms. Natural DINOv2 – 28.8 ±1.0 31.8 ±0.7 48.3 ±0.2 52.6 ±0.5 53.5 ±0.4 62.0 ±0.2 
+
+DINOv3 – 30.1 ±0.5 32.5 ±0.6 53.5 ±2.7 55.2 ±4.1 58.0 ±0.8 64.0 ±0.4 
+
+MAE – 26.0 ±0.2 28.0 ±0.4 37.1 ±0.3 47.1 ±0.4 52.7 ±0.2 55.1 ±0.5 
+
+MultiMAE PT 26.6 ±0.3 27.0 ±0.5 40.7 ±0.3 48.7 ±0.4 51.2 ±0.2 56.1 ±0.1 
+
+LEMON LEMON-FM – 25.7 ±0.4 31.2 ±0.3 40.6 ±0.4 51.0 ±0.1 52.0 ±0.2 66.6 ±0.3 
+
+MAE – 31.9 ±0.5 32.6 ±0.4 41.1 ±0.3 56.2 ±2.8 65.7 ±0.5 67.1 ±0.1 
+
+MultiMAE PT 30.8 ±0.2 32.6 ±0.4 59.5 ±0.4 55.1 ±0.3 62.7 ±0.8 66.0 ±0.2 
+
+DINOv2 – 34.1 ±0.3 34.9 ±0.3 58.2 ±0.6 59.7 ±3.4 63.9 ±0.5 64.4 ±0.2 
+
+Ours PT 34.9 ±0.3 36.8 ±0.4 66.2 ±3.7 68.9 ±0.3 68.7 ±0.4 70.2 ±0.8 
+
+MultiMAE PT+FT 29.4 ±0.6 28.8 ±1.2 54.7 ±0.5 49.9 ±0.4 70.4 ±0.6 71.8 ±0.2 
+
+Table S6: Semantic segmentation with frozen features, mean ± std (part 1 of 2). Linear (lin.) and multiscale (+ms.). Depth marks whether depth is used in pre-training (PT) and/or fine-tuning (FT). Mean and standard deviation over 3 seeds. CholecISeg = CholecInstanceSeg. Natural images refer to LVD for DINO models and IN-1k for MAE models. Remaining datasets in Table S7. identical heads for the segmentation and depth estimation tasks. We also maintain the same training configuration and parameters as our original paper. Results are shown in Table S8. Please refer to Table 1 and 2 in the main paper to compare these values. DAv2 performs competitively on segmentation tasks and is a plausible backbone for dense pixel tasks, demonstrating superior performance compared to MAE and MultiMAE trained on ImageNet-1k. However, off-the-shelf DINOv2 and DINOv3 models slightly outperform DAv2, while the DINOv2 and DART models trained on surgical data far outperform DAv2. For depth estimation (SCARED-C), DAv2 is much more competitive, even outperforming DINOv2 trained on the surgical data. However, DART still demonstrates superior performance over DAv2. These results suggest that although DAv2 can be a useful backbone for downstream visual tasks, training a vision backbone from scratch with depth-as-target is still a better recipe for improved visual understanding. Feature-level alignment within intermediate ViT layers (e.g., RePA or GeometryForcing ) rather than depth-as-target may also produce similar gains in performance; we save this for future work on comprehensive comparison studies between training regimes. HAN ET AL.: DEPTH-AS-TARGET SURGICAL VFM S5 
+
+CholecSeg8k PhaKIR Data Method Depth lin. +ms. lin. +ms. Natural DINOv2 – 36.7 ±0.5 38.5 ±0.5 10.3 ±0.6 10.4 ±0.3 
+
+DINOv3 – 50.0 ±2.9 43.7 ±0.4 11.6 ±0.3 10.6 ±0.1 
+
+MAE – 37.9 ±2.1 38.9 ±1.2 7.6 ±0.8 8.8 ±0.4 
+
+MultiMAE PT 36.0 ±1.1 36.7 ±0.4 8.3 ±0.5 10.1 ±0.3 
+
+LEMON LEMON-FM – 33.9 ±0.3 42.4 ±0.8 8.7 ±0.5 11.0 ±0.2 
+
+MAE – 44.3 ±0.1 46.0 ±2.2 12.0 ±0.2 13.2 ±0.4 
+
+MultiMAE PT 43.4 ±0.3 43.1 ±0.2 11.7 ±0.3 12.2 ±0.1 
+
+DINOv2 – 49.7 ±2.1 50.5 ±2.0 14.1 ±0.4 15.7 ±0.4 
+
+Ours PT 52.4 ±0.2 50.5 ±1.9 14.5 ±0.5 16.2 ±0.9 
+
+MultiMAE PT+FT 44.3 ±0.8 45.2 ±0.5 11.0 ±0.6 11.9 ±0.8 
+
+Table S7: Semantic segmentation with frozen features, mean ± std (part 2 of 2). Continu-ation of Table S6 for the CholecSeg8k and PhaKIR datasets. Mean and standard deviation over 3 seeds. Column conventions as in Table S6. DAv2 DART Dataset H1 H2 H1 H2 EndoVis18 27.1 33.7 34.9 36.8 
+
+CholecISeg 46.5 51.0 66.2 68.9 
+
+SARRARP50 52.0 59.6 68.7 70.2 
+
+CholecSeg8k 36.0 36.8 52.4 50.5 
+
+PhaKIR 9.6 10.7 14.5 16.2 
+
+SCARED-C 0.547 0.612 0.557 0.653 
+
+Table S8: Quantitative results for frozen Depth Anything v2 ViT-B on dense pixel tasks. H1 is a single linear head; H2 is +m.s. for segmentation and DPT for depth. The first five rows are segmentation (mIoU) and the last is depth estimation ( δ1). 
+
+# S6 Additional Qualitative Results 
+
+We show additional qualitative results for segmentation and depth estimation tasks in this section. We include all 9 models that were evaluated in the work. In depth estimation, we observe that some areas of the image have visually inaccurate results. Please note that the SCARED-C dataset only provides sparse depth; the lack of dense supervision limits the performance ceiling of these models. S6 HAN ET AL.: DEPTH-AS-TARGET SURGICAL VFM 
+
+Figure S1: EndoVis18 segmentation qualitative results. From left to right: Ground truth, MAE (IN-1k), MultiMAE (IN-1k), DINOv2 (LVD), DINOv3 (LVD), LEMON-FM, MAE (LEMON), MultiMAE (LEMON), DINOv2 (LEMON), DART (LEMON). 
+
+Figure S2: CholecSeg8k segmentation qualitative results. From left to right: Ground truth, MAE (IN-1k), MultiMAE (IN-1k), DINOv2 (LVD), DINOv3 (LVD), LEMON-FM, MAE (LEMON), MultiMAE (LEMON), DINOv2 (LEMON), DART (LEMON). HAN ET AL.: DEPTH-AS-TARGET SURGICAL VFM S7 
+
+Figure S3: SCARED-C depth estimation qualitative results. From left to right: RGB, Ground truth, MAE (IN-1k), MultiMAE (IN-1k), DINOv2 (LVD), DINOv3 (LVD), LEMON-FM, MAE (LEMON), MultiMAE (LEMON), DINOv2 (LEMON), DART (LEMON).

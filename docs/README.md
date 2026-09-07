@@ -41,17 +41,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-09-06</span>
+      <span class="dpr-home-dashboard-kicker">2026-09-07</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 3 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 5 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>0</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>3</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>3</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>2</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-09-06 22:25:57 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-09-07 23:42:50 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,9 +62,9 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日速读三篇立体匹配论文，无精读，整体聚焦深度估计效率提升。</p>
-<p>最值得关注的是两篇7.0分工作：《NBS: No Bias Stereo》与《PhasorNet》，分别针对无偏匹配和频域结构建模。</p>
-<p>建议优先阅读上述两篇高分论文；若对自监督预训练感兴趣，可再浏览6.0分的《Revisiting Cross-View Completion》。</p>
+<p>今日精读与速读共4篇高相关论文，覆盖深度估计与风格化渲染等视觉前沿方向。</p>
+<p>最值得关注的是两篇9.0分精读：《Weather-Conditioned Depth Anything》聚焦天气条件化深度估计，及《LensStyle》探索可控镜头光效风格化渲染。</p>
+<p>若想快速入门，建议优先精读上述两篇高分工作，速读的两篇可作为补充拓展。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -73,12 +73,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">0 篇</strong>
+    <strong class="dpr-home-dashboard-count">3 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p class="dpr-home-dashboard-empty">今日暂无推荐。</p>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Weather-Conditioned Depth Anything">Weather-Conditioned Depth Anything</span></li><li><span class="dpr-home-dashboard-paper-title" title="LensStyle: Learning the Optical Aesthetics for Controllable Stylized Lens Effect Rendering">LensStyle: Learning the Optical Aesthetics for Controllable Stylized Lens Effect Rendering</span></li><li><span class="dpr-home-dashboard-paper-title" title="PhasorNet: Learning Structure from Frequency for Real-Time Stereo Matching">PhasorNet: Learning Structure from Frequency for Real-Time Stereo Matching</span></li></ul>
   </div>
-
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">mono-depth <strong>1</strong></span><span class="dpr-home-dashboard-tag">neural-bokeh <strong>1</strong></span><span class="dpr-home-dashboard-tag">stereo-depth <strong>1</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -86,12 +86,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">3 篇</strong>
+    <strong class="dpr-home-dashboard-count">2 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="NBS: No Bias Stereo">NBS: No Bias Stereo</span></li><li><span class="dpr-home-dashboard-paper-title" title="PhasorNet: Learning Structure from Frequency for Real-Time Stereo Matching">PhasorNet: Learning Structure from Frequency for Real-Time Stereo Matching</span></li><li><span class="dpr-home-dashboard-paper-title" title="Revisiting Cross-View Completion: Self-Supervised Pre-Training via Reconstruction Error Comparison">Revisiting Cross-View Completion: Self-Supervised Pre-Training via Reconstruction Error Comparison</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="RealOOB: A Definition-Consistent Real-World Oriented Occlusion Boundary Benchmark">RealOOB: A Definition-Consistent Real-World Oriented Occlusion Boundary Benchmark</span></li><li><span class="dpr-home-dashboard-paper-title" title="DART: Depth-as-Target Pretraining for Surgical Vision Foundation Models">DART: Depth-as-Target Pretraining for Surgical Vision Foundation Models</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">stereo-depth <strong>3</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">mono-depth <strong>1</strong></span><span class="dpr-home-dashboard-tag">neural-bokeh <strong>1</strong></span></div>
 </section>
 </div>
 
