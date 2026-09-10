@@ -41,17 +41,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-09-09</span>
+      <span class="dpr-home-dashboard-kicker">2026-09-10</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 12 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 1 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>9</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>3</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>1</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>0</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-09-09 21:53:41 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-09-10 21:43:04 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,7 +62,9 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日共读12篇论文，精读9篇、速读3篇，重点聚焦单目深度估计与3D场景理解。最值得精读的是满分论文《Marigold V2》，它用扩散Transformer刷新了单目深度估计的SOTA，同时《Adapting a Foundation Model for Lunar Surface Height Estimation》展示了基础模型在月球表面高程估计中的迁移潜力。建议普通读者优先从Marigold V2入手，理解扩散模型如何提升深度估计的精度与泛化性，再顺藤摸瓜探索其在地形重建中的应用。</p>
+<p>今天精读 1 篇、速读 0 篇，重点落在单目三维重建方向的 OmniPoint（8.0/10）。</p>
+<p>该工作主打&quot;任意相机下单张图像直接恢复通用公制点云&quot;，值得看的是它把相机无关性与真实尺度这两点放在同一框架里解决。</p>
+<p>普通读者可先看这篇精读笔记了解思路，再关注其后续实测与复现情况，不必急于上手。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -71,12 +73,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">9 篇</strong>
+    <strong class="dpr-home-dashboard-count">1 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Marigold V2: Revisiting Diffusion Transformers for Monocular Depth Estimation">Marigold V2: Revisiting Diffusion Transformers for Monocular Depth Estimation</span></li><li><span class="dpr-home-dashboard-paper-title" title="Adapting a Foundation Model for Lunar Surface Height Estimation">Adapting a Foundation Model for Lunar Surface Height Estimation</span></li><li><span class="dpr-home-dashboard-paper-title" title="Object Concepts Emerge from Motion">Object Concepts Emerge from Motion</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="OmniPoint: Universal Monocular Metric Pointcloud from Any Camera">OmniPoint: Universal Monocular Metric Pointcloud from Any Camera</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">seg <strong>5</strong></span><span class="dpr-home-dashboard-tag">mono-depth <strong>4</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">mono-depth <strong>1</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -84,12 +86,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">3 篇</strong>
+    <strong class="dpr-home-dashboard-count">0 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="CoordFormer: Give Me Any Coordinates and I Will Give You Labels">CoordFormer: Give Me Any Coordinates and I Will Give You Labels</span></li><li><span class="dpr-home-dashboard-paper-title" title="GoDeep: Annotation-Free Open-Vocabulary 3D Scene Understanding via Language-Space Lifting">GoDeep: Annotation-Free Open-Vocabulary 3D Scene Understanding via Language-Space Lifting</span></li><li><span class="dpr-home-dashboard-paper-title" title="Efficient and Robust Camera-independent Multiview 3D Geometric Reconstruction from Noisy Monocular Depth Estimation and Multiple Point Matching">Efficient and Robust Camera-independent Multiview 3D Geometric Reconstruction from Noisy Monocular Depth Estimation and Multiple Point Matching</span></li></ul>
+<p class="dpr-home-dashboard-empty">今日暂无推荐。</p>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">seg <strong>2</strong></span><span class="dpr-home-dashboard-tag">mono-depth <strong>1</strong></span></div>
+
 </section>
 </div>
 
