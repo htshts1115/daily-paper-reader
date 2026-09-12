@@ -48,17 +48,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-09-11</span>
+      <span class="dpr-home-dashboard-kicker">2026-09-12</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 3 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 0 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>0</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>3</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>0</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-09-11 21:38:56 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-09-12 21:16:00 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -69,9 +69,7 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日速读3篇，未做精读，主题集中在3D高斯泼溅辅助深度估计、可变形卷积改进与雷达深度估计三个方向。</p>
-<p>最值得看的是评分7.0的《RIDE》，它用重定位信息结合3D高斯泼溅做深度估计；若关注恶劣视觉条件下的感知，可再看《GRADE》的单帧生成式雷达深度方案。</p>
-<p>普通读者建议先读RIDE的摘要与方法图，理解&quot;重定位+3DGS&quot;如何补足深度精度，再按兴趣决定是否跟进其余两篇。</p>
+<p>今日无新推荐，系统未产出可展示论文。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -93,12 +91,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">3 篇</strong>
+    <strong class="dpr-home-dashboard-count">0 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="RIDE: Relocalization-Informed Depth Estimation with 3D Gaussian Splatting">RIDE: Relocalization-Informed Depth Estimation with 3D Gaussian Splatting</span></li><li><span class="dpr-home-dashboard-paper-title" title="Enhanced Deformable Convolution with Center-invariant Offset and Edge-aware Mask">Enhanced Deformable Convolution with Center-invariant Offset and Edge-aware Mask</span></li><li><span class="dpr-home-dashboard-paper-title" title="GRADE: Single-Frame Generative Radar Depth Estimation Under Visual Degradation">GRADE: Single-Frame Generative Radar Depth Estimation Under Visual Degradation</span></li></ul>
+<p class="dpr-home-dashboard-empty">今日暂无推荐。</p>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">mono-depth <strong>2</strong></span><span class="dpr-home-dashboard-tag">seg <strong>1</strong></span></div>
+
 </section>
 </div>
 
