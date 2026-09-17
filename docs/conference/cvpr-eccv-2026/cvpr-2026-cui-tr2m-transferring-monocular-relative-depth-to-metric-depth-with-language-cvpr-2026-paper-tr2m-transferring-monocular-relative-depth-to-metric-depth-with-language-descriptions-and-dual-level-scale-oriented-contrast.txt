@@ -1,0 +1,537 @@
+Title: TR2M: Transferring Monocular Relative Depth to Metric Depth with Language Descriptions and Dual-Level Scale-Oriented Contrast
+
+URL Source: https://openaccess.thecvf.com/content/CVPR2026/papers/Cui_TR2M_Transferring_Monocular_Relative_Depth_to_Metric_Depth_with_Language_CVPR_2026_paper.pdf
+
+Published Time: Sat, 16 May 2026 16:52:41 GMT
+
+Number of Pages: 12
+
+Markdown Content:
+# TR2M: Transferring Monocular Relative Depth to Metric Depth with Language Descriptions and Dual-Level Scale-Oriented Contrast 
+
+## Beilei Cui 1* Yiming Huang 1* Long Bai 1 Hongliang Ren 1,2† 1The Chinese University of Hong Kong, Hong Kong SAR 
+
+2Shenzhen Loop Area Institute, China 
+
+{beileicui,yhuangdl,b.long }@link.cuhk.edu.hk, hlren@ee.cuhk.edu.hk 
+
+> *
+
+Equal contribution. †Corresponding author. MDE      
+
+> RGB Metric Depth
+> RDE
+> RGB Relative Depth
+> Scale?
+> (a) Monocular Metric Depth Estimation (b) Monocular Relative Depth Estimation
+> “The image shows a playroom of ……”
+> (c) Relative to Metric Depth Transfer (Ours)
+> Feature
+> Extraction
+
+TR2M     
+
+> ~19 M
+> Rescale Maps RGB & Text Metric Depth
+> Rescale
+> Relative Depth
+> “The image shows a playroom of ……”
+> “A street with parked cars ……” “A medical image of cecum……”
+> Metric Depth Across Domains Easily Accessible Description Small Amount of Trainable Parameters
+> Relative Depth Metric Depth
+> (d) Qualitative Examples
+> Image
+
+Figure 1. Illustration of motivation. (a) Metric Depth Estimation typically restricts to a single domain or relies on camera parameters or sensors to enhance generalization. (b) Relative Depth Estimation generalizes better but is ambiguous in scale. (c) We therefore seek to transfer generalizable relative depth to metric depth by pixel-wise rescaling maps given image and readily accessible text description, which succeeds in obtaining metric depth for various domains with one lightweight trainable architecture. (d) Qualitative examples. 
+
+## Abstract 
+
+This work presents a generalizable framework to transfer relative depth to metric depth. Current monocular depth es-timation methods are mainly divided into metric depth es-timation (MMDE) and relative depth estimation (MRDE). MMDEs estimate depth in metric scale but are often limited to a specific domain. MRDEs generalize well across differ-ent domains, but with uncertain scales that hinder down-stream applications. To this end, we aim to build up a framework to solve scale uncertainty and transfer relative depth to metric depth. Previous methods used language as input and estimated two factors for conducting rescaling. Our approach, TR2M, utilizes both text descriptions and images as inputs and estimates two rescale maps to transfer relative depth to metric depth at the pixel level. Features from two modalities are fused with a cross-modality atten-tion module to better capture scale information. A strategy is designed to construct and filter confident pseudo metric depth for more comprehensive supervision. We also de-velop dual-level scale-oriented contrastive learning to uti-lize depth distribution as guidance to enforce the model learning about intrinsic cues consistent with the scale dis-tribution. TR2M only exploits a small number of trainable parameters to train on datasets in various domains and ex-periments not only demonstrate TR2M’s great performance in seen datasets but also reveal superior zero-shot capabil-ities on five unseen datasets. We show the huge potential in pixel-wise transferring relative depth to metric depth with language assistance instead of large-size metric depth mod-els with large amounts of training data. Code is available at: https://github.com/BeileiCui/TR2M .This CVPR paper is the Open Access version, provided by the Computer Vision Foundation. Except for this watermark, it is identical to the accepted version; the final published version of the proceedings is available on IEEE Xplore. 34181 1. Introduction 
+
+Monocular depth estimation (MDE) plays a crucial role in comprehending the 3D layout of environments depicted in 2D images and finds numerous applications in robotics [11, 54], autonomous driving [9, 37], endoscopic surgery [25, 33] and virtual reality technologies [12, 14]. Predicting a dense depth map from a single image is ill-posed without additional sensors because any points along the ray for a pixel with different depth values can yield the same image coordinate. Recent research on MDE focuses mainly on two aspects: monocular metric depth estimation (MMDE) and monocu-lar relative depth estimation (MRDE) as shown in Figure 1 (a) and (b). MMDE aims at predicting a dense depth map in a specific scale (often in meters). A limitless range of out-puts leads early works’ performance to commonly degrade much on test data with diverse scales [74]. Recent advance-ments have been made to rectify such a situation by lever-aging additional prior conditions such as camera informa-tion [20, 64] or scene information [5]. Alternatively, MRDE estimates the depth map in a unified scale. The affine-invariant loss enables optimization on vast amounts of data, resulting in excellent generalization across domains. How-ever, the scale uncertainty of MRDE also limits its practical applicability where a determined scale is needed, such as in robot planning and navigation. We consider addressing scale uncertainty for transfer-ring relative depth to metric depth efficiently to construct an MMDE pipeline with as good generalization capabili-ties across different domains as MRDE methods. Language descriptions effectively predict scene scale for relative-to-metric depth conversion (MMDE), leveraging object-scene correlations (e.g., vehicles/houses outdoors imply larger scale) [68]. However, two major problems have affected the performance of previous language description based meth-ods in predicting scene scales: 1) Large regions of erro-neous prediction still occur in state-of-the-art relative depth models, therefore a single factor for transforming relative depth map to metric scaled depth map will keep or even magnify such inaccuracy; 2) Same objects with different distributions and proportions result in inconsistent overall depth, but the language descriptions may be the same or very similar. Meanwhile, scale consistency at the feature level is often overlooked. Pixels with similar depth and scale may have low similarity in pixel-level features, lead-ing to instability of overall depth estimation. In light of the above observations, we develop a frame-work to predict pixel-wise transformation parameters to 
+
+Transfer a monocular Relative depth map to a Metric depth map based on the image and corresponding text descrip-tion termed TR2M as shown in Figure 1 (c). The image itself serves as input for the depth model, while the lan-guage description is readily available, eliminating the need for additional sensors or calibrations. The image and text feature embeddings are acquired with separate frozen en-coders. A lightweight network with cross-modality atten-tion takes two feature embeddings as inputs and predicts two maps functioning as a scale map and a shift map. Then, the metric depth can be obtained by a simple pixel-wise lin-ear transformation based on a scale and shift map, which is supervised by the ground truth metric depth. To encourage scale continuity and pixel-wise consistency in regions with-out ground-truth supervision, we also construct pseudo met-ric depth by aligning relative and ground truth metric depth and use a threshold to select high-confidence pseudo depths as the supervision signal. We further innovatively propose a Dual-Level Scale-Oriented Contrast to enhance the fea-ture consistency with the same depth scale. Image-wise features are enforced to be aligned with their correspond-ing scales and pixel-wise features are classified by their depth distribution and maximize the distance among fea-tures with different distributions and minimize the distance among features with the same distributions. We demon-strate that TR2M yields results similar to aligning relative depth through a linear transformation with the ground truth, and it surpasses some SOTA metric depth estimation meth-ods with fewer trainable parameters, offering improved gen-eralization across diverse domains. We summarize our main contributions as follows: 1) We propose a novel framework that leverages image and text descriptions to predict rescale maps to transfer monocular relative depth map to metric depth map across multiple domains. 2) We introduce a Dual-Level Scale-Oriented Contrast Learning strategy by classifying depth based on its dis-tribution to enforce global scale consistency. 3) Extensive experiments have demonstrated the superior performance of our proposed method on multiple scenes. To the best of our knowledge, we are the first to em-ploy text descriptions to perform pixel-wise transforma-tion from relative to metric depth. 
+
+## 2. Related Work 
+
+2.1. Monocular Depth Estimation 
+
+Recent Monocular Depth Estimation (MDE) comprises metric (MMDE) and relative (MRDE) depth estimation. MMDE models learn to predict pixel-wise depth maps in metric scale supervised by ground truth metric depth [3, 4, 17, 55]. Remarkable advances have been made in network architecture [30, 38, 60, 66], geometry model-ing [21, 48, 63, 72] and image priors [36, 47]. However, these methods typically restrict their setting to specific do-mains, resulting in performance degradation under domain shifts and limited generalization to unobserved environ-ments. Recent studies have investigated MMDE models 34182 with improved generalization ability with the help of cam-era intrinsic-based modeling [1, 39, 40, 64] or direct inte-gration of camera intrinsic [15, 20]. These methods of-ten need fine-tuning to adapt to specific domains or rely on particular sensors or cameras as prior knowledge. In contrast, by training on large-scale datasets with multifari-ous scales and domains accompanied by scale-invariant loss function [28, 42, 44, 61], relative depth models have been proven to have better generalization across different scenes. As a trade-off, the metric scale can not be recovered by rela-tive depth models, which limits downstream applications to some extent. TR2M aims to break through such a predica-ment by aligning highly generalizable relative depth into a metric scale efficiently to construct a universal metric depth estimation pipeline. 
+
+2.2. Language Involved Depth Estimation 
+
+Vision-Language Models (VLM) [8, 35, 41] develop a holistic grasp of both textual and visual content by under-going pre-training on varied datasets, thereby establishing a robust foundation that enhances performance in subse-quent downstream tasks [59, 65, 69, 76]. Recently, some researchers have attempted to leverage the power of VLM for monocular depth estimation [7, 71]. DepthCLIP [70] utilizes CLIP’s [41] semantic features combined with a depth projection mechanism to enable zero-shot adaptation, translating semantic language understanding into monocu-lar depth estimation tasks. Wordepth [67] utilizes the Vari-ational Auto-Encoder (VAE) to learn the geometry distribu-tion from the text description. Further advancements were made based on DepthCLIP by learnable prompts [24] or to-kens [2]. ScaleDepth [75] designed bin and scale queries to estimate the relative depth and scale factor for metric depth. However, the designed correlations between text and depth are indirect and too scratchy to represent precise depth in-formation. 
+
+2.3. Relative to Metric Depth Transfer 
+
+With the advancement in relative depth estimation models in recent years, researchers have started to study the transfer of powerful RDE models to metric depth scale. Efforts have been made to utilize left-right stereo consistency [57], cam-era geometric embedding [20], or test-time adaptation [74] to capture scale information. Most state-of-the-art methods train a relative depth model on diverse datasets first and then fine-tune the encoder with a metric head to specific metric datasets [43, 44, 61, 62]. RSA [68] estimates scale factor and shift factor from text input to globally rescale relative depth to metric depth for different scenes. However, metric heads are limited to specific datasets, and complex environ-ments may mislead text descriptions to inaccurate scale es-timation. More direct and integrated relative to metric depth transformation methods are still under exploration. 
+
+2.4. Contrastive Learning for Depth Estimation 
+
+Contrastive Learning has achieved substantial progress in learning feature representations for unsupervised learning tasks [10, 22, 58]. Pixel-level contrastive learning emerges for dense prediction with or without labels as guidance [27, 52, 53, 73]. WCL utilizes windows to form positive and negative pairs from depth feature maps for contrastive learn-ing [16]. D4RD [31] developed a robust depth estimation method by enforcing consistency among sample noises with different perturbations. Li et al. [31] model depth features with a Gaussian distribution to conduct region-wise con-trastive learning. Current contrastive learning methods for depth estimation are mainly unsupervised learning or super-vised by other types of labels, without utilizing depth itself as a supervisory signal. 
+
+## 3. Method 
+
+3.1. Overview 
+
+Figure 2 shows an overview framework of the proposed TR2M. Taking an RGB Image I ∈ RH×W ×3 and its text description L as input, TR2M aims to estimate two maps: scale map A ∈ RH×W and shift map B ∈ RH×W to rescale its corresponding relative depth Dr ∈ RH×W to metric depth ˆDm ∈ RH×W . Note that Dr ∈ RH×W is generated by a pre-trained relative depth model. Besides optimizing 
+
+ˆDm with the ground truth depth map Dgt m , we also perform linear regression to find the scale and shift factor ˜α and ˜β
+
+that minimizes pseudo rescaled metric depth Dpseudo m with 
+
+Dgt m . If the quality of Dpseudo m is good enough based on an evaluation threshold, it is also used as a supervision for ˆDm.Furthermore, we also propose dual-level scale-oriented con-trast learning to enforce feature consistency guided by depth distribution, thus improving the scale perception ability. 
+
+3.2. Scale and Shift Map Estimation 
+
+Network Architecture. Both images and textual descrip-tions can provide clues about scale, but a single modality alone with loss of overall layout or average scale remains ambiguous. We endeavor to comprehensively utilize both image and text to learn more accurate pixel-level scale in-formation as shown in Figure 2. To be specific, with the RGB image I ∈ RH×W ×3 and text description L as inputs, we first extract image feature FI ∈ RHW ×D and text fea-ture FL ∈ R1×D separately with a frozen image encoder and a frozen text encoder. To capture information effectively from both feature em-beddings, we introduce a cross-modality attention module as in Eq. (1). To maintain the pixel-level output, we make the image feature embedding query to access information from the key and value of the text feature embedding. Im-age feature embedding first applies self-attention and aggre-gates text information with skip connection, as in Eq. (2), 34183 Image Encoder  
+
+> “The image shows a classroom of ……”
+> Relative Depth Model
+> Cross-Attention Transformer
+> Relative Depth
+> Shift Decoder
+> Fine Scale Map
+> Fine Shift Map
+
+⨀ ⨁ 𝐷 −1  
+
+> Metric Depth Ground Truth
+> Threshold Aligned
+> Pseudo Metric Depth
+> Pseudo Metric Depth
+> ℒ𝑠𝑖
+> ℒtp−𝑠𝑖
+> Input Image Input Description : Frozen Model : Trainable Model
+
+⨀ : Pixel-wise Multiplication 
+
+⨁ : Pixel-wise Addition      
+
+> 𝐷 −1 : Reciprocal Transformation
+> ℒtp−𝑠𝑖 : Threshold Pseudo SI log Loss
+> ℒ𝑠𝑖 : SI log Loss
+> Scale and Shift Maps Prediction Model
+> Self-Attention Transformer
+> 𝐴
+> 𝐵
+> 𝐹 𝑓
+> 𝐼 𝐿 ෡𝐷 𝑚
+> 𝐷 𝑟 𝐷 𝑚 𝑝𝑠𝑒𝑢𝑑𝑜
+> 𝐷 𝑚 𝑔𝑡
+> Text Encoder
+> 𝐼𝑚𝑎𝑔𝑒 𝐸𝑚𝑏𝑒𝑑s 𝐹 𝐼
+> 𝑇𝑒𝑥𝑡 𝐸𝑚𝑏𝑒𝑑𝑠 𝐹 𝐿
+> Scale Decoder MLP MLP Scale-Oriented Contrast
+
+Figure 2. Illustration of the proposed TR2M framework. Image and text embedding features are first obtained with separate frozen encoders, and a cross-modality attention module is proposed to integrate them. The rescale maps are predicted with different decoders to transfer relative depth to metric depth. Ground truth depth map and aligned pseudo metric depth map are utilized. Scale-Oriented Contrast is applied to the final embedding features. 
+
+to obtain the final feature embedding Fout ∈ RHW ×D .Attn icm (QI , K i, V i) = softmax 
+
+( QI KTi
+
+√d
+
+)
+
+·Vi, i ∈ { I, L },
+
+(1) 
+
+Fout = FI + Attn Icm + Attn Lcm . (2) Then, two lightweight decoder heads as in DPT [42] are applied to generate the fine scale map A ∈ RH×W and fine shift map B ∈ RH×W with A = Scalehead ( Ff ) , B =Shifthead ( Ff ) to make pixel-wise adjustments to the scale and shift. We aim at transferring relative depth to metric depth, so we assume a pre-trained frozen RDE model exists to generate the relative depth map Dr ∈ RH×W . The final metric depth can be obtained by rescaling Dr as below: 
+
+ˆDm = 1
+
+A ⊙ Dr + B , (3) where ⊙ denotes element-wise multiplication. A Scale-Invariant log loss [13] is utilized as follows: 
+
+Lsi 
+
+( ˆDm, D gt m
+
+)
+
+= 1
+
+HW 
+
+> HW
+
+∑
+
+> i=1
+
+ϵ2 
+
+> i
+
+− λ
+
+(HW )2
+
+(HW ∑
+
+> i=1
+
+ϵi
+
+)2
+
+,
+
+(4) where ϵi = log ˆDm(i) − logD gt m (i) and i denotes the index of pixels. 
+
+Pseudo Metric Depth with Threshold. The sparsity of ground truth metric depth results in partial pixels having no supervision to learn scale information. To conduct more comprehensive scale supervision, we leverage pseudo met-ric depth by aligning relative and metric depth on a least-squares criterion. To be specific, let ˜α, ˜β ∈ R1 denote single estimators for scale and shift, respectively. Following [44], a meaningful alignment could be made based on a least-squares criterion as below: 
+
+(˜ α, ˜β) = arg min  
+
+> ˜α, ˜βHW
+
+∑
+
+> i=1
+
+(
+
+˜αD r (i) + ˜β − Dgt m (i)
+
+)2
+
+, (5) The aligned pseudo metric depth can be determined by: 
+
+Dpseudo m = ˜ αD r + ˜β with the above ˜α and ˜β, which can be efficiently solved in closed form by rewriting Eq. (5) as a least-squares problem (details are shown in the Supple-mentary). We then use threshold accuracy δ1 (percentage of max (Dgt m /D pseudo m , D pseudo m /D gt m
+
+) < 1.25 ) metric as a condition. If δ1 of Dpseudo m is greater than a preset threshold value, we consider Dpseudo m as a credible pseudo depth and use it for supervision, which can be written as: 
+
+Ltp −si 
+
+( ˆDm, D pseudo m
+
+)
+
+= 1(δ1 > ρ )·L si 
+
+( ˆDm, D pseudo m
+
+)
+
+,
+
+(6) where 1(·) is the indicator function, δ1 is the threshold ac-curacy of Dpseudo m and ρ is the preset threshold value. 
+
+3.3. Dual-Level Scale-Oriented Contrast 
+
+As demonstrated by Depth Anything [61], semantic en-coders such as DINOv2 [35] often produce similar features for distinct object regions (e.g., car front vs. back). In con-trast, depth estimation requires distinguishing potentially large variations, even between adjacent pixels. To enhance cross-domain generalization, models must capture the in-trinsic relationships governing depth values. As shown in Figure 3, this approach enforces embedding similarity for features with similar scale and depth distributions and dis-similarity for those with divergent distributions. 34184 𝐹 𝑓 𝑞      
+
+> 𝐹 𝑓 𝑘
+> ℒ𝑓𝑖𝑛𝑒
+> Pixel-level Fine Contrast Image-level Coarse Contrast
+> ℒ𝑠𝑜𝑐 = ℒ 𝑐𝑜𝑎𝑟𝑠𝑒 + ℒ 𝑓𝑖𝑛𝑒
+> Small Scale Large Scale
+> Image Embeddings ℒ𝑐𝑜𝑎𝑟𝑠𝑒
+> Attract Repel Attract Repel
+> Small Depth Large Depth
+> Pixel Embeddings
+> ෨𝐹 𝑓
+
+Figure 3. Illustration of the proposed Dual-Level Scale Oriented Contrast Learning. The scale-oriented contrast enables embed-ding features more consistent with the scale and depth distribution within different levels, thus enhancing scale perception capability. 
+
+Image-Level Coarse Contrast. We first conduct an image-level coarse contrast to ensure that the overall im-age embeddings are aligned with their scale distribu-tion. For each training iteration, we first select an em-bedding set F composed with image embeddings ˜F =[ ˜F 0 
+
+> f
+
+, ˜F 1 
+
+> f
+
+, ..., ˜F M −1
+
+> f
+
+]
+
+where ˜Ff represents the fine feature embedding for an image obtained by average pooling on 
+
+Ff . For simplicity, we assume that the pseudo scale fac-tors ˜αi for each feature embeddings in the set are ordered (∀i, j with i < j, αi < α j ). We then introduce a contrastive loss to ensure that the embeddings with the same scale levels are closer than embeddings with different scale levels: 
+
+Lcoarse = − 1
+
+M 
+
+> M−1
+
+∑
+
+> i=0
+
+log exp (Sc−pi
+
+)
+
+exp (Sc−pi
+
+) + exp (Sc−ni
+
+) ,Sc−pi = 1
+
+|F|
+
+∑
+
+> F1,F 2∈F
+
+∑
+
+> |i−j|<t
+
+〈
+
+F i 
+
+> 1
+
+· F j
+
+> 2
+
+〉
+
+,Sc−ni = 1
+
+|F| (M − 1) 
+
+∑
+
+> F1,F 2∈F
+
+∑
+
+> |i−j|≥ t
+
+〈
+
+F i 
+
+> 1
+
+· F j
+
+> 2
+
+〉
+
+,
+
+(7) where ⟨·⟩ is the cosine similarity function, t is the scale similarity factor that controls and distinguishes sim-ilar scales, Sc−p and Sc−n denote positive pairs and neg-ative pairs. It ensures that the learned features reflect the natural scale ordering for the scenes of the images. 
+
+Pixel-Level Fine Contrast. In addition to image-level coarse contrast, we leverage depth ground truth for pixel-level fine contrast to align pixel embeddings with the depth distribution. Given an image Iq ∈ RH×W ×3 as a query sample and a set of key samples, we train the model by distinguishing the positive ones from the negative ones at the pixel level. Following [22, 27], we decouple the model into two symmetric branches that are updated by back-propagation and exponential moving average (EMA) [26] separately. Each branch contains a proposed rescale model and a projector to map the feature Ff into a lower dimen-sion. Query and key samples are fed into different branch to predict query and key feature maps F qf , F kf ∈ Rh×w×Dc
+
+and pixel-level feature embedding can be obtained with 
+
+F qf (i) and F kf (j) for the i-th and j-th pixel, respectively. We convert the depth map into a classification map based on the depth distribution. To be specific, consider C classes of distribution, the classification map can be calculated by: 
+
+Y = round ( dmax − Ddmax − dmin 
+
+× |C| ), (8) where D is the depth map, dmin and dmax are the min-imum and maximum depth value. The corresponding class map for query and key Y q , Y k ∈ Rh×w×|C| can then be obtained by resolution reduction and one-hot en-coding. 
+
+{
+
+F qf (i), Y qf (i)
+
+}
+
+represents query pixel i and 
+
+{
+
+F kf (j), Y kf (j)
+
+}
+
+represents key pixel j, separately. For query pixel i, we then compute a binary selection mask: 
+
+M ⊆ { 0, 1} HS × WS for each key feature map F k which is determined by the class: Mj = 1 [Y q (i) = Y k(j)], where 
+
+1(·) is indicator function. F k(j) is grouped into positive samples when two pixels have the same class, denoted as 
+
+F kf (j)+, and grouped into negative sample otherwise, de-noted as F kf (j)−. Our scale-oriented contrast is then for-mulated to maximize similarities for positive pairs and min-imize them for negative pairs: 
+
+Lf ine = − 1
+
+hw 
+
+> hw
+
+∑
+
+> i=1
+
+log exp 
+
+(
+
+Sf −pi
+
+)
+
+exp 
+
+(
+
+Sf −pi
+
+)
+
++ exp 
+
+(
+
+Sf −ni
+
+) ,Sf −pi = 1
+
+|P i|
+
+∑
+
+> j+∈P i
+
+〈
+
+F qf (i) · F kf (j)+〉
+
+,Sf −ni = ∑ 1
+
+|N ni |
+
+∑ 
+
+> j−∈N ni
+
+〈
+
+F qf (i) · F kf (j)−〉
+
+,
+
+(9) where Pi and Ni represent the sets of pixel embeddings cor-responding to positive and negative samples for pixel i, re-spectively. The features are reorganized based on the depth distribution, enhancing the model’s generalization ability for scale perception. The final scale-oriented loss consists of the two level losses Lsoc = Lcoarse + Lf ine .34185 Table 1. Quantitative results on NYUv2. I, L, R, and M refer to Image, Language, Relative, and Metric, denoting the input and output type of the method. ”Domain Adap” denotes Domain Adaptation. ”FT” means fine-tuned. ”Median” denotes using median scaling for each image. ”Linear Fit” refers to using ground truth to optimize scale and shift for each image. ”Global” refers to optimizing a single scale and shift for the entire dataset. Gray results denote alignment with ground truth is used. ∗ denotes reproduced in our environment. We highlighted the first , second , third , fourth and fifth best results. 
+
+Model Type Scaling Train Images Train Params δ1 ↑ δ2 ↑ δ3 ↑ AbsRel ↓ log 10 ↓ RM SE ↓
+
+Direct Metric Depth Estimation Methods 
+
+DA ∗ [61] I → M Domain Adap - 25M 0.957 0.995 0.999 0.075 0.033 0.273 DA V2 [62] I → M Domain Adap - 25M 0.969 0.996 0.999 0.073 0.032 0.261 ZoeDepth [5] I → M Domain Adap - 345M 0.951 0.994 0.999 0.077 0.033 0.282 UniK3D ∗ [40] I → M Zero-shot 8M 359M 0.958 0.991 0.996 0.072 0.031 0.268 Metric3Dv2 ∗ [23] I → M Zero-shot 16M 1011M 0.980 0.997 0.999 0.067 0.030 0.260 UniDepth ∗ [39] I → M Zero-shot 3M 347M 0.981 0.997 1.000 0.072 0.030 0.229 
+
+Indirect Metric Depth Estimation Methods 
+
+DA [61] R → M Median 64M 25M 0.480 0.734 0.886 0.353 0.135 1.743 DA [61] R → M Linear Fit 64M 25M 0.969 0.995 0.999 0.055 0.024 0.260 DA [61] R → M Global 64M 25M 0.630 0.926 0.987 0.199 0.087 0.646 DepthCLIP [70] I,L → M Zero-shot - - 0.394 0.683 0.851 0.388 0.156 1.167 DepthLM [7] I,L → M Zero-shot - - 0.824 0.933 0.990 0.134 0.068 0.401 ScaleDepth ∗ [75] I,L → M Domain Adap - 109M 0.913 0.989 0.998 0.099 0.041 0.329 WorDepth ∗ [67] I,L → M Domain Adap - 137M 0.926 0.990 0.998 0.090 0.040 0.330 RSA ∗ [68] (I,L) R → M Rescale factors 102K 4.7M 0.752 0.964 0.992 0.156 0.071 0.528 TR2M (Ours) (I,L) R → M Rescale maps 102K 19M 0.954 0.996 0.999 0.082 0.035 0.293 
+
+Table 2. Quantitative results on KITTI. Details about notations can be found at Table 1. 
+
+Model Type Scaling Train Images Train Params δ1 ↑ δ2 ↑ δ3 ↑ AbsRel ↓ RM SE log ↓ RM SE ↓
+
+Direct Metric Depth Estimation Methods 
+
+DA ∗ [61] I → M Domain Adap - 25M 0.971 0.996 0.999 0.054 0.083 2.290 DA V2 [62] I → M Domain Adap - 25M 0.973 0.997 0.999 0.053 0.081 2.235 ZoeDepth [5] I → M Domain Adap - 345M 0.971 0.996 0.999 0.054 0.082 2.281 UniK3D ∗ [40] I→ M Zero-shot 8M 359M 0.945 0.994 0.998 0.117 0.129 2.995 Metric3Dv2 ∗ [23] I→ M Zero-shot 16M 1011M 0.977 0.996 0.999 0.051 0.080 2.403 UniDepth ∗ [39] I→ M Zero-shot 3M 347M 0.985 0.998 0.999 0.043 0.067 1.820 
+
+Indirect Metric Depth Estimation Methods 
+
+DA [61] R → M Median 64M 25M 0.925 0.986 0.996 0.091 0.129 3.648 DA [61] R → M Linear Fit 64M 25M 0.944 0.991 0.998 0.077 0.122 3.190 DA [61] R → M Global 64M 25M 0.663 0.932 0.981 0.191 0.228 5.273 DepthCLIP [70] I,L → M Zero-shot - - 0.465 0.713 0.867 0.343 0.305 7.583 DepthLM [7] I,L → M Zero-shot - - 0.765 0.912 0.988 0.156 0.193 4.356 ScaleDepth ∗ [75] I,L → M Domain Adap - 109M 0.968 0.996 0.999 0.058 0.086 2.235 WorDepth ∗ [67] I,L → M Domain Adap - 137M 0.965 0.996 0.999 0.066 0.088 2.356 RSA ∗ [68] (I,L) R → M Rescale factors 102K 4.7M 0.786 0.967 0.995 0.147 0.179 4.143 TR2M (Ours) (I,L) R → M Rescale maps 102K 19M 0.965 0.996 0.999 0.066 0.093 2.328 
+
+3.4. Training strategies 
+
+Besides the above-mentioned loss function, we also imple-ment edge-aware smoothness loss [19] Les to enforce the smoothness property of the scale and shift maps. We train the framework in an end-to-end mode with a combination of all optimization objectives: 
+
+L = λ1Lsi + λ2Ltp −si + λ3Lsoc + λ4Les . (10) More detailed settings are shown in the Supplementary. 
+
+## 4. Experiments 
+
+Datasets Our primary datasets for training and evalua-tion for TR2M are NYUv2 [49], KITTI [18], VOID [56] and C3VD [6] ranging from outdoor and indoor scenes to surgical scenarios to enable depth transfer across vari-ous domains with one model. To demonstrate generaliza-tion ability, we evaluate zero-shot performance on five real-world and synthetic datasets: SUN RGB-D [50], iBims-1 [29], HyperSim [46], DIODE Outdoors [51], and Sim-Col [45]. We followed [68] to generate text description with LLaVA v1.6 Vicuna and Mistral [32]. More details about the datasets are presented in the Supplementary. 
+
+Evaluation Metrics Following [5, 61, 62, 67, 68], we evaluate our model in metric depth with commonly used metrics for depth estimation tasks, including AbsRel ,
+
+RM SE , RM SE log , log 10 , δ1, δ2 and δ3 where the first four are lower-is-better and the last three are higher-is-better. 34186 Implementation Details All experiments were con-ducted on NVIDIA RTX4090 GPUs. We use the AdamW [34] optimizer with a batch size of 8. Learning rate is set to 1 × 10 −5 with a decay of 0.9 every epoch. We train our model for 20 epochs and the hyperparameters λ, λ1, λ2,
+
+λ3 and λ4 are set to 0.15 , 1, 0.5, 0.1 and 0.01 , respectively. The number of learnable Scale Embeddings is 256. We use Depth Anything-Small as our frozen relative depth model. We use the Vit-L/14 model from CLIP [41] and the ViT-L model from DINOv2 [35] as our frozen text and image en-coder, respectively. Note that all evaluation metrics on our proposed method and baselines are conducted without any post-processing like scale alignment or median scaling for strict evaluation on the metric scale. 
+
+4.1. Comparison Results on Depth Transfer 
+
+We first evaluate the metric depth results on NYUv2 and KITTI which are common indoor and outdoor benchmarks. We reproduced some methods for fair comparison that are marked with ∗ in the tables. In Table 1, our method outper-forms all the other language/transfer based methods across all evaluation metrics and even obtained better δ2 and δ3
+
+compared to the results of DepthAnything with linear fit, which requires ground truth to be rescaled for NYUv2. In Table 2, our model also obtains satisfactory results on KITTI with two best and three second-best evaluation met-rics. Two important facts and observations further demon-strate the superiority of our method. First, our method only contains 19M trainable parameters, which is much smaller than most other methods. RSA has a smaller model size but results in much worse performance for its single-factor way of rescaling. Second, methods requiring domain adaptation are limited to training and evaluating on a single domain. Methods capable of zero-shot evaluation, like UniK3D and Metric3Dv2, require training on a large amount of data. By contrast, our method is trained end-to-end with multiple do-mains utilizing only 102K images for training and obtained comparable results. These two aspects are further demon-strated in the next section. Figures 4 and 5 show qualitative results: our method produces more accurate, consistently improved depth maps and, via pixel-level transformation, can correct erroneous regions in relative depth. Additional results and analysis are provided in the Supplementary. 
+
+4.2. Zero-shot Generalization 
+
+We also conduct zero-shot metric depth estimation on five unseen datasets. We fine-tuned DepthAnything with the four datasets we used for fair comparison. We adopt the same evaluation protocol for all baselines: predicted metric depths are evaluated directly against ground truth without any post-processing. As shown in Table 3, our TR2M re-sults in the best average ranking compared to other meth-ods. It is worth highlighting that our method achieves no-table zero-shot performance with a ViT-Small ( ∼ 25M pa-rameters) backbone, whose scale is less than 1/10 of most other compared baselines with large architectures ( ∼ 345M parameters). Also, we only utilize 102K images for train-ing, which is much smaller than other metric depth meth-ods like UniK3D and UniDepth trained on a large amount of data. Training one DA model with mixed datasets (DA Mix in Table 3) degrades the performance, which is possibly because it relies on domain-specific decoders; mixing do-mains with large gaps may hinder its ability to perceive do-main and scale. We aim to demonstrate that a metric depth model exhibiting strong generalization capabilities across domains need not rely on large-scale training datasets or separate, complex model architectures when provided with readily available image or text embeddings—features com-monly accessible in multimodal tasks. 
+
+4.3. Ablation Study 
+
+Due to limited space, we only present the two most impor-tant ablation studies here. More ablation experiments and discussions are shown in the Supplementary. 
+
+Effectiveness of Proposed Modules. We study the effect of our proposed modules, including the rescale map de-sign, threshold pseudo metric depth supervision Ltp −si , and scale-oriented contrast Lsoc . The results are summarized in Table 4. ✕ in Rescale Map denotes using two single fac-tors instead of maps to rescale, while ✕ for Ltp −si and Lsoc 
+
+simply refers to discarding the module. As expected, uti-lizing all the modules has the highest performance. Dis-carding Lsoc results in worse performance, especially for zero-shot evaluation for the latter two datasets. Scale-oriented contrast enables the model to learn about knowl-edge of scale and depth distribution, therefore enhancing depth estimation accuracy. Discarding Ltp −si has limited effects on the seen dataset NYUv2 but degrades in the un-seen datasets iBims-1 and DIODE Outdoor. This is because 
+
+Ltp −si provides more comprehensive guidance on pixels without ground truth, thus enhancing the overall general-ization ability for zero-shot evaluation. Further discarding rescale maps results in a significant decline in all metrics, demonstrating the importance of using pixel-level maps to do rescaling. 
+
+Incorporating text and image information. We further carry out an ablation study on the effects of text and image information for relative to metric depth transfer. The results are presented in Table 5. Text descriptions cannot capture information about depth distribution or layouts, resulting in inaccurate scale estimation when using text information only. Using only image information improves performance substantially, but it is still not as good as using both text and 34187 Table 3. Zero-shot metric depth estimation. The first three test sets are indoor scenes; the fourth is for outdoor scenes and the last one is a surgical scene dataset. Note that ZoeDepth and DA Single use models are trained on NYUv2 for indoor evaluation, models trained on KITTI for outdoor evaluation, and models trained on C3VD for surgical evaluation. Other compared baselines and our model utilize one model trained on multiple datasets for all zero-shot evaluations.                                                                                                                                             
+
+> Method Backbone Train Images SUN RGB-D iBims-1 HyperSim DIODE Outdoor SimCol Rank
+> AbsRel ↓δ1↑AbsRel ↓δ1↑AbsRel ↓δ1↑AbsRel ↓δ1↑AbsRel ↓δ1↑
+> ZoeDepth BeiT 384 -Large -0.520 0.545 0.169 0.656 0.407 0.302 0.814 0.237 0.372 0.438 4.70 DA Single ViT-Large -0.500 0.660 0.150 0.714 0.363 0.361 0.794 0.288 0.302 0.553 2.80 DA Mix ViT-Large 102K 0.503 0.582 0.158 0.705 0.412 0.296 0.842 0.181 0.382 0.432 5.00 Unidepth-V-L ViT-Large 3M 0.538 0.443 0.384 0.217 0.294 0.545 0.504 0.635 --4.00 UniK3D-V-S ViT-Small 8M 0.680 0.234 0.504 0.415 0.349 0.525 1.678 0.414 --6.00 UniK3D-V-L ViT-Large 8M 0.564 0.382 0.186 0.735 0.232 0.660 0.833 0.603 --3.75 RSA ViT-Small 102K 0.457 0.527 0.266 0.450 0.461 0.230 0.852 0.244 0.466 0.162 5.80 TR2M (Ours) ViT-Small 102K 0.451 0.591 0.154 0.736 0.357 0.361 0.673 0.274 0.284 0.445 2.40 Image Pred Scale Map Pred Shift Map Relative Depth Transferred (Ours) Ground Truth ∆Ours RSA ∆RSA
+
+Figure 4. Qualitative results on NYUv2. Our method consistently produces better predictions with much less error. ∆ denotes AbsRel 
+
+ranging from lowest (Black) to highest (Red). Table 4. Ablation study on the main proposed modules.                                                 
+
+> Rescale Maps Ltp −si Lsoc NYUv2 iBims-1 DIODE Outdoor
+> AbsRel ↓δ1↑AbsRel ↓δ1↑AbsRel ↓δ1↑
+> ✕✕✕0.118 0.902 0.202 0.566 0.761 0.225
+> ✓✕✕0.084 0.946 0.173 0.657 0.702 0.237
+> ✓✓✕0.085 0.945 0.160 0.708 0.687 0.243
+> ✓✓✓0.082 0.954 0.154 0.736 0.673 0.274
+
+Table 5. Ablation study on text and image information. 
+
+Text Image NYUv2 iBims-1 DIODE Outdoor 
+
+AbsRel ↓ δ1 ↑ AbsRel ↓ δ1 ↑ AbsRel ↓ δ1 ↑
+
+✓ ✕ 0.114 0.909 0.193 0.621 0.745 0.231 
+
+✕ ✓ 0.085 0.945 0.164 0.704 0.694 0.259 
+
+✓ ✓ 0.082 0.954 0.154 0.736 0.673 0.274 Image Relative Depth Transferred (Ours) Ground Truth 
+
+Figure 5. The value of the relative depth map within the red rectan-gles is inconsistent with the ground truth. Our method can correct such errors when transferring to metric depth. 
+
+image. The information from the two modalities can com-plement each other, ensuring the model’s perception of both global and local scales. 
+
+## 5. Conclusion 
+
+This paper proposes TR2M, a generalizable framework for transferring monocular relative depth to metric depth. TR2M takes a text description and an image, predicting two rescaling maps for pixel-wise transformation. A cross-modality attention module fuses features from both modal-ities. To leverage relative depth effectively, we align it with ground truth to generate pseudo metric depth, filtering con-fident samples for supervision. We further introduce scale-oriented contrastive learning to enhance scale perception by modeling depth distribution. Consequently, TR2M demon-strates strong zero-shot metric depth estimation capability across diverse domains using a single lightweight network. 
+
+## Acknowledgements. 
+
+This work was supported by NSFC Young Scientists Fund — Category A T252500134, NSFC/RGC Joint Research Scheme N CUHK420/22, Ministry of Science and Technol-ogy (MOST) of China Key Project 2025YFE0122500, and GRF 14206125. 34188 References 
+
+[1] Manuel L´ opez Antequera, Pau Gargallo, Markus Hofinger, Samuel Rota Bulo, Yubin Kuang, and Peter Kontschieder. Mapillary planet-scale depth dataset. In European Confer-ence on Computer Vision , pages 589–604. Springer, 2020. 3[2] Dylan Auty and Krystian Mikolajczyk. Learning to prompt clip for monocular depth estimation: Exploring the limits of human language. In Proceedings of the IEEE/CVF Inter-national Conference on Computer Vision , pages 2039–2047, 2023. 3 [3] Shariq Farooq Bhat, Ibraheem Alhashim, and Peter Wonka. Adabins: Depth estimation using adaptive bins. In Proceed-ings of the IEEE/CVF conference on computer vision and pattern recognition , pages 4009–4018, 2021. 2 [4] Shariq Farooq Bhat, Ibraheem Alhashim, and Peter Wonka. Localbins: Improving depth estimation by learning local dis-tributions. In European Conference on Computer Vision ,pages 480–496. Springer, 2022. 2 [5] Shariq Farooq Bhat, Reiner Birkl, Diana Wofk, Peter Wonka, and Matthias M¨ uller. Zoedepth: Zero-shot trans-fer by combining relative and metric depth. arXiv preprint arXiv:2302.12288 , 2023. 2, 6 [6] Taylor L Bobrow, Mayank Golhar, Rohan Vijayan, Venkata S Akshintala, Juan R Garcia, and Nicholas J Durr. Colonoscopy 3d video dataset with paired depth from 2d-3d registration. Medical Image Analysis , page 102956, 2023. 6 [7] Zhipeng Cai, Ching-Feng Yeh, Hu Xu, Zhuang Liu, Gregory Meyer, Xinjie Lei, Changsheng Zhao, Shang-Wen Li, Vikas Chandra, and Yangyang Shi. Depthlm: Metric depth from vision language models. arXiv preprint arXiv:2509.25413 ,2025. 3, 6 [8] Mathilde Caron, Hugo Touvron, Ishan Misra, Herv´ e J´ egou, Julien Mairal, Piotr Bojanowski, and Armand Joulin. Emerg-ing properties in self-supervised vision transformers. In Pro-ceedings of the IEEE/CVF international conference on com-puter vision , pages 9650–9660, 2021. 3 [9] Chenyi Chen, Ari Seff, Alain Kornhauser, and Jianxiong Xiao. Deepdriving: Learning affordance for direct percep-tion in autonomous driving. In Proceedings of the IEEE international conference on computer vision , pages 2722– 2730, 2015. 2 [10] Xinlei Chen, Haoqi Fan, Ross Girshick, and Kaiming He. Improved baselines with momentum contrastive learning. 
+
+arXiv preprint arXiv:2003.04297 , 2020. 3 [11] Xingshuai Dong, Matthew A Garratt, Sreenatha G Ana-vatti, and Hussein A Abbass. Towards real-time monocular depth estimation for robotics: A survey. IEEE Transactions on Intelligent Transportation Systems , 23(10):16940–16961, 2022. 2 [12] Ruofei Du, Eric Turner, Maksym Dzitsiuk, Luca Prasso, Ivo Duarte, Jason Dourgarian, Joao Afonso, Jose Pascoal, Josh Gladstone, Nuno Cruces, et al. Depthlab: Real-time 3d in-teraction with depth maps for mobile augmented reality. In 
+
+Proceedings of the 33rd Annual ACM Symposium on User Interface Software and Technology , pages 829–843, 2020. 2 [13] David Eigen, Christian Puhrsch, and Rob Fergus. Depth map prediction from a single image using a multi-scale deep net-work. Advances in neural information processing systems ,27, 2014. 4 [14] Fatima El Jamiy and Ronald Marsh. Survey on depth percep-tion in head mounted displays: distance estimation in virtual reality, augmented reality, and mixed reality. IET Image Pro-cessing , 13(5):707–712, 2019. 2 [15] Jose M Facil, Benjamin Ummenhofer, Huizhong Zhou, Luis Montesano, Thomas Brox, and Javier Civera. Cam-convs: Camera-aware multi-scale convolutions for single-view depth. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 11826– 11835, 2019. 3 [16] Rizhao Fan, Matteo Poggi, and Stefano Mattoccia. Con-trastive learning for depth prediction. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , pages 3226–3237, 2023. 3 [17] Huan Fu, Mingming Gong, Chaohui Wang, Kayhan Bat-manghelich, and Dacheng Tao. Deep ordinal regression net-work for monocular depth estimation. In Proceedings of the IEEE conference on computer vision and pattern recogni-tion , pages 2002–2011, 2018. 2 [18] Andreas Geiger, Philip Lenz, and Raquel Urtasun. Are we ready for autonomous driving? the kitti vision benchmark suite. In 2012 IEEE conference on computer vision and pat-tern recognition , pages 3354–3361. IEEE, 2012. 6 [19] Cl´ ement Godard, Oisin Mac Aodha, and Gabriel J Bros-tow. Unsupervised monocular depth estimation with left-right consistency. In Proceedings of the IEEE conference on computer vision and pattern recognition , pages 270–279, 2017. 6 [20] Vitor Guizilini, Igor Vasiljevic, Dian Chen, Rares , Ambrus , ,and Adrien Gaidon. Towards zero-shot scale-aware monocu-lar depth estimation. In Proceedings of the IEEE/CVF Inter-national Conference on Computer Vision , pages 9233–9243, 2023. 2, 3 [21] Wencheng Han, Junbo Yin, and Jianbing Shen. Self-supervised monocular depth estimation by direction-aware cumulative convolution network. In Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV) , pages 8613–8623, 2023. 2 [22] Kaiming He, Haoqi Fan, Yuxin Wu, Saining Xie, and Ross Girshick. Momentum contrast for unsupervised visual rep-resentation learning. In Proceedings of the IEEE/CVF con-ference on computer vision and pattern recognition , pages 9729–9738, 2020. 3, 5 [23] Mu Hu, Wei Yin, Chi Zhang, Zhipeng Cai, Xiaoxiao Long, Hao Chen, Kaixuan Wang, Gang Yu, Chunhua Shen, and Shaojie Shen. Metric3d v2: A versatile monocular geomet-ric foundation model for zero-shot metric depth and surface normal estimation. IEEE Transactions on Pattern Analysis and Machine Intelligence , 2024. 6 [24] Xueting Hu, Ce Zhang, Yi Zhang, Bowen Hai, Ke Yu, and Zhihai He. Learning to adapt clip for few-shot monocular depth estimation. In Proceedings of the IEEE/CVF Win-ter Conference on Applications of Computer Vision , pages 5594–5603, 2024. 3 34189 [25] Yiming Huang, Beilei Cui, Long Bai, Ziqi Guo, Mengya Xu, Mobarakol Islam, and Hongliang Ren. Endo-4dgs: En-doscopic monocular scene reconstruction with 4d gaussian splatting. In International Conference on Medical Image Computing and Computer-Assisted Intervention , pages 197– 207. Springer, 2024. 2 [26] J Stuart Hunter. The exponentially weighted moving aver-age. Journal of quality technology , 18(4):203–210, 1986. 5 [27] Yueming Jin, Yang Yu, Cheng Chen, Zixu Zhao, Pheng-Ann Heng, and Danail Stoyanov. Exploring intra-and inter-video relation for surgical semantic scene segmentation. IEEE Transactions on Medical Imaging , 41(11):2991–3002, 2022. 3, 5 [28] Bingxin Ke, Anton Obukhov, Shengyu Huang, Nando Met-zger, Rodrigo Caye Daudt, and Konrad Schindler. Repurpos-ing diffusion-based image generators for monocular depth estimation. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 9492– 9502, 2024. 3 [29] Tobias Koch, Lukas Liebel, Friedrich Fraundorfer, and Marco Korner. Evaluation of cnn-based single-image depth estimation methods. In Proceedings of the European Con-ference on Computer Vision (ECCV) Workshops , pages 0–0, 2018. 6 [30] Iro Laina, Christian Rupprecht, Vasileios Belagiannis, Fed-erico Tombari, and Nassir Navab. Deeper depth prediction with fully convolutional residual networks. In 2016 Fourth international conference on 3D vision (3DV) , pages 239– 248. IEEE, 2016. 2 [31] Meixuan Li, Tianyu Li, Guoqing Wang, Peng Wang, Yang Yang, and Jie Zou. Region-aware distribution contrast: A novel approach to multi-task partially supervised learning. In 
+
+European Conference on Computer Vision , pages 234–251. Springer, 2024. 3 [32] Haotian Liu, Chunyuan Li, Yuheng Li, and Yong Jae Lee. Improved baselines with visual instruction tuning. In Pro-ceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 26296–26306, 2024. 6 [33] Xingtong Liu, Ayushi Sinha, Masaru Ishii, Gregory D Hager, Austin Reiter, Russell H Taylor, and Mathias Unberath. Dense depth estimation in monocular endoscopy with self-supervised learning methods. IEEE transactions on medical imaging , 39(5):1438–1447, 2019. 2 [34] Ilya Loshchilov and Frank Hutter. Decoupled weight decay regularization. arXiv preprint arXiv:1711.05101 , 2017. 7 [35] Maxime Oquab, Timoth´ ee Darcet, Th´ eo Moutakanni, Huy Vo, Marc Szafraniec, Vasil Khalidov, Pierre Fernandez, Daniel Haziza, Francisco Massa, Alaaeldin El-Nouby, et al. Dinov2: Learning robust visual features without supervision. 
+
+arXiv preprint arXiv:2304.07193 , 2023. 3, 4, 7 [36] Suraj Patni, Aradhye Agarwal, and Chetan Arora. Ecodepth: Effective conditioning of diffusion models for monocular depth estimation. In Proceedings of the IEEE/CVF Con-ference on Computer Vision and Pattern Recognition , pages 28285–28295, 2024. 2 [37] Wanli Peng, Hao Pan, He Liu, and Yi Sun. Ida-3d: Instance-depth-aware 3d object detection from stereo vision for au-tonomous driving. In Proceedings of the IEEE/CVF con-ference on computer vision and pattern recognition , pages 13015–13024, 2020. 2 [38] Luigi Piccinelli, Christos Sakaridis, and Fisher Yu. idisc: In-ternal discretization for monocular depth estimation. In Pro-ceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 21477–21487, 2023. 2 [39] Luigi Piccinelli, Yung-Hsu Yang, Christos Sakaridis, Mattia Segu, Siyuan Li, Luc Van Gool, and Fisher Yu. Unidepth: Universal monocular metric depth estimation. In Proceed-ings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 10106–10116, 2024. 3, 6 [40] Luigi Piccinelli, Christos Sakaridis, Mattia Segu, Yung-Hsu Yang, Siyuan Li, Wim Abbeloos, and Luc Van Gool. Unik3d: Universal camera monocular 3d estimation. In Pro-ceedings of the Computer Vision and Pattern Recognition Conference , pages 1028–1039, 2025. 3, 6 [41] Alec Radford, Jong Wook Kim, Chris Hallacy, Aditya Ramesh, Gabriel Goh, Sandhini Agarwal, Girish Sastry, Amanda Askell, Pamela Mishkin, Jack Clark, et al. Learning transferable visual models from natural language supervi-sion. In International conference on machine learning , pages 8748–8763. PmLR, 2021. 3, 7 [42] Ren´ e Ranftl, Alexey Bochkovskiy, and Vladlen Koltun. Vi-sion transformers for dense prediction. ICCV , 2021. 3, 4 [43] Ren´ e Ranftl, Alexey Bochkovskiy, and Vladlen Koltun. Vi-sion transformers for dense prediction. In Proceedings of the IEEE/CVF international conference on computer vision ,pages 12179–12188, 2021. 3 [44] Ren´ e Ranftl, Katrin Lasinger, David Hafner, Konrad Schindler, and Vladlen Koltun. Towards robust monocular depth estimation: Mixing datasets for zero-shot cross-dataset transfer. IEEE Transactions on Pattern Analysis and Ma-chine Intelligence , 44(3), 2022. 3, 4 [45] Anita Rau, Binod Bhattarai, Lourdes Agapito, and Danail Stoyanov. Bimodal camera pose prediction for endoscopy. 
+
+IEEE Transactions on Medical Robotics and Bionics , 5(4): 978–989, 2023. 6 [46] Mike Roberts, Jason Ramapuram, Anurag Ranjan, Atulit Kumar, Miguel Angel Bautista, Nathan Paczan, Russ Webb, and Joshua M Susskind. Hypersim: A photorealistic syn-thetic dataset for holistic indoor scene understanding. In 
+
+Proceedings of the IEEE/CVF international conference on computer vision , pages 10912–10922, 2021. 6 [47] Javier Rodr´ ıguez-Puigvert, V´ ıctor M. Batlle, J.M.M. Mon-tiel, Ruben Martinez-Cantin, Pascal Fua, Juan D. Tard´ os, and Javier Civera. Lightdepth: Single-view depth self-supervision from illumination decline. In Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV) , pages 21273–21283, 2023. 2 [48] Shuwei Shao, Zhongcai Pei, Weihai Chen, Xingming Wu, and Zhengguo Li. Nddepth: Normal-distance as-sisted monocular depth estimation. In Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV) , pages 7931–7940, 2023. 2 [49] Nathan Silberman, Derek Hoiem, Pushmeet Kohli, and Rob Fergus. Indoor segmentation and support inference from 34190 rgbd images. In Computer Vision–ECCV 2012: 12th Eu-ropean Conference on Computer Vision, Florence, Italy, Oc-tober 7-13, 2012, Proceedings, Part V 12 , pages 746–760. Springer, 2012. 6 [50] Shuran Song, Samuel P Lichtenberg, and Jianxiong Xiao. Sun rgb-d: A rgb-d scene understanding benchmark suite. In 
+
+Proceedings of the IEEE conference on computer vision and pattern recognition , pages 567–576, 2015. 6 [51] Igor Vasiljevic, Nick Kolkin, Shanyi Zhang, Ruotian Luo, Haochen Wang, Falcon Z Dai, Andrea F Daniele, Moham-madreza Mostajabi, Steven Basart, Matthew R Walter, et al. Diode: A dense indoor and outdoor depth dataset. arXiv preprint arXiv:1908.00463 , 2019. 6 [52] Wenguan Wang, Tianfei Zhou, Fisher Yu, Jifeng Dai, En-der Konukoglu, and Luc Van Gool. Exploring cross-image pixel contrast for semantic segmentation. In Proceedings of the IEEE/CVF international conference on computer vision ,pages 7303–7313, 2021. 3 [53] Xinlong Wang, Rufeng Zhang, Chunhua Shen, Tao Kong, and Lei Li. Dense contrastive learning for self-supervised visual pre-training. In Proceedings of the IEEE/CVF con-ference on computer vision and pattern recognition , pages 3024–3033, 2021. 3 [54] Diana Wofk, Fangchang Ma, Tien-Ju Yang, Sertac Karaman, and Vivienne Sze. Fastdepth: Fast monocular depth esti-mation on embedded systems. In 2019 International Confer-ence on Robotics and Automation (ICRA) , pages 6101–6108. IEEE, 2019. 2 [55] Alex Wong, Safa Cicek, and Stefano Soatto. Targeted ad-versarial perturbations for monocular depth prediction. Ad-vances in neural information processing systems , 33:8486– 8497, 2020. 2 [56] Alex Wong, Xiaohan Fei, Stephanie Tsuei, and Stefano Soatto. Unsupervised depth completion from visual iner-tial odometry. IEEE Robotics and Automation Letters , 5(2): 1899–1906, 2020. 6 [57] Cho-Ying Wu, Jialiang Wang, Michael Hall, Ulrich Neu-mann, and Shuochen Su. Toward practical monocular indoor depth estimation. In CVPR , 2022. 3 [58] Zhirong Wu, Yuanjun Xiong, Stella X Yu, and Dahua Lin. Unsupervised feature learning via non-parametric instance discrimination. In Proceedings of the IEEE conference on computer vision and pattern recognition , pages 3733–3742, 2018. 3 [59] Fengyu Yang, Chao Feng, Ziyang Chen, Hyoungseob Park, Daniel Wang, Yiming Dou, Ziyao Zeng, Xien Chen, Rit Gan-gopadhyay, Andrew Owens, et al. Binding touch to every-thing: Learning unified multimodal tactile representations. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 26340–26353, 2024. 3[60] Guanglei Yang, Hao Tang, Mingli Ding, Nicu Sebe, and Elisa Ricci. Transformer-based attention networks for continuous pixel-wise prediction. In Proceedings of the IEEE/CVF International Conference on Computer vision ,pages 16269–16279, 2021. 2 [61] Lihe Yang, Bingyi Kang, Zilong Huang, Xiaogang Xu, Jiashi Feng, and Hengshuang Zhao. Depth anything: Unleashing the power of large-scale unlabeled data. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 10371–10381, 2024. 3, 4, 6 [62] Lihe Yang, Bingyi Kang, Zilong Huang, Zhen Zhao, Xiao-gang Xu, Jiashi Feng, and Hengshuang Zhao. Depth any-thing v2. Advances in Neural Information Processing Sys-tems , 37:21875–21911, 2025. 3, 6 [63] Xiaodong Yang, Zhuang Ma, Zhiyu Ji, and Zhe Ren. Gedepth: Ground embedding for monocular depth estima-tion. In Proceedings of the IEEE/CVF International Confer-ence on Computer Vision (ICCV) , pages 12719–12727, 2023. 2[64] Wei Yin, Chi Zhang, Hao Chen, Zhipeng Cai, Gang Yu, Kaixuan Wang, Xiaozhi Chen, and Chunhua Shen. Metric3d: Towards zero-shot metric 3d prediction from a single image. In Proceedings of the IEEE/CVF International Conference on Computer Vision , pages 9043–9053, 2023. 2, 3 [65] Chenyu You, Yifei Mint, Weicheng Dai, Jasjeet S Sekhon, Lawrence Staib, and James S Duncan. Calibrating multi-modal representations: A pursuit of group robustness with-out annotations. In 2024 IEEE/CVF Conference on Com-puter Vision and Pattern Recognition (CVPR) , pages 26140– 26150. IEEE, 2024. 3 [66] Weihao Yuan, Xiaodong Gu, Zuozhuo Dai, Siyu Zhu, and Ping Tan. Neural window fully-connected crfs for monocu-lar depth estimation. In Proceedings of the IEEE/CVF con-ference on computer vision and pattern recognition , pages 3916–3925, 2022. 2 [67] Ziyao Zeng, Daniel Wang, Fengyu Yang, Hyoungseob Park, Stefano Soatto, Dong Lao, and Alex Wong. Wordepth: Vari-ational language prior for monocular depth estimation. In 
+
+Proceedings of the IEEE/CVF Conference on Computer Vi-sion and Pattern Recognition , pages 9708–9719, 2024. 3, 6[68] Ziyao Zeng, Yangchao Wu, Hyoungseob Park, Daniel Wang, Fengyu Yang, Stefano Soatto, Dong Lao, Byung-Woo Hong, and Alex Wong. Rsa: Resolving scale ambiguities in monoc-ular depth estimators through language descriptions. In 
+
+The Thirty-eighth Annual Conference on Neural Information Processing Systems , 2024. 2, 3, 6 [69] Renrui Zhang, Ziyu Guo, Wei Zhang, Kunchang Li, Xu-peng Miao, Bin Cui, Yu Qiao, Peng Gao, and Hongsheng Li. Pointclip: Point cloud understanding by clip. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , pages 8552–8562, 2022. 3 [70] Renrui Zhang, Ziyao Zeng, Ziyu Guo, and Yafeng Li. Can language understand depth? In Proceedings of the 30th ACM International Conference on Multimedia , pages 6868–6874, 2022. 3, 6 [71] Wenyao Zhang, Hongsi Liu, Bohan Li, Jiawei He, Zekun Qi, Yunnan Wang, Shengyang Zhao, Xinqiang Yu, Wenjun Zeng, and Xin Jin. Hybrid-grained feature aggregation with coarse-to-fine language guidance for self-supervised monoc-ular depth estimation. In Proceedings of the IEEE/CVF In-ternational Conference on Computer Vision , pages 6678– 6692, 2025. 3 [72] Chaoqiang Zhao, Matteo Poggi, Fabio Tosi, Lei Zhou, Qiyu Sun, Yang Tang, and Stefano Mattoccia. Gasmono: 34191 Geometry-aided self-supervised monocular depth estimation for indoor scenes. In Proceedings of the IEEE/CVF In-ternational Conference on Computer Vision (ICCV) , pages 16209–16220, 2023. 2 [73] Xiangyun Zhao, Raviteja Vemulapalli, Philip Andrew Mans-field, Boqing Gong, Bradley Green, Lior Shapira, and Ying Wu. Contrastive learning for label efficient semantic seg-mentation. In Proceedings of the IEEE/CVF International Conference on Computer Vision , pages 10623–10633, 2021. 3[74] Yizhou Zhao, Hengwei Bian, Kaihua Chen, Pengliang Ji, Liao Qu, Shao-yu Lin, Weichen Yu, Haoran Li, Hao Chen, Jun Shen, et al. Metric from human: Zero-shot monoc-ular metric depth estimation via test-time adaptation. In 
+
+The Thirty-eighth Annual Conference on Neural Information Processing Systems , 2024. 2, 3 [75] Ruijie Zhu, Chuxin Wang, Ziyang Song, Li Liu, Tianzhu Zhang, and Yongdong Zhang. Scaledepth: Decomposing metric depth estimation into scale prediction and relative depth estimation. arXiv preprint arXiv:2407.08187 , 2024. 3, 6 [76] Xiangyang Zhu, Renrui Zhang, Bowei He, Ziyu Guo, Ziyao Zeng, Zipeng Qin, Shanghang Zhang, and Peng Gao. Point-clip v2: Prompting clip and gpt for powerful 3d open-world learning. In Proceedings of the IEEE/CVF international con-ference on computer vision , pages 2639–2650, 2023. 3 34192

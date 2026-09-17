@@ -1,0 +1,462 @@
+Title: Depth Any Endoscopy: Towards Self-Supervised Generalizable Depth Estimation in Monocular Endoscopy
+
+URL Source: https://openaccess.thecvf.com/content/CVPR2026/papers/Shao_Depth_Any_Endoscopy_Towards_Self-Supervised_Generalizable_Depth_Estimation_in_Monocular_CVPR_2026_paper.pdf
+
+Published Time: Sat, 16 May 2026 16:52:41 GMT
+
+Number of Pages: 12
+
+Markdown Content:
+# Depth Any Endoscopy: Towards Self-Supervised Generalizable Depth Estimation in Monocular Endoscopy 
+
+## Shuwei Shao 1 Kejin Zhu 2 Shixing Ma 1 Xinzhe Du 1 Baochang Zhang 3 Zhe Min 1,4*
+
+> 1
+
+## School of Control Science and Engineering, Shandong University, Jinan, Shandong, China 
+
+> 2
+
+## School of Automation Science and Electrical Engineering, Beihang University, Beijing, China 
+
+> 3
+
+## School of Artificial Intelligence, Beihang University, Beijing, China 
+
+> 4
+
+## Shenzhen Loop Area Institute, Shenzhen, China 
+
+## Abstract 
+
+Monocular depth estimation serves as a core technique in endoscopic applications such as 3D reconstruction and localization. However, most existing methods focus primar-ily on in-domain depth estimation, which limits their robust-ness and prevents them from delivering impressive cross-domain performance, due to variations in depth distribu-tions, illumination conditions, and texture patterns. In this work, we propose Depth Any Endoscopy (DAE) , a novel self-supervised framework for generalizable depth estima-tion in monocular endoscopy. To specify, we develop a dual-level Mixture-of-Experts (MoE) adaptation paradigm that effectively tailors Vision Foundation Models to diverse en-doscopic procedures, such as laparoscopy and colonoscopy, accounting for the challenges posed by varying environ-ments. Internally, we integrate LoRA and Adapter modules within the MoE architecture, allowing the model to flexi-bly adapt to the characteristics of input data. Externally, a mixture of domain-specific experts provides customized guidance to enhance the training stability. In addition, we introduce a learnable gradient harmonization mecha-nism to dynamically balance the optimization between the depth and pose networks, along with a semantic distribution calibration module that strengthens the semantic consis-tency of depth predictions. Extensive experiments demon-strate that the proposed DAE achieves state-of-the-art per-formance in both zero-shot and in-domain depth estima-tion scenarios. The source code is publicly available at 
+
+https://github.com/ShuweiShao/DAE .
+
+## 1. Introduction 
+
+Monocular depth estimation plays a critical role in mini-mally invasive endoscopic surgery, facilitating high-fidelity 3D reconstruction, engaging augmented reality experiences    
+
+> *Corresponding author Depth Any Endoscopy
+> Lapar--oscopy
+> Colon--oscopy Artho--scopy
+> Depth Map Depth Map
+> Depth Map
+> Figure 1. We introduce Depth Any Endoscopy , developed to han-dle diverse endoscopic procedures within a single unified model.
+
+and accurate surgical navigation [9, 66]. Because of con-cerns over the security, privacy, and surgical professional-ism, collecting large-scale and reliable ground-truth depth data for supervised model training remains highly challeng-ing. In light of these practical constraints, a variety of self-supervised methods have sprung out, achieving remarkable advancements by mitigating inter-frame brightness varia-tions [34, 47], leveraging Structure-from-Motion (SfM) for sparse supervisory cues [28], and designing efficient net-work architectures [62], among others. Nevertheless, these methods remain largely confined to in-domain depth esti-mation, which inevitably restricts their ability to generalize across diverse endoscopic environments. Most recently, significant strides have been achieved to-wards developing generalizable depth foundation models capable of handling varied natural scenes [5, 18, 23, 37, 60, 61]. These methods, however, depend heavily on depth an-notations during training and struggle to generalize effec-tively in endoscopic scenes due to the substantial domain gap. Afterwards, several efforts [10, 51, 70] have sought to adapt these foundation models to endoscopic scenarios us-ing Low-Rank Adaptation (LoRA) [19] or its variants. By This CVPR paper is the Open Access version, provided by the Computer Vision Foundation. Except for this watermark, it is identical to the accepted version; the final published version of the proceedings is available on IEEE Xplore. 34126 (a)  
+
+> SimCol3D SCARED
+> (b) (c)
+> SimCol3D SCARED SimCol3D SCARED
+> 1e5 1e5 Figure 2. Illustration of the differences between the SCARED [1] (laparoscopy) and SimCol3D [42] (colonoscopy) in depth distribu-tions (a), illumination (b), and texture patterns (c). In (c), abrupt numerical changes highlight color variations in textured regions.
+
+leveraging large-scale pre-trained Vision Foundation Mod-els (VFMs), these methods alleviate some of the limitations of in-domain approaches. Nevertheless, their adaptation is generally limited to a single domain, resulting in insufficient cross-domain generalization capability. In particular, achieving robust and generalizable depth estimation in a self-supervised manner across diverse endo-scopic procedures presents the following key challenges: (i) Considerable variations between procedures in depth distri-butions, illumination conditions, and tissue texture patterns hinder the proper convergence of the network, especially in a self-supervised setup that relies primarily on the pho-tometric loss without direct depth supervision. (ii) Gradi-ent imbalances between the depth and pose networks occur because data from different procedures may entail varying learning difficulties. As both networks are supervised via a shared photometric loss, effective gradient balancing is crit-ical for maintaining coordinated depth-pose optimization. In this paper, we present Depth Any Endoscopy (DAE) ,a unified self-supervised depth estimation framework capa-ble of delivering reliable performance across distinct endo-scopic procedures, e.g. , laparoscopy and colonoscopy (see Fig. 1). To be specific, we introduce a dual-level Mixture-of-Experts (MoE) adaptation paradigm that bridges Vision Foundation Models with heterogeneous endoscopic condi-tions characterized by variations in depth distributions, il-lumination, and texture patterns (see Fig. 2). At the intra-model level, we incorporate LoRA modules with varying ranks and Adapter layers with different kernel sizes into the MoE structure, where the dynamic selection of optimal low-rank subspaces and kernel configurations enables flexible adjustment of internal feature representations based on the characteristics of input data. At the extra-model level, the domain-specific teacher MoE provides explicit depth guid-ance through a stationary routing strategy, thus stabilizing the training process. To ensure coherent learning from ex-perts across inherent scale ambiguities, we develop a scale-decoupling loss. In addition, we integrate a learnable gradi-ent harmonization mechanism that flexibly regulates the op-timization dynamics between the depth and pose networks, alleviating gradient imbalances arising from diverse proce-dural data and fostering coordinated optimization. Further-more, a semantic distribution calibration module built upon DINOv3 [52] is devised to strengthen the semantic consis-tency of depth predictions. To summarize, the contributions of this work are listed as: • We introduce a unified self-supervised depth estimation framework that harnesses heterogeneous endoscopic data and achieves reliable generalization over multiple surgi-cal procedures. • We propose a dual-level MoE adaptation scheme, consist-ing of intra- and extra-model components, to adapt Vision Foundation Models for varying endoscopic environments. • We devise a learnable gradient harmonization mechanism to stabilize joint depth-pose optimization, alongside a se-mantic distribution calibration module that enforces the semantic coherence of depth predictions. 
+
+## 2. Related Work 
+
+2.1. Self-supervised Depth Estimation 
+
+In recent years, self-supervised depth estimation methods have attracted widespread attention and made remarkable progress, primarily because they avoid the need for hard-ware sensors to acquire costly ground-truth depth labels. One of the early works by Zhou et al. [69] formulated depth estimation as a novel view synthesis task, laying the groundwork for this research direction. Following this, numerous methods have been developed [3, 15, 30, 49, 54, 59, 65, 67, 68]. For example, Godard et al. [15] proposed a minimum reprojection loss to improve robust-ness against occlusions, and an auto-masking loss to ex-clude pixels that do not conform to the camera motion model during training. Concurrently, a growing body of research [28, 34, 45, 47, 53, 57, 62] has extended self-supervised depth estimation to endoscopic scenarios. Tu-ran et al. [53] were among the notable pioneers to explore self-supervised endoscopic depth and ego-motion estima-tion, following a paradigm similar to that of [69]. Liu et al. [28] later leveraged Structure-from-Motion to provide sparse geometric supervision. To alleviate the photometric ambiguities induced by inter-frame brightness fluctuations, Ozyoruk et al. [34] and Shao et al. [47] introduced an affine brightness Transformer and an appearance flow network, re-spectively. Yang et al. [62] focused instead on designing an efficient network architecture that integrates convolutional operations with Transformer modules. In contrast, the pro-posed DAE strives to establish a unified and generalizable framework that extends beyond in-domain depth estimation. 34127 ❄ LayerNorm   
+
+> MoE-LoRA 🔥
+> Self-Attention
+> qkv
+
+⨁ 
+
+> ❄LayerNorm
+> MoE-Adapter 🔥
+
+⨁Transformer Block                      
+
+> ···
+> Expert1 Expert2 Expert3 Expert N
+> activated not activated
+> 🔥 🔥 🔥 🔥
+> LoRA LoRA LoRA LoRA
+> ❄
+> Pre-trained Weights
+> Selector 🔥 Iin
+> ⨁
+> Iout
+> ···
+> Expert1 Expert2 Expert3 Expert M
+> activated not activated
+> 🔥 🔥 🔥 🔥
+> Adapter
+> ❄
+> Pre-trained Weights
+> Selector 🔥 Iin
+> ⨁
+> Adapter Adapter Adapter
+> Iout Adapter Expert 🔥
+> Conv
+> LoRA Expert 🔥
+> ⨂
+> Indicator
+> ··· ··· ···
+> Expert1
+> Laparoscopy
+> Expert Z
+> Colonoscopy
+> Transformer Block1 Transformer BlockL
+> ···
+> ❄❄
+> Head
+> Input
+> DAE
+> Sigmoid
+> Transformer Block1 Transformer BlockL
+> ···
+> ❄❄
+> Input
+> Target Frame
+> Extra-Model MoE
+> 𝓛 𝒔𝒊
+> Top 10% of pixels with the largest errors
+> Discard ❌
+> Depth Map
+> MLP
+> 🔥
+> Harm--onization Factor
+> MPoseNet
+
+×
+
+> Reconstruction &Optimization
+> Target & Source Frames
+
+🔥 Trainable 
+
+❄ Frozen ⨂ Matrix Multiplication 
+
+⨁ Element-wise Add      
+
+> Intra-model MoE Intra-model MoE
+> Learnable Gradient Harmonization
+> 𝜎 𝜎 tanh
+> ××
+> ×+
+> 1-
+> ×2
+> GRU 🔥
+> Normalization 𝓛 𝒔𝒅𝒄
+> ❄DINOv3 Semantic Distribution Calibration
+> 𝓛 𝒓𝒂𝒏𝒌
+> (B)
+> Conv
+> Conv
+> (C)
+> 𝓛 𝒑𝒉
+> 𝓛 𝒆𝒔
+> Head
+> Sigmoid
+
+(A) Dual-level MoE   
+
+> Transformer Block1 Transformer BlockL
+> ···
+> 🔥 🔥
+> Head
+> Sigmoid
+> Transformer Block2
+> 🔥
+> AB
+> Transformer Block2
+> ❄Depth Depth
+> Transformer Block2
+> ❄
+
+Input  
+
+> Transformer Block3
+> 🔥 Depth
+> 🔥
+> tanh
+
+Figure 3. Overview of the proposed DAE framework. Note that the experts in extra-model MoE are self-supervised pre-trained on the corresponding domain data, with their weights remaining frozen throughout the DAE training. For clarity, the appearance and optical flow networks (for mitigating brightness changes [47]) and the intrinsic estimation network [10] (for computing the intrinsic matrix) are omitted. 
+
+2.2. Generalizable Depth Estimation 
+
+The recent evolution of generalizable depth estimation [5, 14, 18, 23, 37, 38, 40, 60, 61, 63] has brought considerable progress to monocular approaches, driven by the scaling of training data and the refinement of optimization techniques. As one of the seminal works, Ranftl et al. [40] proposed to train a model in the disparity space and developed a scale-and shift-invariant loss function to mitigate discrepancies arising from varied dataset characteristics. This formulation has since been widely used in subsequent research. On the basis of [40], Yang et al. [60, 61] further leveraged extensive unlabeled data, combining data augmentation with auxiliary teacher supervision to acquire a robust and general-purpose depth estimation model with improved generalization. Al-ternatively, Ke et al. [23] harnessed the rich visual knowl-edge embedded in Stable Diffusion [44], repurposing it for depth estimation task to deliver fine-grained depth predic-tions. Given the strong geometric priors inherent in these Vision Foundation Models, recent studies [10, 50, 51, 70] have increasingly explored adopting them for endoscopic scenarios. For example, Cui et al. [10] showcased the po-tential of adapting Depth Anything [60] using the dynamic vector-based LoRA and convolutional neck modules. Af-terwards, Sheikh et al. [22] integrated weight-decomposed LoRA [27] with high-rank updating [22] to achieve more effective adaptation. In this work, we continue prior efforts while concurrently facilitating adaptation across diverse en-doscopic procedures, paving the way towards a more uni-versal depth estimation framework for surgical endoscopy. 
+
+2.3. Mixture-of-Experts 
+
+Mixture-of-Experts [20] is a scalable technique for increas-ing the model capacity while maintaining minimal compu-tational overhead, with Feed-Forward Networks [2, 13, 43] typically serving as the standard choice for expert modules within MoE architectures. Building upon MoE, contempo-rary studies [24, 29, 32] have incorporated multiple uniform LoRA modules into Large Language and Vision Models to facilitate multi-task learning. Beyond this, MoE has been applied to downstream dense prediction tasks [35, 36, 55], enhancing robustness and modeling prediction uncertainty. In this work, we delve into endoscopic depth estimation and devise a dual-level MoE architecture, featuring intra-model and extra-model components, crafted to effectively navigate the variability and complexity of endoscopic environments. 
+
+## 3. Methodology 
+
+In this section, we provide a detailed description to the core components of the proposed DAE framework (see Fig. 3), including the principles of self-supervised depth estimation (Sec. 3.1), the dual-level Mixture-of-Experts (Sec. 3.2), the learnable gradient harmonization (Sec. 3.3), the semantic distribution calibration (Sec. 3.4), and the overall architec-ture and loss formulation (Sec. 3.5). 
+
+3.1. Preliminaries 
+
+Self-supervised monocular depth estimation formulates the learning process as novel view synthesis, using two net-works: a depth network to predict depth from a single im-age and a pose network to estimate the 6 degree-of-freedom (DOF) pose transformation. Supposing a target frame ft and a source frame fs, the view synthesis process is defined as 
+
+pt→s = KM t→sDtK−1pt, (1) where pt→s denotes the pixel coordinate mapped from the target view t to the source view s, pt is the pixel coordinate 34128 in the view t, K is the camera intrinsic, Mt→s is the 6-DOF pose transformation matrix, and Dt is the target depth map. The warped frame fs→t is then obtained by 
+
+fs→t(p) = fs ⟨pt→s⟩ , (2) where ⟨·⟩ stands for the warping operation [21]. The photo-metric discrepancy [15, 56] between fs→t and ft is used as self-supervision, 
+
+Lph = P
+
+> p
+
+ α(1 −SSIM( ft,fs→t)) 2 + (1 − α) ∥ft − fs→t∥1
+
+
+
+, (3) where Lph refers to the photometric loss, with α set to 0.85. 
+
+3.2. Dual-Level Mixture-of-Experts 
+
+The proposed MoE design involves dual levels: intra-model and extra-model. The intra-model MoE, integrated into the VFMs such as Depth Anythingv2 [61], dynamically routes through LoRA experts of varying ranks and adapter experts with different kernel sizes based on the input characteristics. The extra-model MoE offers tailored depth guidance, with each expert following a static routing strategy determined by a domain indicator. Further details are provided below. 
+
+Intra-model MoE. Data from different surgical proce-dures tend to exhibit considerable variations, making it hard to adapt VFMs using the vanilla LoRA [19]. For instance, prior methods [10, 51] rely on a fixed and pre-defined rank, which limits LoRA’s flexibility and hampers its ability to effectively handle such domain variations. Drawing on the success of MoE in prior tasks [24, 29, 32, 36, 55], we inte-grate LoRA into a Mixture-of-Experts architecture, where multiple LoRA modules with distinct ranks r act as experts. A lightweight selector SL (·) dynamically routes the input query Iin to the Top-κ optimal experts in light of its char-acteristics. Assuming that every MoE-LoRA layer consists of N experts, denoted by EL = {EL1 , E L2 , . . . , E LN }, the function of the layer is given by 
+
+Iout = Wq,k,v (Iin ) + 
+
+> N
+
+X
+
+> n=1
+
+SL(Iin ) · ELn (Iin ), (4) with 
+
+ELn (Iin ) = BnAnIin , (5) 
+
+SL(Iin ) = Top κ
+
+
+
+softmax 
+
+ Wsel Iin 
+
+τ
+
+  
+
+, (6) where Wq,k,v stands for the query, key, and value weights of the attention module in pre-trained VFMs, which remain frozen during training, Bn and An denote the trainable low-rank matrices with rank rn, Wsel stands for the trainable weights of the selector, and τ is a temperature coefficient controlling the weight smoothness, set to 1. Because the Vision Transformer (ViT)-based VFMs [11, 60, 61] inherently lack inductive biases [39, 46, 48], we in-troduce convolutional adapters to capture local visual pat-terns and structural details. These adapters are incorporated into a MoE framework, where experts with different ker-nel sizes improve the model’s flexibility in handling diverse data distributions across surgical procedures. Analogous to the routing strategy in the MoE-LoRA layers, we use a se-lector SA(·) to dynamically assign input queries to appro-priate adapter experts. Each MoE-Adapter layer is assumed to consist of M experts, EA = {EA1 , E A2 , . . . , E AM }, the layer output is achieved via 
+
+Iout = Wmlp Iin +
+
+> M
+
+X
+
+> m=1
+
+SA(Iin ) · EAm (Iin ), (7) where Wmlp denotes the frozen weight matrix of the Multi-layer Perceptron (MLP) in pre-trained VFMs. Each adapter expert EAm (·) corresponds to a convolutional block with a specific kernel size. 
+
+Extra-model MoE. At the extra-model level, we incor-porate a domain-specific teacher Mixture-of-Experts to pro-vide direct depth guidance, which is critical as we find that the network struggles to cope with diverse data without ex-plicit depth supervision, potentially overwhelming the train-ing process. Unlike the intra-model MoE that performs dy-namic routing within the layers, the extra-model MoE, de-noted as EG = {EG1 , E G2 , . . . , E GZ }, employs a station-ary routing strategy determined by the discrete domain indi-cator D (e.g., SCARED dataset [1], SimCol3D dataset [42], etc., represented as 0, 1, ...). This establishes a one-to-one mapping between input ft and its respective guidance expert 
+
+EGz (·),
+
+EGz = EG[ζ ∈ D ], (8) where ζ denotes the specific indicator value. Each domain-specific expert is self-supervised and pre-trained on the cor-responding domain data. Nevertheless, due to the inherent scale ambiguity of monocular systems, and to prevent the DAE from being biased towards the expert scales, we de-velop a scale-decoupling loss to ensure that the model learns meaningful depth guidance. This loss consists of two com-ponents: a scale-invariant loss and a ranking loss. Given a depth prediction Dt and its corresponding guid-ance EGz (ft), the scale-invariant loss [40] is denoted as 
+
+Lsi = X
+
+> p
+
+∥ ˜Dt − EGz (ft)∥1 (9) with 
+
+ℓ = median( EGz (ft)) median( Dt) + ϵ , ˜Dt = ℓ · Dt, (10) where ϵ prevents division by zero. The ranking loss [7, 58] is used to exploit ordinal cues from the expert guidance while disentangling scale bias by 34129 enforcing depth order consistency between sampled pairs. Given a set of Q pairs P = {[pi, 1, pi, 2]}Qi=1 with predicted depths (di, 1, d i, 2) and guidance depths (dEGz  
+
+> i, 1
+
+, d EGz  
+
+> i, 2
+
+), the loss is defined as 
+
+Lrank = 1
+
+Q
+
+> Q
+
+X
+
+> i=1
+
+ϕ(pi, 1, pi, 2), (11) with             
+
+> ϕ(pi, 1,pi, 2) =
+> (log(1 + exp[ −ηi(di, 1−di, 2)]) ,ηi̸= 0 ,
+> (di, 1−di, 2)2,ηi= 0 ,
+
+(12) and the pseudo ordinal label ηi is determined by 
+
+ηi =
+
+
+
++1 , ˆdi, 1/ ˆdi, 2 ≥ 1 + γ, 
+
+−1, ˆdi, 1/ ˆdi, 2 ≤ 1/(1 + γ),
+
+0, otherwise ,
+
+(13) where γ is a tolerance threshold of 0.03 following [26, 58]. To mitigate errors in expert guidance, we compute the con-sistency between predicted and guidance depths and disre-gard the top 10% of pixels with the largest errors to avoid misleading the training signal [61]. 
+
+3.3. Learnable Gradient Harmonization 
+
+In self-supervised depth estimation, both the depth and pose networks are jointly optimized using a shared photometric loss. As a result, ensuring balanced gradients between these two networks is essential for stable and efficient training dy-namics. For instance, Godard et al. [15] introduces a scal-ing factor of 0.01 to adjust the gradient magnitudes of the pose network. In experiments, we find that this harmoniza-tion factor is typically dataset-dependent. For the SCARED dataset [1], a factor of 0.001 enables proper convergence, while a value of 0.01 causes the model to fail. In contrast, the model trained on the SimCol3D [42] converges properly with a factor of 0.01. This discrepancy may arise from the varying difficulties in learning depth and pose across dif-ferent datasets, and without suitable mitigation, such gradi-ent imbalances could lead to slow convergence and unstable training dynamics. In this regard, we develop a learnable gradient harmo-nization mechanism that adaptively regulates the optimiza-tion dynamics between depth and pose networks across dif-ferent domains. Given a domain indicator ζ ∈ D associated with the input data, we first map ζ to a learnable domain embedding using an embedding layer, which is then fed into an MLP layer to generate a domain-specific harmonization factor α. This factor is applied to the pose network output as follows 
+
+M′ = α · M. (14) Then, the gradient of the photometric loss Lph with respect to M becomes 
+
+∂Lph 
+
+∂M = ∂Lph 
+
+∂M′ · ∂M′
+
+∂M = α · ∂Lph 
+
+∂M′ , (15) where ∂M′ 
+
+> ∂M
+
+= α, since α is independent of M. This demon-strates that the harmonization factor α directly modulates the gradient magnitudes of pose network, adaptively align-ing the gradient magnitudes of the depth and pose networks within a “matching range”, hence harmonizing their opti-mization contributions. In practice, α is learned end-to-end alongside the depth and pose network parameters. In order to accelerate convergence during training, we also multiply the output of pose network by an empirical factor of 0.01. 
+
+3.4. Semantic Distribution Calibration 
+
+Existing studies [6, 17, 60] have verified that high-level se-mantic information contributes to improved depth estima-tion. Building upon the insights from [60, 64], which em-phasize the rich semantic priors captured by generally pre-trained encoders, we devise a semantic distribution calibra-tion (SDC) module to align our model’s features with the high-level semantics from a pre-trained encoder, hence en-forcing the semantic consistency of depth predictions. We use DINOv3 [52] as the semantic guidance encoder. For a given ft, the semantic prior feature is Fsp t = Fsp (ft),while the feature extracted by the DAE encoder is Ft. Since these two representations exist in different domains, a fea-ture space mapping function is required to bridge the do-main gap, which is formulated as minimizing the following transformation error: 
+
+min 
+
+> θt
+
+Ep [∥T (Fsp t (p)) − Ft(p)∥1] , (16) where θt is the learnable parameters of T (·). To instantiate 
+
+T (·), we leverage a Gated Recurrent Unit (GRU) [8] pro-jector, with its hidden state initialized as the tanh-activated 
+
+Fsp t . The original Fsp t serves as the input and the number of iterations is set to 2. We then normalize the projected Fsp t
+
+and Ft along the feature dimension to derive semantic distri-butions bFsp t and bFt. Next, the discrepancy between bFsp t and 
+
+bFt is quantified by the Kullback-Leibler (KL) divergence. The semantic distribution calibration loss is defined as 
+
+Lsdc = X
+
+> p
+
+KL div (bFsp t , bFt), (17) where KL div (·, ·) denotes the KL divergence, serving as a semantic similarity measure in the latent space. 
+
+3.5. Overall Architecture and Loss Function 
+
+Overall Architecture . Our depth network builds upon the Depth Anythingv2 [61] with a modified depth head [10], while for pose estimation, we employ a similar architecture 34130 Table 1. Quantitative zero-shot depth comparison on the C3VD, C3VDv2 and SERV-CT datasets. Methods marked with an asterisk (⋆) utilize pre-trained VFM models, while those marked with † indicate methods retrained using the same training data as ours. Tr.: training. The results of other compared methods are reported using the official model weights. The best results are highlighted in bold .                                                                                                                           
+
+> Method C3VD [4] C3VDv2 [16] SERV-CT [12] Tr. samples AbsRel ↓RMSE ↓δ↑AbsRel ↓RMSE ↓δ↑AbsRel ↓RMSE ↓δ↑
+> AF-SfMLearner [47] 0.359 15.599 0.422 0.342 16.228 0.454 0.102 11.092 0.898 ∼15K MonoPCC [57] 0.361 15.485 0.418 0.386 17.436 0.409 0.089 9.706 0.920 ∼15K DARES [50] 0.320 14.916 0.451 0.321 15.395 0.471 0.082 9.678 0.935 ∼15K ⋆
+> Endo-FASt3r [51] 0.316 14.569 0.436 0.293 15.396 0.498 0.079 9.772 0.935 ∼15K ⋆
+> Endo-FASt3r †[51] 0.121 6.540 0.853 0.154 8.122 0.784 0.115 15.860 0.901 ∼57K ⋆
+> EndoDAC [10] 0.256 12.515 0.547 0.237 11.947 0.599 0.080 9.278 0.937 ∼15K ⋆
+> EndoDAC †[10] 0.114 7.328 0.877 0.150 8.505 0.802 0.132 14.336 -∼57K ⋆
+> Depth Anythingv1 [60] 0.253 14.413 0.598 0.172 9.014 0.739 0.146 16.736 0.804 ∼62.6M ⋆
+> Depth Anythingv2 [61] 0.208 11.995 0.707 0.184 9.068 0.733 0.164 18.644 0.768 ∼62.6M ⋆
+> DAE (Ours) 0.086 4.397 0.934 0.132 6.051 0.846 0.078 9.064 0.949 ∼57K ⋆
+
+to [15, 47]. Additionally, we introduce appearance and opti-cal flow networks, as proposed in [47], to handle inter-frame brightness fluctuations. To further enhance the framework’s versatility, we employ an intrinsic estimation network [10] instead of relying on the calibrated intrinsic matrices. The architecture of experts in extra-model MoE is based on [10]. 
+
+Overall Loss . The total loss function is formulated as a weighted sum of all losses, 
+
+Ltotal = Lph + λ1Lsi + λ2Lrank + λ3Lsdc + λ4Les (18) with 
+
+Les = X
+
+> p
+
+|∇ D(p)| · e−|∇ft(p)|, (19) where Les stands for the edge-aware smoothness loss [15], and λ1, λ2, λ3 and λ4 are set to 0.1, 0.01, 0.01, and 0.001, respectively. 
+
+## 4. Experiment 
+
+4.1. Implementation Details 
+
+The proposed framework is implemented in PyTorch and trained on a single NVIDIA RTX A5000 GPU utilizing the AdamW optimizer [31]. The learning rate is initialized at 
+
+1 × 10 −4 and reduced by a factor of 0.1 after 10 epochs. We adopt the data augmentation strategies from [15, 69], train-ing the model for 20 epochs using a batch size of 8. In our MoE-LoRA and MoE-Adapter layers, we set the number of experts to 4, with Top-1 expert being selected as optimal for each input. The pre-defined ranks for MoE-LoRA are 4, 8, 16, and 32, while the kernel sizes for MoE-Adapter are 3, 5, 7, and 9. The tunable layers in VFM Depth Anythingv2 are [2, 4, 5, 7, 8, 10, 11], with all other layers frozen. We adopt the standard evaluation metrics as used in [10, 47]. 
+
+4.2. Dataset 
+
+The training data has four mixed datasets: SCARED [1], Hamlyn [33], SimCol3D [42], and Colondepth [41]. For the SCARED dataset, we follow the split from [47], which includes 15351 frames for training and 551 frames for eval-uation. For the Hamlyn dataset, we manually curate 10392 frames with higher-quality. Moreover, we randomly sample 15351 frames from the SimCol3D, and employ all 15840 frames from Colondepth for training. In total, our training data consists of 56934 frames across all datasets. Regard-ing the zero-shot evaluation, we employ the unseen datasets C3VD [4], C3VDv2 [16], and SERV-CT [12], along with clinically collected arthroscopy data exclusively for quali-tative comparison. The C3VD and C3VDv2 datasets each consist of 551 randomly sampled test frames, whereas the SERV-CT has 48 test frames. For the in-domain evaluation, we adopt the SCARED and SimCol3D datasets. The Sim-Col3D test set comprises 551 randomly sampled frames. 
+
+4.3. Quantitative Zero-shot Evaluation 
+
+We begin by evaluating the proposed DAE through an ex-amination of its zero-shot generalization ability across dif-ferent endoscopic datasets. As shown in Table 1, DAE con-sistently outperforms the compared approaches on all met-rics. C3VD and C3VDv2 datasets are derived from colono-scopic recordings, whereas SERV-CT is collected from la-paroscopic procedures. We can see that Depth Anythingv1 and Depth Anythingv2, despite being trained on large-scale datasets, showcase degraded performance due to the sub-stantial domain gap between natural and surgical scenar-ios. In comparison, EndoDAC, DARES, and Endo-FASt3r adapt Depth Anything to endoscopic scenarios. However, their focus on single-domain adaptation limits their ability to generalize across diverse surgical domains. To present a fairer comparison, we retrain EndoDAC and Endo-FASt3r on the same mixed data and our method still achieves supe-rior generalization across all three datasets. 
+
+4.4. Quantitative In-domain Evaluation 
+
+We further evaluate the proposed DAE on the SCARED and SimCol3D datasets under the in-domain evaluation setting. 34131 Table 2. Quantitative in-domain depth comparison on the SCARED and SimCol3D datasets. The proposed method is not fine-tuned to overfit a specific dataset before evaluation, but rather uses the unified model trained on the mixed data directly.                                                                                                                
+
+> Method SCARED [1] SimCol3D [42] AbsRel ↓Sq Rel ↓RMSE ↓RMSE log ↓δ↑AbsRel ↓Sq Rel ↓RMSE ↓RMSE log ↓δ↑
+> Monodepth2 [15] 0.066 0.540 5.420 0.091 0.956 0.113 0.152 0.468 0.123 0.930 AF-SfMLearner [47] 0.059 0.470 5.062 0.083 0.967 0.117 0.146 0.458 0.123 0.936 Lite-Mono [67] 0.064 0.522 5.300 0.088 0.958 0.123 0.185 0.459 0.132 0.932 MonoViT [68] 0.063 0.493 5.166 0.086 0.963 0.116 0.148 0.477 0.130 0.935 PC-Depth [25] 0.057 0.514 5.362 0.084 0.971 0.156 0.166 0.715 0.192 0.793 DARES [50] 0.052 0.356 4.483 0.073 0.980 0.093 0.099 0.490 0.125 0.947 EndoDAC [10] 0.052 0.362 4.464 0.073 0.979 0.099 0.106 0.477 0.126 0.947 Endo-FASt3r [51] 0.051 0.354 4.480 --0.104 0.134 0.506 0.133 0.932
+> DAE (Ours) 0.047 0.312 4.156 0.067 0.983 0.088 0.085 0.450 0.121 0.949
+
+Input AF-SfMLearner Endo-FASt3r DARES EndoDAC Depth Anythingv2 DAE (Ours) 
+
+Figure 4. Qualitative zero-shot and in-domain depth comparison across different datasets . The first row is from the C3VDv2 dataset (colonoscopy), the second from the collected clinical arthroscopy data, and the third from the SCARED dataset (laparoscopy). 
+
+Our model is trained solely on the mixed datasets without any fine-tuning on either dataset, while the compared meth-ods are trained independently on each of them. As shown in Table 2, DAE achieves superior performance using a single unified model, demonstrating its strong capability to handle data variations across domains. 
+
+4.5. Qualitative Evaluation 
+
+In Fig. 4, we present qualitative comparisons of zero-shot and in-domain depth estimation across diverse datasets. For the colonoscopy data (row 1), most of the compared meth-ods fail to predict correct depth values. When evaluated on the clinical arthroscopy data (row 2), collected from the fe-mur or pelvis and markedly different from the soft-tissue scenarios captured by laparoscopy or colonoscopy, the pro-posed DAE generalizes more effectively than the compared methods. For the in-domain data (row 3), the proposed DAE more accurately delineates the depth of anatomical struc-tures. Additionally, Fig. 5 demonstrates the qualitative point cloud comparison, indicating that reconstructions from the proposed DAE exhibit fewer distortions and better preserve prominent features, such as tissue contours. 
+
+4.6. Ablation Study 
+
+Table 3. Ablation study on the DAE . MD: mixed datasets; MoE-E: extra-model MoE; MoE-I: intra-model MoE; LGH: learnable gradient harmonization; SDC: semantic distribution calibration.                                             
+
+> ID MD MoE-E MoE-I LGH SDC Abs Rel ↓RMSE ↓δ↑
+> 00.053 4.769 0.977 1✓0.108 8.842 0.889 2✓✓0.052 4.555 0.979 3✓✓✓0.050 4.365 0.981 4✓✓✓✓0.048 4.263 0.982 5✓✓✓✓✓0.047 4.156 0.983
+
+In order to evaluate the impact of each key component in the proposed DAE, we perform a series of ablation studies, with results on the SCARED dataset displayed in Tables 3 and 4, and Fig. 6. 
+
+DAE (Table 3). We first construct a baseline by adapting Depth Anythingv2 using the vanilla LoRA, trained on a sin-gle dataset (ID 0). When directly trained on the mixed data, 34132 DAE (Ours) EndoDAC Depth Anythingv2 Input Figure 5. Qualitative zero-shot and in-domain point cloud com-parison across different datasets . The top two rows are sourced from C3VDv2, while the bottom two rows are from SCARED. 
+
+the performance degrades significantly due to the large vari-ations across different endoscopic procedures (ID 1). Next, we introduce the extra-model MoE, which provides tailored guidance towards the correct optimization direction, lead-ing to consistent performance gains across all metrics (ID 2). We then incorporate the intra-model MoE, which adap-tively adjusts the model’s feature representations based on the characteristics of the input data, resulting in further im-provement (ID 3). Subsequently, we append the learnable gradient harmonization mechanism to dynamically balance the gradient magnitudes, achieving additional performance enhancement (ID 4). Finally, by introducing the semantic distribution calibration module, we form the complete DAE framework, which achieves the best overall results (ID 5). 
+
+Extra-model and intra-model MoEs (Table 4). We in-vestigate the influence of loss functions in the extra-model MoE and the impact of expert types in the intra-model MoE. Combining Lsi and Lrank delivers better performance than using Lsi alone (IDs 0 and 1). Incorporating either LoRA or adapter experts further improves performance, with LoRA experts performing slightly better than adapter experts (IDs 2 and 3). Furthermore, integrating LoRA and adapter ex-perts achieves superior results compared to their standalone counterparts, owing to the inherent complementary proper-ties (ID 4). 
+
+Expert selection tendencies and harmonization fac-tors (Fig. 6). We further analyze the expert selection bi-ases and harmonization factors on SCARED and SimCol3D }(( |_Pose Depth 
+
+> }((
+
+# |_Pose Depth    
+
+> 0.51 ×0.01 0.78 ×0.01
+> Harmonization Factor (c)
+> SCARED
+> LoRA Expert0 LoRA Expert1 LoRA Expert2 LoRA Expert3
+> SCARED
+> SimCol3D
+> SCARED SimCol3D
+> Adapter Expert0 Adapter Expert1 Adapter Expert2 Adapter Expert3
+> (a) (b)
+> SimCol3D
+
+Figure 6. Analysis of expert selection biases (a), (b) and har-monization factors (c) across different datasets .Table 4. Ablation study on the loss functions and expert types in extra-model and intra-model MoEs . LE: LoRA experts; AE: adapter experts. 
+
+ID Lsi Lrank LE AE Abs Rel ↓ RMSE ↓ δ ↑
+
+0 ✓ 0.053 4.606 0.978 1 ✓ ✓ 0.052 4.555 0.979 2 ✓ ✓ ✓ 0.050 4.392 0.980 3 ✓ ✓ ✓ 0.051 4.453 0.980 4 ✓ ✓ ✓ ✓ 0.050 4.365 0.981 datasets. The expert selection patterns exhibit notable dif-ferences between these two datasets. On SCARED, LoRA experts 0 and 2 (with ranks 4 and 16) are most frequently selected, while adapter expert 0 (with kernel size 3) is the dominant choice, and those with kernel size 9 are rarely ac-tivated. As a comparison, on SimCol3D, LoRA experts 0 and 3 (with ranks 4 and 32) are most frequently chosen, and adapter expert 2 (with kernel size 7) becomes the most active. In addition, the harmonization factors differ across datasets (e.g., 0.51 vs. 0.78), highlighting dataset-specific adaptation behavior. 
+
+## 5. Conclusion 
+
+In this paper, we introduce DAE, a unified self-supervised depth estimation framework that delivers consistent perfor-mance across diverse endoscopic procedures. The proposed DAE leverages a dual-level Mixture-of-Experts paradigm to adapt Vision Foundation Models to heterogeneous surgi-cal domains, along with a learnable gradient harmonization mechanism and a semantic distribution calibration module to strengthen coordinated optimization and enforce seman-tic consistency of depth predictions. Extensive experiments show that DAE attains state-of-the-art performance in both zero-shot and in-domain depth estimation settings. 34133 6. Acknowledgments 
+
+This work was supported in part by the National Natural Science Fund for Excellent Young Scientists Fund Program (Overseas) under Grant No. 22IAA01849, in part by the National Natural Science Foundation of China under Grant No. 62303275, in part by the Jinan Science and Technology Bureau under Grant No. 202333011, in part by the Post-doctoral Fellowship Program of China Postdoctoral Science Foundation under Grant No. GZC20251184 and in part by the China Postdoctoral Science Foundation under Grant No. 2025M781651. 
+
+## References 
+
+[1] Max Allan, Jonathan Mcleod, Congcong Wang, Jean Claude Rosenthal, Zhenglei Hu, Niklas Gard, Peter Eisert, Ke Xue Fu, Trevor Zeffiro, Wenyao Xia, et al. Stereo correspondence and reconstruction of endoscopic data challenge. arXiv preprint arXiv:2101.01133 , 2021. 2, 4, 5, 6, 7 [2] Hangbo Bao, Wenhui Wang, Li Dong, Qiang Liu, Owais Khan Mohammed, Kriti Aggarwal, Subhojit Som, Songhao Piao, and Furu Wei. Vlmo: Unified vision-language pre-training with mixture-of-modality-experts. In Advances in Neural Information Processing Systems , pages 32897– 32912, 2022. 3 [3] Jia-Wang Bian, Zhichao Li, Naiyan Wang, Huangying Zhan, Chunhua Shen, Ming-Ming Cheng, and Ian Reid. Unsuper-vised scale-consistent depth and ego-motion learning from monocular video. In Advances in Neural Information Pro-cessing Systems , 2019. 2 [4] Taylor L Bobrow, Mayank Golhar, Rohan Vijayan, Venkata S Akshintala, Juan R Garcia, and Nicholas J Durr. Colonoscopy 3d video dataset with paired depth from 2d-3d registration. Medical image analysis , 90:102956, 2023. 6 [5] Aleksei Bochkovskii, Ama ˜ AG ¸ l Delaunoy, Hugo Germain, Marcel Santos, Yichao Zhou, Stephan R Richter, and Vladlen Koltun. Depth pro: Sharp monocular metric depth in less than a second. In International Conference on Learning Representations , 2025. 1, 3 [6] Po-Yi Chen, Alexander H Liu, Yen-Cheng Liu, and Yu-Chiang Frank Wang. Towards scene understanding: Un-supervised monocular depth estimation with semantic-aware representation. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 2624– 2632, 2019. 5 [7] Weifeng Chen, Zhao Fu, Dawei Yang, and Jia Deng. Single-image depth perception in the wild. In Advances in Neural Information Processing Systems , 2016. 4 [8] Kyunghyun Cho, Bart Van Merri¨ enboer, Dzmitry Bahdanau, and Yoshua Bengio. On the properties of neural machine translation: Encoder-decoder approaches. In Proceedings of SSST-8, eighth workshop on syntax, semantics and structure in statistical translation , pages 103–111, 2014. 5 [9] Toby Collins, Daniel Pizarro, Simone Gasparini, Nicolas Bourdel, Pauline Chauvet, Michel Canis, Lilian Calvet, and Adrien Bartoli. Augmented reality guided laparoscopic surgery of the uterus. IEEE Transactions on Medical Imag-ing , 40(1):371–380, 2020. 1 [10] Beilei Cui, Mobarakol Islam, Long Bai, An Wang, and Hongliang Ren. Endodac: Efficient adapting foundation model for self-supervised depth estimation from any endo-scopic camera. In International Conference on Medical Im-age Computing and Computer-Assisted Intervention , pages 208–218. Springer, 2024. 1, 3, 4, 5, 6, 7 [11] Alexey Dosovitskiy, Lucas Beyer, Alexander Kolesnikov, Dirk Weissenborn, Xiaohua Zhai, Thomas Unterthiner, Mostafa Dehghani, Matthias Minderer, Georg Heigold, Syl-vain Gelly, Jakob Uszkoreit, and Neil Houlsby. An image is worth 16x16 words: Transformers for image recognition at scale. In International Conference on Learning Representa-tions , 2021. 4 [12] PJ Eddie Edwards, Dimitris Psychogyios, Stefanie Speidel, Lena Maier-Hein, and Danail Stoyanov. Serv-ct: A disparity dataset from cone-beam cone-beam ct for validation of en-doscopic 3d reconstruction. Medical Image Analysis , page 102302, 2021. 6 [13] William Fedus, Barret Zoph, and Noam Shazeer. Switch transformers: Scaling to trillion parameter models with sim-ple and efficient sparsity. Journal of Machine Learning Re-search , 23(120):1–39, 2022. 3 [14] Xiao Fu, Wei Yin, Mu Hu, Kaixuan Wang, Yuexin Ma, Ping Tan, Shaojie Shen, Dahua Lin, and Xiaoxiao Long. Geowiz-ard: Unleashing the diffusion priors for 3d geometry esti-mation from a single image. In European Conference on Computer Vision , pages 241–258. Springer, 2024. 3 [15] Cl´ ement Godard, Oisin Mac Aodha, Michael Firman, and Gabriel J Brostow. Digging into self-supervised monocular depth estimation. In Proceedings of the IEEE International Conference on Computer Vision , pages 3828–3838, 2019. 2, 4, 5, 6, 7 [16] Mayank V Golhar, Lucas Sebastian Galeano Fretes, Loren Ayers, Venkata S Akshintala, Taylor L Bobrow, and Nicholas J Durr. C3vdv2–colonoscopy 3d video dataset with enhanced realism. arXiv preprint arXiv:2506.24074 , 2025. 6[17] Vitor Guizilini, Rui Hou, Jie Li, Rares Ambrus, and Adrien Gaidon. Semantically-guided representation learning for self-supervised monocular depth. In International Confer-ence on Learning Representations , 2020. 5 [18] Jing He, Haodong Li, Wei Yin, Yixun Liang, Leheng Li, Kaiqiang Zhou, Hongbo Zhang, Bingbing Liu, and Ying-Cong Chen. Lotus: Diffusion-based visual foundation model for high-quality dense prediction. In International Confer-ence on Learning Representations , 2025. 1, 3 [19] Edward J Hu, Yelong Shen, Phillip Wallis, Zeyuan Allen-Zhu, Yuanzhi Li, Shean Wang, Lu Wang, Weizhu Chen, et al. Lora: Low-rank adaptation of large language mod-els. In International Conference on Learning Representa-tions , page 3, 2022. 1, 4 [20] Robert A Jacobs, Michael I Jordan, Steven J Nowlan, and Geoffrey E Hinton. Adaptive mixtures of local experts. Neu-ral Computation , 3(1):79–87, 1991. 3 [21] Max Jaderberg, Karen Simonyan, Andrew Zisserman, et al. 34134 Spatial transformer networks. In Advances in Neural Infor-mation Processing Systems , pages 2017–2025, 2015. 4 [22] Ting Jiang, Shaohan Huang, Shengyue Luo, Zihan Zhang, Haizhen Huang, Furu Wei, Weiwei Deng, Feng Sun, Qi Zhang, Deqing Wang, et al. Mora: High-rank updat-ing for parameter-efficient fine-tuning. arXiv preprint arXiv:2405.12130 , 2024. 3 [23] Bingxin Ke, Anton Obukhov, Shengyu Huang, Nando Met-zger, Rodrigo Caye Daudt, and Konrad Schindler. Repurpos-ing diffusion-based image generators for monocular depth estimation. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 9492– 9502, 2024. 1, 3 [24] Dengchun Li, Yingzi Ma, Naizheng Wang, Zhengmao Ye, Zhiyuan Cheng, Yinghao Tang, Yan Zhang, Lei Duan, Jie Zuo, Cal Yang, et al. Mixlora: Enhancing large language models fine-tuning with lora-based mixture of experts. arXiv preprint arXiv:2404.15159 , 2024. 3, 4 [25] Shijie Li, Weijun Lin, Qingyuan Xiang, Yunbin Tu, Shitan Asu, and Zheng Li. Unsupervised photometric-consistent depth estimation from endoscopic monocular video. In Pro-ceedings of the AAAI Conference on Artificial Intelligence ,pages 4923–4931, 2025. 7 [26] Zhenyu Li, Shariq Farooq Bhat, and Peter Wonka. Patchre-finer: Leveraging synthetic data for real-domain high-resolution monocular metric depth estimation. In European Conference on Computer Vision , pages 250–267. Springer, 2024. 5 [27] Shih-Yang Liu, Chien-Yi Wang, Hongxu Yin, Pavlo Molchanov, Yu-Chiang Frank Wang, Kwang-Ting Cheng, and Min-Hung Chen. Dora: Weight-decomposed low-rank adaptation. In Forty-first International Conference on Ma-chine Learning , 2024. 3 [28] Xingtong Liu, Ayushi Sinha, Masaru Ishii, Gregory D Hager, Austin Reiter, Russell H Taylor, and Mathias Unberath. Dense depth estimation in monocular endoscopy with self-supervised learning methods. IEEE Transactions on Medical Imaging , 39(5):1438–1447, 2019. 1, 2 [29] Zefang Liu and Jiahua Luo. Adamole: Fine-tuning large lan-guage models with adaptive mixture of low-rank adaptation experts. arXiv preprint arXiv:2405.00361 , 2024. 3, 4 [30] Zhong Liu, Ran Li, Shuwei Shao, Xingming Wu, and Weihai Chen. Self-supervised monocular depth estimation with self-reference distillation and disparity offset refinement. IEEE Transactions on Circuits and Systems for Video Technology ,2023. 2 [31] Ilya Loshchilov and Frank Hutter. Decoupled weight de-cay regularization. In International Conference on Learning Represenations , 2019. 6 [32] Tongxu Luo, Jiahe Lei, Fangyu Lei, Weihao Liu, Shizhu He, Jun Zhao, and Kang Liu. Moelora: Contrastive learning guided mixture of experts on parameter-efficient fine-tuning for large language models. arXiv preprint arXiv:2402.12851 ,2024. 3, 4 [33] Peter Mountney, Danail Stoyanov, and Guang-Zhong Yang. Three-dimensional tissue deformation recovery and tracking. 
+
+IEEE Signal Processing Magazine , 27(4):14–24, 2010. 6 [34] Kutsev Bengisu Ozyoruk, Guliz Irem Gokceler, Taylor L Bobrow, Gulfize Coskun, Kagan Incetan, Yasin Almali-oglu, Faisal Mahmood, Eva Curto, Luis Perdigoto, Ma-rina Oliveira, et al. Endoslam dataset and an unsupervised monocular visual odometry and depth estimation approach for endoscopic videos: Endo-sfmlearner. Medical Image Analysis , 2021. 1, 2 [35] Svetlana Pavlitska, Beyza Keskin, Alwin Faßbender, Chris-tian Hubschneider, and J Marius Z¨ ollner. Extracting uncer-tainty estimates from mixtures of experts for semantic seg-mentation. In Proceedings of the IEEE/CVF International Conference on Computer Vision , pages 311–320, 2025. 3 [36] Svetlana Pavlitskaya, Christian Hubschneider, Michael We-ber, Ruby Moritz, Fabian Huger, Peter Schlicht, and Marius Zollner. Using mixture of expert models to gain insights into semantic segmentation. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition Workshops , pages 342–343, 2020. 3, 4 [37] Luigi Piccinelli, Yung-Hsu Yang, Christos Sakaridis, Mattia Segu, Siyuan Li, Luc Van Gool, and Fisher Yu. Unidepth: Universal monocular metric depth estimation. In Proceed-ings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 10106–10116, 2024. 1, 3 [38] Luigi Piccinelli, Christos Sakaridis, Yung-Hsu Yang, Mat-tia Segu, Siyuan Li, Wim Abbeloos, and Luc Van Gool. Unidepthv2: Universal monocular metric depth estimation made simpler. IEEE Transactions on Pattern Analysis and Machine Intelligence , 2025. 3 [39] Maithra Raghu, Thomas Unterthiner, Simon Kornblith, Chiyuan Zhang, and Alexey Dosovitskiy. Do vision trans-formers see like convolutional neural networks? In Advances in Neural Information Processing Systems , pages 12116– 12128, 2021. 4 [40] Ren´ e Ranftl, Katrin Lasinger, David Hafner, Konrad Schindler, and Vladlen Koltun. Towards robust monocular depth estimation: Mixing datasets for zero-shot cross-dataset transfer. IEEE Transactions on Pattern Analysis and Ma-chine Intelligence , 44(3):1623–1637, 2020. 3, 4 [41] Anita Rau, PJ Eddie Edwards, Omer F Ahmad, Paul Riordan, Mirek Janatka, Laurence B Lovat, and Danail Stoyanov. Im-plicit domain adaptation with conditional generative adver-sarial networks for depth prediction in endoscopy. Interna-tional Journal of Computer Assisted Radiology and Surgery ,14(7):1167–1176, 2019. 6 [42] Anita Rau, Sophia Bano, Yueming Jin, Pablo Azagra, Javier Morlana, Rawen Kader, Edward Sanderson, Bogdan J Ma-tuszewski, Jae Young Lee, Dong-Jae Lee, et al. Simcol3d-3d reconstruction during colonoscopy challenge. Medical Im-age Analysis , 96:103195, 2024. 2, 4, 5, 6, 7 [43] Carlos Riquelme, Joan Puigcerver, Basil Mustafa, Maxim Neumann, Rodolphe Jenatton, Andr´ e Susano Pinto, Daniel Keysers, and Neil Houlsby. Scaling vision with sparse mix-ture of experts. In Advances in Neural Information Process-ing Systems , pages 8583–8595, 2021. 3 [44] Robin Rombach, Andreas Blattmann, Dominik Lorenz, Patrick Esser, and Bj¨ orn Ommer. High-resolution image synthesis with latent diffusion models. In Proceedings of 34135 the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 10684–10695, 2022. 3 [45] Shuwei Shao, Zhongcai Pei, Weihai Chen, Baochang Zhang, Xingming Wu, Dianmin Sun, and David Doermann. Self-supervised learning for monocular depth estimation on mini-mally invasive surgery scenes. In IEEE International Confer-ence on Robotics and Automation , pages 7159–7165. IEEE, 2021. 2 [46] Shuwei Shao, Ran Li, Zhongcai Pei, Zhong Liu, Weihai Chen, Wentao Zhu, Xingming Wu, and Baochang Zhang. Towards comprehensive monocular depth estimation: Mul-tiple heads are better than one. IEEE Transactions on Multi-media , 25:7660–7671, 2022. 4 [47] Shuwei Shao, Zhongcai Pei, Weihai Chen, Wentao Zhu, Xingming Wu, Dianmin Sun, and Baochang Zhang. Self-supervised monocular depth and ego-motion estimation in endoscopy: Appearance flow to the rescue. Medical Image Analysis , page 102338, 2022. 1, 2, 3, 6, 7 [48] Shuwei Shao, Zhongcai Pei, Weihai Chen, Ran Li, Zhong Liu, and Zhengguo Li. Urcdc-depth: Uncertainty recti-fied cross-distillation with cutflip for monocular depth esti-mation. IEEE Transactions on Multimedia , 26:3341–3353, 2023. 4 [49] Shuwei Shao, Zhongcai Pei, Weihai Chen, Dingchi Sun, Peter CY Chen, and Zhengguo Li. Monodiffusion: Self-supervised monocular depth estimation using diffusion model. IEEE Transactions on Circuits and Systems for Video Technology , 2024. 2 [50] Mona Sheikh Zeinoddin, Chiara Lena, Jiongqi Qu, Luca Car-lini, Mattia Magro, Seunghoi Kim, Elena De Momi, Sophia Bano, Matthew Grech-Sollars, Evangelos Mazomenos, et al. Dares: Depth anything in robotic endoscopic surgery with self-supervised vector-lora of the foundation model. In Eu-ropean Conference on Computer Vision Workshops , pages 1–11. Springer, 2024. 3, 6, 7 [51] Mona Sheikh Zeinoddin, Mobarak I Hoque, Zafer Tan-dogdu, Greg L Shaw, Matthew J Clarkson, Evangelos B Ma-zomenos, and Danail Stoyanov. Endo-fast3r: Endoscopic foundation model adaptation for structure from motion. In 
+
+International Conference on Medical Image Computing and Computer-Assisted Intervention , pages 117–126. Springer, 2025. 1, 3, 4, 6, 7 [52] Oriane Sim´ eoni, Huy V Vo, Maximilian Seitzer, Federico Baldassarre, Maxime Oquab, Cijo Jose, Vasil Khalidov, Marc Szafraniec, Seungeun Yi, Micha¨ el Ramamonjisoa, et al. Dinov3. arXiv preprint arXiv:2508.10104 , 2025. 2, 5[53] Mehmet Turan, Evin Pinar Ornek, Nail Ibrahimli, Can Giracoglu, Yasin Almalioglu, Mehmet Fatih Yanik, and Metin Sitti. Unsupervised odometry and depth learning for endoscopic capsule robots. In IEEE International Confer-ence on Intelligent Robots and Systems , pages 1801–1807. IEEE, 2018. 2 [54] Jiyuan Wang, Chunyu Lin, Cheng Guan, Lang Nie, Jing He, Haodong Li, Kang Liao, and Yao Zhao. Jasmine: Harness-ing diffusion prior for self-supervised depth estimation. In 
+
+Advances in Neural Information Processing Systems , 2025. 2[55] Yun Wang, Longguang Wang, Chenghao Zhang, Yongjian Zhang, Zhanjie Zhang, Ao Ma, Chenyou Fan, Tin Lun Lam, and Junjie Hu. Learning robust stereo matching in the wild with selective mixture-of-experts. In Proceedings of the IEEE/CVF International Conference on Computer Vision ,pages 21276–21287, 2025. 3, 4 [56] Zhou Wang, Alan C Bovik, Hamid R Sheikh, and Eero P Si-moncelli. Image quality assessment: from error visibility to structural similarity. IEEE Transactions on Image Process-ing , 13(4):600–612, 2004. 4 [57] Zhiwei Wang, Ying Zhou, Shiquan He, Ting Li, Fan Huang, Qiang Ding, Xinxia Feng, Mei Liu, and Qiang Li. Monopcc: Photometric-invariant cycle constraint for monocular depth estimation of endoscopic images. Medical Image Analysis ,102:103534, 2025. 2, 6 [58] Ke Xian, Jianming Zhang, Oliver Wang, Long Mai, Zhe Lin, and Zhiguo Cao. Structure-guided ranking loss for single im-age depth prediction. In Proceedings of the IEEE/CVF Con-ference on Computer Vision and Pattern Recognition , pages 611–620, 2020. 4, 5 [59] Weilong Yan, Ming Li, Haipeng Li, Shuwei Shao, and Robby T Tan. Synthetic-to-real self-supervised robust depth estimation via learning with motion and structure priors. In 
+
+Proceedings of the Computer Vision and Pattern Recognition Conference , pages 21880–21890, 2025. 2 [60] Lihe Yang, Bingyi Kang, Zilong Huang, Xiaogang Xu, Jiashi Feng, and Hengshuang Zhao. Depth anything: Unleashing the power of large-scale unlabeled data. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 10371–10381, 2024. 1, 3, 4, 5, 6 [61] Lihe Yang, Bingyi Kang, Zilong Huang, Zhen Zhao, Xiao-gang Xu, Jiashi Feng, and Hengshuang Zhao. Depth any-thing v2. In Advances in Neural Information Processing Sys-tems , pages 21875–21911, 2024. 1, 3, 4, 5, 6 [62] Zhuoyue Yang, Junjun Pan, Ju Dai, Zhen Sun, and Yi Xiao. Self-supervised lightweight depth estimation in endoscopy combining cnn and transformer. IEEE Transactions on Med-ical Imaging , 2024. 1, 2 [63] Wei Yin, Chi Zhang, Hao Chen, Zhipeng Cai, Gang Yu, Kaixuan Wang, Xiaozhi Chen, and Chunhua Shen. Metric3d: Towards zero-shot metric 3d prediction from a single image. In Proceedings of the IEEE/CVF International Conference on Computer Vision , pages 9043–9053, 2023. 3 [64] Sihyun Yu, Sangkyung Kwak, Huiwon Jang, Jongheon Jeong, Jonathan Huang, Jinwoo Shin, and Saining Xie. Representation alignment for generation: Training diffusion transformers is easier than you think. In International Con-ference on Learning Representations , 2025. 5 [65] Huangying Zhan, Ravi Garg, Chamara Saroj Weerasekera, Kejie Li, Harsh Agarwal, and Ian Reid. Unsupervised learn-ing of monocular depth estimation and visual odometry with deep feature reconstruction. In Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition ,pages 340–349, 2018. 2 [66] Linsen Zhang, Shiqi Liu, Xiaoliang Xie, Xiaohu Zhou, Zengguang Hou, Xinkai Qu, Wenzheng Han, Meng Song, Xiyao Ma, and Haining Zhao. Novel 3d instrument navi-34136 gation in intracranial vascular surgery with multi-source im-age fusion and self-calibration. Biomimetic Intelligence and Robotics , 5(3):100233, 2025. 1 [67] Ning Zhang, Francesco Nex, George Vosselman, and Nor-man Kerle. Lite-mono: A lightweight cnn and transformer architecture for self-supervised monocular depth estimation. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 18537–18546, 2023. 2, 7 [68] Chaoqiang Zhao, Youmin Zhang, Matteo Poggi, Fabio Tosi, Xianda Guo, Zheng Zhu, Guan Huang, Yang Tang, and Ste-fano Mattoccia. Monovit: Self-supervised monocular depth estimation with a vision transformer. In 2022 International Conference on 3D Vision , pages 668–678. IEEE, 2022. 2, 7 [69] Tinghui Zhou, Matthew Brown, Noah Snavely, and David G Lowe. Unsupervised learning of depth and ego-motion from video. In Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition , pages 1851–1858, 2017. 2, 6[70] Zanwei Zhou, Chen Yang, Piao Yang, Xiaokang Yang, and Wei Shen. Endodav: Depth any video in endoscopy with spa-tiotemporal accuracy. In International Conference on Med-ical Image Computing and Computer-Assisted Intervention ,pages 192–201. Springer, 2025. 1, 3 34137

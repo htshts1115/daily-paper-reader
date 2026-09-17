@@ -1,0 +1,286 @@
+Title: Radar-Guided Polynomial Fitting for Metric Depth Estimation
+
+URL Source: https://openaccess.thecvf.com/content/CVPR2026/papers/Rim_Radar-Guided_Polynomial_Fitting_for_Metric_Depth_Estimation_CVPR_2026_paper.pdf
+
+Published Time: Sat, 16 May 2026 16:50:56 GMT
+
+Number of Pages: 12
+
+Markdown Content:
+# Radar-Guided Polynomial Fitting for Metric Depth Estimation 
+
+# Patrick Rim 1 Hyoungseob Park 1 Vadim Ezhov 1 Jeffrey Moon 2 Alex Wong 11Yale University 2University of Pennsylvania 
+
+# Abstract 
+
+We propose POLAR, a novel radar-guided depth estimation method that introduces polynomial fitting to efficiently trans-form scaleless depth predictions from pretrained monocular depth estimation (MDE) models into metric depth maps. Un-like existing approaches that rely on complex architectures or expensive sensors, our method is grounded in a fundamental insight: although MDE models often infer reasonable local depth structure within each object or local region, they may misalign these regions relative to one another, making a lin-ear scale and shift (affine) transformation insufficient given three or more of these regions. To address this limitation, we use polynomial coefficients predicted from cheap, ubiquitous radar data to adaptively adjust predictions non-uniformly across depth ranges. In this way, POLAR generalizes beyond affine transformations and is able to correct such misalign-ments by introducing inflection points. Importantly, our poly-nomial fitting framework preserves structural consistency through a novel training objective that enforces local mono-tonicity via first-derivative regularization. POLAR achieves state-of-the-art performance across three datasets, outper-forming existing methods by an average of 24.9% in MAE and 33.2% in RMSE, while also achieving state-of-the-art efficiency in terms of latency and computational cost. 
+
+# 1. Introduction 
+
+Metric 3-dimensional (3D) reconstruction is critical for spa-tial tasks such as self-driving [17, 37], where it is necessary to recover the structure of the 3D environment in order to nav-igate. In many such systems, multiple sensors—including cameras, lidar, and radar—provide complementary informa-tion about the 3D scene. While lidar sensors offer dense and precise point clouds, they are expensive and not widely available [44]. In contrast, radar sensors, particularly mil-limeter wave (mmWave) radars [23], return only about a hundred points per frame and are noisier [18]. Yet, they offer key advantages: they are far more cost-effective and energy-efficient, robust to challenging environmental conditions, and ubiquitously equipped on modern vehicles [11].        
+
+> Figure 1. If an MDE model predicts incorrect relative depths between three or more objects , an affine scale-and-shift (dashed) cannot resolve this misalignment. POLAR (solid) overcomes this limitation by learning an N’th-order polynomial fit with up to
+> N−2inflection points.
+
+Unless camera baselines are known, images offer scale-less reconstruction. They are also high-dimensional and sensitive to variations in illumination, object appearance, orientation, and camera viewpoint. Training robust mod-els that can generalize across these factors often demands large-scale datasets, which are costly to collect. As a result, leveraging pretrained monocular depth estimation (MDE) foundation models [4, 42, 46, 69] emerges as a practical alternative. However, as 3D reconstruction from a single 2D image is inherently ill-posed, they typically infer scaleless relative depth, or depth that lacks the fidelity needed for ap-plications demanding accurate metric-scale reconstruction, such as mapping and navigation. Existing approaches [9, 21, 57, 71, 72] attempt to trans-form these MDE predictions into accurate metric depth maps using a global affine (scale-and-shift) transformation. This class of methods assumes that the reconstruction is off by a single scaling factor across the entire scene. While effec-tive in estimating ordinal relationships within local regions, where MDE predictions typically exhibit reasonable local (object-level) reconstructions, such linear corrections fail when multiple objects are placed at incorrect depths rela-tive to each other. Specifically, once an MDE model places three or more objects at incorrect relative depths, no simple This CVPR paper is the Open Access version, provided by the Computer Vision Foundation. Except for this watermark, it is identical to the accepted version; the final published version of the proceedings is available on IEEE Xplore. 26941 scale-and-shift can reconcile this misalignment (Fig. 1). In this work, we challenge the common assumption that scale ambiguity in MDE is only up to an unknown global scale and shift. Instead, we propose to incorporate higher-order corrections through a polynomial transformation that allows for stretching and compressing at different depth lev-els, enabling more flexible non-uniform adjustments. Our approach, POLAR, transforms the predictions of pretrained MDE models by (i) learning prototypical patterns in the configuration of radar points, (ii) establishing spatial cor-respondences between radar and MDE features to encode a unified multi-sensor scene representation, and (iii) pre-dicting polynomial coefficients that adaptively fit scaleless depth into metric depth. This polynomial expansion intro-duces additional degrees of freedom (i.e., multiple inflection points) that can better correct non-uniform variations and cross-region misalignments. While one may adjust every prediction (pixel) of an MDE model [29], the number of degrees of freedom is the total number of pixels. Given radar point clouds of a few hundred points (many orders less than the number of pixels), this becomes an ill-posed problem. On the other hand, the number of degrees of freedom in poly-nomial expansion is limited to the number of polynomial terms, which we empirically found to be close to the cardi-nality of radar point clouds, allowing our solution to be better posed and more regular. To our knowledge, no prior work has explored polynomial fitting for adapting predictions of pretrained foundation models. However, learning such a flexible transformation is chal-lenging because higher-order polynomials introduce a vast function space with many free parameters. Unlike a simple linear fit that relies on only scale and bias terms, polynomial fitting allows for numerous inflection points and nonlineari-ties. This expressiveness can inadvertently lead to harmful non-monotonic transformations—where the relative depth orderings of points are incorrectly reversed—if not properly constrained. We address this by introducing a regularization term that enforces the predicted metric depth with respect to the input MDE depth to remain approximately monotoni-cally increasing. This ensures that incremental changes in the input depth result in proportional changes in the predicted depth within local regions where MDE reconstructs structure up to a relative scale. In essence, this regularizer encour-ages a piecewise monotonic transformation, mitigating un-stable oscillations that can arise from overfitting high-degree polynomials while still enabling necessary corrections for cross-region misalignments. 
+
+Our contributions : We propose (1) POLAR, a novel POLynomial fitting method that leverages complementary radAR guidance to transform scaleless monocular depth into accurate metric depth. Our approach (2) introduces a funda-mental insight: using polynomial coefficients predicted from a learned multimodal representation to enable non-uniform corrections. We present (3) a principled geometric formula-tion, where polynomial transformations introduce inflection points that can correct misalignments between local areas that an affine transformation cannot. We design (4) a novel training objective that encourages monotonicity through first-derivative as regularization, preserving local ordinality while allowing cross-region adjustments. Finally, (5) extensive experiments demonstrate that POLAR achieves the state of the art in both performance and efficiency, outperforming existing methods by an average of 29.1% and simultaneously delivering real-time processing of over 40 fps. 
+
+# 2. Related Work 
+
+Monocular Depth Estimation. With recent advances in the scalability of neural networks [5, 10], monocular depth estimation (MDE) models [7, 15, 16, 25, 26, 49, 50, 56, 59, 73, 76] can infer scaleless relative depth from a single image across diverse, unseen domains [4, 14, 42, 45, 69], benefiting from large-scale datasets. Recent works seek to enhance MDE by leveraging auxiliary image signals, such as structure and motion priors from segmentation [2, 19], uncertainty estimation [43], optical flow [75], and visual odometry [13, 52, 65], to improve relative depth estimation. However, monocular metric depth estimation inherently suf-fers from scale ambiguity, as estimating depth from a single image is an ill-posed problem. Even MDE models trained with metric depth supervision often struggle to generalize to unseen domains with high fidelity [57]. One way to address this limitation is to incorporate range-sensing modalities such as lidar [12, 24, 66], radar [51], or visual-inertial odom-etry [61]. 
+
+Image-Guided Depth Completion. Most often studied in the context of lidar-camera depth [6, 8, 12, 32, 39, 40, 48, 60–64, 70], image-guided depth completion leverages the strengths of each modality: images offer dense visual context and structural priors, while lidar points provide absolute metric scale to resolve depth ambiguity. Fusion strategies for these modalities include early fusion, where feature maps are concatenated at initial layers [35, 36], late fusion, where inputs are processed by independent branches [48, 68], and multi-scale fusion, which captures both local details and global scene structure [27]. U-Net-like architectures have been widely used for coarse-to-fine depth completion [20, 31], with improvements from deformable convolutions [41, 67], and attention mechanisms [47, 74]. 
+
+Radar-Camera Depth Estimation. While lidar-based depth estimation methods achieve high accuracy due to their dense and precise measurements, their widespread adoption is limited by high costs, power consumption, and sensitivity to environmental conditions [44]. In contrast, radar provides a cost-effective alternative [22], offering robustness in ad-verse conditions such as low light, fog, and rain—where both cameras and lidar often struggle [38, 53]. The ubiquity 26942 of radar sensors [11] in existing automotive and robotic plat-forms further supports their integration into depth estimation pipelines. Leveraging radar for metric depth estimation not only reduces costs but also enhances the robustness and scal-ability of perception systems, making it an attractive choice for real-world deployment. Despite these advantages, methods that fuse image and radar inputs for depth estimation must address the sparsity and elevation ambiguity [51] of radar point clouds. [30] uses a two-stage late fusion approach that first produces a coarse depth map and performs outlier rejection, then predicts the final depth map. [34] leverages Doppler velocity and optical flow to associate radar points with image pixels. [33] refines radar depth using height-extension of radar points to ad-dress elevation ambiguity. [51] introduces RadarNet, which uses radar-pixel correspondence scores as well as confidence scores to generate a semi-dense depth map, which is then used to predict the final dense depth map using gated fusion. [28] mitigates distribution artifacts using sparse supervision, while [54] employs a two-stage confidence-driven approach. GET-UP [55] uses attention-enhanced graph neural networks to capture both 2D and 3D features from radar data and lever-ages point cloud upsampling to refine radar features. Like our method, RadarCam-Depth [29] and TacoDepth [58] also begin with an initial MDE prediction, but refine it and de-code dense depth directly from fused features, rather than employing a learned scene-fitting approach. Existing methods operate within the paradigm of comple-tion or direct decoding of fused features, and they often rely on multi-stage training and explicit radar-pixel association learning, increasing model complexity and computational overhead. In contrast, POLAR employs a streamlined yet powerful architecture that directly predicts polynomial co-efficients from radar and MDE features, enabling accurate and efficient fitting of scaleless depth to metric scale. It bypasses the need for multi-stage systems that learn explicit correspondences while enabling flexible depth corrections. 
+
+# 3. Method Formulation 
+
+We aim to reconstruct a 3D scene from an RGB image I ∈
+
+RH×W ×3 and a synchronized radar point cloud C ∈ RNC ×3
+
+by fitting a scaleless depth map from a pretrained MDE foun-dation model to a metric depth map. Our method leverages MDE to seed scaleless depth predictions and estimates met-ric depth through polynomial fitting guided by cross-modal features that encode spatial correspondences between the 3D radar points and the dense scaleless depth predictions. As MDE models are trained on millions of images, they are robust to typical visual nuisance variability, spanning from illumination changes and object appearances to view-point shifts. To circumvent the need to collect many large-scale synchronized radar-camera datasets, we begin with a frozen pretrained MDE model M , which serves as a learned geometric prior, to infer a scaleless depth map z ∈ RH×W
+
+> +
+
+from the image. We then encode the point cloud C and the scaleless depth map z separately. Through a fusion pro-cess that captures correspondences between them, we predict 
+
+N +1 polynomial coefficients {ˆc0, ˆc1, · · · , ˆcN } that are used to transform z into a metric depth map ˆd.
+
+## 3.1. Motivation 
+
+Existing methods [9, 21, 57, 71, 72] refine MDE predictions by applying simple scale-and-shift transformations. How-ever, this approach lacks the complexity needed to correct non-uniform variations from ground truth across different depths. A practical illustration of this shortcoming arises when multiple objects or local regions appear in the same scene: MDE may accurately infer the reconstruction within each object region, yet place them at incorrect relative depths with respect to each other. Such cross-region misalignments cannot be corrected by a single global scaling factor (see Fig. 1). This violates the assumption that the MDE recon-struction is up to an unknown global scale and shift. To address this, our polynomial fitting approach expo-nentiates the MDE prediction to higher powers and learns coefficients that transform it into a metric depth map via summation. Lower-order coefficients (including scale and shift) capture the global scene layout, while higher-order coefficients focus on local depth adjustments, correcting cross-object misalignments and fine-grained MDE errors. An intuitive understanding of polynomial fitting can be drawn from the geometric perspective of depth transforma-tions. An affine (scale-and-shift) operation, mathematically represented as ˆaz + ˆb, uniformly stretches or compresses the entire reconstruction by the same factor across all depth levels. While effective for coarse global corrections, such an affine transformation has zero inflection points , limit-ing its flexibility to address cross-region misalignments in relative depth predictions. In contrast, the total degree of our polynomial fitting method determines the maximum number of potential inflection points, where the curvature of the depth transformation can change. For a polynomial 
+
+f (z) = PNi=0 ˆci zi, an inflection point z∗ occurs if 
+
+f ′′ (z∗) = XNi=2 i(i − 1) ˆ ci (z∗)i−2 = 0 , (1) indicating where the second derivative changes sign. By learning inflection points, we can model transition regions in the curvature of the MDE error, allowing necessary non-uniform corrections. 
+
+## 3.2. Representation Learning and Fusion 
+
+Radar Processing. We begin with a radar point cloud 
+
+C ∈ RNC ×3, where each of the NC points is represented by its (x, y, z ) coordinates in three-dimensional camera space. Radar point clouds, while noisy and sparse, provide met-ric depth measurements. We concatenate a sinusoidal 3D 26943 ❆
+
+Image Scaleless Depth Radar Radar Aggregation Prototypes     
+
+> 012…N
+
+MDE-Radar Fusion 
+
+> z
+
+Output Depth MDE Model 
+
+> N
+> 01…2
+
+fz
+
+fs  
+
+> Frozen Trainable Figure 2. Method Overview. POLAR transforms scaleless MDE predictions into metric depth using polynomial fitting guided by radar features. Learnable prototypes extract patterns in the configurations of radar point clouds and are used to aggregate spatially-informed radar features. The geometry-aware MDE features are fused with the radar features via a learnable soft-correspondence module to yield a unified scene representation that is used to predict polynomial coefficients for fitting. This enables non-uniform corrections that improve accuracy beyond affine transformations.
+
+positional embedding ϕ3D (x, y, z ) to C, and feed it into a multilayer perceptron (MLP) ψr, producing radar features 
+
+Fr ∈ RNC ×cr , where cr is the feature dimension. 
+
+Radar Aggregation. To facilitate effective radar fea-ture aggregation, we introduce a set of learnable prototypes 
+
+P ∈ RNP ×cr , where these NP prototypes capture diverse spatial and geometric properties present in the radar point cloud. Each prototype learns to focus on specific patterns in the configuration of radar points, making them highly expressive and adaptable across varying scenes. Unlike ex-isting works [29, 51] that directly encode and pool radar points—making them more susceptible to nuisances like multipath propagation—our learnable prototypes identify and match meaningful patterns within the point cloud. This allows for selective feature aggregation that mitigates the impact of outliers, resulting in more robust depth predictions. Next, learnable prototypes are matched to the most rele-vant radar features. We treat the prototypes as centroids and perform soft clustering over the radar features. Each radar point is softly assigned to prototypes according to feature similarity, and the corresponding values are aggregated to yield a global scene-descriptive representation FR:
+
+Dij = ∥Pj − Φr (Fr )i∥2, FR = σ(−D / τ ) Ψ r (Fr ),
+
+(2) where Φr, Ψr are MLPs that project the radar features Fr,the matrix D ∈ RNP ×NC contains the pairwise squared dis-tances between prototypes {Pj }NP 
+
+> j=1
+
+and projected radar fea-tures {Φr (Fr )i}NC
+
+> i=1
+
+, and σ denotes softmax. This clustering-based formulation enables prototypes to capture recurring spatial and geometric patterns in radar point clouds. Com-paratively, applying lidar depth completion methods, which densify a sparse projection of points using surrounding con-text, to a radar point cloud results in poor performance (see Supp. Mat.). This is because radar measurements are or-ders of magnitude sparser than lidar and are much noisier, especially when lacking sufficient antenna elements, e.g., elevation ambiguity, or range resolution [51]. 
+
+MDE-Radar Fusion. The scaleless depth map z ∈
+
+RH×W 
+
+> +
+
+from the MDE model is encoded with a learn-able depth encoder fz , producing depth features Z ∈
+
+R(H×W )×cz . These features inherit invariants learned through large-scale MDE training—such as robustness to color variations, illumination changes, and diverse object poses—and therefore primarily encode object-level prop-erties. Since variations in the shape of objects and their geometry are generally more stable across scenes than pho-tometric appearance, the resulting depth features provide a more reliable geometric context for fusion with radar fea-tures. This allows radar point configurations to be matched to consistently observed shapes and surfaces, rather than to pixel-wise color intensities that can vary arbitrarily with lighting and viewpoint. To this end, we learn soft spatial correspondences between the depth features Z and the radar features FR to construct a unified scene representation S that fuses the structural information encoded in the MDE predic-tions with the metric cues provided by the radar features: 
+
+S = softmax 
+
+ (Z + E) × (Φ R(FR)) T
+
+√cr
+
+
+
+ΨR(FR), (3) where E ∈ R(H×W )×cz is a learned 2D positional embed-ding, and ΦR, ΨR are MLPs that project the aggregated radar features FR. cz is set equal to cr to align the depth and radar features within a common embedding space, facilitat-ing cross-modal fusion, and S is reshaped to H × W × cz .26944 nuScenes ZJU View-of-Delft 
+
+Distance Method MAE RMSE MAE RMSE MAE RMSE 50m RadarNet [CVPR ’23] 1727.7 3746.8 1430.5 3250.8 2944.8 6113.2 SparseBeatsDense [ECCV ’24] 1524.5 3567.3 1424.4 3267.5 2909.9 5746.4 GET-UP [WACV ’25] 1241.0 2857.0 1483.9 3220.5 2330.0 4565.0 RadarCam-Depth [ICRA ’24] 1286.1 2964.3 1067.5 2817.4 1895.1 4458.7 TacoDepth [CVPR ’25] 1046.8 2487.5 930.2 2477.3 - -
+
+POLAR (Ours) 1014.4 2475.7 578.0 1108.6 1293.7 2420.6 
+
+70m RadarNet [CVPR ’23] 2073.2 4590.7 1543.8 3655.3 3428.9 7331.9 SparseBeatsDense [ECCV ’24] 1822.9 4303.6 1520.0 3593.4 3408.3 6914.7 GET-UP [WACV ’25] 1541.0 3657.0 1651.5 3711.7 2758.0 5678.0 RadarCam-Depth [ICRA ’24] 1587.9 3662.5 1157.0 3117.7 2095.4 4944.6 TacoDepth [CVPR ’25] 1347.1 3152.8 983.1 2779.6 - -
+
+POLAR (Ours) 1286.1 2947.3 603.7 1154.9 1442.9 2803.8 
+
+80m RadarNet [CVPR ’23] 2179.3 4898.7 1578.4 3804.2 3597.0 7809.2 SparseBeatsDense [ECCV ’24] 1927.0 4609.6 1548.4 3708.1 3584.0 7375.2 GET-UP [WACV ’25] 1632.0 3932.0 1699.7 3882.6 2917.3 6145.1 RadarCam-Depth [ICRA ’24] 1689.7 3948.0 1183.5 3229.0 2227.4 5385.8 TacoDepth [CVPR ’25] 1492.4 3324.8 1032.5 2850.3 - -
+
+POLAR (Ours) 1407.8 3193.5 629.6 1171.3 1500.1 3951.8   
+
+> Table 1. Quantitative results on nuScenes, ZJU-4DRadarCam, and View-of-Delft test sets evaluated with various maximum depths.
+
+Predicting Coefficients. The fused representation S
+
+is passed through a shallow convolutional neural network (CNN) fs followed by a global average pooling (GAP) layer to yield ¯S = GAP (fs(S)) , which is a cs-dimensional fea-ture vector. The GAP layer aggregates spatial information from the entire scene, ensuring that ¯S captures global con-text. This final scene representation ¯S is then fed into an MLP ψs, which predicts the N + 1 polynomial coefficients as a vector ˆc:
+
+ˆc = ψs( ¯S) ∈ RN +1 . (4) These coefficients allow the model to adaptively refine the initial depth predictions from the MDE model, with each coefficient adjusting depth at different scales and granulari-ties. Lower-order terms capture broad scene structure, while higher-order terms enable fine-grained and cross-region cor-rections, resulting in a high-fidelity metric-scale depth map. 
+
+## 3.3. Polynomial Fitting 
+
+Given a scaleless depth map z ∈ RH×W 
+
+> +
+
+predicted by the MDE foundation model, our goal is to transform it into a metric depth map ˆd ∈ RH×W 
+
+> +
+
+using the polynomial coeffi-cients {ˆc0, ˆc1, . . . , ˆcN } predicted by our network (Sec. 3.2). Formally, we express the final depth map ˆd as: 
+
+ˆd(x, y ) = 
+
+> N
+
+X
+
+> i=0
+
+ˆci · z(x, y )i, ∀(x, y ) ∈ H × W. (5) This polynomial formulation applies the learned coef-ficients to successive powers of the scaleless depth map, enabling complex, non-linear transformations that surpass the limitations of affine transformations. Each pixel’s final depth is thus computed by summing multiple weighted terms, where each term corresponds to a different polynomial order of the initial depth prediction. This contrasts with directly mapping to a metric-scale depth map [29, 51], where the degrees of freedom comprise every predicted pixel. Each prediction of corresponding points and pixels can be viewed as a constraint or equation in our estimation system. As the radar point cloud ( ∼ 10 2
+
+points) only occupies a small subset of the image space (∼ 10 6 pixels), the solution is underdetermined and often irregular (see Fig. 3). Conversely, a simple linear fit (only two degrees of freedom) with inconsistent MDE predictions and noisy radar points leads to an overdetermined system (see Tab. 4). POLAR offers the middle ground: By a flexible choice of polynomial degree, we can appropriately tune and select the complexity of the function, i.e., degrees of freedom, that leads to a better fit between MDE predictions and radar points. In terms of overhead, compared to predicting the scale and shift for an affine transformation, predicting N +1 coeffi-cients for polynomial fitting introduces a negligible increase in computational cost ( < 0.01% more FLOPs): the final MLP outputs an (N + 1) -dimensional vector instead of a two-dimensional vector, and the final depth map is com-puted through parallelized exponentiation and multiplication operations (see Supp. Mat. for the complete derivation). 
+
+Geometric Intuition. Applying polynomial fitting to the scaleless depth map is best viewed as a flexible, depth-dependent correction mechanism. In contrast to a single scale-and-shift operation, which uniformly adjusts the entire depth field by a single global factor, polynomial transforma-26945 Image C Ground Truth       
+
+> Sample MDE GET-UP RC-D Ours
+> Image A Ground Truth Image B Ground Truth
+> Prediction Error Error Prediction Error Prediction
+
+Figure 3. Qualitative results on nuScenes. GET-UP and RadarCam-Depth (RC-D) fail to reconstruct entire regions, yielding objects with large depth errors. Raw MDE yields reasonable relative reconstructions but suffers from incorrect global scale and cross-object misalignments. POLAR leverages polynomial fitting to recover a global scale and correct these misalignments. 
+
+tions introduce multiple degrees of freedom—higher-order terms enable correction of misalignments in relative depth between objects and local regions. By introducing polynomial terms, our method adjusts depth according to the initial depth estimates z. Lower-order coefficients ( ˆc0, ˆc1, · · · ) establish a broad global scale, providing a metric basis for the initially scaleless 
+
+z. Higher-order coefficients ( · · · , ˆcN −1, ˆcN ) introduce both low-frequency corrections, e.g., resolving cross-object mis-alignments (Fig. 1), as well as high-frequency corrections, e.g., sharpening fine object boundaries (Fig. 3, Image C). The concept of inflection points provides an intuitive un-derstanding of this approach. Each additional polynomial order introduces more potential inflection points, allowing the depth transformation to shift curvature where needed. This flexibility enables “stretching” or “compressing” differ-ent depth levels: areas already near their correct metric depth receive minimal adjustment, while regions suffering larger errors (e.g., due to misalignment with other regions) undergo more substantial correction. Higher-order terms magnify small (i.e., high-frequency) discrepancies in the initial MDE predictions, making them more apparent to the model and easier to correct. In this way, the degree of the polynomial, selected as a hyperparameter, governs the capacity of our model to apply non-uniform corrections across the scene. The sign of the predicted polynomial coefficients fur-thers our interpretation. Positive coefficients for higher-order terms push depth values outward while negative ones pull them inward, effectively expanding or contracting selected depth intervals to correct local errors. In doing so, these coefficients shape the curvature of the polynomial, dictating where and how inflection points arise. For instance, if the model consistently overestimates distant objects, a negative high-order coefficient can compress that region, whereas a positive coefficient might be learned to correct underesti-mations. By treating coefficient signs as dynamic anchors for curvature changes, the polynomial fitting framework pro-vides an interpretable mechanism (e.g., Fig. 4) for refining scaleless depth into high-fidelity metric depth. 
+
+## 3.4. Loss Function 
+
+We employ a loss function comprising three terms, each weighted by its λ, to guide the learning of the polynomial coefficients and ensure accurate depth estimation. Our loss is defined as: 
+
+L = λ1∥ ˆd−d∥1 +λ2∥ ˆd−d∥22 +λm 1H×W − d ˆd
+
+dz 1
+
+, (6) where d ∈ RH×W 
+
+> +
+
+is the ground truth metric depth map, 
+
+ˆd ∈ RH×W 
+
+> +
+
+is our predicted metric depth, and z ∈ RH×W
+
+> +
+
+is the scaleless depth map predicted by the MDE model. The first two terms, L1 and L2 losses, ensure that our predicted depth map ˆd closely matches the ground truth dgt 
+
+by penalizing discrepancies. The L1 term is less sensitive to outliers and thus promotes robustness, while the L2 term penalizes larger errors more significantly. The novel component of our objective lies in the third term, which constrains the first derivative of the predicted depth ˆd w.r.t the input scaleless depth z (Eq. 7) to remain 26946 Figure 4. POLAR leverages spatial information from radar points to predict higher-degree polynomial transformations that can correct non-affine errors in MDE predictions. 
+
+near that of ˆd = z.
+
+d ˆd
+
+dz (x, y ) = 
+
+> N
+
+X
+
+> i=1
+
+i ˆci z(x, y )i−1. (7) This regularization enforces that our polynomial fitting func-tion remains approximately monotonically increasing, akin to isotonic regression [1]. Generally, within an object or local region, a pixel with a higher initial scaleless depth value should not be assigned a lower final metric depth value compared to a pixel with a lower initial scaleless depth. The preservation of ordinal relationships is an inductive bias grounded in the assumption that the MDE model provides a reasonably accurate estimation of intra-object relative depth. Polynomial fitting introduces a large function space, with expressiveness growing with degree N , which can signifi-cantly and detrimentally disrupt local monotonic depth or-dering if unconstrained. Our regularization term addresses this by preserving local depth ordinality while still allowing corrections of cross-object misalignments. This constraint prevents overfitting of nonlinear transformations to noisy radar data, spurious correlations, and outliers, thereby avoid-ing the oscillatory behavior that is a known challenge with fitting higher-degree polynomials [3]. 
+
+# 4. Experiments 
+
+Baseline Methods. We consider five recent radar-camera depth estimation baselines: RadarNet [51], Sparse-BeatsDense [28], GET-UP [55], RadarCam-Depth [29], and TacoDepth [58]. Notably, both RadarCam-Depth and TacoDepth also take scaleless MDE predictions as input, together with radar points, to predict metric depth. 
+
+Datasets. We evaluate all methods on the nuScenes, ZJU-4DRadarCam (ZJU), and View-of-Delft (VoD) datasets (see Supp. Mat. for more details) using the MAE and RMSE metrics with maximum evaluation distances of 50, 70, and 80 meters, following established conventions in the literature. 
+
+## 4.1. Main Results 
+
+Compared to baselines, POLAR reduces MAE by 4.4% and RMSE by 3.7% on nuScenes, 38.5% and 57.5% on ZJU, and 31.8% and 38.5% on VoD, achieving SOTA results for all datasets (Tab. 1). We qualitatively compare POLAR against baseline meth-ods on the challenging nuScenes dataset, providing a vi-sual demonstration of its improved depth estimation perfor-mance (Fig. 3). POLAR more accurately predicts metric scale and exhibits fewer global misalignments. Further-more, it is able to extrapolate depth predictions of object surfaces from learned photometric priors, an ability inher-ited from the backbone MDE model (e.g., UniDepth) trained on large-scale datasets. Our polynomial fitting approach then non-uniformly corrects depth discrepancies across the scene, leading to significant performance improvement over initial MDE predictions. Introducing multiple degrees of freedom enables POLAR to correct misalignments of objects relative to each other, improving accuracy by correcting consistent over- or under-estimations in local regions. For instance, the raw MDE prediction for Image C incorrectly places the bus stop roof at around the same depth as the more distant tree branches, as highlighted on the right. Additionally, MDE does not accurately infer the boundary between the curb and asphalt, again placing both at erroneously similar depths. With a learned polynomial transformation, POLAR corrects these misalignments with depth-dependent adjustments, ac-curately separating the curb from the asphalt and placing the bus stop roof and tree branch at their correct depths. RadarCam-Depth predicts a per-pixel scale map; the large number of degrees of freedom can make it challenging to preserve initially correct MDE depth structure. As shown in the top-left of Image C, the tree trunk and attached fern are incorrectly placed at different depths despite the ini-tial MDE predictions correctly positioning them at similar depths. Furthermore, overfitting to specific regions within a scene—particularly those with denser ground truth—may reduce overall error relative to the MDE model but can lead to unintended geometric artifacts. This can result in the omis-sion of entire structures in the predicted depth map, such as the highlighted building on the left of Image A and the crane arms in Image B. GET-UP also struggles to accurately infer depth structure, resulting in the omission of objects: the highlighted building in Image A, the crane arms in Image B, and foreground tree branches in Image C. 26947 Method Train Time / Epoch Lin [30] 89.25 RadarNet [51] 101.50 SparseBeatsDense [28] 63.96 GET-UP [55] 249.57 RadarCam-Depth [29] 86.38 
+
+POLAR (Ours) 33.16   
+
+> Table 2. Training times (minutes per epoch) on nuScenes using a single NVIDIA A6000 GPU.
+
+Method Inference Time GFLOPs Lin [30] 129.96 550.43 SparseBeatsDense [28] 97.47 532.74 GET-UP [55] 445.45 630.99 RadarCam-Depth [29] 315.64 619.02 TacoDepth [58] 29.30 139.87 
+
+POLAR (Ours) 24.81 89.70   
+
+> Table 3. Inference time in milliseconds (ms) and computational cost (GFLOPs) on nuScenes.
+
+As the degree of the polynomial increases, the maxi-mum possible number of inflection points also grows, giving POLAR greater expressive power to correct misalignments between the many elements of the scene in Fig. 4, including cars, trucks, trees, buildings, and traffic lights. This is re-flected in the successively improved error maps. See Sec. 5 for quantitative evaluations. 
+
+## 4.2. Computational Efficiency 
+
+POLAR achieves state-of-the-art training time, inference time (ms), and computational overhead (GFLOPs) compared to all baseline methods, while also achieving state-of-the-art accuracy. Tab. 2 shows that POLAR has the lowest training time per epoch among all methods, requiring 33.16 min-utes per epoch on nuScenes. This efficiency stems from our streamlined design, which avoids multi-stage process-ing and explicit radar-camera association learning, both of which contribute to longer training times in methods such as RadarCam-Depth and GET-UP. Tab. 3 highlights POLAR’s state-of-the-art inference speed, requiring just 24.81 ms per frame—a reduction of 15.3% compared to the previous state-of-the-art TacoDepth and 92.1% compared to RadarCam-Depth. This corresponds to 40.3 fps, enabling real-time depth perception. Further-more, POLAR achieves this inference speed with a lower computational overhead of 89.70 GFLOPs—a 39.5% reduc-tion relative to TacoDepth and an 85.5% reduction relative to RadarCam-Depth. Taken together, these results establish POLAR as not only the most accurate radar-camera depth estimation method, but also the most practical for real-time deployment where latency is critical.                                                               
+
+> nuScenes ZJU
+> Polynomial Degree MAE RMSE MAE RMSE 1 (Scale + Shift) 2156.8 4491.3 1078.2 2405.5 21715.2 3840.6 901.0 1822.7 41482.7 3510.1 791.2 1516.4 61466.9 3496.0 670.3 1297.9 81407.8 3193.5 629.6 1171.3
+> 10 1463.7 3494.5 643.3 1184.5
+> Table 4. Sensitivity study of polynomial degree hyperparameter.
+> nuScenes VoD
+> Ablated Component MAE RMSE MAE RMSE cross-modality att. 2238.8 4817.4 2147.9 4926.1 learnable prototypes 1615.5 3629.0 1619.3 4162.7 feature aggregation 1454.1 3488.9 1543.1 4070.6 direct decoding 1968.0 4155.7 1855.9 4608.0 monotonicity loss 1921.1 4399.5 1924.5 4660.3 no ablations 1407.8 3193.5 1500.1 3951.8
+> Table 5. Ablation studies of architecture and loss components.
+
+# 5. Comparative Studies 
+
+Polynomial Degree. Tab. 4 shows that POLAR with poly-nomial degree 8 outperforms lower degrees. At degree 10, performance degrades slightly, potentially due to excessive flexibility resulting in detrimental oscillations. 
+
+Ablations. As shown in Tab. 5, replacing learnable pro-totypes with self-attention on the radar point features, or replacing our feature aggregation method (Eq. 2) with cross-attention, both degrade performance, demonstrating that pro-totypes capture relevant patterns within radar point configu-rations. Removing the monotonicity loss term also reduces performance, suggesting that depth ordering regularization is crucial for stable polynomial fitting. Finally, learning to di-rectly regress depth from our final fused representation using a decoder head performs substantially worse. We hypothe-size that this is because the number of degrees of freedom (H × W pixels) is far larger than the available constraints (sparse radar points) to solve for depth at every pixel. 
+
+# 6. Discussion 
+
+Limitations. POLAR requires tuning the polynomial degree as a hyperparameter (Sec. 5), which may vary across datasets. Additionally, while our novel first-derivative reg-ularization mitigates oscillatory behavior from high-degree polynomials, further constraints could enhance stability. 
+
+Summary. We are the first to formulate radar-camera depth estimation as a scene-fitting problem, leveraging high-degree polynomials to transform MDE predictions into accurate metric depth. Our principled and efficient ap-proach demonstrates that a fundamental insight—shifting from affine scale-and-shift to flexible polynomial transfor-mations—outperforms computationally heavier methods. 26948 Acknowledgments 
+
+This work is supported by NSF-2112562 Athena AI Institute. 
+
+# References 
+
+[1] Richard E. Barlow, David J. Bartholomew, J. Martin Bremner, and H. D. Brunk. Statistical Inference Under Order Restric-tions: The Theory and Application of Isotonic Regression .John Wiley & Sons, New York, 1972. 7 [2] Jiawang Bian, Zhichao Li, Naiyan Wang, Huangying Zhan, Chunhua Shen, Ming-Ming Cheng, and Ian Reid. Unsuper-vised scale-consistent depth and ego-motion learning from monocular video. Advances in neural information processing systems , 32, 2019. 2 [3] Christopher M. Bishop. Pattern Recognition and Machine Learning . Springer, New York, 2006. 7 [4] Aleksei Bochkovskii, Amaël Delaunoy, Hugo Germain, Mar-cel Santos, Yichao Zhou, Stephan R. Richter, and Vladlen Koltun. Depth pro: Sharp monocular metric depth in less than a second, 2024. 1, 2 [5] Mathilde Caron, Hugo Touvron, Ishan Misra, Hervé Jégou, Julien Mairal, Piotr Bojanowski, and Armand Joulin. Emerg-ing properties in self-supervised vision transformers. In Pro-ceedings of the IEEE/CVF international conference on com-puter vision , pages 9650–9660, 2021. 2 [6] Marvin Chancán, Alex Wong, and Ian Abraham. 3d reprojection-driven robot navigation improves depth sens-ing. In 2025 International Conference on Advanced Robotics and Mechatronics (ICARM) . IEEE, 2025. 2 [7] Xien Chen, Suchisrit Gangopadhyay, Michael Chu, Patrick Rim, Hyoungseob Park, and Alex Wong. Uncle: Benchmark-ing unsupervised continual learning for depth completion. 
+
+arXiv preprint arXiv:2410.18074 , 2024. 2 [8] Younjoon Chung, Hyoungseob Park, Patrick Rim, Xiaoran Zhang, Jihe He, Ziyao Zeng, Safa Cicek, Byung-Woo Hong, James S. Duncan, and Alex Wong. Eta: Energy-based test-time adaptation for depth completion. In Proceedings of the IEEE/CVF International Conference on Computer Vision ,2025. 2 [9] Yaqing Ding, Václav Vávra, Viktor Kocur, Jian Yang, Torsten Sattler, and Zuzana Kukelova. Fixing the scale and shift in monocular depth for camera pose estimation. arXiv preprint arXiv:2501.07742 , 2025. 1, 3 [10] Alexey Dosovitskiy, Lucas Beyer, Alexander Kolesnikov, Dirk Weissenborn, Xiaohua Zhai, Thomas Unterthiner, Mostafa Dehghani, Matthias Minderer, Georg Heigold, Syl-vain Gelly, et al. An image is worth 16x16 words: Transform-ers for image recognition at scale. In International Conference on Learning Representations , 2021. 2 [11] Angela H Eichelberger and Anne T McCartt. Toyota drivers’ experiences with dynamic radar cruise control, pre-collision system, and lane-keeping assist. Journal of safety research ,56:67–73, 2016. 1, 3 [12] Vadim Ezhov, Hyoungseob Park, Zhaoyang Zhang, Rishi Upadhyay, Howard Zhang, Chethan Chinder Chandrappa, Achuta Kadambi, Yunhao Ba, Julie Dorsey, and Alex Wong. All-day depth completion. In 2023 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) . IEEE, 2024. 2 [13] Xiaohan Fei, Alex Wong, and Stefano Soatto. Geo-supervised visual depth predictionpatil2020don. IEEE Robotics and Automation Letters , 4(2):1661–1668, 2019. 2 [14] Suchisrit Gangopadhyay, Jung-Hee Kim, Xien Chen, Patrick Rim, Hyoungseob Park, and Alex Wong. Extending founda-tional monocular depth estimators to fisheye cameras with calibration tokens. In Proceedings of the IEEE/CVF Interna-tional Conference on Computer Vision , 2025. 2 [15] Clément Godard, Oisin Mac Aodha, and Gabriel J Brostow. Unsupervised monocular depth estimation with left-right con-sistency. In Proceedings of the IEEE conference on computer vision and pattern recognition , pages 270–279, 2017. 2 [16] Vitor Guizilini, Igor Vasiljevic, Dian Chen, Rares Ambrus, and Adrien Gaidon. Towards zero-shot scale-aware monocu-lar depth estimation. arXiv preprint arXiv:2306.17253 , 2023. 2[17] Abhishek Gupta, Alagan Anpalagan, Ling Guan, and Ahmed Shaharyar Khwaja. Deep learning for object detection and scene perception in self-driving cars: Survey, challenges, and open issues. Array , 10:100057, 2021. 1 [18] Zeyu Han, Jiahao Wang, Zikun Xu, Shuocheng Yang, Lei He, Shaobing Xu, Jianqiang Wang, and Keqiang Li. 4d millimeter-wave radar in autonomous driving: A survey. arXiv preprint arXiv:2306.04242 , 2023. 1 [19] Lukas Hoyer, Dengxin Dai, Qin Wang, Yuhua Chen, and Luc Van Gool. Improving semi-supervised and domain-adaptive semantic segmentation with self-supervised depth estimation. 
+
+International Journal of Computer Vision , pages 1–27, 2023. 2[20] Mu Hu, Shuling Wang, Bin Li, Shiyu Ning, Li Fan, and Xiao-jin Gong. Penet: Towards precise and efficient image guided depth completion. 2021 IEEE International Conference on Robotics and Automation (ICRA) , pages 13656–13662, 2021. 2[21] Wenbo Hu, Xiangjun Gao, Xiaoyu Li, Sijie Zhao, Xiaodong Cun, Yong Zhang, Long Quan, and Ying Shan. Depthcrafter: Generating consistent long depth sequences for open-world videos. arXiv preprint arXiv:2409.02095 , 2024. 1, 3 [22] David Hunt, Shaocheng Luo, Amir Khazraei, Xiao Zhang, Spencer Hallyburton, Tingjun Chen, and Miroslav Pajic. Rad-cloud: Real-time high-resolution point cloud generation us-ing low-cost radars for aerial and ground vehicles. In 2024 IEEE International Conference on Robotics and Automation (ICRA) , pages 12269–12275. IEEE, 2024. 2 [23] Hideo Iizuka, Toshiaki Watanabe, Kazuo Sato, and Kunitoshi Nishikawa. Millimeter-wave microstrip array antenna for automotive radars. IEICE transactions on communications ,86(9):2728–2738, 2003. 1 [24] Maximilian Jaritz, Raoul De Charette, Etienne Wirbel, Xavier Perrotton, and Fawzi Nashashibi. Sparse and dense data with cnns: Depth completion and semantic segmentation. In 2018 International Conference on 3D Vision (3DV) , pages 52–60. IEEE, 2018. 2 [25] Dong Lao, Yangchao Wu, Tian Yu Liu, Alex Wong, and Stefano Soatto. Sub-token vit embedding via stochastic reso-26949 nance transformers. In International Conference on Machine Learning . PMLR, 2024. 2 [26] Dong Lao, Fengyu Yang, Daniel Wang, Hyoungseob Park, Samuel Lu, Alex Wong, and Stefano Soatto. On the viability of monocular depth pre-training for semantic segmentation. In European Conference on Computer Vision . Springer, 2024. 2[27] Ang Li, Zejian Yuan, Yonggen Ling, Wanchao Chi, Sheng-hao Zhang, and Chong Zhang. A multi-scale guided cascade hourglass network for depth completion. In 2020 IEEE Win-ter Conference on Applications of Computer Vision (WACV) ,pages 32–40, 2020. 2 [28] Huadong Li, Minhao Jing, Wang Jin, Shichao Dong, Jiajun Liang, Haoqiang Fan, and Renhe Ji. Sparse beats dense: Rethinking supervision in radar-camera depth completion. In 
+
+European Conference on Computer Vision , pages 127–143. Springer, 2024. 3, 7, 8 [29] Han Li, Yukai Ma, Yaqing Gu, Kewei Hu, Yong Liu, and Xingxing Zuo. Radarcam-depth: Radar-camera fusion for depth estimation with learned metric scale. In 2024 IEEE In-ternational Conference on Robotics and Automation (ICRA) ,pages 10665–10672. IEEE, 2024. 2, 3, 4, 5, 7, 8 [30] Juan-Ting Lin, Dengxin Dai, and Luc Van Gool. Depth estimation from monocular images and sparse radar data. In 2020 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , pages 10233–10240. IEEE, 2020. 3, 8 [31] Yuan Qin. Lin, Tao Cheng, Qianglong Zhong, Wending Zhou, and Huanhuan Yang. Dynamic spatial propagation network for depth completion. In AAAI Conference on Artificial Intel-ligence , 2022. 2 [32] Tian Yu Liu, Parth Agrawal, Allison Chen, Byung-Woo Hong, and Alex Wong. Monitored distillation for positive congruent depth completion. In Computer Vision–ECCV 2022: 17th European Conference, Tel Aviv, Israel, October 23–27, 2022, Proceedings, Part II , pages 35–53. Springer, 2022. 2 [33] Chen-Chou Lo and Patrick Vandewalle. Depth estimation from monocular images and sparse radar using deep ordinal regression network. In 2021 IEEE International Conference on Image Processing (ICIP) , pages 3343–3347. IEEE, 2021. 3[34] Yunfei Long, Daniel Morris, Xiaoming Liu, Marcos Castro, Punarjay Chakravarty, and Praveen Narayanan. Full-velocity radar returns by radar-camera fusion. In Proceedings of the IEEE/CVF International Conference on Computer Vision ,pages 16198–16207, 2021. 3 [35] Fangchang Ma and Sertac Karaman. Sparse-to-dense: Depth prediction from sparse depth samples and a single image. In 
+
+2018 IEEE International Conference on Robotics and Au-tomation (ICRA) , pages 4796–4803, 2018. 2 [36] Fangchang Ma, Guilherme Venturelli Cavalheiro, and Sertac Karaman. Self-supervised sparse-to-dense: Self-supervised depth completion from lidar and monocular camera. 2019 In-ternational Conference on Robotics and Automation (ICRA) ,pages 3288–3295, 2018. 2 [37] Daniel Maier, Armin Hornung, and Maren Bennewitz. Real-time navigation in 3d environments based on depth camera data. In 2012 12th IEEE-RAS International Conference on Humanoid Robots (Humanoids 2012) , pages 692–697. IEEE, 2012. 1 [38] Dong-Hee Paek, Seung-Hyun Kong, and Kevin Tirta Wijaya. K-radar: 4d radar object detection for autonomous driving in various weather conditions. Advances in Neural Information Processing Systems , 35:3819–3829, 2022. 2 [39] Hyoungseob Park, Anjali Gupta, and Alex Wong. Test-time adaptation for depth completion. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 20519–20529, 2024. 2 [40] Hyoungseob Park, Runjian Chen, Patrick Rim, Dong Lao, and Alex Wong. Orcas: Unsupervised depth completion via occluded region completion as supervision. The Fourteenth International Conference on Learning Representations , 2026. 2[41] Jinsun Park, Kyungdon Joo, Zhe Hu, Chi Liu, and In So Kweon. Non-local spatial propagation network for depth completion. In European Conference on Computer Vision ,2020. 2 [42] Luigi Piccinelli, Christos Sakaridis, Yung-Hsu Yang, Mat-tia Segu, Siyuan Li, Wim Abbeloos, and Luc Van Gool. UniDepthV2: Universal monocular metric depth estimation made simpler, 2025. 1, 2 [43] Matteo Poggi, Filippo Aleotti, Fabio Tosi, and Stefano Mat-toccia. On the uncertainty of self-supervised monocular depth estimation. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 3227–3237, 2020. 2 [44] Thinal Raj, Fazida Hanim Hashim, Aqilah Baseri Huddin, Mohd Faisal Ibrahim, and Aini Hussain. A survey on lidar scanning mechanisms. Electronics , 9(5):741, 2020. 1, 2 [45] René Ranftl, Katrin Lasinger, David Hafner, Konrad Schindler, and Vladlen Koltun. Towards robust monocular depth estimation: Mixing datasets for zero-shot cross-dataset transfer. IEEE transactions on pattern analysis and machine intelligence , 44(3):1623–1637, 2020. 2 [46] René Ranftl, Alexey Bochkovskiy, and Vladlen Koltun. Vi-sion transformers for dense prediction. In Proceedings of the IEEE/CVF international conference on computer vision ,pages 12179–12188, 2021. 1 [47] Kyeongha Rho, Jinsung Ha, and Youngjung Kim. Guide-former: Transformers for image guided depth completion. 
+
+2022 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , pages 6240–6249, 2022. 2 [48] Patrick Rim, Hyoungseob Park, Ziyao Zeng, Younjoon Chung, and Alex Wong. Protodepth: Unsupervised contin-ual depth completion with prototypes. In Proceedings of the Computer Vision and Pattern Recognition Conference , pages 6304–6316, 2025. 2 [49] Ashutosh Saxena, Sung Chung, and Andrew Ng. Learning depth from single monocular images. Advances in neural information processing systems , 18, 2005. 2 [50] Ashutosh Saxena, Min Sun, and Andrew Y Ng. Make3d: Depth perception from a single still image. In Aaai , pages 1571–1576, 2008. 2 [51] Akash Deep Singh, Yunhao Ba, Ankur Sarker, Howard Zhang, Achuta Kadambi, Stefano Soatto, Mani Srivastava, and Alex 26950 Wong. Depth estimation from camera image and mmwave radar point cloud. In Proceedings of the IEEE/CVF Con-ference on Computer Vision and Pattern Recognition , pages 9275–9285, 2023. 2, 3, 4, 5, 7, 8 [52] Xiaogang Song, Haoyue Hu, Li Liang, Weiwei Shi, Guo Xie, Xiaofeng Lu, and Xinhong Hei. Unsupervised monocular estimation of depth and visual odometry uusing attention and depth-pose consistency loss. IEEE Transactions on Multime-dia , 2023. 2 [53] Arvind Srivastav and Soumyajit Mandal. Radars for au-tonomous driving: A review of deep learning methods and challenges. IEEE Access , 11:97147–97168, 2023. 2 [54] Huawei Sun, Hao Feng, Julius Ott, Lorenzo Servadei, and Robert Wille. Cafnet: A confidence-driven framework for radar camera depth estimation. In 2024 IEEE/RSJ Interna-tional Conference on Intelligent Robots and Systems (IROS) ,pages 2734–2740. IEEE, 2024. 3 [55] Huawei Sun, Zixu Wang, Hao Feng, Julius Ott, Lorenzo Servadei, and Robert Wille. Get-up: Geometric-aware depth estimation with radar points upsampling. In Proceedings of the Winter Conference on Applications of Computer Vision (WACV) , pages 1850–1860, 2025. 3, 7, 8 [56] Rishi Upadhyay, Howard Zhang, Yunhao Ba, Ethan Yang, Blake Gella, Sicheng Jiang, Alex Wong, and Achuta Kadambi. Enhancing diffusion models with 3d perspective geometry constraints. ACM Transactions on Graphics (TOG) , 42(6): 1–15, 2023. 2 [57] Massimiliano Viola, Kevin Qu, Nando Metzger, Bingxin Ke, Alexander Becker, Konrad Schindler, and Anton Obukhov. Marigold-dc: Zero-shot monocular depth completion with guided diffusion. arXiv preprint arXiv:2412.13389 , 2024. 1, 2, 3 [58] Yiran Wang, Jiaqi Li, Chaoyi Hong, Ruibo Li, Liusheng Sun, Xiao Song, Zhe Wang, Zhiguo Cao, and Guosheng Lin. Tacodepth: Towards efficient radar-camera depth estimation with one-stage fusion. In Proceedings of the Computer Vision and Pattern Recognition Conference , pages 10523–10533, 2025. 3, 7, 8 [59] Alex Wong and Stefano Soatto. Bilateral cyclic constraint and adaptive regularization for unsupervised monocular depth prediction. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 5644–5653, 2019. 2 [60] Alex Wong and Stefano Soatto. Unsupervised depth comple-tion with calibrated backprojection layers. In Proceedings of the IEEE/CVF International Conference on Computer Vision ,pages 12747–12756, 2021. 2 [61] Alex Wong, Xiaohan Fei, Stephanie Tsuei, and Stefano Soatto. Unsupervised depth completion from visual inertial odome-try. IEEE Robotics and Automation Letters , 5(2):1899–1906, 2020. 2 [62] Alex Wong, Safa Cicek, and Stefano Soatto. Learning topol-ogy from synthetic data for unsupervised depth completion. 
+
+IEEE Robotics and Automation Letters , 6(2):1495–1502, 2021. [63] Alex Wong, Xiaohan Fei, Byung-Woo Hong, and Stefano Soatto. An adaptive framework for learning unsupervised depth completion. IEEE Robotics and Automation Letters , 6 (2):3120–3127, 2021. [64] Yangchao Wu, Tian Yu Liu, Hyoungseob Park, Stefano Soatto, Dong Lao, and Alex Wong. Augundo: Scaling up augmen-tations for monocular depth completion and estimation. In 
+
+European Conference on Computer Vision , pages 274–293. Springer, 2024. 2 [65] Chao Xia, Chenfeng Xu, Patrick Rim, Mingyu Ding, Nan-ning Zheng, Kurt Keutzer, Masayoshi Tomizuka, and Wei Zhan. Quadric representations for lidar odometry, mapping and localization. IEEE Robotics and Automation Letters , 8 (8):5023–5030, 2023. 2 [66] Yichen Xie, Chenfeng Xu, Marie-Julie Rakotosaona, Patrick Rim, Federico Tombari, Kurt Keutzer, Masayoshi Tomizuka, and Wei Zhan. Sparsefusion: Fusing multi-modal sparse rep-resentations for multi-sensor 3d object detection. In Proceed-ings of the IEEE/CVF International Conference on Computer Vision , pages 17591–17602, 2023. 2 [67] Zheyuan Xu, Hongche Yin, and Jian Yao. Deformable spatial propagation networks for depth completion. 2020 IEEE In-ternational Conference on Image Processing (ICIP) , pages 913–917, 2020. 2 [68] Zhiqiang Yan, Kun Wang, Xiang Li, Zhenyu Zhang, Baobei Xu, Jun Li, and Jian Yang. Rignet: Repetitive image guided network for depth completion. In European Conference on Computer Vision , 2021. 2 [69] Lihe Yang, Bingyi Kang, Zilong Huang, Zhen Zhao, Xiao-gang Xu, Jiashi Feng, and Hengshuang Zhao. Depth anything v2. Advances in Neural Information Processing Systems , 37: 21875–21911, 2024. 1, 2 [70] Yanchao Yang, Alex Wong, and Stefano Soatto. Dense depth posterior (ddp) from single image and sparse range. In Pro-ceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 3353–3362, 2019. 2 [71] Wei Yin, Chi Zhang, Hao Chen, Zhipeng Cai, Gang Yu, Kaix-uan Wang, Xiaozhi Chen, and Chunhua Shen. Metric3d: Towards zero-shot metric 3d prediction from a single image. In Proceedings of the IEEE/CVF International Conference on Computer Vision , pages 9043–9053, 2023. 1, 3 [72] Yifan Yu, Shaohui Liu, Rémi Pautrat, Marc Pollefeys, and Viktor Larsson. Relative pose estimation through affine corrections of monocular depth priors. arXiv preprint arXiv:2501.05446 , 2025. 1, 3 [73] Ziyao Zeng, Jingcheng Ni, Daniel Wang, Patrick Rim, Youn-joon Chung, Fengyu Yang, Byung-Woo Hong, and Alex Wong. Iris: Integrating language into diffusion-based monoc-ular depth estimation. In Proceedings of the IEEE/CVF Con-ference on Computer Vision and Pattern Recognition , 2026. 2[74] Youmin Zhang, Xianda Guo, Matteo Poggi, Zheng Zhu, Guan Huang, and Stefano Mattoccia. Completionformer: Depth completion with convolutions and vision transformers. In 
+
+2023 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , pages 18527–18536, 2023. 2 [75] Wang Zhao, Shaohui Liu, Yezhi Shu, and Yong-Jin Liu. To-wards better generalization: Joint depth-pose learning without posenet. In Proceedings of the IEEE/CVF Conference on 26951 Computer Vision and Pattern Recognition , pages 9151–9161, 2020. 2 [76] Tinghui Zhou, Matthew Brown, Noah Snavely, and David G Lowe. Unsupervised learning of depth and ego-motion from video. In Proceedings of the IEEE conference on computer vision and pattern recognition , pages 1851–1858, 2017. 2 26952

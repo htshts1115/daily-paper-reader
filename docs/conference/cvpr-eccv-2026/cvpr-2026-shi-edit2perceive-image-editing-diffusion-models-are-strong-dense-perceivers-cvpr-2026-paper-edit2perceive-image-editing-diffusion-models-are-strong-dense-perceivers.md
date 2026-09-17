@@ -1,0 +1,46 @@
+---
+title: "Edit2Perceive: Image Editing Diffusion Models Are Strong Dense Perceivers"
+title_zh: Edit2Perceive：图像编辑扩散模型是强大的密集感知器
+authors: "Shi, Yiqing, Song, Yiren, Shou, Mike Zheng"
+date: 2026-06-01
+pdf: "https://openaccess.thecvf.com/content/CVPR2026/papers/Shi_Edit2Perceive_Image_Editing_Diffusion_Models_Are_Strong_Dense_Perceivers_CVPR_2026_paper.pdf"
+tags: ["query:matting"]
+score: 7.0
+evidence: 统一扩散框架用于深度与抠图
+tldr: 针对多数密集感知方法仍依赖为随机生成设计的文生图扩散模型、缺乏图像到图像一致性的问题，本文提出Edit2Perceive统一扩散框架，将图像编辑扩散模型适配到深度、法线与抠图等任务。方法基于FLUX.1 Kontext架构进行全参数微调，并引入像素空间一致性损失，在去噪中间状态间强制结构保持细化，同时采用单步确定性推理。实验表明该框架在深度与抠图等密集感知任务上取得良好效果，说明编辑模型可作为更合适的密集感知基础模型。
+source: CVPR-2026-Accepted
+selection_source: conference_retrieval
+figures_json: "[{\"url\": \"assets/figures/cvpr-2026-accepted/cvpr-2026-shi-edit2perceive-image-editing-diffusion-models-are-strong-dense-perceivers-cvpr-2026-paper/fig-001.webp\", \"caption\": \"\", \"page\": 1, \"index\": 1, \"width\": 1024, \"height\": 576}, {\"url\": \"assets/figures/cvpr-2026-accepted/cvpr-2026-shi-edit2perceive-image-editing-diffusion-models-are-strong-dense-perceivers-cvpr-2026-paper/fig-002.webp\", \"caption\": \"\", \"page\": 1, \"index\": 2, \"width\": 697, \"height\": 426}, {\"url\": \"assets/figures/cvpr-2026-accepted/cvpr-2026-shi-edit2perceive-image-editing-diffusion-models-are-strong-dense-perceivers-cvpr-2026-paper/fig-003.webp\", \"caption\": \"\", \"page\": 1, \"index\": 3, \"width\": 1024, \"height\": 576}, {\"url\": \"assets/figures/cvpr-2026-accepted/cvpr-2026-shi-edit2perceive-image-editing-diffusion-models-are-strong-dense-perceivers-cvpr-2026-paper/fig-004.webp\", \"caption\": \"\", \"page\": 1, \"index\": 4, \"width\": 1024, \"height\": 576}, {\"url\": \"assets/figures/cvpr-2026-accepted/cvpr-2026-shi-edit2perceive-image-editing-diffusion-models-are-strong-dense-perceivers-cvpr-2026-paper/fig-005.webp\", \"caption\": \"\", \"page\": 1, \"index\": 5, \"width\": 1024, \"height\": 576}, {\"url\": \"assets/figures/cvpr-2026-accepted/cvpr-2026-shi-edit2perceive-image-editing-diffusion-models-are-strong-dense-perceivers-cvpr-2026-paper/fig-006.webp\", \"caption\": \"\", \"page\": 1, \"index\": 6, \"width\": 1024, \"height\": 576}, {\"url\": \"assets/figures/cvpr-2026-accepted/cvpr-2026-shi-edit2perceive-image-editing-diffusion-models-are-strong-dense-perceivers-cvpr-2026-paper/fig-007.webp\", \"caption\": \"\", \"page\": 1, \"index\": 7, \"width\": 697, \"height\": 426}, {\"url\": \"assets/figures/cvpr-2026-accepted/cvpr-2026-shi-edit2perceive-image-editing-diffusion-models-are-strong-dense-perceivers-cvpr-2026-paper/fig-008.webp\", \"caption\": \"\", \"page\": 1, \"index\": 8, \"width\": 1024, \"height\": 576}, {\"url\": \"assets/figures/cvpr-2026-accepted/cvpr-2026-shi-edit2perceive-image-editing-diffusion-models-are-strong-dense-perceivers-cvpr-2026-paper/fig-009.webp\", \"caption\": \"\", \"page\": 1, \"index\": 9, \"width\": 1024, \"height\": 576}, {\"url\": \"assets/figures/cvpr-2026-accepted/cvpr-2026-shi-edit2perceive-image-editing-diffusion-models-are-strong-dense-perceivers-cvpr-2026-paper/fig-010.webp\", \"caption\": \"\", \"page\": 1, \"index\": 10, \"width\": 697, \"height\": 426}, {\"url\": \"assets/figures/cvpr-2026-accepted/cvpr-2026-shi-edit2perceive-image-editing-diffusion-models-are-strong-dense-perceivers-cvpr-2026-paper/fig-011.webp\", \"caption\": \"\", \"page\": 1, \"index\": 11, \"width\": 1024, \"height\": 576}, {\"url\": \"assets/figures/cvpr-2026-accepted/cvpr-2026-shi-edit2perceive-image-editing-diffusion-models-are-strong-dense-perceivers-cvpr-2026-paper/fig-012.webp\", \"caption\": \"\", \"page\": 1, \"index\": 12, \"width\": 1024, \"height\": 576}, {\"url\": \"assets/figures/cvpr-2026-accepted/cvpr-2026-shi-edit2perceive-image-editing-diffusion-models-are-strong-dense-perceivers-cvpr-2026-paper/fig-013.webp\", \"caption\": \"\", \"page\": 1, \"index\": 13, \"width\": 1000, \"height\": 2190}, {\"url\": \"assets/figures/cvpr-2026-accepted/cvpr-2026-shi-edit2perceive-image-editing-diffusion-models-are-strong-dense-perceivers-cvpr-2026-paper/fig-014.webp\", \"caption\": \"\", \"page\": 7, \"index\": 14, \"width\": 1719, \"height\": 1536}, {\"url\": \"assets/figures/cvpr-2026-accepted/cvpr-2026-shi-edit2perceive-image-editing-diffusion-models-are-strong-dense-perceivers-cvpr-2026-paper/fig-015.webp\", \"caption\": \"\", \"page\": 7, \"index\": 15, \"width\": 937, \"height\": 1536}, {\"url\": \"assets/figures/cvpr-2026-accepted/cvpr-2026-shi-edit2perceive-image-editing-diffusion-models-are-strong-dense-perceivers-cvpr-2026-paper/fig-016.webp\", \"caption\": \"\", \"page\": 7, \"index\": 16, \"width\": 904, \"height\": 1536}, {\"url\": \"assets/figures/cvpr-2026-accepted/cvpr-2026-shi-edit2perceive-image-editing-diffusion-models-are-strong-dense-perceivers-cvpr-2026-paper/fig-017.webp\", \"caption\": \"\", \"page\": 7, \"index\": 17, \"width\": 355, \"height\": 355}, {\"url\": \"assets/figures/cvpr-2026-accepted/cvpr-2026-shi-edit2perceive-image-editing-diffusion-models-are-strong-dense-perceivers-cvpr-2026-paper/fig-018.webp\", \"caption\": \"\", \"page\": 7, \"index\": 18, \"width\": 355, \"height\": 355}, {\"url\": \"assets/figures/cvpr-2026-accepted/cvpr-2026-shi-edit2perceive-image-editing-diffusion-models-are-strong-dense-perceivers-cvpr-2026-paper/fig-019.webp\", \"caption\": \"\", \"page\": 7, \"index\": 19, \"width\": 355, \"height\": 355}, {\"url\": \"assets/figures/cvpr-2026-accepted/cvpr-2026-shi-edit2perceive-image-editing-diffusion-models-are-strong-dense-perceivers-cvpr-2026-paper/fig-020.webp\", \"caption\": \"\", \"page\": 7, \"index\": 20, \"width\": 355, \"height\": 355}, {\"url\": \"assets/figures/cvpr-2026-accepted/cvpr-2026-shi-edit2perceive-image-editing-diffusion-models-are-strong-dense-perceivers-cvpr-2026-paper/fig-021.webp\", \"caption\": \"\", \"page\": 7, \"index\": 21, \"width\": 355, \"height\": 355}, {\"url\": \"assets/figures/cvpr-2026-accepted/cvpr-2026-shi-edit2perceive-image-editing-diffusion-models-are-strong-dense-perceivers-cvpr-2026-paper/fig-022.webp\", \"caption\": \"\", \"page\": 7, \"index\": 22, \"width\": 355, \"height\": 355}, {\"url\": \"assets/figures/cvpr-2026-accepted/cvpr-2026-shi-edit2perceive-image-editing-diffusion-models-are-strong-dense-perceivers-cvpr-2026-paper/fig-023.webp\", \"caption\": \"\", \"page\": 7, \"index\": 23, \"width\": 355, \"height\": 355}, {\"url\": \"assets/figures/cvpr-2026-accepted/cvpr-2026-shi-edit2perceive-image-editing-diffusion-models-are-strong-dense-perceivers-cvpr-2026-paper/fig-024.webp\", \"caption\": \"\", \"page\": 7, \"index\": 24, \"width\": 355, \"height\": 355}, {\"url\": \"assets/figures/cvpr-2026-accepted/cvpr-2026-shi-edit2perceive-image-editing-diffusion-models-are-strong-dense-perceivers-cvpr-2026-paper/fig-025.webp\", \"caption\": \"\", \"page\": 7, \"index\": 25, \"width\": 355, \"height\": 355}, {\"url\": \"assets/figures/cvpr-2026-accepted/cvpr-2026-shi-edit2perceive-image-editing-diffusion-models-are-strong-dense-perceivers-cvpr-2026-paper/fig-026.webp\", \"caption\": \"\", \"page\": 7, \"index\": 26, \"width\": 355, \"height\": 355}]"
+motivation: 现有密集感知方法多依赖为随机生成设计的文生图模型，一致性不足。
+method: 基于FLUX.1 Kontext编辑模型构建统一扩散框架，通过全参数微调与像素空间一致性损失适配深度、法线和抠图任务。
+result: 借助单步确定性推理在深度、法线与抠图等密集感知任务上取得良好结构保持效果。
+conclusion: 表明图像编辑扩散模型可作为密集感知任务的更合适基础模型。
+---
+
+## Abstract
+Recent advances in diffusion transformers have shown remarkable generalization in visual synthesis, yet most dense perception methods still rely on text-to-image (T2I) generators designed for stochastic generation. We revisit this paradigm and show that image editing diffusion models are inherently image-to-image consistent, providing a more suitable foundation for dense perception task. We introduce Edit2Perceive, a unified diffusion framework that adapts editing models for depth, normal, and matting. Built upon the FLUX.1 Kontext architecture, our approach employs full-parameter fine-tuning and a pixel-space consistency loss to enforce structure-preserving refinement across intermediate denoising states. Moreover, our single-step deterministic inference yields up to faster runtime while training on relatively small datasets.Extensive experiments demonstrate comprehensive state-of-the-art results across all three tasks, revealing the strong potential of editing-oriented diffusion transformers for geometry-aware perception.
+
+---
+
+## 论文详细总结（自动生成）
+
+# Edit2Perceive 论文中文总结
+
+## 1. 核心问题与整体含义
+- **研究背景**：单目深度估计、表面法线估计、交互式抠图等密集感知任务需要像素级几何/光学属性预测，本质上是确定性的、结构敏感的问题。
+- **核心问题**：现有密集感知方法多依赖大规模文生图（T2I）扩散模型作为视觉先验，但 T2I 模型面向随机生成与语义组合，擅长“概念到像素”，缺乏对图像内部结构关系的推理，存在“表示不匹配”。
+- **核心主张**：图像到图像（I2I）编辑扩散模型，如 FLUX.1 Kontext，天然具有图像到图像一致性，并在预训练中学习结构化场景表示，因此更适合作为密集感知的基础模型。
+- **整体含义**：论文提出 **Edit2Perceive**，将编辑扩散模型统一适配到深度、法线、抠图任务，证明编辑模型可作为一类新的感知导向基础模型，兼具生成模型的表达力与几何推理所需的确定性和稳定性。
+
+## 2. 方法论
+### 2.1 核心思想
+- 将密集感知形式化为条件扩散编辑任务：给定 RGB 图像 \(x\) 和文本提示 \(p\)，预测目标密集图 \(y\)。
+- 基于 **FLUX.1 Kontext** 的 Flow Matching DiT 架构，在 VAE 隐空间操作，通过文本和图像条件生成目标 latent。
+- 对 DiT 主干进行全参数微调，VAE、文本编码器等其余参数冻结。
+- 将随机去噪过程转化为伪确定性路径：固定随机种子，采用退火多分辨率噪声策略。
+
+### 2.2 训练与推理流程
+- 输入编码：条件图像 \(x\) 编码为 \(c_x\)，目标密集图 \(y\) 编码为 \(z_1\)，文本提示编码为 \(c_p\)。
+- 使用 Rectified Flow 构造从高斯噪声 \(z_0\) 到目标 latent \(z_1\) 的直线轨迹：  
+  \(z_t=(1-t)z_0+t z_1\)，速度 \(v=z_1-z_0\)。
+- DiT 学习预测速度：\(v_\theta

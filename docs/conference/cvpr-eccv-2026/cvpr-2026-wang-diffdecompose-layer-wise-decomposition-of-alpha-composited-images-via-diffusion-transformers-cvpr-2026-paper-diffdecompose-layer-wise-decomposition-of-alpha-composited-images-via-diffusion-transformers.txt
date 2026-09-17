@@ -1,0 +1,1401 @@
+DiffDecompose: Layer-Wise Decomposition of Alpha-Composited Images
+via Diffusion Transformers
+Zitong Wang1∗, Hang Zhao1∗, Qianyu Zhou1 †, Xuequan Lu2
+Xiangtai Li3, Hao Yang4, Bo Yang1, Yiren Song5 †
+1 Jilin University, China; 2 University of Western Australia, Australia; 3 Nanyang Technological University,
+Singapore; 4 Shanghai Jiao Tong University, China; 5 National University of Singapore, Singapore
+Input
+Result
+Input
+Result
+Subtask III：
+Semi-
+transparent
+Watermark  
+Removal
+Subtask II：
+Translucent 
+Occlusion 
+Removal 
+Subtask VI：
+X-ray 
+Contraband 
+Decomposition
+Subtask V： 
+Semi-
+transparent 
+Cell 
+Decomposition
+Subtask IV：
+Transparent  
+Glassware 
+Decomposition 
+Subtask I: 
+Translucent  
+Flare 
+Removal 
+(a) Generation results of six subtasks on the proposed AlphaBlend Dataset
+(b) Task Taxonomy and Category 
+Coverage in the AlphaBlend Dataset
+Figure 1. We propose a novel generative task Layer-Wise Decomposition of Alpha-Composited Images (LDAC), to recover constituent
+layers from single overlapped images under the condition of semi-transparent/transparent layer non-linear occlusion. We present the Alph-
+aBlend dataset, the first large-scale dataset for transparent and semi-transparent layer decomposition, supporting six real-world subtasks.
+Highlights the dataset’s broad coverage across categories e.g., flare, fog, glassware, X-ray contraband.
+Abstract
+Existing image decomposition methods struggle to disen-
+tangle semi-transparent or transparent layer occlusions
+due to mask prior dependencies, static object assump-
+tions, and the lack of datasets.
+In this paper, we intro-
+duce a novel task: Layer-Wise Decomposition of Alpha-
+Composited Images, aiming to recover constituent layers
+from single overlapped images under the condition of semi-
+transparent/transparent alpha layer non-linear occlusion.
+To address challenges in layer ambiguity and data scarcity,
+we first introduce AlphaBlend, the first large-scale and
+high-quality dataset for transparent and semi-transparent
+layer decomposition, supporting six real-world subtasks
+(e.g., translucent flare removal, semi-transparent cell de-
+composition, glassware decomposition, X-ray contraband
+decomposition).
+Building on this dataset, we present
+DiffDecompose, a diffusion Transformer-based framework
+∗Equal contribution.
+†Corresponding author.
+that learns the posterior over possible layer decomposi-
+tions conditioned on the input image, semantic prompts,
+and blending type. Rather than regressing alpha mattes di-
+rectly, DiffDecompose performs In-Context Decomposition,
+enabling the model to predict one or multiple layers with-
+out per-layer supervision, and introduces Layer Position
+Encoding Cloning to maintain pixel-level correspondence
+across layers. Extensive experiments on the proposed Alph-
+aBlend dataset and public LOGO dataset verify the effec-
+tiveness of DiffDecompose. Code will be publicly available
+at https://github.com/Wangzt1121/DiffDecompose.
+1. Introduction
+With the development of diffusion models, image-to-image
+[13, 19, 22, 36, 55, 73] and text-to-image [4, 6, 15, 30] gen-
+eration methods have been extensively studied and leads to
+a wide applications [3, 8, 17, 38, 44, 47, 48, 51, 54, 57, 64].
+Among these approaches, layer-wise decomposition is par-
+ticularly advantageous for structured image factorization:
+This CVPR paper is the Open Access version, provided by the Computer Vision Foundation.
+Except for this watermark, it is identical to the accepted version;
+the final published version of the proceedings is available on IEEE Xplore.
+4624
+
+
+the objective is to decompose the image into its constituent
+layers, each containing the foreground object, its associ-
+ated alpha matte, and potential depth ordering. This fac-
+torization affords fine-grained control over individual layers
+and, in turn, facilitates creative tasks such as video genera-
+tion [1, 3, 9, 16, 26] and scene understanding [58, 59].
+While this method offers controllable layer capabilities,
+these methods still face two major challenges in semi-
+transparent/transparent scenes, as shown in Figure 1 (a):
+(1) Limitation of layer-level image inpainting.
+While
+mask-based methods [14, 24, 33, 62] can accurately handle
+object-level information, they completely fail when faces
+with scenes requiring a whole image-level mask like the in-
+put in subtasks I, II, and III. (2) Limitation of tackling non-
+linear layer with diverse contents and complex struc-
+tures. Prior works [57, 64] largely target opaque/solid ob-
+jects, reducing composition to pixel overlap and overlook-
+ing nonlinear mixing (e.g., transparent glassware or semi-
+transparent cells). These two drawbacks seriously hinder
+the development of image editing.
+To address these novel challenges, we present the first
+task for layer-wise decomposition of Alpha-Composited
+Images (LDAC). As shown in the Figure 1, LDAC aims to
+recover a background layer and an alpha-foreground layer
+directly from a single composite, without any mask pri-
+ors. Unlike the image inpainting task, LDAC is intrinsi-
+cally ill-posed: a single alpha composite typically admits
+multiple plausible factorizations due to the entanglement of
+color and transparency across layers, which substantially
+complicates faithful scene reconstruction. Therefore, this
+proposed task faced two main challenges not addressed in
+prior works: (1) Layer ambiguity and coupling of color
+and transparency: Foreground and background occupy the
+same visual plane and lack the separability via depth or
+edge contrast, thereby introducing significant layer ambigu-
+ity. (2) Lack of large-scale dataset: This field lacks relevant
+datasets. Current datasets [48, 57] are often generated from
+AI, and the final overlapped images tend to have a pixel-
+level difference from the initial foreground and background,
+resulting in the failure of layer-wise decomposition.
+Motivated by the above facts, we propose the first large-
+scale, high-quality dataset, named AlphaBlend, to fill the
+gaps in the understanding of this task. As shown in Figure
+1 (b), AlphaBlend has two characteristics: Firstly, it is the
+first dataset to cover six semi-transparent/transparent sce-
+narios, with careful construction to capture nonlinear com-
+positional behavior, foreground–background entanglement,
+and alpha-induced visual ambiguity. Secondly, it spans di-
+verse styles and content (e.g., security, glass replacement,
+and cell separation, etc.), and each domain contains around
+5,000-10,000 training images and 300-500 test images.
+Based on the novel task and the AlphaBlend dataset, we
+propose a diffusion Transformer-based framework DiffDe-
+compose to probabilistically infer multiple plausible layer
+decompositions conditioned on context, which has two
+novel technical designs:
+(1) Rather than explicitly re-
+gressing alpha mattes, we reformulate the task as learning
+the posterior distribution over compositional layers, condi-
+tioned on the observed image, semantic prompts, and blend-
+ing type. (2) We design In-Context Decomposition (ICD) to
+enable the model to effectively predict single-layer or multi-
+layer results under given alpha-composited image condi-
+tions, which across various alpha compositional contexts
+without explicit supervision for each individual layer, and
+also devise Layer Position Encoding Cloning (LPEC) to
+preserve the pixel-level correspondence, therefore mitigat-
+ing inter-layer entanglement during decomposition.
+Our main contributions are four-fold:
+• We present a novel generative task, namely LDAC, for
+the semi-transparent/transparent scenarios, and reformu-
+late this task from a novel perspective as a probabilistic
+problem of generating plausible layer decompositions.
+• We introduce the AlphaBlend dataset, the first large-scale,
+high-quality dataset that supports six LDAC subtasks,
+i.e., translucent flare removal, translucent occlusion re-
+moval, semi-translucent watermark removal, transparent
+glassware decomposition, semi-transparent cell decom-
+position, X-ray contraband decomposition.
+• We propose a DiT-based framework, namely DiffDecom-
+pose, for the LDAC task. We present ICD to realize layer-
+to-layer decomposition and LPEC strategy to avoid ambi-
+guity and coupling of decomposed layers.
+• Extensive experiments on the proposed AlphaBlend
+dataset and public LOGO Benchmarks verify the supe-
+riority and effectiveness of DiffDecompose compared to
+state-of-the-art (SOTA) approaches.
+2. Related Work
+Diffusion Model (DMs) [37, 39] have significantly ad-
+vanced image generation and editing, surpassing GANs
+[10, 28, 28, 29, 32] in tasks such as customized genera-
+tion [67, 68], video generation [41, 49, 53] and control-
+lable editing [21, 61, 69, 70].
+Recent extensions have
+explored applications in 3D modeling [27] and scene-
+consistent generation [31], showcasing the broad gener-
+ative capacity of diffusion models.
+Despite these ad-
+vances, diffusion models remain an open and ill-posed
+challenge, particularly in scenarios involving transparency,
+semi-transparency, and nonlinear blending. In this work,
+we present a novel generative task, namely Layer-Wise De-
+composition of Alpha-Composited Images, and propose a
+diffusion-based framework DiffDecompose, to decompose
+complex semi-transparent/transparent layer-level compos-
+ited images into plausible foreground and background lay-
+ers. To support this novel task, we construct a first, large-
+scale, and high-quality dataset AlphaBlend, which mainly
+4625
+
+
+contains layer-level semi-transparent or transparent images.
+Controllable Generation.
+Recent advances in control-
+lable diffusion models [33, 34, 50, 60, 65] have signifi-
+cantly improved image editing, particularly in inpainting.
+Existing methods fall into text-based and mask-based cat-
+egories.
+Text-based approaches [12, 54, 63, 74] depend
+heavily on precise prompts and degrade when instructions
+are ambiguous [56]. Mask-based approaches [14, 33, 62]
+maintain background structure but require accurate masks
+and iterative denoising, which weakens conditioning in
+complex transparency scenarios. Motivated by noise-free
+conditioning in OminiControl [45] and subsequent meth-
+ods [18, 20, 42, 43, 71], we reformulate object occlusion
+[14, 44, 63] and layer decomposition [48, 57] as a prob-
+abilistic generation problem, modeling the posterior over
+decomposed layers given a composite image. This allows
+our framework to handle not only object-level and channel-
+level occlusions but also the more challenging layer-level
+semi-transparent cases.
+In-Context Learning is initially developed in large lan-
+guage models [5, 72], and recently has been extended to
+vision tasks such as object editing and region manipulation
+[2, 7, 23, 40, 43, 66, 72]. While prior works leverage con-
+textual cues for object insertion or style transfer, none have
+addressed layer-wise decomposition, particularly in semi-
+transparent or transparent settings. In this paper, we intro-
+duce ICD, which enables the model to infer multiple com-
+posited layers based on contextual prompts without explicit
+supervision. Furthermore, we propose LPEC to preserve
+spatial alignment and reinforce information consistency be-
+tween the decomposed layers and the original image.
+3. AlphaBlend Dataset Construction
+To support the study of LDAC, we introduced the Alph-
+aBlend Dataset. The process of AlphaBlend construction
+is to mix a foreground image with an alpha channel with a
+natural Red-Green-Blue (RGB) background, which can be
+unified formulated as: I = Aα ⊕Blend B, where Aα de-
+notes the foreground image with an associated alpha trans-
+parency map, B is the background image, and ⊕Blend is
+a task-specific blending operator (e.g., alpha blending or
+screen mode). It consists of six subtasks (Note that we com-
+bine Subtasks V and VI into one description):
+X-ray Contraband Decomposition sub-dataset simulates
+the physical property of X-ray in synthetic data, and formu-
+lates its process as: I = (1 −α) · B + α ·
+  Aα
+255 ·
+B
+255 · 255
+
+,
+where α controls foreground transparency. This nonlinear
+blending mimics the cumulative darkening seen in overlap-
+ping X-ray materials, reflecting true physical properties.
+Transparent Glassware Decomposition sub-dataset sim-
+ulates transparent and refractive materials like glassware,
+which can be regarded as: I = Aα(x, y) · B(x, y). When
+the alpha channel of B(x, y) is lower than 0.5 and I =
+1 −(1 −Aα(x, y)) · (1 −B)(x, y), when B(x, y) is higher
+than 0.5 during foreground-background composition. This
+condition allows highlights to be intensified while preserv-
+ing subtle background attenuation, thus producing a visu-
+ally realistic rendering of refractive materials.
+Semi-transparent Watermark Removal sub-dataset are
+common in daily life, and we formulate such a compositing
+process as: I = (1−α(x, y))·Aα(x, y)+α(x, y)·B(x, y),
+which effectively reflects the smooth visual interference wa-
+termarks imposed on natural scenes while preserving con-
+sistency for downstream layer decomposition.
+Semi-transparent Cell Decomposition sub-dataset sim-
+ulates overlapping semi-transparent cell structures with a
+simple additive process: I = Aα(x, y) + B(x, y), which
+captures the cumulative intensity build-up observed in mi-
+croscopy, providing a robust evaluation benchmark.
+Translucent Occlusion and Flare Removal sub-datasets
+simulate natural environmental occlusions such as fogged
+or rainy windows, or light.
+These two datasets over-
+lay translucent layers onto outdoor or indoor background
+scenes: I = 1 −(1 −Aα(x, y)) · (1 −B)(x, y), when
+B(x, y). In contrast to object-level foreground overlays, this
+process is full-image, diffuse blending, where translucent
+elements span across the entire scene without distinct se-
+mantic boundaries, acting as complex global degradation.
+4. Methodology
+4.1. Problem Formulation and Overview
+Problem Formulation. As shown in the blue region of Fig-
+ure 2, to recover the background from an observed image
+z ∈RH×W ×4, conventional methods [14, 33, 62] typically
+treat such object removal process as a mask-based inpaint-
+ing task. This process can be formulated as:
+ \la b el { e
+q
+u1} p_{\thet a } (\mathbf {y} \mid \mathbf {z}, \mathbf {m}) = \int p(\mathbf {y} \mid \mathbf {z}_0) p_{\theta }(\mathbf {z}_0 \mid \mathbf {z}, \mathbf {m}) d \mathbf {z}_0, 
+(1)
+where m denotes the mask indicating the region to be re-
+moved or refilled. Under this paradigm, the task is essen-
+tially reduced to predicting pixels within the masked region
+m.
+However, in scenarios involving semi-transparent or
+transparent objects, such as glass, plastic, biological cells,
+or X-ray scans, the objects refract and blend with the back-
+ground information. Consequently, the pixel values in oc-
+cluded regions are no longer a result of simple replacement
+or coverage. Instead, they [14, 33, 62] represent a complex
+nonlinear mixture of multiple layers.
+Directly removing
+these "occlusion" pixels and predicting new ones using only
+neighborhood information is physically inconsistent and of-
+ten leads to erroneous pixel-level restorations.
+Considering these challenges,
+we define a novel
+task,
+namely Layer-Wise Decomposition of Alpha-
+Composited Images (LDAC), where the goal is to decom-
+pose an observed image formed by the layered composition
+4626
+
+
+Mask
+Output 
+Inpainting
+Input
+Decompose
+Input
+Forward Diffusion Process
+Forward Diffusion 
+Split into two images
+Target
+Background
+Foreground
+Predict mask region
+Figure 2. The comparison of previous inpainting methods with
+our proposed DiffDecompose. Previous methods typically rely on
+a mask to remove the original pixels from a specific region, and
+then predict new pixels to refill that region. Ours does not require
+explicit masking; instead, it splits the foreground and background
+through hierarchical decomposition and joint prediction.
+of a transparent/semi-transparent foreground and a back-
+ground. Formally, let x ∈RH×W ×4 denote the foreground
+RGBA image, and y ∈RH×W ×3 denote the RGB back-
+ground. These are combined via a composition function G,
+resulting in an observed image z = G(x, y). The function G
+may vary from simple alpha blending to complex operators
+like additive or screen composition, and its exact formula-
+tion may be unknown in practice.
+Thus, the decomposing background and foreground can
+be defined as an LDAC process (the green background in
+Figure 2). Given the observed image \mathbf {z} , and an uncertain
+composited manner τ, our goal is to recover a plausible
+pair of images (\ mathbf {x}, \mathbf {y}) such that the composition function
+ \ma th c al {G}(\mathbf {x}, \mathbf {y}) \approx \mathbf {z} .
+This inverse problem is highly ill-posed,
+particularly when \mathcal {G} is nonlinear and information is entan-
+gled across layers. To address this challenge, we propose
+to train a conditional diffusion model that learns the joint
+posterior distribution over foreground and background con-
+ditioned on the composed image, which can be defined as:
+ \lab e l { eq u
+2
+} p_ { \ theta }( \ ma thbf {x}, \mathbf {y} \mid \mathbf {z}, \tau ) = \int p(\mathbf {x}, \mathbf {y} \mid \mathbf {z}_0) p_{\theta }(\mathbf {z}_0 \mid \mathbf {z}, \tau ) d \mathbf {z}_0. 
+(2)
+During the training, we assume access to a dataset of
+triplets (\ ma thbf {x}, \mathbf {y}, \mathbf {z}) , where \ math bf {z} = \mathcal {G}(\mathbf {x}, \mathbf {y}) . The model is trained
+to sample decomposed pairs that are both semantically plau-
+sible and compositionally consistent under \mathcal {G} .
+Framework Overview. As shown in Figure 3, the overview
+architecture of DiffDecompose can be divided into two
+steps: Firstly, finetuning the AlphaVAE [52] to obtain the
+ability to extract RGBA features with our proposed Alph-
+aBlend dataset. Then, utilizing the pretrained AlphaVAE to
+respectively encode a semi-transparent/transparent RGBA
+foreground x, a common RGB background y, and a com-
+posited alpha-blend RGBA image z, so as to obtain their
+latent spatial-level features. In detail, the prompts are fed
+into the frozen T5XXL [35] to extract the text-level fea-
+tures. The process of decomposition is realized by ICD
+by concatenating the clean condition token of z and noise
+tokens of x and y, and utilizing the bidirectional attention
+to achieve conditional generation. During the process of
+ICD, the proposed LPEC strategy achieves consistency be-
+tween the specific layer and the original layer information,
+and then utilizes the MMA for the interaction between dif-
+ferent modalities. During the inference stage, an observed
+image z is directly passed into the DiffDecompose model to
+obtain its corresponding decomposed images x and y.
+4.2. In-Context Decomposition
+Since the disentanglement of alpha-composited images is
+non-linear, directly learning the alpha maps is too difficult
+for decomposition. Thus, we develop an ICD to process
+layer decomposition as a context-aware spatial separation
+problem, where the model leverages both visual latent rep-
+resentations fx, fy, and fz, and the textual latent repre-
+sentations ft to infer the spatial organization and semantic
+consistency of foreground and background components. To
+successfully realize this process, we develop the LPEC and
+introduce Multi-modality Attention (MMA) [15] to achieve
+the process of in-context decomposition.
+Layer Position Encoding Cloning. To enforce spatial co-
+herence across composited layers and enhance the disentan-
+glement of foreground x and background y during genera-
+tion, we propose the LPEC mechanism. Specifically, we
+generate two positional encodings PE and PE′ from the
+composited image z, and inject them into the token repre-
+sentations cx, cy and cz of x, y and z:
+ \ l ab e l {
+eq3 } \ t ilde
+ {c } _{ x } = c_{x} + \mathrm {PE}, \quad \tilde {c}_{y} = c_{y} + \mathrm {PE'}, \quad \tilde {c}_{z} = c_{z} + \mathrm {PE'}, (3)
+where PE is the positional encoding that is injected into the
+foreground image x, and PE’ is the positional encoding in-
+jected into the background y and the composited image z.
+The background image y and the composited image x share
+a unified coordinate frame, i.e., ∀(i, j),
+˜c(i,j)
+y
+−˜c(i,j)
+z
+=
+c(i,j)
+y
+−c(i,j)
+z
+preserves relative positional structure during
+attention computation. This separation avoids spatial en-
+tanglement between layers and prevents unwanted feature
+blending. In transparent or semi-transparent compositions,
+foreground and background often overlap spatially but dif-
+fer in semantic meaning and transparency. Maintaining dis-
+joint positional encodings: PE ⊥PE′, the model prevents
+spatial interference between foreground and background
+layers. By maintaining a distinct positional space for the
+foreground, the model is encouraged to preserve its seman-
+tic and spatial independence, thereby enhancing the fidelity
+4627
+
+
+Figure 3. The pipeline of the DiffDecompose framework. For the training phase, AlphaVAE is trained to capture specialized features.
+ICD constructs an image-conditioned model to decompose multiple layers. LPEC ensures the alignment between different layers. For the
+inference phase, an alpha-composited image and its corresponding prompt are input into DiffDecompose to obtain layers.
+of layer disentanglement in semi-transparent or fully trans-
+parent scenes.
+Multi-Modality Attention. After applying LPEC, the la-
+tent tokens cx, cy, and cz are then concatenated along the se-
+quence dimension to perform joint attention. The MMA are
+utilized to provide conditional information for the denois-
+ing of the alpha-composed image. Furthermore, by main-
+taining y in a noise-free state, we ensure the retention of
+high-frequency textures and fine structural details from the
+original image, thereby preventing degradation during iter-
+ative denoising. This process can be written as:
+  \ mathrm {MM A}\l ef t ( \left [
+\til
+d
+e
+ 
+{c}_z; \tilde {c}_x; \tilde {c}_y; c_T\right ]\right ) = \operatorname {softmax}\left (\frac {QK^{\top }}{\sqrt {d}}\right )V, 
+(4)
+where Q, K, V are the query, key, and value projections of
+the concatenated sequence [˜cz; ˜cx; ˜cy; cT ], d is the feature
+dimension, and cT represents the textual condition tokens
+extracted from a task-specific prompt.
+In particular, the
+description consists of the foreground image x, the back-
+ground image y, and their composited observation z, (e.g.,
+Three sub-images. <image-1>: a transparent glass, <image-
+2>: this is a dinning room with some chairs, <image-
+3>: The overlapped of <image-1> and <image-2>.), which
+guide the semantic understanding of the inter-layer relation-
+ships. Such a mechanism allows each token to pay attention
+to its previous and next tokens at the same time, so that the
+clean token of z can guide the generation of the noise to-
+ken x and y, while allowing the noise token to be refined
+according to the conditional context. This mutual attention
+process ensures the generated decomposition components
+maintain semantic consistency with the input conditions.
+5. Experiments
+5.1. Experimental Settings
+Implementation Details.
+During finetuning the Al-
+phaVAE, we take the parameters of the AlphaVAE model
+as the initialization, and train it with the foreground of the
+AlphaBlend dataset for 30,000 steps. After that, we intro-
+duce LoRA [15] to finetune the Flux [25] architecture with
+whole AlphaBlend, under the rank of 128, batch size of 1,
+and a learning rate of 10−4 on an H20 GPU for 30,000 steps.
+Benchmark.
+To provide a rigorous and comprehensive
+evaluation, we evaluate our DiffDecompose and baselines
+on two datasets: our proposed AlphaBlend dataset and the
+public LOGO dataset [11].
+For the AlphaBlend dataset
+(described in Sec . 3), each LDAC subtask provides 500
+test images for evaluation. For LOGO evaluation, we uti-
+lize its three test benchmarks (i.e., LOGO-H, LOGO-L, and
+LOGO-G). To ensure fair comparison and reduce inconsis-
+tencies or boundary artifacts, we apply mask dilation for
+five iterations with a 5×5 kernel before inpainting.
+5.2. Main Results
+Figure 4 showcases the performance of DiffDecompose
+across six presented subtasks. It can effectively disentangle
+4628
+
+
+Figure 4. DiffDecompose effectively preserves the semantics, structure, and fine details of each layer in layer-level and object-level tasks.
+Figure 5. Qualitative comparisons between our presented DiffDecompose and other state-of-the-art (SOTA) methods.
+complex compositional layers, ranging from window rain-
+drops and lens flares to watermarks, glassware, X-ray con-
+traband, and overlapping cells without reliance on explicit
+masks. Furthermore, when placing multiple transparent ob-
+jects, it can also decompose them together from the back-
+ground. These results demonstrate the robustness of LDAC.
+Qualitative Evaluation. Figure 5 compares DiffDecom-
+pose with recent inpainting-based SOTA methods [14, 33,
+46, 62, 74] across semi-transparent layer removal tasks.
+While inpainting performs adequately for small, localized
+occlusions, it fails under large or transparent foregrounds,
+often producing blurred textures and semantic artifacts (e.g.,
+transparent glass, X-ray contraband, dense cell overlaps).
+In contrast, DiffDecompose performs layer-wise separation,
+preserving high-frequency detail and structural consistency.
+It achieves more accurate recovery in watermark removal
+4629
+
+
+Table 1. Comparison results with previous methods on LOGO and AlphaBlend benchmarks.
+Dataset
+LOGO-H
+LOGO-L
+LOGO-G
+Models
+RMSE↓
+SSIM↑
+LPIPS↓
+FID↓
+RMSE↓
+SSIM↑
+LPIPS↓
+FID↓
+RMSE↓
+SSIM↑
+LPIPS↓
+FID↓
+PowerPoint [74]
+10.0330
+0.9726
+0.0360
+34.64
+6.4480
+0.9870
+0.0212
+30.49
+8.1397
+0.9811
+0.0272
+32.42
+Flux-ControlNet [46]
+11.7016
+0.9640
+0.0508
+64.67
+8.7095
+0.9800
+0.0351
+61.22
+14.5943
+0.9670
+0.0705
+37.28
+SDXL-inpainting [33]
+8.1936
+0.9781
+0.0302
+35.24
+4.9184
+0.9899
+0.0172
+30.57
+6.3711
+0.9848
+0.0221
+32.37
+ClipAaway [14]
+11.3593
+0.9690
+0.0463
+36.55
+7.5353
+0.9851
+0.0275
+32.40
+9.3021
+0.9785
+0.0356
+33.21
+Inpaint Anything [62]
+4.8252
+0.9849
+0.0143
+27.50
+3.0461
+0.9931
+0.0072
+23.71
+3.8823
+0.9898
+0.0101
+25.90
+Ours (DiffDecompose)
+3.2321
+0.9923
+0.0092
+27.25
+2.1655
+0.9962
+0.0050
+24.20
+2.7940
+0.9945
+0.0063
+24.78
+Dataset
+Semi-transparent Watermark Removal
+Transparent Glassware Decomposition
+Semi-transparent Cell Decomposition
+Models
+RMSE↓
+SSIM↑
+LPIPS↓
+FID↓
+RMSE↓
+SSIM↑
+LPIPS↓
+FID↓
+RMSE↓
+SSIM↑
+LPIPS↓
+FID↓
+PowerPoint [74]
+31.4009
+0.8808
+0.0571
+59.70
+10.6886
+0.9727
+0.0236
+33.35
+9.55
+0.8504
+0.1526
+36.46
+Flux-ControlNet [46]
+35.9988
+0.8430
+0.1848
+82.21
+17.3372
+0.9551
+0.0451
+68.41
+12.08
+0.9701
+0.0407
+89.47
+SDXL-inpainting [33]
+21.7313
+0.9163
+0.0923
+50.89
+14.4375
+0.9596
+0.0421
+73.36
+9.70
+0.9764
+0.0274
+79.18
+ClipAaway [14]
+35.3515
+0.8641
+0.1561
+60.80
+13.9394
+0.9649
+0.0333
+47.64
+7.58
+0.9590
+0.0180
+49.79
+Inpaint Anything [62]
+11.5273
+0.9527
+0.0484
+34.58
+8.2335
+0.9775
+0.0189
+31.30
+3.3028
+0.9862
+0.0093
+36.42
+Ours (DiffDecompose)
+2.9976
+0.9894
+0.0050
+10.89
+7.9938
+0.9759
+0.0134
+25.55
+2.4467
+0.9901
+0.0055
+27.01
+Dataset
+X-ray Contraband Decomposition
+Translucent Flare Removal
+Translucent Occlusion Removal
+Models
+RMSE↓
+SSIM↑
+LPIPS↓
+FID↓
+RMSE↓
+SSIM↑
+LPIPS↓
+FID↓
+RMSE↓
+SSIM↑
+LPIPS↓
+FID↓
+PowerPoint [74]
+7.1830
+0.9826
+0.0134
+39.90
+90.4829
+0.1319
+0.8150
+404.70
+89.1031
+0.1336
+0.8092
+421.63
+Flux-ControlNet [46]
+7.6561
+0.9808
+0.1550
+45.49
+96.0870
+0.2158
+0.8016
+253.40
+87.8764
+0.1991
+0.8126
+239.67
+SDXL-inpainting [33]
+7.0060
+0.9845
+0.0125
+39.38
+63.1518
+0.3539
+0.7269
+229.96
+64.6848
+0.3296
+0.7351
+209.20
+ClipAaway [14]
+9.9123
+0.9789
+0.0200
+55.92
+97.5711
+0.2416
+0.8362
+255.26
+96.2468
+0.2344
+0.8427
+235.00
+Inpaint Anything [62]
+4.8260
+0.9856
+0.0080
+38.13
+83.3769
+0.3058
+0.9040
+462.58
+83.2172
+0.3090
+0.9046
+477.38
+Ours (DiffDecompose)
+3.8903
+0.9882
+0.0049
+23.73
+16.4373
+0.8189
+0.0945
+23.15
+18.9561
+0.7653
+0.1445
+43.116
+and transparent object decomposition and remains effec-
+tive for full-image translucent occlusions, where inpainting-
+based methods largely fail (see Appendix).
+Quantitative Evaluation. Table 1 quantitatively demon-
+strates the superiority of our DiffDecompose across both
+synthetic and public datasets, outperforming the second-
+best methods by an average margin of 36.3% in RMSE,
++1.2% in SSIM, and 52.8% in LPIPS. In complex scenarios
+such as X-ray contraband removal and translucent window
+occlusions, our model achieves up to 4× lower RMSE and
+3× better LPIPS than inpainting-based baselines, which of-
+ten suffer from color entanglement and global transparency
+issues.
+Notably, for challenging global occlusions (e.g.,
+Rain, Light), our method substantially outperforms all base-
+lines without requiring masks. While our FID on LOGO-
+L is slightly higher than Inpaint Anything [62] (24.20
+vs.23.71), this is due to LOGO-L’s highly structured, mask-
+friendly layout. Crucially, our approach is mask-free and
+achieves consistently better structural accuracy across all
+LOGO datasets (e.g., RMSE ↓1.6, SSIM ↑0.002, LPIPS
+↓0.011 vs. Inpaint Anything on LOGO-H). These results
+demonstrate that DiffDecompose generalizes across diverse
+conditions and outperforms existing methods.
+5.3. Ablation study
+Effectiveness of AlphaBlend datasets. AlphaVAE, as an
+important feature encoding mitigation tool in DiffDecom-
+pose, directly determines the accuracy of the network’s
+decomposition based on the extracted features.
+Table 2
+demonstrates foreground qualitative performance on the
+AlphaBlend dataset.
+In object-level occlusion tasks, the
+RMSE improvement is approximately 0.3931∼0.8658 in
+terms of RMSE. However, when transferred to image-level
+occlusion tasks, the accuracy of RMSE for preserving solid-
+color foregrounds (Foggy) improves by 9.4729, and for pre-
+serving colored foregrounds (glare) improves by 24.9854.
+This clearly demonstrates that color entanglement in the al-
+pha channel significantly increases the difficulty of LDAC.
+Figure 6 shows the significant improvement in foreground
+layer decomposition after fine-tuning AlphaVAE using the
+AlphaBlend dataset. It can be seen that without AlphaBlend
+fine-tuning, the layers decomposed by DiffDecompose ex-
+hibit obvious hue shifts and reduced saturation. For exam-
+ple, small transparent objects appear green/cyan overall, the
+halo bands become dull/mixed, and the raindrop layer also
+shows mixed underlying grayscale and color, resulting in an
+overall gray appearance.
+Table 2. Foreground ablation of AlphaBlend on LDAC subtasks.
+X-ray Contraband
+Semi-transparent glassware
+Subtask
+RMSE↓
+SSIM↑
+LPIPS↓
+RMSE↓
+SSIM↑
+LPIPS↓
+w/o AlphaBlend
+7.0811
+0.9897
+0.0173
+14.3666
+0.9357
+0.0579
+Ours
+6.6880
+0.9903
+0.0138
+13.5008
+0.9495
+0.0578
+Translucent occlusion
+Translucent flare
+Subtask
+RMSE↓
+SSIM↑
+LPIPS↓
+RMSE↓
+SSIM↑
+LPIPS↓
+w/o AlphaBlend
+70.9541
+0.4807
+0.6312
+46.2439
+0.3464
+0.5840
+Ours
+61.4812
+0.5109
+0.5537
+21.2585
+0.6260
+0.3988
+Effectiveness of LPEC. Table 3 illustrates the importance
+of LPEC in process of layer decomposition. For the layer-
+level subtask of translucent occlusion removal, after study-
+4630
+
+
+Figure 6. Foreground ablation of AlphaBlend datasets.
+ing the LPEC, it can improve 2.3/0.0242/0.0227 in terms of
+RMSE/SSIM/LPIPS. For the object-level semi-transparent
+Security, color disentanglement is still the most difficult,
+the LPEC can effectively separate the goods from their bag-
+gage. Additionally, the object-level transparent task of glass
+can improve the ICD results by 16.6106/0.2398/0.056 in
+terms of RMSE, SSIM, and LPIPS objective indicators. To
+further verify the effectiveness of LPEC, Figure 7 shows
+the results of DiffDecompose in four sub-tasks. As can be
+seen, when we remove LPEC, the layers of transparent glass
+and the most challenging subtask VI, contraband decom-
+position, will cause information disentanglement (e.g., the
+color of a person’s face and the body of a car).
+Table 3. Background ablation of LPEC on LDAC subtasks.
+X-ray Contraband
+Semi-transparent glassware
+Subtask
+RMSE↓
+SSIM↑
+LPIPS↓
+RMSE↓
+SSIM↑
+LPIPS↓
+w/o LPEC
+16.5379
+0.7922
+0.0489
+24.6044
+0.7361
+0.0694
+Ours
+3.8903
+0.9882
+0.0049
+7.9938
+0.9759
+0.013
+Translucent occlusion
+Translucent flare
+Subtask
+RMSE↓
+SSIM↑
+LPIPS↓
+RMSE↓
+SSIM↑
+LPIPS↓
+w/o LPEC
+21.2568
+0.7411
+0.1672
+32.4708
+0.7040
+0.2352
+Ours
+18.9561
+0.7653
+0.1445
+16.4373
+0.8189
+0.0945
+Figure 7. The ablation of LPEC and ICD on different subtasks.
+Full settings ensure the information alignment of different layers,
+while removals degrade performance.
+Effectiveness of ICD. The ICD can be regarded as the
+key to the task of decomposition.
+As shown in Fig-
+ure 7, when we totally remove the ICD, the framework will
+no longer directly decompose both foreground and back-
+ground. The model can be viewed as a common image in-
+painting method. In contrast, as we place the ICD on our
+baseline, the results can not only recover the accurate back-
+ground but also output different layers. More ablation stud-
+ies are provided in the Appendix. Current image inpaint-
+ing methods (such as SDXL [33]) primarily rely on mask-
+based methods, which totally fail to edit the whole image.
+As shown in Figure 8, rain and light overlap the whole
+image, regardless of adjusting the intensity and changing
+the prompt, it remains difficult to edit.
+In contrast, our
+proposed DiffDecompose method jointly infers the fore-
+ground and background through a layer-wise decomposi-
+tion framework. This allows our method to effectively de-
+couple semi-transparent overlays without relying on explicit
+masks, thus demonstrating particularly strong robustness in
+complex scenes involving transparency and subtle blending.
+Figure 8. The SDXL-inpainting results under different strengths.
+We input the prompt like "Remove the light and make the scenario
+darker" and "Remove the foreground rain and fog", it is difficult
+for the model to process the layer-level edition.
+6. Conclusion
+In this paper, we propose a novel task, Layer-Wise
+Decomposition of Alpha-Composited Images (LDAC)
+We construct a large-scale and high-quality AlphaBlend
+dataset that contains multiple layer-level transparent/semi-
+transparent foreground alpha-blend images, supporting six
+real-world subtasks. To cope with this complex task, we
+adopt a novel point that redefines the problem as learning
+a posterior over potential layer configurations conditioned
+on contextual cues. In the process of training, we propose a
+transformer diffusion-based framework termed DiffDecom-
+pose, to effectively achieve layer-by-layer decomposition
+under given alpha-composited image as condition through
+ICD. Furthermore, we also devise the LPEC for the pro-
+cess of ICD to effectively align the information between a
+certain layer and the original layer. Extensive experiments
+verify the effectiveness of LDAC task.
+7. Acknowledgement
+This work was supported by the National Natural Science
+Foundation of China (No.
+62502178), and Jilin Univer-
+sity Special Program for Talent Development in Engineer-
+ing Cluster Construction.
+4631
+
+
+References
+[1] Jingqi Bai, Jingkai Zhou, Benzhi Wang, Weihua Chen, Yang
+Yang, Zhen Lei, and Fan Wang. Layer-animate for transpar-
+ent video generation. In IEEE International Conference on
+Acoustics, Speech and Signal Processing, pages 1–5, 2025.
+2
+[2] Yutong Bai, Xinyang Geng, Karttikeya Mangalam, Amir
+Bar, Alan L Yuille, Trevor Darrell, Jitendra Malik, and
+Alexei A Efros. Sequential modeling enables scalable learn-
+ing for large vision models. In Proceedings of the IEEE/CVF
+Conference on Computer Vision and Pattern Recognition,
+pages 22861–22872, 2024. 3
+[3] Omer Bar-Tal, Hila Chefer, Omer Tov, Charles Her-
+rmann, Roni Paiss, Shiran Zada, Ariel Ephrat, Junhwa Hur,
+Guanghui Liu, Amit Raj, et al. Lumiere: A space-time diffu-
+sion model for video generation. In SIGGRAPH Asia 2024
+Conference Papers, pages 1–11, 2024. 1, 2
+[4] James Betker, Gabriel Goh, Li Jing, Tim Brooks, Jianfeng
+Wang, Linjie Li, Long Ouyang, Juntang Zhuang, Joyce Lee,
+Yufei Guo, et al. Improving image generation with better
+captions. Computer Science, 2(3):8, 2023. 1
+[5] Tom Brown, Benjamin Mann, Nick Ryder, Melanie Sub-
+biah, Jared D Kaplan, Prafulla Dhariwal, Arvind Neelakan-
+tan, Pranav Shyam, Girish Sastry, Amanda Askell, et al. Lan-
+guage models are few-shot learners. Advances in Neural In-
+formation Processing Systems, 33:1877–1901, 2020. 3
+[6] Junsong Chen, Jincheng Yu, Chongjian Ge, Lewei Yao, Enze
+Xie, Zhongdao Wang, James T. Kwok, Ping Luo, Huchuan
+Lu, and Zhenguo Li.
+Pixart-\alpha : Fast training of diffusion
+transformer for photorealistic text-to-image synthesis. In The
+Twelfth International Conference on Learning Representa-
+tions, 2024. 1
+[7] Lan Chen, Qi Mao, Yuchao Gu, and Mike Zheng Shou. Edit
+transfer: Learning image editing via vision in-context rela-
+tions. arXiv preprint arXiv:2503.13327, 2025. 3
+[8] Xi Chen, Yutong Feng, Mengting Chen, Yiyang Wang, Shi-
+long Zhang, Yu Liu, Yujun Shen, and Hengshuang Zhao.
+Zero-shot image editing with reference imitation. Advances
+in Neural Information Processing Systems, 37:84010–84032,
+2024. 1
+[9] Xuewei Chen, Zhimin Chen, and Yiren Song. Transanimate:
+Taming layer diffusion to generate rgba video. arXiv preprint
+arXiv:2503.17934, 2025. 2
+[10] Yizhen Chen and Haifeng Hu. An improved method for se-
+mantic image inpainting with gans: progressive inpainting.
+Neural Processing Letters, 49:1355–1367, 2019. 2
+[11] Xiaodong Cun and Chi-Man Pun. Split then refine: stacked
+attention-guided resunets for blind single image visible wa-
+termark removal. In Proceedings of the AAAI Conference on
+Artificial Intelligence, pages 1184–1192, 2021. 5
+[12] Miaomiao Dai, Qianyu Zhou, Ran Yi, and Lizhuang Ma.
+Diffusefist: A fast image-guided style transfer method for
+adapting large-scale diffusion models.
+In IEEE Interna-
+tional Conference on Acoustics, Speech and Signal Process-
+ing, pages 1–5, 2025. 3
+[13] Zhicheng Ding, Panfeng Li, Qikai Yang, and Siyang Li.
+Enhance image-to-image generation with llava-generated
+prompts.
+In 5th International Conference on Information
+Science, Parallel and Distributed Systems, pages 77–81,
+2024. 1
+[14] Yi˘git Ekin, Ahmet Burak Yildirim, Erdem Eren Ça˘glar,
+Aykut Erdem, Erkut Erdem, and Aysegul Dundar. Clipaway:
+Harmonizing focused embeddings for removing objects via
+diffusion models. Advances in Neural Information Process-
+ing Systems, 37:17572–17601, 2024. 2, 3, 6, 7
+[15] Patrick Esser, Sumith Kulal, Andreas Blattmann, Rahim
+Entezari, Jonas Müller, Harry Saini, Yam Levi, Dominik
+Lorenz, Axel Sauer, Frederic Boesel, Dustin Podell, Tim
+Dockhorn, Zion English, and Robin Rombach. Scaling rec-
+tified flow transformers for high-resolution image synthesis.
+In Forty-first International Conference on Machine Learn-
+ing, pages 12606–12633, 2024. 1, 4, 5
+[16] Zeqi Gu, Wenqi Xian, Noah Snavely, and Abe Davis. Fac-
+tormatte: Redefining video matting for re-composition tasks.
+ACM Transactions on Graphics, 42(4):1–14, 2023. 2
+[17] Zhangxuan Gu, Haoxing Chen, and Zhuoer Xu. Diffusion-
+inst: Diffusion model for instance segmentation. In IEEE
+International Conference on Acoustics, Speech and Signal
+Processing, pages 2730–2734, 2024. 1
+[18] Hailong Guo, Bohan Zeng, Yiren Song, Wentao Zhang,
+Chuang Zhang, and Jiaming Liu. Any2anytryon: Leveraging
+adaptive position embeddings for versatile virtual clothing
+tasks. arXiv preprint arXiv:2501.15891, 2025. 3
+[19] Shaohua Guo, Qianyu Zhou, Ye Zhou, Qiqi Gu, Junshu
+Tang, Zhengyang Feng, and Lizhuang Ma. Label-free re-
+gional consistency for image-to-image translation. In IEEE
+International Conference on Multimedia and Expo, pages 1–
+6, 2021. 1
+[20] Shijie Huang, Yiren Song, Yuxuan Zhang, Hailong Guo,
+Xueyin Wang,
+Mike Zheng Shou,
+and Jiaming Liu.
+Photodoodle: Learning artistic image editing from few-shot
+pairwise data. arXiv preprint arXiv:2502.14397, 2025. 3
+[21] Mude Hui, Siwei Yang, Bingchen Zhao, Yichun Shi, Heng
+Wang, Peng Wang, Yuyin Zhou, and Cihang Xie. Hq-edit:
+A high-quality dataset for instruction-based image editing.
+arXiv preprint arXiv:2404.09990, 2024. 2
+[22] Phillip Isola, Jun-Yan Zhu, Tinghui Zhou, and Alexei A
+Efros. Image-to-image translation with conditional adver-
+sarial networks.
+In Proceedings of the IEEE Conference
+on Computer Vision and Pattern Recognition, pages 1125–
+1134, 2017. 1
+[23] Jincen Jiang, Qianyu Zhou, Yuhang Li, Xuequan Lu, Meili
+Wang, Lizhuang Ma, Jian Chang, and Jian Jun Zhang. Dg-
+pic: Domain generalized point-in-context learning for point
+cloud understanding. In European Conference on Computer
+Vision, pages 455–474, 2024. 3
+[24] Longtao Jiang, Zhendong Wang, Jianmin Bao, Wengang
+Zhou, Dongdong Chen, Lei Shi, Dong Chen, and Houqiang
+Li.
+Smarteraser:
+Remove anything from images using
+masked-region guidance. arXiv preprint arXiv:2501.08279,
+2025. 2
+[25] Black Forest Labs.
+Flux.
+https://github.com/
+black-forest-labs/flux, 2024. 5
+4632
+
+
+[26] Yao-Chih Lee, Erika Lu, Sarah Rumbley, Michal Geyer, Jia-
+Bin Huang, Tali Dekel, and Forrester Cole. Generative om-
+nimatte: Learning to decompose video into layers.
+arXiv
+preprint arXiv:2411.16683, 2024. 2
+[27] Xinyu Li, Qi Yao, and Yuanda Wang. Garmentdiffusion: 3d
+garment sewing pattern generation with multimodal diffu-
+sion transformers. arXiv preprint arXiv:2504.21476, 2025.
+2
+[28] Guilin Liu, Fitsum A Reda, Kevin J Shih, Ting-Chun Wang,
+Andrew Tao, and Bryan Catanzaro.
+Image inpainting for
+irregular holes using partial convolutions. In Proceedings
+of the European Conference on Computer Vision, pages 85–
+100, 2018. 2
+[29] Guilin Liu, Aysegul Dundar, Kevin J Shih, Ting-Chun Wang,
+Fitsum A Reda, Karan Sapra, Zhiding Yu, Xiaodong Yang,
+Andrew Tao, and Bryan Catanzaro. Partial convolution for
+padding, inpainting, and image synthesis. IEEE Transactions
+on Pattern Analysis and Machine Intelligence, 45(5):6096–
+6110, 2022. 2
+[30] Zhiyuan Lu, Hao Lu, and Hua Huang. Efficient portrait matte
+creation with layer diffusion and connectivity priors. arXiv
+preprint arXiv:2501.16147, 2025. 1
+[31] Yifang Pan, Karan Singh, and Luiz Gustavo Hafemann.
+Model see model do: Speech-driven facial animation with
+style control. arXiv preprint arXiv:2505.01319, 2025. 2
+[32] Deepak Pathak, Philipp Krahenbuhl, Jeff Donahue, Trevor
+Darrell, and Alexei A Efros.
+Context encoders: Feature
+learning by inpainting.
+In Proceedings of the IEEE Con-
+ference on Computer Vision and Pattern Recognition, pages
+2536–2544, 2016. 2
+[33] Suraj Patil. Sdxl inpainting. https://huggingface.
+co / spaces / diffusers / stable - diffusion -
+xl-inpainting/tree/main, 2024. 2, 3, 6, 7, 8
+[34] William Peebles and Saining Xie. Scalable diffusion models
+with transformers. In Proceedings of the IEEE/CVF Inter-
+national Conference on Computer Cision, pages 4195–4205,
+2023. 3
+[35] Colin Raffel, Noam Shazeer, Adam Roberts, Katherine Lee,
+Sharan Narang, Michael Matena, Yanqi Zhou, Wei Li, and
+Peter J Liu. Exploring the limits of transfer learning with a
+unified text-to-text transformer. Journal of Machine Learn-
+ing Research, 21(140):1–67, 2020. 4
+[36] Elad Richardson, Yuval Alaluf, Or Patashnik, Yotam Nitzan,
+Yaniv Azar, Stav Shapiro, and Daniel Cohen-Or. Encoding
+in style: a stylegan encoder for image-to-image translation.
+In Proceedings of the IEEE/CVF Conference on Computer
+Vision and Pattern Recognition, pages 2287–2296, 2021. 1
+[37] Robin Rombach, Andreas Blattmann, Dominik Lorenz,
+Patrick Esser, and Björn Ommer.
+High-resolution image
+synthesis with latent diffusion models.
+In Proceedings of
+the IEEE/CVF Conference on Computer Vision and Pattern
+Recognition, pages 10684–10695, 2022. 2
+[38] Chaohua Shi, Xuan Wang, Si Shi, Xule Wang, Mingrui Zhu,
+Nannan Wang, and Xinbo Gao. Foodfusion: A novel ap-
+proach for food image composition via diffusion models.
+arXiv preprint arXiv:2408.14135, 2024. 1
+[39] Jiaming Song, Chenlin Meng, and Stefano Ermon. Denois-
+ing diffusion implicit models. In 9th International Confer-
+ence on Learning Representations, 2021. 2
+[40] Wensong Song, Hong Jiang, Zongxing Yang, Ruijie Quan,
+and Yi Yang. Insert anything: Image insertion via in-context
+editing in dit. arXiv preprint arXiv:2504.15009, 2025. 3
+[41] Yiren Song, Shijie Huang, Chen Yao, Xiaojun Ye, Hai Ci,
+Jiaming Liu, Yuxuan Zhang, and Mike Zheng Shou. Proces-
+spainter: Learn painting process from sequence data. arXiv
+preprint arXiv:2406.06062, 2024. 2
+[42] Yiren Song, Danze Chen, and Mike Zheng Shou.
+Layer-
+tracer: Cognitive-aligned layered svg synthesis via diffusion
+transformer. arXiv preprint arXiv:2502.01105, 2025. 3
+[43] Yiren Song, Cheng Liu, and Mike Zheng Shou. Makeany-
+thing:
+Harnessing
+diffusion
+transformers
+for
+multi-
+domain procedural sequence generation.
+arXiv preprint
+arXiv:2502.01572, 2025. 3
+[44] Zeyi Sun, Ye Fang, Tong Wu, Pan Zhang, Yuhang Zang, Shu
+Kong, Yuanjun Xiong, Dahua Lin, and Jiaqi Wang. Alpha-
+clip: A clip model focusing on wherever you want. In Pro-
+ceedings of the IEEE/CVF Conference on Computer Vision
+and Pattern Recognition, pages 13019–13029, 2024. 1, 3
+[45] Zhenxiong Tan, Songhua Liu, Xingyi Yang, Qiaochu Xue,
+and Xinchao Wang.
+Ominicontrol:
+Minimal and uni-
+versal control for diffusion transformer.
+arXiv preprint
+arXiv:2411.15098, 2024. 3
+[46] AlimamaCreative Team. Flux.1-dev-controlnet-inpainting-
+alpha.
+https : / / github . com / alimama -
+creative/FLUX-Controlnet-Inpainting.git,
+2024. 6, 7
+[47] Xie Tianyidan, Rui Ma, Qian Wang, Xiaoqian Ye, Feixuan
+Liu, Ying Tai, Zhenyu Zhang, Lanjun Wang, and Zili Yi.
+Anywhere: A multi-agent framework for user-guided, reli-
+able, and diverse foreground-conditioned image generation.
+In Proceedings of the AAAI Conference on Artificial Intelli-
+gence, pages 7410–7418, 2025. 1
+[48] Petru-Daniel Tudosiu, Yongxin Yang, Shifeng Zhang, Fei
+Chen, Steven McDonagh, Gerasimos Lampouras, Ignacio
+Iacobacci, and Sarah Parisot. Mulan: A multi layer anno-
+tated dataset for controllable text-to-image generation.
+In
+Proceedings of the IEEE/CVF Conference on Computer Vi-
+sion and Pattern Recognition, pages 22413–22422, 2024. 1,
+2, 3
+[49] Cong Wan, Xiangyang Luo, Zijian Cai, Yiren Song, Yunlong
+Zhao, Yifan Bai, Yuhang He, and Yihong Gong. Grid: Visual
+layout generation. arXiv preprint arXiv:2412.10718, 2024.
+2
+[50] Chaoyang Wang, Xiangtai Li, Lu Qi, Xiaofan Lin, Jinbin
+Bai, Qianyu Zhou, and Yunhai Tong. Conditional panoramic
+image generation via masked autoregressive modeling. In
+The Thirty-ninth Annual Conference on Neural Information
+Processing Systems, 2025. 3
+[51] Hexiang Wang, Fengqi Liu, Qianyu Zhou, Ran Yi, Xin Tan,
+and Lizhuang Ma. Continuous piecewise-affine based mo-
+tion model for image animation.
+In Proceedings of the
+AAAI Conference on Artificial Intelligence, pages 5427–
+5435, 2024. 1
+4633
+
+
+[52] Zile Wang, Hao Yu, Jiabo Zhan, and Chun Yuan. Alphavae:
+Unified end-to-end rgba image reconstruction and generation
+with alpha-aware representation learning, 2025. 4
+[53] Jianzong Wu, Xiangtai Li, Yanhong Zeng, Jiangning Zhang,
+Qianyu Zhou, Yining Li, Kai Chen, and Yunhai Tong. Mo-
+tionbooth: Motion-aware customized text-to-video genera-
+tion. Advances in Neural Information Processing Systems,
+37:34322–34348, 2024. 2
+[54] Shaoan Xie, Zhifei Zhang, Zhe Lin, Tobias Hinz, and Kun
+Zhang. Smartbrush: Text and shape guided object inpainting
+with diffusion model. In Proceedings of the IEEE/CVF Con-
+ference on Computer Vision and Pattern Recognition, pages
+22428–22437, 2023. 1, 3
+[55] Yanwu Xu, Yang Zhao, Zhisheng Xiao, and Tingbo Hou.
+Ufogen: You forward once large scale text-to-image gener-
+ation via diffusion gans. In Proceedings of the IEEE/CVF
+Conference on Computer Vision and Pattern Recognition,
+pages 8196–8206, 2024. 1
+[56] Ziyang Xu, Kangsheng Duan, Xiaolei Shen, Zhifeng Ding,
+Wenyu Liu, Xiaohu Ruan, Xiaoxin Chen, and Xinggang
+Wang. Pixelhacker: Image inpainting with structural and se-
+mantic consistency. arXiv preprint arXiv:2504.20438, 2025.
+3
+[57] Jinrui Yang, Qing Liu, Yijun Li, Soo Ye Kim, Daniil Pakho-
+mov, Mengwei Ren, Jianming Zhang, Zhe Lin, Cihang Xie,
+and Yuyin Zhou. Generative image layer decomposition with
+visual effects. arXiv preprint arXiv:2411.17864, 2024. 1, 2,
+3
+[58] Jinrui Yang, Qing Liu, Yijun Li, Soo Ye Kim, Daniil Pakho-
+mov, Mengwei Ren, Jianming Zhang, Zhe Lin, Cihang Xie,
+and Yuyin Zhou. Generative image layer decomposition with
+visual effects. In Proceedings of the e IEEE/CVF Computer
+Vision and Pattern Recognition Conference, pages 7643–
+7653, 2025. 2
+[59] Shuai Yang, Jing Tan, Mengchen Zhang, Tong Wu, Yixuan
+Li, Gordon Wetzstein, Ziwei Liu, and Dahua Lin. Layer-
+pano3d: Layered 3d panorama for hyper-immersive scene
+generation. arXiv preprint arXiv:2408.13252, 2024. 2
+[60] Hu Ye, Jun Zhang, Sibo Liu, Xiao Han, and Wei Yang. Ip-
+adapter: Text compatible image prompt adapter for text-to-
+image diffusion models. arXiv preprint arXiv:2308.06721,
+2023. 3
+[61] Qifan Yu, Wei Chow, Zhongqi Yue, Kaihang Pan, Yang
+Wu, Xiaoyang Wan, Juncheng Li, Siliang Tang, Hanwang
+Zhang, and Yueting Zhuang.
+Anyedit: Mastering unified
+high-quality image editing for any idea.
+arXiv preprint
+arXiv:2411.15738, 2024. 2
+[62] Tao Yu, Runseng Feng, Ruoyu Feng, Jinming Liu, Xin
+Jin, Wenjun Zeng, and Zhibo Chen.
+Inpaint anything:
+Segment anything meets image inpainting. arXiv preprint
+arXiv:2304.06790, 2023. 2, 3, 6, 7
+[63] Yongsheng Yu, Ziyun Zeng, Hang Hua, Jianlong Fu, and
+Jiebo Luo. Promptfix: You prompt and we fix the photo.
+arXiv preprint arXiv:2405.16785, 2024. 3
+[64] Lvmin Zhang and Maneesh Agrawala. Transparent image
+layer diffusion using latent transparency.
+arXiv preprint
+arXiv:2402.17113, 2024. 1, 2
+[65] Lvmin Zhang, Anyi Rao, and Maneesh Agrawala. Adding
+conditional control to text-to-image diffusion models.
+In
+Proceedings of the IEEE/CVF International Conference on
+Computer Vision, pages 3836–3847, 2023. 3
+[66] Yuanhan Zhang, Kaiyang Zhou, and Ziwei Liu. What makes
+good examples for visual in-context learning?
+Advances
+in Neural Information Processing Systems, 36:17773–17794,
+2023. 3
+[67] Yuxuan Zhang, Yiren Song, Jiaming Liu, Rui Wang, Jinpeng
+Yu, Hao Tang, Huaxia Li, Xu Tang, Yao Hu, Han Pan, et al.
+Ssr-encoder: Encoding selective subject representation for
+subject-driven generation. In Proceedings of the IEEE/CVF
+Conference on Computer Vision and Pattern Recognition,
+pages 8069–8078, 2024. 2
+[68] Yuxuan Zhang, Yiren Song, Jinpeng Yu, Han Pan, and
+Zhongliang Jing. Fast personalized text to image synthesis
+with attention injection. In IEEE International Conference
+on Acoustics, Speech and Signal Processing, pages 6195–
+6199, 2024. 2
+[69] Yuxuan Zhang, Lifu Wei, Qing Zhang, Yiren Song, Jiaming
+Liu, Huaxia Li, Xu Tang, Yao Hu, and Haibo Zhao. Stable-
+makeup: When real-world makeup transfer meets diffusion
+model. arXiv preprint arXiv:2403.07764, 2024. 2
+[70] Yuxuan Zhang, Qing Zhang, Yiren Song, and Jiaming Liu.
+Stable-hair: Real-world hair transfer via diffusion model.
+arXiv preprint arXiv:2407.14078, 2024. 2
+[71] Yuxuan Zhang, Yirui Yuan, Yiren Song, Haofan Wang,
+and Jiaming Liu.
+Easycontrol:
+Adding efficient and
+flexible control for diffusion transformer.
+arXiv preprint
+arXiv:2503.07027, 2025. 3
+[72] Zechuan Zhang, Ji Xie, Yu Lu, Zongxin Yang, and Yi Yang.
+In-context edit: Enabling instructional image editing with in-
+context generation in large scale diffusion transformer. arXiv
+preprint arXiv:2504.20690, 2025. 3
+[73] Jun-Yan Zhu, Richard Zhang, Deepak Pathak, Trevor Dar-
+rell, Alexei A Efros, Oliver Wang, and Eli Shechtman. To-
+ward multimodal image-to-image translation. Advances in
+Neural Information Processing Systems, 30, 2017. 1
+[74] Junhao Zhuang, Yanhong Zeng, Wenran Liu, Chun Yuan,
+and Kai Chen. A task is worth one word: Learning with
+task prompts for high-quality versatile image inpainting. In
+European Conference on Computer Vision, pages 195–211,
+2024. 3, 6, 7
+4634

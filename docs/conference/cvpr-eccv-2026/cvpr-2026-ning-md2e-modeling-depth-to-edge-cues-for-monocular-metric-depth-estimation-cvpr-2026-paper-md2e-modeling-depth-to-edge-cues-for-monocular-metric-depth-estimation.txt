@@ -1,0 +1,471 @@
+Title: MD2E: Modeling Depth-to-Edge Cues for Monocular Metric Depth Estimation
+
+URL Source: https://openaccess.thecvf.com/content/CVPR2026/papers/Ning_MD2E_Modeling_Depth-to-Edge_Cues_for_Monocular_Metric_Depth_Estimation_CVPR_2026_paper.pdf
+
+Published Time: Sat, 16 May 2026 16:46:52 GMT
+
+Number of Pages: 11
+
+Markdown Content:
+# MD2E: Modeling Depth-to-Edge Cues for Monocular Metric Depth Estimation 
+
+# Chao Ning 1,2 Minghe Shen 3 Naoto Yokoya 1,2* 1The University of Tokyo 2RIKEN 3University College London 
+
+> {6575088851,yokoya }@edu.k.u-tokyo.ac.jp, minghe.shen.24@ucl.ac.uk
+
+# Abstract 
+
+We study monocular metric depth estimation (MMDE) with-out camera intrinsics at training or inference. When focal length and scene depth vary together, depth changes are dif-ficult to perceive in the image, yet the edge-frequency statis-tics exhibit systematic, scale-correlated shifts. Building on this observation, we introduce a spectral quantile estima-tor (SQE) that analyzes the Fourier spectrum of a predicted edge map and outputs a single score used as a proxy for metric scale. Consequently, we propose MD2E, a method that models depth-to-edge cues by deriving edge targets from depth annotations, calibrating metric scale using the spectral score, and using edge predictions to regularize depth boundaries while producing metric depth. Across diverse cameras and datasets, MD2E achieves state-of-the-art performance in MMDE in both zero-shot and fine-tuning settings. The project page is available at https: //2j472no.github.io/MD2E/ .
+
+# 1. Introduction 
+
+Monocular depth estimation (MDE), which aims to predict a dense depth map from a single RGB image, serves as a fundamental prerequisite for numerous computer vision and robotics applications. It provides essential 3D scene under-standing for tasks such as autonomous driving [8, 49], aug-mented reality [55, 66], and visual SLAM [23, 59]. Despite the inherent ill-posedness of inferring 3D geometry from monocular cues, recent advances in deep learning have en-abled significant progress by leveraging large-scale datasets and powerful neural architectures. To bridge domain gaps in MDE, MiDaS [42] mixes het-erogeneous supervision with a scale- and shift-invariant objective and principled multi-objective training, allowing learning even when annotations are incompatible across modalities and ranges. This choice intentionally removes absolute scale, so the model learns depth only up to an 
+
+> *Corresponding author
+
+Focal=20 mm, 
+
+depth=2 m Focal=8.5 mm, 
+
+depth=1 m Edge ( tpred =8.9) Edge ( tpred =5.7) Depth pred. 0m 
+
+> 5m
+
+Depth pred.    
+
+> Figure 1. Same chair captured with coupled changes in focal length and depth. Left to right: RGB image, edge prediction, depth prediction. Depth variation is difficult to perceive from the RGB image, whereas the predicted edge map shows clear differences (e.g., edge thickness). The edge spectral-quantile score tpred ex-poses this camera variation and enables calibration to metric depth.
+
+affine transform and delivers relative depth that transfers well across indoor and outdoor scenes. Subsequent works strengthened this recipe by upgrading dense-prediction backbones [43] and scaling training data to foundation-model regimes [60, 61]. Relative depth specifies only the ordering of scene points. The estimate is invariant under any monotonic transform, so the absolute scale is undetermined. Tasks that require metric quantities, including monocular 3D ob-ject detection [13, 26], large-scale reconstruction for digital twins [48], and robot grasping [34, 58], therefore cannot rely on relative depth alone. To meet these requirements, This CVPR paper is the Open Access version, provided by the Computer Vision Foundation. Except for this watermark, it is identical to the accepted version; the final published version of the proceedings is available on IEEE Xplore. 5772 Metric3D [62] recovers absolute scale with canonical cam-era normalization and intrinsics-aware rescaling. This re-solves scale ambiguity and enables robust Monocular Met-ric Depth Estimation (MMDE). However, both Metric3D [62] and its successor Met-ric3D v2 [22] presuppose calibrated intrinsics at training and inference. To reduce dependence on camera settings, UniDepth [40] and UniDepthV2 [41] learn dense camera representations and infer metric depth from a single image without intrinsics, and Depth Pro [6] attains absolute scale from a single image without camera metadata. In this paper, we present an MMDE approach that pre-dicts metric depth from a single image without camera pa-rameters at training or inference. As illustrated in Figure 1, RGB appearance can remain nearly invariant under focal length and depth coupling for a fixed target, whereas the corresponding edge map shows systematic changes in the distribution of edge energy across spatial frequencies, in-cluding apparent edge thickness. We leverage this cue with a spectral quantile estimator (SQE) that computes a scalar score tpred from the edge map by analyzing its Fourier spec-trum: a smooth radial high-pass is applied, energy is ag-gregated into a differentiable radial histogram, and a soft quantile of the cumulative radial energy is extracted. This score serves as a scale proxy that calibrates the predicted depth, converting relative estimates to metric units and en-abling accurate MMDE from a single image. Motivated by the observation that the edge spectral-quantile score tpred provides scale cues not evident in RGB, we propose MD2E, which models depth-to-edge cues to train monocular metric depth without camera parameters. Specifically, MD2E converts dense depth annotations into edge supervision, predicts an edge map, and uses an SQE to compute tpred ; this score calibrates the metric scale, while the edge predictions regularize depth to preserve sharp boundaries. Experiments show that MD2E yields more ac-curate metric depth than methods that learn camera settings and achieves state-of-the-art results in both zero-shot and fine-tuning settings. In summary, our core contributions are as follows: • We propose MD2E, a monocular metric depth estimation paradigm that models depth-to-edge cues to train without camera parameters. Concretely, MD2E converts dense depth annotations into edge supervision, predicts an edge map, and uses a SQE to compute the edge score tpred for metric-scale calibration. The edge predictions regularize depth to preserve sharp boundaries. • We show that the spectral-quantile edge cue adapts across different camera settings and scene types, enabling the network to capture camera-induced edge variations. • Extensive experiments in both zero-shot and fine-tuning settings demonstrate that MD2E attains state-of-the-art performance in monocular metric depth estimation. 
+
+# 2. Related work 
+
+2.1. In-domain MDE 
+
+Early MDE primarily followed an in-domain protocol: models were trained and evaluated on a single dataset, with objectives tailored to that dataset’s distribution and annotation scheme. Architecture-centric methods [36] strengthened encoder-decoder designs to preserve detail and suppress artifacts. Discretization-based parameteriza-tions cast depth into ordered bins to stabilize optimiza-tion and sharpen boundaries, including ordinal regression with non-uniform bins [15], image-adaptive binning [3], interval-estimation/bin refinement [46], and locally adap-tive bins [4]. Transformer-based models improved global context aggregation within the same in-domain setting, such as NewCRFs [63] coupling transformer features with CRF reasoning, DepthFormer [30] with multi-scale attention, and BinsFormer [31] with tokenized bin representations. Recently, in-domain fine-tuning on the target dataset has become an important evaluation protocol for state-of-the-art MDE methods, as adopted by Depth Anything V2 [61], UniDepthV2 [41], and Metric3D v2 [22]. 
+
+2.2. Robust MDE 
+
+Robust MDE has transitioned from single-dataset train-ing to heterogeneous supervision and cross-dataset gen-eralization. Early efforts used SfM/MVS reconstructions from Internet photo collections to obtain large but noisy supervision [29], and leveraged relative-depth annotations in unconstrained images to broaden scene coverage [10], yet dataset bias persisted. MiDaS [42] mixes heteroge-neous datasets with a scale- and shift-invariant objective under multi-objective training, achieving strong zero-shot transfer across indoor and outdoor domains; DPT [43] keeps this recipe with transformer backbones and improves the accuracy-efficiency trade-off. Building on this line, Depth Anything [60] scales data and training to foundation-style models, further strengthening zero-shot generalization while remaining competitive under fine-tuning. Construct-ing large-scale datasets through mixed training that com-bines multiple MDE datasets is an effective strategy for achieving robust MDE. 
+
+2.3. Zero-shot MMDE 
+
+Scale- and shift-invariant losses improve cross-dataset ro-bustness but remove absolute scale, so models general-ize only in relative depth. This gap motivates zero-shot MMDE, which predicts metric depth on unseen data with-out adaptation. One line of work recovers scale by canon-icalizing cameras under the pinhole model and restoring it with known intrinsics [62]. Larger variants keep this as-sumption while improving robustness [22]. To remove the need for camera parameter inputs, Depth Pro [6] integrates a 5773 focal-length prediction module into the model and learns it under supervision from camera annotations. Another line learns dense camera representations to infer metric scale from a single image [40, 41] and geometry-aware mappings under unknown cameras [20]. To the best of our knowledge, we are the first to employ edge maps as a cue for zero-shot MMDE. 
+
+2.4. Sharp MDE 
+
+Sharp MDE requires precise predictions on thin structures and clean depth discontinuities. Wang et al. [54] intro-duced the normalized multiscale gradient loss, which en-forces agreement of disparity gradients and achieves shift as well as scale invariance in disparity space. MiDaS [42] augments a scale- and shift-invariant objective with a multi-scale gradient-matching term, and Depth Anything V2 [61] adopts a related gradient-matching loss, yielding crisper boundaries and finer detail. UniDepthV2 [41] introduces an edge-guided loss that enhances edge localization and sharpness in metric depth outputs. Diffusion-based meth-ods [24, 38] leverage generative priors to supply missing fine structure when supervision is sparse. Increasing spa-tial resolution [6, 35] effectively improves the fine-grained details of depth predictions and yields sharper results. In this paper, we supervise the model with dense depth anno-tations to learn a depth-aware edge predictor, and further leverage the predicted edges as supervision to obtain sharp depth predictions. 
+
+2.5. Edge cues in MDE 
+
+Edge cues are widely used to sharpen boundaries and con-strain discontinuities in MDE. Early self-supervised meth-ods introduced edge-aware regularizers that weight smooth-ness by image gradients to preserve object borders [18]. Subsequent works made the role of edges explicit: Zhu et al. [67] enforced consistency between segmentation bound-aries and depth discontinuities to regularize border regions; Xian et al. [56] proposed an edge-guided sampling strat-egy within a structure-guided ranking loss to emphasize fine structures; Talker et al. [50] learned a depth-edge predic-tor from dense synthetic supervision to refine edges under sparse LiDAR labels; Li et al. [28] detected RGB edges and fed the resulting edge maps to a fusion model that aggre-gates depths from multiple sources. In contrast to previous approaches, we convert dense depth annotations into edge maps and use these depth-derived edges for supervision, which avoids noise from high-frequency textures and miti-gates artifacts caused by missing or incomplete depth labels in edge regions while retaining the benefits of edge-aware guidance. 
+
+# 3. Method 
+
+This section presents MD2E for accurate and sharp MMDE. As shown in Figure 2, a depth-to-edge transformation con-verts depth annotations into edge annotations to supervise edge prediction. The model outputs an edge map and an initial depth map. The predicted edge map is fed to a spec-tral quantile estimator to obtain an edge score for calibrat-ing the predicted depth to metric scale. In addition, the predicted edge map is used to supervise depth prediction at boundaries, which yields sharper object contours in the depth map. 
+
+3.1. Depth-to-edge transformation 
+
+To obtain an edge map from the depth map, we first trans-form it into inverse depth to emphasize geometric disconti-nuities in near regions and to enable more consistent edge extraction on planar surfaces. Subsequently, anisotropic fi-nite differences are aggregated along the horizontal, ver-tical, and diagonal directions to produce an initial edge saliency map. A local softmax over each 3 × 3 neighbor-hood then yields probabilistic contrast, and the final edge strength is defined as the center weight minus the neigh-borhood minimum, resulting in a spatially adaptive, high-contrast boundary representation. First, we convert depth to inverse depth and aggre-gate symmetric finite differences to obtain the directional saliency: 
+
+S(x) = X
+
+> u∈K
+
+γuD−1(x) . (1) Here, x indexes pixels of inverse depth map D−1;
+
+γuD−1(x) = D−1(x + u) − D−1(x − u) is the sym-metric directional difference; | · | denotes absolute value; 
+
+K = {(1 , 0) , (0 , 1) , (1 , 1) , (1 , −1) } are the axis-aligned and 
+
+±45 ◦ directions. Then, we apply a local softmax over the 3 × 3 neighbor-hood: 
+
+Px(y) = exp  S(y)P  
+
+> z∈N (x)
+
+exp  S(z) , y ∈ N (x). (2) Here, N (x) is the 3 × 3 neighborhood centered at x, and 
+
+exp( ·) denotes the natural exponential. Finally, we define the edge strength as the center weight minus the neighborhood minimum: 
+
+E(x) = Px(x) − min   
+
+> y∈N (x)
+
+Px(y). (3) Here, E(x) denotes the edge strength and min takes the minimum over the neighborhood N (x). During train-ing, we treat ground-truth and predicted depth differently: for ground-truth, we binarize the edge target by a global 
+
+0.9-quantile threshold; for predicted depth, we append a 5774 MDE Model    
+
+> tpred
+> Depth2edge
+> transform
+> Edge annotation
+> Image
+> Supervise Ledge
+> Spectral quantile estimator tGT
+> Supervise
+> L1
+> Depth annotation Calibrate depth with tpred
+> Supervise
+> Ldepth
+> Initial depth pred. Final depth pred.
+> Supervise
+> LMSE
+> Depth2edge transform Edge pred.
+
+Figure 2. Overview of MD2E. An image is processed by the MDE model to produce an edge map and an initial depth map. Dense depth labels are transformed into edge annotations to supervise the edge branch. A spectral-quantile estimator computes an edge score tpred ,which calibrates the initial depth to metric scale. The final depth is trained with both ground-truth depth and edge prediction supervision, yielding sharp and accurate metric depth. 
+
+lightweight 1 × 1 convolutional head to better align with the binary edge labels, while keeping this head decoupled from the depth regressor so that metric depth accuracy is unaffected. 
+
+3.2. Spectral quantile estimator 
+
+To capture the effects of camera focal-length changes from an edge map and account for scene variations in depth cal-ibration, we propose the spectral quantile estimator (SQE). Focal length alters the image formation scale: when focal length changes, the same scene structure projects to differ-ent pixel spans, shifting edge thickness and the distribution of edge energy across spatial frequencies [32, 65]. Vari-ations in scene layout, for example, indoor environments with dense man-made edges and repeated fine structures versus outdoor scenes dominated by large planar facades or open ground, also redistribute edge energy across radial spatial frequencies, which in turn affects monocular metric depth calibration. SQE summarizes these effects with a sin-gle score by analyzing the edge map in the Fourier domain, applying a smooth radial high-pass, aggregating energy into a differentiable radial histogram, and extracting a soft quan-tile of the cumulative radial energy. First, we compute a windowed, mean-removed power spectrum of the edge map: 
+
+Φ( f ) = F
+
+n
+
+(w ⊙ E ) − mean( w ⊙ E )
+
+o
+
+(f ) 2
+
+. (4) Here, E is the edge map, w is a learnable apodization win-dow parameterized as a convex combination of a flat win-dow and a separable Hann window [21], ⊙ denotes elemen-twise multiplication, mean( ·) is the spatial average, F{·} is the two-dimensional discrete Fourier transform, | · | 2 is the squared magnitude, and f indexes spatial frequency. To emphasize fine-scale structure while suppressing low-frequency bias, we apply a smooth radial high-pass to the spectrum: 
+
+Φh(f ) = Φ( f )
+
+
+
+1 − exp  −(r(f )/r 0)2
+
+. (5) Here, r(f ) = 
+
+q
+
+f 2 
+
+> x
+
++ f 2 
+
+> y
+
+is the radial spatial frequency and 
+
+r0 is a learnable cutoff. Subsequently, we aggregate the high-pass spectrum into 
+
+K radial bins using Gaussian soft assignment [52], defined as 
+
+Rk = X
+
+> f
+
+Φh(f )exp 
+
+
+
+− (r(f )−bk )2
+
+> 2σ2
+
+PKj=1 exp 
+
+
+
+− (r(f )−bj )2
+
+> 2σ2
+
+ , k = 1 , . . . , K. 
+
+(6) Here, {bk}Kk=1 are uniformly spaced centers in [0 , r max ]
+
+with rmax = max f r(f ), σ is the bin bandwidth, the de-nominator normalizes the assignment over k, and the sum runs over discrete frequency samples f .5775 To place radial energy on a probability scale for quantile selection while removing dependence on absolute magni-tude, we define the cumulative normalized radial energy as 
+
+pk = Rk
+
+PKj=1 Rj
+
+, C k =
+
+> k
+
+X
+
+> j=1
+
+pj , k = 1 , . . . , K.  (7) Here, PKk=1 pk = 1 and Ck is the cumulative sum over bins. From the cumulative radial energy {Ck}, we obtain a soft quantile at a learnable level p by weighting bins ac-cording to their proximity to p:
+
+fp =
+
+> K
+
+X
+
+> k=1
+
+exp  −λ |Ck − p|bk
+
+PKj=1 exp  −λ |Cj − p| . (8) Here, bk are the radial bin centers, fp denotes the quantile location and a learnable λ > 0 controls the softness. To convert fp into a dimensionless score that increases with higher-frequency concentration while remaining stable near small fp, we use a smoothed lower-bounded inverse scale as 
+
+t = rmax 
+
+α r max + β log  1 + exp  (fp − α r max )/β  . (9) Here, fp is the soft quantile location on the radial axis, 
+
+rmax = max f r(f ), α ∈ (0 , 1) is the floor ratio, β > 0
+
+is the smoothing factor, and log( ·) denotes the natural loga-rithm. In summary, SQE maps the edge map to a single scalar by locating a soft quantile of the radial spectrum. Thin-ner, crisper edges (higher-frequency concentration, larger 
+
+fp) yield a smaller score t, whereas broader, low-frequency edges yield a larger t, providing a compact signal for cal-ibrating metric depth under changes in focal length and scene layout. 
+
+3.3. Supervision 
+
+As shown in Figure 2, we adopt Metric3D v2 [22] as our MDE model. To reduce computational cost, we remove the joint depth and normal optimization module of Metric3D v2 and replace it with two convolutional predictors that output an initial depth field  Z and an edge map  Epred .The SQE is then applied to the edge map to produce a score defined as 
+
+tpred = SQE( Epred ), (10) which calibrates the depth logits before metric scaling: 
+
+Dpred = ¯dmax 
+
+1 + exp   − Z t pred 
+
+ . (11) Here ¯dmax denotes a fixed maximum depth constant and 
+
+Dpred is the predicted metric depth map. To address foreground-background imbalance in edge supervision, we use class-balanced cross-entropy [57] for edge supervision as 
+
+Ledge = − X
+
+> l
+
+ θ ρ ∗ 
+
+> l
+
+log ρl + (1 − θ) (1 − ρ∗ 
+
+> l
+
+) log  1 − ρl
+
+ .
+
+(12) Here,  ρl ∈ (0 , 1)  is the edge probability at pixel  l derived from  Epred , ρ∗ 
+
+> l
+
+∈ { 0, 1} is the edge label from EGT , obtained via the depth-to-edge transformation of the GT depth map, and  θ = n− 
+
+> n++n−
+
+with  n+ = P 
+
+> l
+
+ρ∗ 
+
+> l
+
+and  n− = P
+
+> l
+
+(1 − ρ∗ 
+
+> l
+
+).We enforce consistency between the SQE scores from the predicted and GT edges by minimizing 
+
+L1 = tpred − tGT . (13) Here, tGT = SQE( EGT ).We supervise the final depth prediction with a metric depth loss [14, 27] as 
+
+Ldepth = 1
+
+M
+
+> M
+
+X
+
+> m=1
+
+ξ2 
+
+> m
+
+− 0.85 
+
+M 2
+
+> M
+
+X
+
+> m=1
+
+ξm
+
+!2
+
+. (14) Here, ξm = log Dpred (m) − log DGT (m), M is the number of pixels, and m indexes pixels. In view of the sparsity and boundary imprecision of GT depth in real-world datasets, we enforce consistency be-tween the predicted edge map and the edge map derived from the predicted depth using a mean-squared error: 
+
+LMSE = X
+
+> o
+
+ Epred (o) − E D (o)2. (15) Here, ED is obtained by applying the depth-to-edge trans-formation to Dpred , and o indexes pixels. Finally, to balance importance and scale across losses, we define the final supervision as 
+
+L = 0 .1Ledge + L1 + 100 Ldepth + LMSE . (16) 
+
+# 4. Experiments 
+
+4.1. Setting 
+
+Datasets. To reduce training cost, we build the training pool from a subset of the sources used by Metric3D v2 [22], including DDAD [19], DIML [11], Cityscapes [12], Map-illary Planet-Scale Depth [1], Virtual KITTI [7], Mat-terport3D [9], Taskonomy [64], DSEC [16], and Hyper-sim [44]. We cap the aggregate training set at 4M RGB-depth pairs drawn from these sources. For edge supervision, we use only Virtual KITTI and Hypersim, since dense and reliable depth allows robust depth-derived edge maps. For evaluation we perform zero-shot testing on NYUv2 [47], KITTI [17], DIODE [53], iBIMS-1 [25], and ETH3D [45], 5776 Table 1. Zero-shot quantitative comparison with state-of-the-art MMDE methods on six unseen benchmarks. 
+
+Method Backbone DIODE iBIMS-1 NYUv2 DIODE ETH3D KITTI indoor scenes (A.Rel ↓/RMS ↓) outdoor scenes (A.Rel ↓/RMS ↓)Adabins [3] EffNet-B5 [51] 0.443 / 1.963 0.212 / 0.901 - 0.865 / 10.35 1.271 / 6.178 -NewCRFs [63] Swin-L [33] 0.404 / 1.867 0.206 / 0.861 - 0.854 / 9.228 0.890 / 5.011 -ZoeDepth [5] BEiT-L [2] 0.400 / 1.581 0.169 / 0.711 - 0.269 / 6.898 0.545 / 3.112 -UniDepthV2 [41] DINOv2-L [37] 0.161 / 0.816 0.090 / 0.373 0.076 / 0.269 1.231 / 15.928 0.256 / 1.617 0.103 / 2.765 Depth Pro [6] DINOv2-L [37] 0.203 / 0.882 0.162 / 0.588 0.111 / 0.378 0.576 / 10.930 0.403 / 3.699 0.257 / 4.368 Metric3D v2 [22] DINOv2-L [37] 0.093 / 0.389 0.185 / 0.592 0.063 / 0.251 0.221 / 3.897 0.357 / 2.980 0.052 / 2.511 MD2E (ours) DINOv2-L [37] 0.089 / 0.400 0.087 / 0.344 0.057 / 0.212 0.209 / 3.728 0.277 / 1.512 0.050 / 1.801 
+
+Table 2. In-domain quantitative comparison with state-of-the-art MDE methods on NYUv2 and KITTI datasets.                                                                                                                  
+
+> Method Backbone NYUv2 KITTI
+> δ1↑δ2↑δ3↑A.Rel ↓Log 10 ↓RMS ↓δ1↑δ2↑δ3↑A.Rel ↓RMS ↓RMS log ↓
+> NewCRFs [63] Swin-L [33] 0.922 0.992 0.998 0.095 0.041 0.334 0.974 0.997 0.999 0.052 2.129 0.079 IEBins [46] Swin-L [33] 0.936 0.992 0.998 0.087 0.038 0.314 0.978 0.998 0.999 0.050 2.011 0.075 ZoeDepth [5] BEiT-L [2] 0.953 0.995 0.999 0.077 0.033 0.277 0.971 0.996 0.999 0.057 2.281 0.082 Depth Anything V2 [61] DINOv2-L [37] 0.984 0.998 1.000 0.056 0.024 0.206 0.983 0.998 1.000 0.045 1.861 0.067 UniDepthV2 [41] DINOv2-L [37] 0.988 0.998 1.000 0.047 0.020 0.180 0.989 0.998 0.999 0.037 1.710 0.061 Metric3D v2 [22] DINOv2-L [37] 0.989 0.998 1.000 0.047 0.020 0.183 0.985 0.998 0.999 0.044 1.985 0.064 MD2E (ours) DINOv2-L [37] 0.992 0.998 1.000 0.044 0.019 0.168 0.990 0.999 1.000 0.035 1.520 0.052
+
+and we report in-domain results by fine-tuning on NYUv2 and KITTI. 
+
+Training recipe. To reduce training time, we adopt a ViT-L encoder pretrained from Metric3D v2 and reinitial-ize the DPT decoder [43]. Training uses AdamW with a batch size of 16, a base learning rate of 1 × 10 −4 and a 
+
+0.01 learning-rate multiplier on the encoder, together with a polynomial learning-rate decay schedule that anneals the rate to zero over 10 6 iterations. Data augmentation fol-lows standard monocular depth estimation practice, includ-ing photometric distortion, random rotation, random hori-zontal flip, random crop, and color jitter. The full run fin-ishes within four days on 8× NVIDIA A100 GPUs. 
+
+4.2. Comparison with state-of-the-art methods 
+
+Zero-shot quantitative comparison. We evaluate zero-shot generalization on six unseen benchmarks that span indoor and outdoor scenes, as summarized in Table 1. For a fair comparison with Metric3D v2 [22], we train MD2E on the sub-training datasets of Metric3D v2 and do not use camera parameters or surface-normal annota-tions. Under this setting, MD2E achieves substantial gains across unseen benchmarks. On iBIMS-1, absolute relative (A.Rel) error decreases by 53.0% and root mean squared (RMS) error by 41.9% , and on ETH3D and KITTI, RMS decreases by 49.3% and 28.3% , respectively. DIODE results further show consistent A.Rel improvements for both the indoor and outdoor benchmarks. Compared with UniDepthV2 [41], the performance gap on outdoor bench-marks is large: on DIODE outdoor A.Rel is 0.209 versus 1.231 for UniDepthV2; on ETH3D the RMS is lower while A.Rel is slightly higher, 0.277 versus 0.256. Compared with Depth Pro [6], the margins are substantial on ETH3D (RMS 1.512 versus 3.699) and KITTI (RMS 1.801 versus 4.368). 
+
+In-domain quantitative comparison. Table 2 reports results on NYUv2 and KITTI. Against the state-of-the-art single-dataset method, IEBins [46], the margins are larger: A.Rel error decreases by 49.4% on NYUv2 and 30.0% 
+
+on KITTI, RMS error decreases by 46.5% on NYUv2 and 
+
+24.4% on KITTI, and KITTI RMS log  decreases by 30.7% .Depth Anything V2 [61], the state-of-the-art method for learning affine-invariant depth that requires fine-tuning to produce metric predictions, is clearly surpassed: MD2E reduces A.Rel error by 21.4% on NYUv2 and 22.2% on KITTI, and lowers KITTI RMS error by 18.3% . MD2E also improves over Metric3D v2 [22] on KITTI RMS er-ror by 23.4% , and over UniDepthV2 [41] on NYUv2 RMS error by 6.7% and KITTI RMS log  by 14.8% . Across both datasets, MD2E attains the best δ1 and matches the best δ2
+
+and δ3.
+
+Qualitative comparison. As shown in Figure 3, Met-ric3D v2 [22] calibrates metric depth using camera parame-ters and produces accurate predictions on DIODE, NYUv2, and KITTI, yet the results lack sharp details, as illustrated by the plants in the first and third rows. Depth Pro [6] 5777 0m      
+
+> ≥200m
+> 0m
+> ≥200m
+> 0.0
+> ≥0.5
+> 0.0
+> ≥0.5
+> 0m
+> ≥200m
+> 0.0
+> ≥0.5
+> DIODE RGB & GT Ibims-1 NYUv2 KITTI
+> 0m
+> ≥10m
+> 0m
+> ≥10m
+> 0.0
+> ≥0.5
+> 0.0
+> ≥0.5
+> 0m
+> ≥10m
+> 0.0
+> ≥0.5
+> 0m
+> ≥10m
+> 0m
+> ≥10m
+> 0.0
+> ≥0.5
+> 0.0
+> ≥0.5
+> 0m
+> ≥10m
+> 0.0
+> ≥0.5
+> 0m
+> ≥80m
+> 0m
+> ≥80m
+> 0.0
+> ≥0.5
+> 0.0
+> ≥0.5
+> Depth Pro UniDepthV2 Metric3D v2 MD2E (ours) Depth A.Rel
+
+Figure 3. Qualitative comparison on four unseen datasets. The odd row shows the input RGB image and the absolute relative (A.Rel) error map, while the even row shows the GT depth and the predicted metric depth. The last column specifies the colormap ranges for depth and error. 
+
+improves fine-grained depth details by increasing the input RGB resolution. To handle high-resolution inputs, it splits images into overlapping patches before inference. This de-sign may weaken global interaction and, in turn, reduce metric-depth accuracy. UniDepthV2 [41] pursues sharp boundaries through strong supervision in edge regions, but incomplete and discontinuous labels near edges in many training datasets can lead to fragmented predictions on thin structures, such as the branch in the first row and the plants near the window in the third row. Overall, MD2E main-tains calibrated metric depth while preserving sharp detail. Additional qualitative comparisons are provided in the sup-plementary file. 
+
+4.3. Effectiveness of the edge score 
+
+According to prior studies [6, 22], mixed-dataset training for MMDE typically requires calibration using focal length and resolution information, expressed as fx/W . To ex-amine whether our edge score tpred can replace fx/W as the calibration scale and to assess its advantages, we sam-pled approximately 30 images per camera setting (about 
+
+10 6 samples in total) and conducted a nonlinear correlation analysis using a power-law transformation. We considered two explanatory variables: the normal-ized focal length fx/W and the per-sample maximum an-notated depth dmax , where dmax serves as a proxy for scene type (e.g., outdoor scenes typically exhibit larger maxima 5778 0.95 0.96 0.97 0.98 0.99 1.00  
+
+> ( / W)0.1
+> 123456789
+> d0.5 max
+> 78910 11 12
+> tpred
+> Pearson 0.698
+> 1.5
+> 1.0
+> 0.5
+> 0.0 0.5 1.0 1.5
+> tpred  tpred
+
+Figure 4. Relationship between normalized focal length fx/W ,maximum scene depth dmax , and edge score tpred . Points are colored by their signed deviation from the best-fit surface 
+
+−1.895( fx/W )0.1 +0 .013( dmax )0.5 +10 .372 , revealing a strong linear dependence (Pearson P ≈ 0.698 ) after nonlinear scaling. 
+
+than indoor scenes). We fit a least-squares regression model as 
+
+ˆtpred = −1.895( fx/W )0.1 + 0 .013( dmax )0.5 + 10 .372 ,
+
+(17) and compute the Pearson correlation coefficient P between the fitted and observed values to quantify the strength of linear dependence [39]. The Pearson correlation coefficient 
+
+P quantifies the degree of linear association between two variables, where P = 1 denotes perfect positive correlation and P = 0 indicates no linear relationship. The fitted model exhibits a strong positive asso-ciation after the nonlinear scaling. As shown in Figure 4, points in the transformed coordinate space  (fx/W )0.1, (dmax )0.5, t pred 
+
+ concentrate near a plane de-fined by the regression surface, and the correlation reaches 
+
+P ≈ 0.698 . These results indicate that tpred is primarily governed by the joint influence of fx/W and dmax . Since 
+
+fx/W reflects camera settings and dmax reflects scene scale, tpred provides a per-image scale cue that adapts to both factors and enables accurate metric-depth calibration. 
+
+# 5. Ablation study 
+
+In this section, we perform an ablation study to quantify the contribution of each component of MD2E. All variants are trained on 1M samples for 10 5 iterations with a batch size of 16. Reported numbers are averaged over six unseen benchmarks, and the results are summarized in Table 3. 
+
+Generalization collapse without SQE calibration or 
+
+Table 3. Ablation study results of MD2E. 
+
+Variant δ1 ↑ A.Rel ↓ RMS ↓
+
+MD2E 0.604 0.233 2.873 w/o SQE 0.251 0.527 5.734 w/o Ledge &LMSE 0.325 0.478 5.023 w/o L1 0.572 0.261 3.028 w/o LMSE 0.599 0.240 2.892 
+
+edge supervision. As shown in Table 3, removing SQE (second row), i.e., disabling depth calibration, causes a col-lapse of zero-shot generalization: δ1 drops from 0.604 to 0.251, while A.Rel and RMS rise from 0.233 and 2.873 to 0.527 and 5.734, corresponding to a 58% relative decrease in δ1 and relative increases of 126% in A.Rel and 100% in RMS. Removing edge supervision (third row) yields a sim-ilar trend: δ1 decreases to 0.325 and A.Rel/RMS increase to 0.478/5.023. In this setting, SQE receives only a feature map, and feature noise hinders the estimation of spectral-quantile scores needed to calibrate metric depth. 
+
+Marginal gains from SQE score alignment ( L1) and edge sharpening ( LMSE ). In the configuration without L1
+
+(fourth row of Table 3), since the edge prediction outputs a probability map, L1 supervision aligns the SQE score with the ground-truth edge scores, increasing δ1 from 0.572 to 0.604 and reducing A.Rel from 0.261 to 0.233 and RMS from 3.028 to 2.873. In the configuration without LMSE 
+
+(last row of Table 3), LMSE is used to sharpen the pre-dicted edges, and its removal yields small accuracy changes, with δ1 changing from 0.604 to 0.599, A.Rel from 0.233 to 0.240, and RMS from 2.873 to 2.892. 
+
+# 6. Conclusion 
+
+We present MD2E for MMDE by modeling depth-to-edge cues. The method first converts dense depth annotations into edge maps and uses these maps to supervise edge pre-diction. From the predicted edge map, an SQE computes an edge score that calibrates metric depth. Because edge pat-terns vary with camera focal length and scene layout, this score captures both camera and scene shifts and enables ac-curate metric-depth calibration. Meanwhile, the edge map yields sharper depth boundaries. Across zero-shot and fine-tuning settings, MD2E attains state-of-the-art MMDE per-formance. 
+
+# 7. Acknowledgments 
+
+This work was supported by JST SPRING (Grant Num-ber JPMJSP2108) and JST FOREST (Grant Number JP-MJFR206S). 5779 References 
+
+[1] Manuel L´ opez Antequera, Pau Gargallo, Markus Hofinger, Samuel Rota Bulo, Yubin Kuang, and Peter Kontschieder. Mapillary planet-scale depth dataset. In ECCV , pages 589– 604. Springer, 2020. 5 [2] Hangbo Bao, Li Dong, Songhao Piao, and Furu Wei. BEiT: BERT pre-training of image transformers. In ICLR , 2022. 6 [3] Shariq Farooq Bhat, Ibraheem Alhashim, and Peter Wonka. Adabins: Depth estimation using adaptive bins. In CVPR ,pages 4009–4018, 2021. 2, 6 [4] Shariq Farooq Bhat, Ibraheem Alhashim, and Peter Wonka. Localbins: Improving depth estimation by learning local dis-tributions. In ECCV , pages 480–496. Springer, 2022. 2 [5] Shariq Farooq Bhat, Reiner Birkl, Diana Wofk, Peter Wonka, and Matthias M¨ uller. Zoedepth: Zero-shot trans-fer by combining relative and metric depth. arXiv preprint arXiv:2302.12288 , 2023. 6 [6] Aleksei Bochkovskii, Ama¨ el Delaunoy, Hugo Germain, Marcel Santos, Yichao Zhou, Stephan R Richter, and Vladlen Koltun. Depth pro: Sharp monocular metric depth in less than a second. arXiv preprint arXiv:2410.02073 , 2024. 2, 3, 6, 7 [7] Yohann Cabon, Naila Murray, and Martin Humenberger. Vir-tual kitti 2. arXiv preprint arXiv:2001.10773 , 2020. 5 [8] Holger Caesar, Varun Bankiti, Alex H Lang, Sourabh Vora, Venice Erin Liong, Qiang Xu, Anush Krishnan, Yu Pan, Giancarlo Baldan, and Oscar Beijbom. nuscenes: A mul-timodal dataset for autonomous driving. In CVPR , pages 11621–11631, 2020. 1 [9] Angel Chang, Angela Dai, Thomas Funkhouser, Maciej Halber, Matthias Niessner, Manolis Savva, Shuran Song, Andy Zeng, and Yinda Zhang. Matterport3d: Learning from rgb-d data in indoor environments. arXiv preprint arXiv:1709.06158 , 2017. 5 [10] Weifeng Chen, Zhao Fu, Dawei Yang, and Jia Deng. Single-image depth perception in the wild. NeurIPS , 29, 2016. 2 [11] Jaehoon Cho, Dongbo Min, Youngjung Kim, and Kwanghoon Sohn. Diml/cvl rgb-d dataset: 2m rgb-d images of natural indoor and outdoor scenes. arXiv preprint arXiv:2110.11590 , 2021. 5 [12] Marius Cordts, Mohamed Omran, Sebastian Ramos, Timo Rehfeld, Markus Enzweiler, Rodrigo Benenson, Uwe Franke, Stefan Roth, and Bernt Schiele. The cityscapes dataset for semantic urban scene understanding. In CVPR ,pages 3213–3223, 2016. 5 [13] Mingyu Ding, Yuqi Huo, Hongwei Yi, Zhe Wang, Jianping Shi, Zhiwu Lu, and Ping Luo. Learning depth-guided convo-lutions for monocular 3d object detection. In CVPR , pages 11672–11681, 2020. 1 [14] David Eigen, Christian Puhrsch, and Rob Fergus. Depth map prediction from a single image using a multi-scale deep net-work. Advances in neural information processing systems ,27, 2014. 5 [15] Huan Fu, Mingming Gong, Chaohui Wang, Kayhan Bat-manghelich, and Dacheng Tao. Deep ordinal regression net-work for monocular depth estimation. In CVPR , pages 2002– 2011, 2018. 2 [16] Mathias Gehrig, Willem Aarents, Daniel Gehrig, and Davide Scaramuzza. Dsec: A stereo event camera dataset for driv-ing scenarios. IEEE Robotics and Automation Letters , 6(3): 4947–4954, 2021. 5 [17] Andreas Geiger, Philip Lenz, Christoph Stiller, and Raquel Urtasun. Vision meets robotics: The kitti dataset. The Inter-national Journal of Robotics Research , 32(11):1231–1237, 2013. 5 [18] Cl´ ement Godard, Oisin Mac Aodha, and Gabriel J Bros-tow. Unsupervised monocular depth estimation with left-right consistency. In CVPR , pages 270–279, 2017. 3 [19] Vitor Guizilini, Rares Ambrus, Sudeep Pillai, Allan Raven-tos, and Adrien Gaidon. 3d packing for self-supervised monocular depth estimation. In CVPR , pages 2485–2494, 2020. 5 [20] Vitor Guizilini, Igor Vasiljevic, Dian Chen, Rares , Ambrus , ,and Adrien Gaidon. Towards zero-shot scale-aware monoc-ular depth estimation. In ICCV , pages 9233–9243, 2023. 3 [21] Fredric J Harris. On the use of windows for harmonic anal-ysis with the discrete fourier transform. Proceedings of the IEEE , 66(1):51–83, 1978. 4 [22] Mu Hu, Wei Yin, Chi Zhang, Zhipeng Cai, Xiaoxiao Long, Hao Chen, Kaixuan Wang, Gang Yu, Chunhua Shen, and Shaojie Shen. Metric3d v2: A versatile monocular geomet-ric foundation model for zero-shot metric depth and surface normal estimation. arXiv preprint arXiv:2404.15506 , 2024. 2, 5, 6, 7 [23] Mohammad Mahdi Johari, Camilla Carta, and Franc ¸ois Fleuret. Eslam: Efficient dense slam system based on hy-brid representation of signed distance fields. In CVPR , pages 17408–17419, 2023. 1 [24] Bingxin Ke, Anton Obukhov, Shengyu Huang, Nando Met-zger, Rodrigo Caye Daudt, and Konrad Schindler. Repurpos-ing diffusion-based image generators for monocular depth estimation. In CVPR , pages 9492–9502, 2024. 3 [25] Tobias Koch, Lukas Liebel, Friedrich Fraundorfer, and Marco K¨ orner. Evaluation of CNN-based single-image depth estimation methods. In Computer Vision – ECCV 2018 Workshops , pages 331–348, 2018. 5 [26] Jason Ku, Alex D Pon, and Steven L Waslander. Monocular 3d object detection leveraging accurate proposals and shape reconstruction. In CVPR , pages 11867–11876, 2019. 1 [27] Jin Han Lee, Myung-Kyu Han, Dong Wook Ko, and Il Hong Suh. From big to small: Multi-scale local planar guidance for monocular depth estimation. arXiv preprint arXiv:1907.10326 , 2019. 5 [28] Pengzhi Li, Yikang Ding, Haohan Wang, Chengshuai Tang, and Zhiheng Li. The devil is in the edges: monocular depth estimation with edge-aware consistency fusion. arXiv preprint arXiv:2404.00373 , 2024. 3 [29] Zhengqi Li and Noah Snavely. Megadepth: Learning single-view depth prediction from internet photos. In CVPR , pages 2041–2050, 2018. 2 [30] Zhenyu Li, Zehui Chen, Xianming Liu, and Junjun Jiang. Depthformer: Exploiting long-range correlation and local in-formation for accurate monocular depth estimation. Machine Intelligence Research , 20(6):837–854, 2023. 2 5780 [31] Zhenyu Li, Xuyang Wang, Xianming Liu, and Junjun Jiang. Binsformer: Revisiting adaptive bins for monocular depth estimation. IEEE TIP , 2024. 2 [32] Tony Lindeberg. Edge detection and ridge detection with automatic scale selection. IJCV , 30(2):117–156, 1998. 4 [33] Ze Liu, Yutong Lin, Yue Cao, Han Hu, Yixuan Wei, Zheng Zhang, Stephen Lin, and Baining Guo. Swin transformer: Hierarchical vision transformer using shifted windows. In 
+
+ICCV , pages 10012–10022, 2021. 6 [34] Haoxiang Ma, Modi Shi, Boyang Gao, and Di Huang. Gen-eralizing 6-dof grasp detection via domain prior knowledge. In CVPR , pages 18102–18111, 2024. 1 [35] S Mahdi H Miangoleh, Sebastian Dille, Long Mai, Sylvain Paris, and Yagiz Aksoy. Boosting monocular depth estima-tion models to high-resolution via content-adaptive multi-resolution merging. In CVPR , pages 9685–9694, 2021. 3 [36] Chao Ning and Hongping Gan. Trap attention: Monocular depth estimation with manual traps. In CVPR , pages 5033– 5043, 2023. 2 [37] Maxime Oquab, Timoth´ ee Darcet, Th´ eo Moutakanni, Huy Vo, Marc Szafraniec, Vasil Khalidov, Pierre Fernandez, Daniel Haziza, Francisco Massa, Alaaeldin El-Nouby, Mah-moud Assran, Nicolas Ballas, Wojciech Galuba, Russell Howes, Po-Yao Huang, Shang-Wen Li, Ishan Misra, Michael Rabbat, Vasu Sharma, Gabriel Synnaeve, Hu Xu, Herv´ e Je-gou, Julien Mairal, Patrick Labatut, Armand Joulin, and Piotr Bojanowski. Dinov2: Learning robust visual features with-out supervision. arXiv preprint arXiv:2304.07193 , 2023. 6 [38] Suraj Patni, Aradhye Agarwal, and Chetan Arora. Ecodepth: Effective conditioning of diffusion models for monocular depth estimation. In CVPR , pages 28285–28295, 2024. 3 [39] Karl Pearson. Vii. note on regression and inheritance in the case of two parents. Proceedings of the Royal Society of London , 58(347-352):240–242, 1895. 8 [40] Luigi Piccinelli, Yung-Hsu Yang, Christos Sakaridis, Mattia Segu, Siyuan Li, Luc Van Gool, and Fisher Yu. Unidepth: Universal monocular metric depth estimation. In CVPR ,pages 10106–10116, 2024. 2, 3 [41] Luigi Piccinelli, Christos Sakaridis, Yung-Hsu Yang, Mat-tia Segu, Siyuan Li, Wim Abbeloos, and Luc Van Gool. Unidepthv2: Universal monocular metric depth estimation made simpler. arXiv preprint arXiv:2502.20110 , 2025. 2, 3, 6, 7 [42] Ren´ e Ranftl, Katrin Lasinger, David Hafner, Konrad Schindler, and Vladlen Koltun. Towards robust monocular depth estimation: Mixing datasets for zero-shot cross-dataset transfer. IEEE TPAMI , 44(3):1623–1637, 2020. 1, 2, 3 [43] Ren´ e Ranftl, Alexey Bochkovskiy, and Vladlen Koltun. Vi-sion transformers for dense prediction. In ICCV , pages 12179–12188, 2021. 1, 2, 6 [44] Mike Roberts, Jason Ramapuram, Anurag Ranjan, Atulit Kumar, Miguel Angel Bautista, Nathan Paczan, Russ Webb, and Joshua M Susskind. Hypersim: A photorealistic syn-thetic dataset for holistic indoor scene understanding. In 
+
+ICCV , pages 10912–10922, 2021. 5 [45] Thomas Schops, Johannes L Schonberger, Silvano Galliani, Torsten Sattler, Konrad Schindler, Marc Pollefeys, and An-dreas Geiger. A multi-view stereo benchmark with high-resolution images and multi-camera videos. In CVPR , pages 3260–3269, 2017. 5 [46] Shuwei Shao, Zhongcai Pei, Xingming Wu, Zhong Liu, Wei-hai Chen, and Zhengguo Li. Iebins: Iterative elastic bins for monocular depth estimation. NeurIPS , 36:53025–53037, 2023. 2, 6 [47] Nathan Silberman, Derek Hoiem, Pushmeet Kohli, and Rob Fergus. Indoor segmentation and support inference from rgbd images. In ECCV , pages 746–760. Springer, 2012. 5 [48] Jiaming Sun, Yiming Xie, Linghao Chen, Xiaowei Zhou, and Hujun Bao. Neuralrecon: Real-time coherent 3d reconstruc-tion from monocular video. In CVPR , pages 15598–15607, 2021. 1 [49] Pei Sun, Henrik Kretzschmar, Xerxes Dotiwalla, Aurelien Chouard, Vijaysai Patnaik, Paul Tsui, James Guo, Yin Zhou, Yuning Chai, Benjamin Caine, Vijay Vasudevan, Wei Han, Jiquan Ngiam, Hang Zhao, Aleksei Timofeev, Scott Et-tinger, Maxim Krivokon, Amy Gao, Aditya Joshi, Yu Zhang, Jonathon Shlens, Zhifeng Chen, and Dragomir Anguelov. Scalability in perception for autonomous driving: Waymo open dataset. In CVPR , pages 2446–2454, 2020. 1 [50] Lior Talker, Aviad Cohen, Erez Yosef, Alexandra Dana, and Michael Dinerstein. Mind the edge: Refining depth edges in sparsely-supervised monocular depth estimation. In CVPR ,pages 10606–10616, 2024. 3 [51] Mingxing Tan and Quoc Le. Efficientnet: Rethinking model scaling for convolutional neural networks. In International conference on machine learning , pages 6105–6114. PMLR, 2019. 6 [52] Jan C Van Gemert, Jan-Mark Geusebroek, Cor J Veenman, and Arnold WM Smeulders. Kernel codebooks for scene categorization. In ECCV , pages 696–709. Springer, 2008. 4 [53] Igor Vasiljevic, Nick Kolkin, Shanyi Zhang, Ruotian Luo, Haochen Wang, Falcon Z Dai, Andrea F Daniele, Moham-madreza Mostajabi, Steven Basart, Matthew R Walter, and Gregory Shakhnarovich. Diode: A dense indoor and out-door depth dataset. arXiv preprint arXiv:1908.00463 , 2019. 5[54] Chaoyang Wang, Simon Lucey, Federico Perazzi, and Oliver Wang. Web stereo video supervision for depth prediction from dynamic scenes. In Proceedings of the IEEE Inter-national Conference on 3D Vision (3DV) , pages 348–357. IEEE, 2019. 3 [55] Jamie Watson, Mohamed Sayed, Zawar Qureshi, Gabriel J Brostow, Sara Vicente, Oisin Mac Aodha, and Michael Fir-man. Virtual occlusions through implicit depth. In CVPR ,pages 9053–9064, 2023. 1 [56] Ke Xian, Jianming Zhang, Oliver Wang, Long Mai, Zhe Lin, and Zhiguo Cao. Structure-guided ranking loss for single image depth prediction. In CVPR , pages 611–620, 2020. 3 [57] Saining Xie and Zhuowen Tu. Holistically-nested edge de-tection. In ICCV , pages 1395–1403, 2015. 5 [58] Yinzhen Xu, Weikang Wan, Jialiang Zhang, Haoran Liu, Zikang Shan, Hao Shen, Ruicheng Wang, Haoran Geng, Yi-jia Weng, Jiayi Chen, Tengyu Liu, Li Yi, and He Wang. Unidexgrasp: Universal robotic dexterous grasping via 5781 learning diverse proposal generation and goal-conditioned policy. In CVPR , pages 4737–4746, 2023. 1 [59] Chi Yan, Delin Qu, Dan Xu, Bin Zhao, Zhigang Wang, Dong Wang, and Xuelong Li. Gs-slam: Dense visual slam with 3d gaussian splatting. In CVPR , pages 19595–19604, 2024. 1 [60] Lihe Yang, Bingyi Kang, Zilong Huang, Xiaogang Xu, Jiashi Feng, and Hengshuang Zhao. Depth anything: Unleashing the power of large-scale unlabeled data. In CVPR , pages 10371–10381, 2024. 1, 2 [61] Lihe Yang, Bingyi Kang, Zilong Huang, Zhen Zhao, Xiao-gang Xu, Jiashi Feng, and Hengshuang Zhao. Depth any-thing v2. NeurIPS , 37:21875–21911, 2024. 1, 2, 3, 6 [62] Wei Yin, Chi Zhang, Hao Chen, Zhipeng Cai, Gang Yu, Kaixuan Wang, Xiaozhi Chen, and Chunhua Shen. Metric3d: Towards zero-shot metric 3d prediction from a single image. In ICCV , pages 9043–9053, 2023. 2 [63] Weihao Yuan, Xiaodong Gu, Zuozhuo Dai, Siyu Zhu, and Ping Tan. Neural window fully-connected crfs for monocular depth estimation. In CVPR , pages 3916–3925, 2022. 2, 6 [64] Amir R Zamir, Alexander Sax, William Shen, Leonidas J Guibas, Jitendra Malik, and Silvio Savarese. Taskonomy: Disentangling task transfer learning. In CVPR , pages 3712– 3722, 2018. 5 [65] Zhengyou Zhang. A flexible new technique for camera cali-bration. IEEE TPAMI , 22(11):1330–1334, 2002. 4 [66] Chengxuan Zhu, Renjie Wan, Yunkai Tang, and Boxin Shi. Occlusion-free scene recovery via neural radiance fields. In 
+
+CVPR , pages 20722–20731, 2023. 1 [67] Shengjie Zhu, Garrick Brazil, and Xiaoming Liu. The edge of depth: Explicit constraints between segmentation and depth. In CVPR , pages 13116–13125, 2020. 3 5782

@@ -1,0 +1,359 @@
+Title: Edit2Perceive: Image Editing Diffusion Models Are Strong Dense Perceivers
+
+URL Source: https://openaccess.thecvf.com/content/CVPR2026/papers/Shi_Edit2Perceive_Image_Editing_Diffusion_Models_Are_Strong_Dense_Perceivers_CVPR_2026_paper.pdf
+
+Published Time: Sat, 16 May 2026 16:54:39 GMT
+
+Number of Pages: 10
+
+Markdown Content:
+# Edit2Perceive: Image Editing Diffusion Models Are Strong Dense Perceivers 
+
+## Yiqing Shi 1∗ Yiren Song 2∗ Mike Zheng Shou 2†
+
+1Peking University, 2 National University of Singapore * Equal contribution † Corresponding author. Depth Estimation Ranking                          
+
+> Ours
+> Lotus-D DepthAnythingV2 Lotus-G E2E-FT GeoWizard Marigold GenPercept Marigold v1.1 MiDaS
+> Ours 1.5
+> Lotus-D 2.9
+> DepthAnythingV2 3.5
+> Lotus-G 4.2
+> E2E-FT 4.7
+> GeoWizard 4.8
+> Marigold 5.3
+> GenPercept 6.0
+> Marigold v1.1 6.4
+> MiDaS 9.5
+> Normal Estimation Ranking
+> Ours
+> Marigold v1.1 ETE-FT Lotus-D Lotus-G DSINE StableNormal GenPercept GeoWizard
+> Ours 1.4
+> Marigold v1.1 2.4
+> ETE-FT 3.2
+> Lotus-D 3.4
+> Lotus-G 4.4
+> DSINE 4.7
+> StableNormal 5.6
+> GenPercept 7.4
+> GeoWizard 8.3
+> Interactive Matting Ranking
+> SDMatte LiteSDMatte SmartMatting MatAny MAM
+> Ours Ours 1.2
+> SDMatte 2.2
+> LiteSDMatte 2.9
+> SmartMatting 4.3
+> MatAny 4.4
+> MAM 5.9
+
+Figure 1. We present Edit2Perceive , a unified framework for diverse dense prediction tasks. Our model achieves state-of-the-art per-formance across zero-shot Monocular Depth Estimation, Surface Normal Estimation, and Interactive Matting, consistently outperforming previous methods. The bar charts on the right compare the average ranking score of our method against prior work on each task; lower is better. The green dot ( •) on the input images indicates the positive user prompt for interactive matting. 
+
+## Abstract 
+
+Recent advances in diffusion transformers have shown re-markable generalization in visual synthesis, yet most dense perception methods still rely on text-to-image (T2I) gener-ators designed for stochastic generation. We revisit this paradigm and show that image editing diffusion models are inherently image-to-image consistent, providing a more suitable foundation for dense perception tasks. We in-troduce Edit2Perceive , a unified diffusion framework that adapts editing models for depth, normal, and matting. Built upon the FLUX.1 Kontext architecture, our approach em-ploys full-parameter fine-tuning and a pixel-space consis-tency loss to enforce structure-preserving refinement across intermediate denoising states. Furthermore, compared with conventional generative models, our single-step determinis-tic inference substantially reduces inference computational cost (FLOPs). Extensive experiments demonstrate compre-hensive state-of-the-art results across all three tasks, reveal-ing the strong potential of editing-oriented diffusion trans-formers for geometry-aware perception. Code is released at https://github.com/showlab/Edit2Perceive. 
+
+## 1. Introduction 
+
+Dense perception tasks, such as Monocular Depth Es-timation, Surface Normal Estimation, and Interactive Mat-ting, are central to understanding 3D structure and object segmentation from 2D images. These tasks are particularly challenging because they require models to accurately pre-dict pixel-level geometric or optical attributes. Monocular Depth Estimation, for instance, necessitates recovering 3D scene geometry from a single image, which is inherently ill-posed. Similarly, Surface Normal Estimation demands precise angular predictions, while Interactive Matting in-volves the segmenting foreground from the background in an image given interactive input, which is highly sensitive to edge details. Solving these ill-posed problems depends on how much prior knowledge a model possesses about the visual world. Recent progress has been largely driven by leveraging rich visual priors from large-scale text-to-image (T2I) diffusion models, such as Stable Diffusion [1], which have shown impressive success when adapted for percep-tion tasks [2]. However, we argue that this paradigm is inherently lim-ited by a representation mismatch. The T2I models are trained to synthesize diverse visual concepts based on un-This CVPR paper is the Open Access version, provided by the Computer Vision Foundation. Except for this watermark, it is identical to the accepted version; the final published version of the proceedings is available on IEEE Xplore. 43568 structured textual prompts, which excel in semantic com-position (“concept-to-pixel” mapping) but lack the capac-ity to reason about structural relationships within an image. As a result, they are misaligned with the deterministic and geometry-aware nature of dense perception. We revisit this assumption and propose that image-to-image (I2I) diffusion models, especially context-based edi-tors such as FLUX.1 Kontext [3], offer a more natural foun-dation for dense perception. Unlike T2I models, these mod-els are trained to generate semantically coherent edits con-ditioned on an existing image. This pretraining objective implicitly requires parsing the input into a structured scene representation—capturing objects, surfaces, and their inter-relations. Such structured priors are essential for dense per-ception. Building upon this insight, we introduce Edit2Perceive ,a unified framework that adapts a powerful I2I diffusion model into a dense perceiver. We first convert the stochastic denoising process into a pseudo-deterministic path by fix-ing the random seed, ensuring a unique and reproducible input-output mapping. To further strengthen geometric fi-delity, we design a pixel-space consistency loss that en-forces fine-grained geometric fidelity and enhances struc-ture preservation in the final output. Additionally, to meet the high numerical stability required for Monocular Depth Estimation task, we theoretically derive that a square-root mapping minimizes the Absolute Relative (AbsRel) Error caused by the preprocess. Finally, benefiting from the inherent mechanism of flow matching, Edit2Perceive en-ables single-step deterministic inference, combining accu-racy with efficiency. Extensive experiments across three major dense percep-tion tasks (Monocular Depth Estimation, Surface Normal Estimation, and Interactive Matting) show that our method achieves state-of-the-art performance while using limited train data. It achieved impressive results in the wild (Fig. 1). Our main contributions are summarized as follows: • We demonstrate that image editing diffusion models, rather than text-to-image generators, provide a better in-ductive bias for deterministic dense perception, effec-tively bridging generative modeling and geometric rea-soning. • We propose Edit2Perceive , a unified diffusion trans-former fine-tuned across depth, normal, and matting tasks, enhanced with a pixel-consistency loss and an ana-lytically derived optimal normalization for depth. • We achieve state-of-the-art performance with efficient single-step inference, showing that editing-oriented dif-fusion models can serve as a new class of perception-oriented foundation models. 
+
+## 2. Related Work 
+
+2.1. Image Generation and Editing Models 
+
+Large-scale diffusion models have become the corner-stone of visual content creation. Text-to-image (T2I) sys-tems such as Stable Diffusion [1] and FLUX.1 [4] demon-strate strong semantic understanding through large-scale image–text pre-training. Meanwhile, research attention is shifting toward more controllable generation. Unlike T2I models that generate scenes from abstract text, I2I models aim to make precise modifications to existing visual con-tent. Recent editing systems such as Step1X-Edit [5] and FLUX.1 Kontext [3] learn complex correspondences be-tween image structure and editing instructions, achieving high structural consistency. With the transition to Diffu-sion Transformers [6], controllable generation has advanced rapidly. Models such as EasyControl [7] exemplify MM-DiT–based conditioning and have inspired a broad line of DiT-driven methods [8–17]. 
+
+2.2. Dense Perception Tasks 
+
+Dense perception tasks, including monocular depth es-timation, surface normal estimation, and interactive mat-ting, are fundamental to computer vision. Traditional ap-proaches can be broadly categorized into two paths. The first is data-driven, involving training specialized models on massive annotated datasets. From MiDaS [18], which pio-neered cross-dataset generalization, to the Depth Anything series [19, 20], which leverages large-scale unlabeled data for pre-training, this path improves performance by scaling up data and model size. However, this approach is compu-tationally intensive, and the resulting models are often de-signed for a single task, limiting their ability to generalize to new ones. The second path is task-driven, focusing on designing sophisticated inductive biases for specific tasks, such as the geometric constraints in DSINE [21] for normal estimation. While efficient, these designs are often difficult to transfer to other perception tasks. Both paths highlight the need for a powerful and general-purpose visual prior, which is precisely what large-scale generative models can offer. 
+
+2.3. Diffusion Models for Dense Perception 
+
+To leverage the powerful priors of generative models, an emerging line of research adapts diffusion models for dense perception tasks. Pioneering works like Marigold [2, 22] and GeoWizard [23] demonstrated the feasibility of fine-tuning pre-trained T2I models (e.g., Stable Diffusion) for depth and normal estimation, achieving excellent general-ization with limited data. This paradigm was subsequently refined by a series of studies: GenPercept [24], Stable Normal [25], Lotus [26], and E2E-FT [27] improved the sampling process or training objectives to enable efficient single-step inference, significantly enhancing the models’ practicality. Similarly, in the domain of image matting, 43569 DiT Block 
+
+> Self-Attention
+> Feed Forward
+> …
+> DiT Block
+> …
+> DiT Block
+
+VAE 
+
+Text 
+
+Encoder 
+
+Add Noise  VAE 
+
+> “Transform to depth map while maintaining original composition”
+> “Transform to normal map while maintaining original composition”
+
+Sample Input  Attention Map       
+
+> Denoise
+> Text Target Image
+> Query
+> Key
+> “Transform to matting map while maintaining original composition”
+> Frozen Learnable Text Condition Token Noisy Target Token Image Condition Token
+> Text Target Image
+
+Figure 2. Overview of the Edit2Perceive Framework. We adapt the FLUX.1 Kontext editor for dense perception. An input image x and text prompt p condition for the target image y. In the forward process, target token will be mixed with noise, and get noisy target token zt
+
+and then concatenate with text condition token and image condition token. The DiT backbone is trained to predict the velocity of the flow from a noise vector z0 to the target latent z1. Our training objective combines the latent-space flow matching loss ( LFM ) with a pixel-space consistency loss ( LCons ) for enhanced geometric fidelity. 
+
+methods such as MAM [28], SMat [29], and SDMatte [30] have also successfully utilized diffusion priors to improve the modeling of fine-grained edge details. While these works have collectively advanced the field, they are mostly built upon a common foundation: using T2I generative models as the starting point. In contrast, we ex-plore an alternative possibility. Based on the “Representa-tion Mismatch” argument from our introduction, we posit that I2I editing models, pre-trained for structured semantic understanding, can provide a more natural foundation for dense perception tasks. Concurrent to our work, FE2E [31] also builds on editing diffusion models, focusing on deter-ministic zero-noise denoising and consistent-velocity train-ing, with logarithmic depth normalization to address preci-sion issues. In contrast, our approach emphasizes geomet-ric fidelity, introducing a pixel-space consistency loss and theoretically deriving a square-root depth mapping, while retaining Gaussian noise to better leverage the editor’s gen-erative priors. 
+
+## 3. Method 
+
+3.1. Edit2Perceive: Overall Architecture 
+
+Our framework, Edit2Perceive , is built upon FLUX.1 Kontext [3], a flow-matching [32] model based on the DiT [6] architecture. FLUX.1 Kontext unifies image gen-eration and editing by incorporating semantic context from both text and image inputs through a simple sequence con-catenation mechanism. It processes these inputs with a combination of shared and task-specific transformer blocks to extract image features, and generates new views that maintain semantic consistency, which is vital for dense per-ception tasks. We formalize dense perception as a conditional diffusion editing task. As illustrated in Fig. 2, given an input RGB image x ∈ RH×W ×3 and a text prompt p, our goal is to predict the corresponding target image y ∈ RH×W ×3. Our method operates in the latent space of a pre-trained VAE. First, we encode the inputs: the conditioning image x is encoded into a latent representation cx, the target dense map 
+
+y into a target latent z1, and the text prompt p into a text embedding cp.Next, we define a straight-line trajectory from a standard Gaussian noise vector z0 ∼ N (0 , I) to the target latent z1
+
+using Rectified Flow [33]: 
+
+zt = (1 − t)z0 + tz 1, t ∈ [0 , 1] . (1) The constant velocity vector of this path is v = z1 − z0.Our DiT model is trained to predict this velocity, denoted as 
+
+vθ conditioned on the intermediate state zt, the timestep t,and the conditions cx and cp
+
+Training Objective. Our model is trained by optimizing a composite loss function that combines a latent-space flow matching with a pixel-space consistency loss. The primary objective is the flow matching loss, which minimizes the mean squared error between the predicted and true veloci-ties: 
+
+LFM = Et,z 1,z 0,c ∥vθ (concat (zt, c x, c p), t ) − v∥22 . (2) While LFM effectively guides the generation process in the latent space, it lacks direct supervision on the final pixel-level output, which can lead to geometric inaccuracies. To address this, we introduce a pixel-space consistency loss, 
+
+LCons , to enhance geometric fidelity. Our final training ob-jective is a weighted sum of these two losses: 
+
+L = LFM + λLCons , (3) Here, λ is an adaptive weight that balances the two ob-jectives. The detailed formulation of LCons for different dense perception tasks and the curriculum-based strategy for weighting λ will be elaborated in Section 3.2. 43570 Inference. During inference, we generate the target latent 
+
+ˆz1 by solving the ordinary differential equation (ODE) that defines the flow. Although Flow-Matching usually fails in one-step inference, geometric perception is a highly deter-ministic task, and we adapt a single-step Euler integrator: 
+
+ˆz1 = z0 + vθ (concat (z0, c x, c p), t = 0) . (4) The final dense map ˆy is then obtained by the VAE decoder. Furthermore, to enhance the determinism of the process, both training and inference share a fixed random seed for the initial noise z0. Following Marigold [2], we also adopt an annealed multi-resolution noise strategy. 
+
+3.2. Enhancing Geometric Fidelity with Consis-tency Loss 
+
+Although LFM aligns the flow in the latent space, it pro-vides no direct supervision on the final pixel-level output re-constructed by the VAE decoder. Minor errors in the latent space can be amplified after decoding, leading to blurriness or structural artifacts. To bridge this gap and enhance geometric fidelity, we introduce pixel-space consistency loss , LCons , computed directly between the decoded prediction ˆy and the ground truth y. This loss is customized for each task’s specific properties. For simplicity, all formulations below are av-eraged over all pixels, denoted by E.
+
+Monocular Depth Estimation. We employ a Scale-and-Shift Invariant L1 Loss. We first align the prediction ˆy to the ground truth y via least-squares fitting to obtain ˆyalign =
+
+sˆy + t, and then compute the L1 error: 
+
+Ldepth Cons = E [|y − ˆyalign |] . (5) 
+
+Surface Normal Estimation. To ensure accurate normal orientation while maintaining numerical stability, we use a mean angular error based on atan2 . While the traditional ar-ccos method suffers from gradient explosion when vectors are nearly collinear, our approach robustly computes the an-gle by using the dot and cross products to find its cosine and sine values, respectively: 
+
+Lnormal Cons = E [atan2 (|y × ˆy|, y · ˆy)] . (6) This formulation is mathematically equivalent to arccos but gradient-stable. 
+
+Interactive Matting. Following standard practice [34], we compute separate L1 loss for the unknown transition re-gion U and the known foreground / background regions K,allowing the model to capture challenging edge details: 
+
+Lmatting Cons = Ei∈U [|yi − ˆyi|] + Ei∈K [|yi − ˆyi|]. (7) 
+
+Adaptive Loss Weighting. The consistency loss LCons 
+
+provides a valuable geometric gradient from the pixel space to guide the latent-space flow matching. We combine the two losses with an adaptive weight λ:
+
+L = LFM + λLCons , (8) The weight λ is critical and is designed to implement a cur-riculum. It is set to zero during the first epoch to prioritize learning from the diffusion prior, and then linearly increases to balance the two objectives. This is formulated as: 
+
+λ = sg (|L FM |)
+
+sg (|L Cons |) + ϵ · max 
+
+
+
+0, step 
+
+Nstep 
+
+− 1
+
+
+
+, (9) where ‘sg’ denotes the stop-gradient operator and Nstep is the total number of steps in one epoch, ϵ is a small num-ber (0.001) added for numerical stability to prevent division by zero. This formulation enables the model focus on la-tent space flow matching at initial epoch and then gradually turns into a pixel space consistency loss. 
+
+3.3. Task-Specific Data Representation 
+
+To seamlessly adapt the supervision signal y of vari-ous dense perception tasks to the input requirements of the pre-trained editing model (a 3-channel BF16 tensor in the [−1, 1] range), we design task-specific pre-processing pipelines aimed at maximizing information preservation and minimizing quantization error. 
+
+Monocular Depth Estimation. Depth maps (y) are single-channel and exhibit a long-tailed distribution. Di-rect linear normalization of y under BF16 precision causes significant quantization error in near-field details. To ad-dress this, we seek an optimal non-linear mapping, g(y),that minimizes the quantization-induced relative error. We formalize this by minimizing the integral of the rel-ative error over the depth range [ymin , y max ]. Detailed in Appendix, this objective simplifies to minimizing the fol-lowing integral with respect to the function g:         
+
+> min
+> g
+> 1512( ymax −ymin )
+> Zymax
+> ymin
+> g(y)max −g(y)min
+> y·g′(y)dy. (10)
+
+By applying the Cauchy-Schwarz inequality, we theoreti-cally prove that this integral is minimized when g′(y) ∝
+
+1/√y. This yields the optimal mapping function: 
+
+g(y) = √y. (11) Let ysqrt = g(y). We then apply a robust percentile-based linear normalization to these mapped values to scale them into the [−1, 1] range for the VAE: 
+
+ynorm =
+
+ ysqrt − ysqrt, p2 
+
+ysqrt, p98 − ysqrt, p2 
+
+− 0.5
+
+
+
+× 2. (12) Here, ysqrt, p2 and ysqrt, p98 represent the 2nd and 98th per-centiles of the sqrt-transformed image y sqrt. Finally, the single-channel ynorm is replicated to three channels to form the final input representation for our framework. 43571 Surface Normal Estimation. Normal maps are inher-ently 3-channel vectors. We simply ensure they are nor-malized to unit length: ynorm = y/ ∥y∥2.
+
+Interactive Matting. Alpha mattes are single-channel images in the [0 , 1] range. We first binarize the matte and then linearly map it to the [−1, 1] range: 
+
+ynorm = ( I(y > 0.5) − 0.5) × 2, (13) then replicating it to three channels. 
+
+## 4. Experiment 
+
+4.1. Experiment Setup 
+
+Implementation Details. Our experimental framework is built upon the FLUX.1 Kontext backbone. All parameters are frozen except DiT. For depth estimation and normal esti-mation tasks, we adopt the AdamW optimizer with a learn-ing rate of 3 × 10 −5 and a batch size of 16. For interac-tive matting, due to the higher memory demand from paired context images, we use the memory-efficient AdamW8bit optimizer with a batch size of 16. To accelerate conver-gence, we apply annealed multi-resolution noise during training. The model typically converges within approxi-mately 6000 training steps. Each task is trained on a single NVIDIA H200 GPU for about 1.5 days. 
+
+Dataset and Benchmarks. We train and evaluate our model on task-specific benchmark datasets. Monocular Depth Estimation: Trained on Hypersim [35] and Vir-tual KITTI 2 [36], with a 90%:10% sample ratio. Sur-face Normal Estimation: Trained on Hypersim [35], In-teriorVerse [37], and Sintel [38], with a 50%:45%:5% sam-ple ratio. Interactive Matting: Trained on AM-2k [39], Distinctions-646 [40], Composition-1k [41], and COCO-Matting [42], with a 25%:25%:25%:25% sample ratio. For evaluation, we test our models on zero-shot gener-alization on all benchmarks except for AM-2k in Interac-tive Matting task. Monocular Depth Estimation: Eval-uated on NYUv2 [43], KITTI [44], ETH3D [45], Scan-Net [46], and DIODE [47]. Surface Normal Estimation: 
+
+Evaluated on NYUv2 [43], ScanNet [46], iBims-1 [48], and DIODE [47]. Interactive Matting: Evaluated on P3M-500-NP [49], AM-2k [39], and AIM-500 [50]. 
+
+Metrics. For Monocular Depth Estimation, we report Ab-sRel and δ1. Specifically, AbsRel = E[(ˆ yalign − y)/y ]
+
+where E is the expectation (average) of all valid pixels, 
+
+ˆyalign denotes the aligned prediction, and y the ground-truth depth. δ1 measures the proportion of pixels satisfying 
+
+max(ˆ yalign /y, y/ ˆyalign ) < 1.25 .For Surface Normal Estimation, we report Mean angular error and the percentage of pixels with error ¡ 11.25°. For Interactive Matting, we evaluate using MSE, MAD, SAD, Gradient, and Connectivity metrics. 
+
+4.2. Quantitative Evaluation 
+
+Table 1, 2, and 3 demonstrate the quantitative results across three dense perception tasks. Despite using far less training data and a single-step inference, our method consis-tently outperforms all strong baselines, demonstrating the effectiveness of image-editing diffusion models in struc-tural understanding and geometric reasoning. For Zero-Shot Monocular Depth Estimation, as shown in Table 1, our approach achieves new SOTA performance on five benchmarks, reaching an average rank of 1.5. On ETH3D and Scannet, the AbsRel error decreases 27% and 
+
+11% compared to second-best model, respectively. Notably, our model is trained on only 74 K images yet surpasses heavily supervised approaches such as DepthAnything V2 
+
+(62 .6M images), highlighting the efficiency of our depth representation optimization. For Zero-Shot Surface Normal Estimation (Table 2), our model ranks first on all benchmarks with an average rank of 
+
+1.4, confirming strong cross-dataset robustness and superior geometric detail reconstruction. Finally, as shown in Table 3, our interactive variant achieves the lowest errors on all three datasets and an aver-age rank of 1.2, demonstrating precise alpha prediction and excellent generalization to both portrait and non-portrait scenes. 
+
+4.3. Qualitative Evaluation 
+
+In this section, we present the qualitative evaluation re-sults. As shown in Fig. 3, we compare our method with baseline approaches on the Monocular Depth Estimation, Surface Normal Estimation and Interactive Matting. Our model produces depth maps with finer structural details and stronger consistency with the input image, while baseline methods tend to miss or blur small but critical objects. Similar improvements are observed in the surface normal and matting tasks. Our results exhibit better spatial coher-ence and visual consistency, demonstrating the model’s ca-pability to preserve both geometric accuracy and perceptual quality across dense perception tasks. 
+
+4.4. Ablation Study 
+
+To thoroughly analyze the contributions of each compo-nent in our framework, we conduct a series of detailed abla-tion studies. We first validate our core thesis on the superi-ority of I2I editing models as a foundation, then separately evaluate the effectiveness of our proposed pixel-space con-sistency loss and the theoretically optimal depth mapping function. Further details are provided in Supplementary Sections B.1 and C.1 .
+
+Importance of the Base Model: Image-to-Image (I2I) vs. Text-to-Image (T2I). Our core thesis posits that due to differences in pre-training objectives, I2I models designed for editing are better suited for dense perception than T2I 43572 Table 1. Quantitative comparison for zero-shot monocular depth estimation benchmarks. Our method is evaluated against recent SOTA methods across five benchmarks. The best and second-best are highlighted. All metrics are presented in percentage terms.                                                                                                                                         
+
+> Method Data NYU KITTI ETH3D Scannet DIODE AvgRank ↓
+> AbsRel ↓δ1↑AbsRel ↓δ1↑AbsRel ↓δ1↑AbsRel ↓δ1↑AbsRel ↓δ1↑
+> MiDaS 2M 11.1 88.5 23.6 63.0 18.4 75.2 12.1 84.6 33.2 71.5 9.5 GeoWizard 280k 5.2 96.6 9.7 92.1 6.4 96.1 6.1 95.3 29.7 79.2 4.8 GenPercept 74k 5.6 96.0 9.9 90.4 6.2 95.8 --35.7 75.6 6.0 DepthAnything V2 62.6M 4.5 97.9 7.4 94.6 13.1 86.5 --26.5 73.4 3.5 Marigold 74k 5.5 96.4 9.9 91.6 6.5 95.9 6.4 95.2 30.8 77.3 5.3 Marigold1.1 74k 5.5 96.4 10.5 90.2 6.9 95.7 5.8 96.3 29.8 78.2 6.4 Lotus-D 59k 5.1 97.2 8.1 93.1 6.1 97.0 5.5 96.5 22.8 73.8 2.9 Lotus-G 59k 5.4 96.8 8.5 92.2 5.9 97.0 5.9 95.7 22.9 72.9 4.2 E2E-FT 74k 5.4 96.5 9.6 92.1 6.4 95.9 5.8 96.5 30.3 77.6 4.7
+> Edit2Perceive 74k 4.4 97.6 7.9 94.5 4.3 98.3 4.9 97.3 24.8 81.4 1.5
+
+Table 2. Quantitative evaluation of our method on zero-shot surface normal estimation benchmarks. The best and second-best perfor-mances are highlighted.                                                                                                        
+
+> Method Data NYU Scannet iBims-1 DIODE AvgRank ↓
+> Mean ↓11.25° ↑Mean ↓11.25° ↑Mean ↓11.25° ↑Mean ↓11.25° ↑
+> GeoWizard 278k 19.0 50.0 17.6 54.6 19.3 62.3 24.7 30.1 8.3 GenPercept 44k 18.3 56.0 18.2 57.4 18.3 63.8 22.3 38.1 7.4 StableNormal 278k 17.8 54.2 16.7 54.0 17.1 67.8 19.3 53.8 5.5 DSINE 160K 16.2 61.0 16.4 59.6 17.1 67.4 19.9 41.8 4.5 Lotus-D 59k 16.2 59.8 14.7 64.0 17.1 66.4 --3.1 Lotus-G 59k 16.5 59.4 15.1 63.9 17.2 66.2 --4.4 ETE-FT 74k 16.5 60.4 14.7 66.1 16.1 69.7 19 44.4 3.0 Marigold v1.1 77k 16.1 60.5 14.5 66.1 16.3 68.5 18.8 45.5 2.4
+> Edit2Perceive 77k 15.7 61.6 14.1 66.3 15.1 70.9 18.7 44.3 1.4
+
+Table 3. Quantitative evaluation of our method on interactive matting benchmarks. The best and second-best performances are high-lighted. All methods use the same visual input points.                                                                                                                   
+
+> Method AIM-500 P3M-500-NP AM-2k AvgRank ↓
+> MSE ↓MAD ↓SAD ↓Grad ↓Conn ↓MSE ↓MAD ↓SAD ↓Grad ↓Conn ↓MSE ↓MAD ↓SAD ↓Grad ↓Conn ↓
+> MAM 0.075 0.108 186.5 37.5 40.4 0.087 0.116 207.5 29.4 43.5 0.060 0.081 141.6 22.5 31.5 5.9 MatAny 0.043 0.052 87.0 33.4 25.4 0.029 0.034 57.3 25.9 16.0 0.012 0.019 32.2 15.7 20.4 4.4 SmartMatting 0.030 0.039 66.3 46.6 18.8 0.024 0.029 50.5 28.5 19.6 0.030 0.037 62.6 33.8 15.9 4.3 LiteSDMatte 0.011 0.021 34.4 24.3 20.0 0.012 0.017 29.9 16.6 21.8 0.009 0.016 27.5 13.6 17.7 2.9 SDMatte 0.011 0.019 31.8 26.8 17.5 0.013 0.018 32.0 20.4 20.8 0.006 0.010 17.5 13.2 10.9 2.2
+> Edit2Perceive 0.006 0.017 29.1 18.2 15.7 0.003 0.011 19.4 13.2 10.2 0.004 0.012 20.4 9.6 9.9 1.2
+
+generators. To provide direct experimental evidence, we conduct a rigorous controlled experiment. We select two models with identical architectures: 
+
+FLUX.1 Kontext (I2I) and FLUX.1 (T2I) . Crucially, we construct the same I2I-style fine-tuning pipeline for the T2I model (FLUX.1) as our main framework, using token con-catenation for the text prompt, condition image and target image. This ensures that the only significant difference be-tween the two models is the prior knowledge acquired dur-ing their respective pre-training phases. As shown in Table 4 and Table 5, we conducted a to-tal of six sets of controlled experiments (four for depth es-timation and two for normal estimation). The results are unequivocal: across all experimental settings, the perfor-mance of the I2I-based model comprehensively and signif-icantly surpasses its T2I counterpart. For instance, in the depth estimation task (Table 4), even with the most basic configuration (ID 5 & 1), the I2I model achieves a re-markable 25% and 27% relative improvement in AbsRel on NYUv2 and KITTI, respectively. This advantage per-sists even after applying all our optimization strategies (ID 8 & 4). The same trend is observed in the normal estimation task (Table 5). This overwhelming experimental evidence strongly validates our core thesis: the structured semantic priors learned by I2I models provide a far superior starting point for downstream perception tasks than those from T2I models. As shown in Fig. 4 , we visualized Self-Attention Maps 
+
+(16th DiT block) in . I2I capture sharp object boundaries as early as Epoch 1, while T2I remains scattered (Similar in Epoch 3). This suggests I2I possess a superior “structural prior” for geometry tasks. 43573 Input DepthAnythingV2 Marigold v1.1 Edit2Perceive GT Lotus-D (a) Monocular Depth Estimation Stable Normal Marigold v1.1 GT Edit2Perceive Lotus-G Input (b) Surface Normal Estimation Input MAM SDMatte GT Edit2Perceive SMat (c) Interactive Matting 
+
+Figure 3. Qualitative Comparison of our methods with other SOTA methods across different benchmarks. The arrows emphasize the regions that Edit2Perceive (ours) significantly outperform others. Zoom in for better view. Input  T2I-epoch1  I2I-epoch1  T2I-epoch3  I2I-epoch3 
+
+Figure 4. Visualization of Attention Map between T2I and I2I. 
+
+Effect of Pixel-Space Consistency Loss. In Section 3.2, we proposed the pixel-space consistency loss ( LCons ) to bridge the gap between latent-space supervision and pixel-level quality. To verify its general effectiveness, we con-ducted six sets of controlled experiments across three tasks and two base models. 5.5 7.0 8.5                                       
+
+> 93.3 96.7 100.0
+> Monocular Depth Estimation
+> w/o LCons (AbsRel ↓)wLCons (AbsRel ↓)w/o LCons (δ1↑)wLCons (δ1↑)
+> 16.3 18.7 21.0
+> 50.7 61.3 72.0
+> Surface Normal Estimation
+> w/o LCons (Mean ↓)wLCons (Mean ↓)w/o LCons (11.25 ◦↑)wLCons (11.25 ◦↑)
+> 0.011 0.014 0.018
+> 19.0 24.0 29.0
+> Interactive Matting
+> w/o LCons (MAD ↓)wLCons (MAD ↓)w/o LCons (SAD ↓)wLCons (SAD ↓)
+> NYUv2 Scannet KITTI ETH3D DIODE iBims-1 NYUv2 Scannet AIM-500 AM-2k P3M-500-NP
+
+Figure 5. Effectiveness of the Pixel-Space Consistency Loss (LCons ) across All Tasks. The radar charts compare the perfor-mance with (solid line) and without (dashed line) our consistency loss. For each task, axes represent key metrics on different datasets (lower is better for error metrics like AbsRel, Mean, MAD, SAD; higher is better for accuracy metrics like δ1, 11.25 ◦). 
+
+As shown in Fig. 5 and Table 4,5, introducing LCons 
+
+brings consistent performance improvements across all con-figurations. Interestingly, we observe a complementary re-lationship between the gains from LCons and the strength of the base model. For example, on the weaker T2I backbone (Table 4, IDs 1 & 2, 3 & 4), LCons provides substantial im-provements (AbsRel drop of 1.0-1.4 on NYUv2). On the stronger I2I backbone (IDs 5 & 6, 7 & 8), where the model already possesses better structural understanding, the gains become more subtle (AbsRel drop of 0.3-0.4), indicating that LCons acts more as a fine-tuner rather than a rectifier .Furthermore, as illustrated in Fig. 5, this improvement is crucial for tasks highly sensitive to fine-grained structures and edges, such as normal estimation and image matting. This proves that LCons serves as an effective plug-and-play module that injects pixel-level geometric constraints into the latent-space generation process, thereby enhancing the final perception quality. 
+
+Effect of Theoretically Optimal Depth Mapping. In Section 3.3, we theoretically derived the optimality of the square root (Sqrt) depth mapping for minimizing relative quantization error. We conducted four sets of controlled experiments in Ta-ble 4 (IDs 1 & 3, 2 & 4, 5 & 7, 6 & 8) to compare our Sqrt mapping against traditional uniform normalization (Uni). The results show that the Sqrt mapping yields significant performance improvements in all cases. We observe that the improvement is particularly pro-nounced on the outdoor dataset KITTI, which features a larger depth range. For instance, without LCons (IDs 1 & 3, 5 & 7), the AbsRel reduction on KITTI (-3.0, -1.4) is much larger than on the indoor dataset NYUv2 (-0.5, -0.4). This phenomenon aligns perfectly with our theoreti-cal analysis. As shown in formulation 10, our integral error analysis, based on the objective predicts this behavior. By substituting g(y) = y (Uniform) and g(y) = √y (Sqrt) into the integral for different depth ranges, we can quan-tify the theoretical error reduction. For an indoor range like 43574 NYUv2 ( [0 .1, 10] m), the theoretical improvement for Ab-sRel is 0.26. For an outdoor range like KITTI ( [0 .1, 80] m), the theoretical improvement for AbsRel is a more substan-tial 0.6. The strong consistency between our experimental results and theoretical predictions not only proves the supe-riority of our depth mapping method but also highlights that a principled, first-principles-based design is crucial for un-locking the full potential of large-scale models and achiev-ing SOTA performance. 
+
+Effect of Inference Steps. Our framework naturally sup-ports efficient single-step inference. As shown in Fig. 6, performance peaks at 4 steps and then slightly degrades with more steps. This suggests that, unlike generative tasks, dense perception does not necessarily benefit from prolonged denoising, which may introduce over-smoothing artifacts. Despite its simplicity, single-step inference al-ready achieves competitive performance, highlighting the efficiency of our deterministic formulation. Further details are provided in Supplementary Sections B.2 and C.3 .
+
+Table 4. Ablation on the Base Model, Consistency Loss, and Depth Normalization for Monocular Depth Estimation. Here the column “D.M.” stands for Depth Mapping, we compare two ways: Uni (Uniform) and Sqrt (Square Root). The best and second-best performances are highlighted.                                                                 
+
+> ID Base Model LCons D.M. NYUv2 KITTI AbsRel ↓δ1↑AbsRel ↓δ1↑
+> 1FLUX.1 Uni 6.8 95.1 13.2 83.7 2FLUX.1 ✓Uni 5.4 96.9 12.5 84.3 3FLUX.1 Sqrt 6.3 95.8 10.2 89.7 4FLUX.1 ✓Sqrt 5.3 97.0 8.4 92.8 5FLUX.1 Kontext Uni 5.1 96.9 9.6 91.2 6FLUX.1 Kontext ✓Uni 4.8 97.2 9.6 91.2 7FLUX.1 Kontext Sqrt 4.7 97.5 8.2 94.1 8FLUX.1 Kontext ✓Sqrt 4.4 97.6 7.9 94.5
+
+Table 5. Ablation on the Base Model, Consistency Loss for Sur-face Normal Estimation. The best and second-best perfor-mances are highlighted.                                 
+
+> ID Base Model LCons
+> NYUv2 Scannet Mean ↓11.25° ↑Mean ↓11.25° ↑
+> 1FLUX.1 16.6 57.7 15.0 62.1 2FLUX.1 ✓16.4 59.1 14.9 63.3 3FLUX.1 Kontext 15.8 60.0 14.2 65.2 4FLUX.1 Kontext ✓15.7 61.6 14.1 66.3
+
+Model Efficiency We compare our model with concur-rent models (MoGe, UniDepth) in Fig. 7. Although dis-criminative models offer faster inference and higher preci-sion, our approach demonstrates a significant advantage in data efficiency (requiring only about 1/100 of the data size) while achieving competitive performance, and additionally features lower FLOPs compared to other generative models. Note that we strictly adopt the optimal ensemble configu-ration (as reported in their original papers) for fair compar-94 96 98              
+
+> δ1↑(%) Monocular Depth Estimation 12 4 10 25 Inference Steps 80 .082 .5
+> 65 70
+> 11 .25 ◦↑(%) Surface Normal Estimation 12 4 10 25 Inference Steps 44 46
+> NYUv2 KITTI ETH3D Scannet DIODE iBims-1
+
+Figure 6. Ablation study on inference steps. 10 5 10 6 10 7    
+
+> Training Data Volume (Images, Log Scale)
+> 90 91 92 93 94 95 Av g. δ1 ↑
+> GeoWizard
+> 780T
+> Ours
+> 57T
+> DepthAnything v2
+> 5.8T
+> MoGe
+> 2.3T
+> UniDepth
+> 1.1T Model Type Generative Discriminative
+> Marigold v1.1
+> 105T
+> DepthFM
+> 94T
+> Train Data Size
+
+Figure 7. Comparison of Model FLOPS (Size of Bubble), Train Data Size, and Average δ1 ↑ over 5 depth estimation benchmarks (NYUv2, KITTI, ETH3D, Scannet, DIODE). 
+
+ison: GeoWizard ( 10 × 50 ), Marigold v1.1 ( 10 × 4), and DepthFM ( 7 × 1). 
+
+## 5. Conclusion 
+
+In this work, we present Edit2Perceive , a simple but powerful diffusion-transformer framework for dense per-ception tasks. Unlike traditional text-to-image diffusion models, our approach leverages image-to-image diffusion models as geometric priors, reframing dense perception as a deterministic image-to-image transformation process. This perspective allows the model to achieve strong spa-tial consistency and structural fidelity across diverse tasks such as Monocular Depth Estimation, Surface Normal Es-timation, and Interactive Matting. By introducing pixel-space consistency loss and efficient single-step inference, Edit2Perceive not only achieves SOTA accuracy but also significantly reduces inference cost. Our results demon-strate that diffusion-based editors can serve as a new class of perception-oriented foundation models, combining the ex-pressive power of generative models with the precision and stability required for geometric reasoning. We believe this work opens up promising directions for unifying editing and perception within a single diffusion framework, paving the way for efficient, structure-aware, and general-purpose vi-sual understanding. 43575 Acknowledgment 
+
+This research is supported by the National Re-search Foundation, singapore under its Al singa-pore Programme (AlSG Award No:AISG3-RP-2022-030). 
+
+## References 
+
+[1] Robin Rombach, Andreas Blattmann, Dominik Lorenz, Patrick Esser, and Bj¨ orn Ommer. High-resolution image syn-thesis with latent diffusion models. In CVPR , pages 10684– 10695, June 2022. 1, 2 [2] Bingxin Ke, Anton Obukhov, Shengyu Huang, Nando Met-zger, Rodrigo Caye Daudt, and Konrad Schindler. Repurpos-ing diffusion-based image generators for monocular depth estimation. In CVPR , 2024. 1, 2, 4 [3] Black Forest Labs, Stephen Batifol, Andreas Blattmann, Frederic Boesel, Saksham Consul, Cyril Diagne, Tim Dock-horn, Jack English, Zion English, Patrick Esser, Sumith Ku-lal, Kyle Lacey, Yam Levi, Cheng Li, Dominik Lorenz, Jonas M¨ uller, Dustin Podell, Robin Rombach, Harry Saini, Axel Sauer, and Luke Smith. Flux.1 kontext: Flow matching for in-context image generation and editing in latent space, 2025. 2, 3 [4] Black Forest Labs. Flux. https://github.com/ black-forest-labs/flux , 2024. 2 [5] Shiyu Liu, Yucheng Han, Peng Xing, Fukun Yin, Rui Wang, Wei Cheng, Jiaqi Liao, Yingming Wang, Honghao Fu, Chun-rui Han, Guopeng Li, Yuang Peng, Quan Sun, Jingwei Wu, Yan Cai, Zheng Ge, Ranchen Ming, Lei Xia, Xianfang Zeng, Yibo Zhu, Binxing Jiao, Xiangyu Zhang, Gang Yu, and Daxin Jiang. Step1x-edit: A practical framework for gen-eral image editing. arXiv preprint arXiv:2504.17761 , 2025. 2[6] William Peebles and Saining Xie. Scalable diffusion models with transformers. In ICCV , pages 4195–4205, 2023. 2, 3 [7] Yuxuan Zhang, Yirui Yuan, Yiren Song, Haofan Wang, and Jiaming Liu. Easycontrol: Adding efficient and flexible con-trol for diffusion transformer. In ICCV , 2025. 2 [8] Yiren Song, Cheng Liu, and Mike Zheng Shou. Omniconsis-tency: Learning style-agnostic consistency from paired styl-ization data. In NeurIPS , 2025. 2 [9] Yan Gong, Yiren Song, Yicheng Li, Chenglin Li, and Yin Zhang. Relationadapter: Learning and transferring vi-sual relation with diffusion transformers. arXiv preprint arXiv:2506.02528 , 2025. [10] Yuxin Jiang, Yuchao Gu, Yiren Song, Ivor Tsang, and Mike Zheng Shou. Personalized vision via visual in-context learning. arXiv preprint arXiv:2509.25172 , 2025. [11] Zitong Wang, Hang Zhao, Qianyu Zhou, Xuequan Lu, Xi-angtai Li, and Yiren Song. Diffdecompose: Layer-wise de-composition of alpha-composited images via diffusion trans-formers. arXiv preprint arXiv:2505.21541 , 2025. [12] Yiren Song, Cheng Liu, and Mike Zheng Shou. Makeany-thing: Harnessing diffusion transformers for multi-domain procedural sequence generation. arXiv preprint arXiv:2502.01572 , 2025. [13] Yiren Song, Danze Chen, and Mike Zheng Shou. Layer-tracer: Cognitive-aligned layered svg synthesis via diffusion transformer. In ICCV , 2025. [14] Hailong Guo, Bohan Zeng, Yiren Song, Wentao Zhang, Chuang Zhang, and Jiaming Liu. Any2anytryon: Leveraging adaptive position embeddings for versatile virtual clothing tasks. In ICCV , 2025. [15] Runnan Lu, Yuxuan Zhang, Jiaming Liu, Haofan Wang, and Yiren Song. Easytext: Controllable diffusion trans-former for multilingual text rendering. arXiv preprint arXiv:2505.24417 , 2025. [16] Wenda Shi, Yiren Song, Zihan Rao, Dengming Zhang, Ji-aming Liu, and Xingxing Zou. Wordcon: Word-level ty-pography control in scene text rendering. arXiv preprint arXiv:2506.21276 , 2025. [17] Wenda Shi, Yiren Song, Dengming Zhang, Jiaming Liu, and Xingxing Zou. Fonts: Text rendering with typography and style controls. In ICCV , 2025. 2 [18] Ren´ e Ranftl, Katrin Lasinger, David Hafner, Konrad Schindler, and Vladlen Koltun. Towards robust monocular depth estimation: Mixing datasets for zero-shot cross-dataset transfer. IEEE TPAMI , 44(3):1623–1637, 2022. 2 [19] Lihe Yang, Bingyi Kang, Zilong Huang, Xiaogang Xu, Jiashi Feng, and Hengshuang Zhao. Depth anything: Unleashing the power of large-scale unlabeled data. In CVPR , 2024. 2 [20] Lihe Yang, Bingyi Kang, Zilong Huang, Zhen Zhao, Xiao-gang Xu, Jiashi Feng, and Hengshuang Zhao. Depth any-thing v2. arXiv preprint arXiv:2406.09414 , 2024. 2 [21] Gwangbin Bae and Andrew J. Davison. Rethinking inductive biases for surface normal estimation. In CVPR , 2024. 2 [22] Bingxin Ke, Kevin Qu, Tianfu Wang, Nando Metzger, Shengyu Huang, Bo Li, Anton Obukhov, and Konrad Schindler. Marigold: Affordable adaptation of diffusion-based image generators for image analysis. IEEE TPAMI ,PP, 2025. 2 [23] Xiao Fu, Wei Yin, Mu Hu, Kaixuan Wang, Yuexin Ma, Ping Tan, Shaojie Shen, Dahua Lin, and Xiaoxiao Long. Geowiz-ard: Unleashing the diffusion priors for 3d geometry estima-tion from a single image. arXiv preprint arXiv:2403.12013 ,2024. 2 [24] Guangkai Xu, Yongtao Ge, Mingyu Liu, Chengxiang Fan, Kangyang Xie, Zhiyue Zhao, Hao Chen, and Chunhua Shen. What matters when repurposing diffusion models for general dense perception tasks? In ICLR , 2024. 2 [25] Chongjie Ye, Lingteng Qiu, Xiaodong Gu, Qi Zuo, Yushuang Wu, Zilong Dong, Liefeng Bo, Yuliang Xiu, and Xiaoguang Han. Stablenormal: Reducing diffusion variance for stable and sharp normal. ACM TOG , 2024. 2 [26] Jing He, Haodong Li, Wei Yin, Yixun Liang, Leheng Li, Kaiqiang Zhou, Hongbo Liu, Bingbing Liu, and Ying-Cong Chen. Lotus: Diffusion-based visual foundation model for high-quality dense prediction. arXiv preprint arXiv:2409.18124 , 2024. 2 [27] Gonzalo Martin Garcia, Karim Abou Zeid, Christian Schmidt, Daan de Geus, Alexander Hermans, and Bastian Leibe. Fine-tuning image-conditional diffusion models is easier than you think. In WACV , 2025. 2 [28] Jiachen Li, Jitesh Jain, and Humphrey Shi. Matting anything. 
+
+arXiv preprint arXiv:2306.05399 , 2023. 3 43576 [29] Zixuan Ye, Wenze Liu, He Guo, Yujia Liang, Chaoyi Hong, Hao Lu, and Zhiguo Cao. Unifying automatic and interactive matting with pretrained vits. In CVPR , 2024. 3 [30] Longfei Huang, Yu Liang, Hao Zhang, Jinwei Chen, Wei Dong, Lunde Chen, Wanyu Liu, Bo Li, and Peng-Tao Jiang. Sdmatte: Grafting diffusion models for interactive matting. In ICCV , 2025. 3, 1 [31] JiYuan Wang, Chunyu Lin, Lei Sun, Rongying Liu, Lang Nie, Mingxing Li, Kang Liao, Xiangxiang Chu, and Yao Zhao. From editor to dense geometry estimator. arXiv preprint arXiv:2509.04338 , 2025. 3 [32] Yaron Lipman, Ricky T. Q. Chen, Heli Ben-Hamu, Maxi-milian Nickel, and Matt Le. Flow matching for generative modeling. In ICLR , Feb 2023. 3 [33] Xingchao Liu, Chengyue Gong, and Qiang Liu. Flow straight and fast: Learning to generate and transfer data with rectified flow. arXiv preprint arXiv:2209.03003 , 2022. 3 [34] Jingfeng Yao, Xinggang Wang, Shusheng Yang, and Baoyuan Wang. Vitmatte: Boosting image matting with pre-trained plain vision transformers. Information Fusion , 103: 102091, 2024. ISSN 1566-2535. 4 [35] Mike Roberts and Nathan Paczan. Hypersim: A photorealis-tic synthetic dataset for holistic indoor scene understanding. 
+
+ICCV , pages 10892–10902, 2020. 5 [36] Yohann Cabon, Naila Murray, and M. Humenberger. Virtual kitti 2. arXiv preprint arXiv:2001.10773 , 2020. 5 [37] Jingsen Zhu, Fujun Luan, Yuchi Huo, Zihao Lin, Zhihua Zhong, Dianbing Xi, Rui Wang, Hujun Bao, Jiaxiang Zheng, and Rui Tang. Learning-based inverse rendering of complex indoor scenes with differentiable monte carlo raytracing. In 
+
+SIGGRAPH Asia 2022 Conference Papers . ACM, 2022. 5 [38] D. J. Butler, J. Wulff, G. B. Stanley, and M. J. Black. Anaturalistic open source movie for optical flow evaluation. In A. Fitzgibbon et al. (Eds.), editor, ECCV , Part IV, LNCS 7577, pages 611–625. Springer-Verlag, October 2012. 5 [39] Jizhizi Li, Jing Zhang, Stephen J Maybank, and Dacheng Tao. Bridging composite and real: towards end-to-end deep image matting. IJCV , 130(2):246–266, 2022. 5 [40] Yu Qiao, Yuhao Liu, Xin Yang, Dongsheng Zhou, Mingliang Xu, Qiang Zhang, and Xiaopeng Wei. Attention-guided hier-archical structure aggregation for image matting. In CVPR ,June 2020. 5 [41] Ning Xu, Brian Price, Scott Cohen, and Thomas Huang. Deep image matting. In CVPR , pages 2970–2979, 2017. 5 [42] Ruihao Xia, Yu Liang, Peng-Tao Jiang, Hao Zhang, Qianru Sun, Yang Tang, Bo Li, and Pan Zhou. Towards natural im-age matting in the wild via real-scenario prior. arXiv preprint arXiv:2410.06593 , 2024. 5 [43] Pushmeet Kohli Nathan Silberman, Derek Hoiem and Rob Fergus. Indoor segmentation and support inference from rgbd images. In ECCV , 2012. 5 [44] Andreas Geiger, Philip Lenz, and Raquel Urtasun. Are we ready for autonomous driving? the kitti vision benchmark suite. In CVPR , 2012. 5 [45] Thomas Sch¨ ops, Torsten Sattler, and Marc Pollefeys. BAD SLAM: Bundle adjusted direct RGB-D SLAM. In CVPR ,2019. 5 [46] Angela Dai, Angel X. Chang, Manolis Savva, Maciej Hal-ber, Thomas Funkhouser, and Matthias Niessner. Scannet: Richly-annotated 3d reconstructions of indoor scenes. In 
+
+CVPR , July 2017. 5 [47] Igor Vasiljevic, Nick Kolkin, Shanyi Zhang, Ruotian Luo, Haochen Wang, Falcon Z. Dai, Andrea F. Daniele, Moham-madreza Mostajabi, Steven Basart, Matthew R. Walter, and Gregory Shakhnarovich. DIODE: A Dense Indoor and Out-door DEpth Dataset. CoRR , abs/1908.00463, 2019. 5 [48] Tobias Koch, Lukas Liebel, Friedrich Fraundorfer, and Marco K¨ orner. Evaluation of cnn-based single-image depth estimation methods. In Stefan Leal-Taix´ e, Laura;Roth, editor, Eur. Conf. Comput. Vis. Worksh. , pages 331–348. Springer International Publishing, 2019. doi: 10.1007/978-3-030-11015-4 25. 5 [49] Jizhizi Li, Sihan Ma, Jing Zhang, and Dacheng Tao. Privacy-preserving portrait matting. In ACM MM , page 3501–3509. Association for Computing Machinery, 2021. 5 [50] Jizhizi Li, Jing Zhang, and Dacheng Tao. Deep automatic natural image matting. In IJCAI , pages 800–806, 8 2021. 5 43577

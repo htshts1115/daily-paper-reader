@@ -1,0 +1,997 @@
+From Inpainting to Layer Decomposition:
+Repurposing Generative Inpainting Models for Image Layer Decomposition
+Jingxi Chen1, 2*, Yixiao Zhang2, Xiaoye Qian2, Zongxia Li1,
+Cornelia Fermuller1, Caren Chen2, Yiannis Aloimonos1
+1University of Maryland
+2Amazon
+https://inpaintinglayerdecomp.github.io/
+Input Image
+Output Background
+Output Foreground
+Input Image
+Output Background
+Output Foreground
+Figure 1. We propose a novel method for image layer decomposition, that is able to simultaneously extract foreground object with potential
+occlusion recovered, and remove the object from the background. The model is efficiently adapted from a pre-trained inpainting model. For
+each set of images in this figure, left is the original image, middle is the background and right is the foreground.
+Abstract
+Images can be viewed as layered compositions, fore-
+ground objects over background, with potential occlusions.
+This layered representation enables independent editing of
+elements, offering greater flexibility for content creation. De-
+spite the progress in large generative models, decomposing
+a single image into layers remains challenging due to limited
+methods and data. We observe a strong connection between
+layer decomposition and in/outpainting tasks, and propose
+adapting a diffusion-based inpainting model for layer decom-
+position using lightweight finetuning. To further preserve
+detail in the latent space, we introduce a novel multi-modal
+context fusion module with linear attention complexity. Our
+model is trained purely on a synthetic dataset constructed
+from open-source assets and achieves superior performance
+in object removal and occlusion recovery, unlocking new pos-
+sibilities in downstream editing and creative applications.
+*Work done during Jingxi Chen’s internship at Amazon
+1. Introduction
+Recent advances in generative modeling, particularly diffu-
+sion models, have greatly improved image synthesis and ma-
+nipulation. While most image diffusion models [22, 27, 34]
+target single tasks like inpainting, super-resolution, or im-
+age translation, they excel at generating plausible content in
+under-constrained scenarios. However, real-world applica-
+tions often require a combination of related tasks. One such
+task is image layer decomposition, simultaneously extracting
+the foreground and completing the background, which goes
+beyond inpainting and supports applications like creative
+re-composition, layered artwork generation, and component-
+based retrieval.
+While single-task image diffusion models have been
+widely studied, diffusion-based image layer decomposition
+remains underexplored. A recent work [37] addresses this by
+fully fine-tuning a closed-source, pre-trained text-to-image
+This CVPR paper is the Open Access version, provided by the Computer Vision Foundation.
+Except for this watermark, it is identical to the accepted version;
+the final published version of the proceedings is available on IEEE Xplore.
+16054
+
+
+model on a large, curated dataset. Although effective, this
+approach demands substantial computational resources and
+data. In contrast, we observe that decomposed backgrounds
+involve filling masked regions, while foregrounds extend
+unmasked regions with an additional alpha channel. This
+conceptual similarity to inpainting and outpainting motivates
+our approach: to achieve layer decomposition through effi-
+cient adaptation of a pre-trained model, without large-scale
+training.
+The central research question of this work is: What is
+the relationship between image layer decomposition and
+inpainting, and can existing inpainting models be effectively
+adapted to perform layer decomposition?
+This question drives our investigation into whether
+lightweight repurposing of inpainting models can offer a
+practical alternative to large-scale retraining for image layer
+decomposition. This direction is valuable to both researchers
+and practitioners, as training generative models from scratch
+is increasingly costly in terms of compute and data. In
+contrast, numerous pre-trained models already exist for stan-
+dard tasks like inpainting. If these models can be effec-
+tively adapted for layer decomposition with minimal effort, it
+would significantly reduce development overhead and enable
+a plug-and-play extension that benefits from future advances
+in inpainting models.
+In this work, we introduce the first approach to adapt
+a pre-trained image inpainting model for the novel task of
+image layer decomposition, as illustrated in Figure 1. By
+examining the fundamental relationship between inpainting
+and layer decomposition, we observe that the latter extends
+inpainting by requiring not only background completion
+but also foreground extraction and outpainting. This in-
+sight motivates our method, Outpaint-and-Remove, which
+efficiently adapts a pre-trained diffusion-based inpainting
+model to perform image layer decomposition in a parameter-
+and data-efficient manner.
+For robust evaluation, we conduct experiments on the
+MULAN [30] dataset, which is the only standard dataset in
+this domain to the best of our knowledge. We also conduct
+user study on a small set of real-word high quality images.
+Both qualitative and quantitative results show state-of-the-art
+performance on the novel task of image layer decomposition,
+as well as on standard object removal. Our ablation studies
+further validate the effectiveness of our design, demonstrat-
+ing that augmenting a pre-trained inpainting model signifi-
+cantly improves its ability to perform layer decomposition.
+Our main contributions are summarized as follows:
+• A novel perspective on layer decomposition, and a data-
+and parameter-efficient method that enables pre-trained
+image inpainting models to perform layer decomposition.
+• Comprehensive experiments and ablations demonstrate
+that our adaptation-based approach effectively leverages
+publicly available models and datasets to achieve state-of-
+the-art performance on both image layer decomposition
+and the original inpainting task.
+2. Related Work
+2.1. Image Diffusion Models
+Diffusion models (or related flow-based models) [4, 6, 7,
+24, 26] have dominated image generation since the pioneer-
+ing work DDPM [13], outperforming VAE-based [17] and
+GAN-based [11] approaches in diversity, robustness, and
+scalability. While alternatives such as autoregressive mod-
+els [29] have been proposed, most state-of-the-art text-to-
+image models remain within the diffusion paradigm [3, 26].
+Diffusion models have also been successfully adapted to a
+wide range of image tasks, including inpainting [8, 22, 36],
+super-resolution [10], image translation [3, 19], and even
+discriminative tasks like segmentation and matting [1, 14].
+2.2. Image inpainting Models
+Early image inpainting methods typically rely on training
+convolutional neural networks or transformers from scratch
+on curated datasets [28, 39, 40]. More recently, diffusion-
+based generative models have become the dominant ap-
+proach for inpainting, driven by both industrial [9, 20] and
+open-source [2] efforts. Compared to traditional methods,
+these models offer greater diversity through sampling and
+better controllability via prompt conditioning.
+2.3. Image Layer Decomposition
+Layer decomposition enables flexible element-wise image
+editing that is infeasible with single-layer images. How-
+ever, high-quality layer-annotated datasets remain scarce
+in the open-source community. MULAN [30] provides a
+large-scale dataset with RGBA layers, but these are gener-
+ated using off-the-shelf detection, segmentation, or inpaint-
+ing models, and their quality is not guaranteed. LayerDif-
+fuse [41] and Alfie [25] repurpose diffusion models to syn-
+thesize RGBA layers. In our work, we leverage MULAN and
+LayerDiffuse as foreground layer data sources. LAYERDE-
+COMP [37] is a recent method explicitly targeting the layer
+decomposition task. However, LAYERDECOMP requires
+full fine-tuning on a large scale high-quality dataset, making
+it impractical for general users with limited resources. In
+contrast, our method introduces lightweight LoRA-based
+fine-tuning strategy with multi-modal context inputs. This
+allows us to re-purpose existing pre-trained inpainting mod-
+els for layer decomposition without large-scale training and
+democratize the capability to a broader range of users.
+3. Proposed Approach
+3.1. Problem Formulation
+The core idea of our method is that image layer decompo-
+sition can be reformulated as a combination of inpainting
+16055
+
+
+and outpainting tasks. Rather than designing a model from
+scratch, we show that a single inpainting model can be effi-
+ciently fine-tuned to handle this task.
+In this section, we discuss the conceptual connection
+between image inpainting and layer decomposition, and ex-
+plain how we adapt the inpainting formulation to simul-
+taneously recover missing regions (inpainting) and extend
+visible content beyond its original boundaries (outpainting),
+effectively enabling layered decomposition.
+Image inpainting: The image inpainting problem can be
+formulated as follows: given an input image I and a binary
+mask M, a diffusion-based inpainting model fθ1 takes the
+masked image I·M as input and predicts the missing content
+in the region indicated by M. Here, · denotes the element-
+wise masking operation that removes the target region in I
+for the purpose of inpainting.
+Image Layer Decomposition: For the Image Layer De-
+composition, given an input image I and a binary mask M,
+a diffusion-based model fθ2 takes the image I and M as
+input and outputs both the extracted foreground indicated by
+M, which may include occluded regions, and a completed
+background with the foreground object removed. The key
+difference from image inpainting lies not only in the ad-
+ditional foreground output but also in the treatment of the
+background. As shown in Figure 6, an inpainting model sim-
+ply fills the masked region with plausible content, while layer
+decomposition requires explicit object removal, restoring the
+background as if the object never existed.
+Nevertheless, we observe a structural unification between
+inpainting and layer decomposition tasks. For the back-
+ground layer, both approaches involve filling masked regions
+with plausible content. For the foreground layer, the goal
+is to recover accurate RGB and alpha channels within the
+masked object, while enforcing zero alpha outside, effec-
+tively an outpainting formulation with transparency con-
+straints. We also provide an intuitive illustration of the simi-
+larity between outpainting and foreground generation in the
+supplementary materials. This dual formulation allows both
+foreground and background generation to be viewed as spe-
+cial cases of in-/out-painting. As modern diffusion models
+are generalists due to large-scale pre-training, we propose
+reusing a single inpainting backbone with minimal modifi-
+cations, adding a lightweight foreground prediction head, to
+support image layer decomposition via parameter-efficient
+fine-tuning.
+3.2. Pipeline Overview
+We present an overview of our proposed Outpaint-and-
+Remove pipeline in Figure 2. In the Figure 3, We detail
+our proposed method and key components. We also explain
+our unique data curation strategy built entirely from open-
+source datasets and tools in Figure 5.
+Inpainting 
+DiT
+LoRA
+Multi-context 
+Tokenization
+RGB
+Decoding
+RGBA
+Decoding
+RGB
+Decoding
+Inpainting 
+DiT
+Inpainting 
+Tokenization
+PEFT
+Figure 2. The top illustrates the original inpainting functionality
+of the pre-trained Inpainting DiT. The bottom shows our adapted
+pipeline for the image layer decomposition task. We introduce
+three key components to the pre-trained model for the adaptation:
+1) Multi-Modal context Tokenization, 2) Parameter-Efficient Fine-
+Tuning (PEFT), 3) RGBA Decoding. Original components from
+the pre-trained model are highlighted in light blue, while our added
+or modified components are shown in orange.
+3.3. Multi-Modal Context Tokenization
+Modern diffusion or flow models work on tokens in a la-
+tent space. To preserve as much fine details as possible in
+the latent space, we are motivated to exploit multi-modal
+context inputs as conditions for generation. Specifically, we
+produce the edge map, segmentation map and depth map
+from the given image. Given the image, mask, and multi-
+modal maps obtained, we first convert all these image-like
+inputs into tokens. With recent advances in VAE encoders
+from pre-trained DiT models, we find these encoders can
+effectively tokenize various image-like inputs, as verified in
+our supplementary material.
+However, when we want to incorporate more modalities
+context tokens as additional inputs, challenge arises from the
+computational overhead introduced by the growing number
+of tokens. To address this, we propose summarizing the
+multi-modal tokens into a compact representation before
+feeding them into the DiT. While token fusion is best han-
+dled by a transformer-like module, standard attention has
+quadratic complexity, O(K2), where K is the total num-
+ber of tokens from all modalities. To reduce this cost, our
+proposed Multi-Modal Latent Fusion module, inspired by
+linear attention transformers [15, 23], uses a small constant
+number N << K of latent tokens as queries. This reduces
+the attention complexity to approximately O(KN), making
+it linear with respect to the number of input tokens.
+3.4. Design of the Image-Mask Context
+The design of the image-mask context plays a critical role in
+our method. As shown in the ablation study (Section 4.4.2),
+the choice of image-mask context directly reflects the nature
+of the task, a combination of foreground outpainting and
+background removal.
+16056
+
+
+Inpainting DiT 
+❄
+LoRA🔥
+Input layer🔥
+Encoder
+❄
+Image-Mask Context
+Multi-Modal Context
+cross-modal prediction
+Encoder
+❄
+Multi-Modal 
+Latent Fusion
+🔥
+concat
+{𝑧!
+", 𝑧!
+#}
+𝑧!$%
+"
+𝑧!$%
+#
+RGBA
+Decoder
+❄
+RGB
+Decoder
+❄
+Diffusion Steps T
+Multi-Modal Latent Fusion
+random masking 
+Cross 
+Attention
+K, V
+Q
+Linear
+….
+Linear
+Self- 
+Attention
+Repeat D
+Latent Tokens
+{𝑐&$'
+"
+, 𝑐&$'
+#
+}
+𝑐''
+Figure 3. Detailed diagram of the key components in our proposed adaptation method. Light blue boxes denote components from the original
+pre-trained inpainting DiT model, while orange boxes represent our modifications or additions. Our approach efficiently incorporates both
+Image-Mask Context and Multi-Modal Context tokens to guide generation. After adaptation, the model can simultaneously output an
+extracted and outpainted foreground along with a clean, object-removed background.
+Standard Inpainting Image—Mask Context
+𝑐!"#
+$
+𝑐!"#
+%
+Figure 4. We illustrate the difference between the standard image-
+mask context used in diffusion-based inpainting models, shown
+in the light blue box as cb
+I−M, and our proposed image-mask con-
+text for image layer decomposition, shown in the orange box as
+{cf
+I−M, cb
+I−M}.
+Our context design is illustrated in Figure 4. Unlike
+standard diffusion-based inpainting models that use only
+a background image-mask context cb
+I−M, we introduce an
+additional foreground image-mask context cf
+I−M. This fore-
+ground context serves as a control signal that helps the model
+balance preservation of existing information and generation
+of new content, enabling faithful extraction and outpainting
+of foreground objects.
+After obtaining all context tokens from different sources,
+foreground context cf
+I−M
+∈RN×d1, background con-
+text cb
+I−M
+∈RN×d1, and fused multi-modal context
+cMM
+∈RN×d2, we concatenate them with the corre-
+sponding noisy input tokens for foreground zf
+t ∈RN×d3
+and background zb
+t ∈RN×d3. The concatenation is per-
+formed along the channel dimension as follows: Foreground
+input:concat(zf
+t , cf
+I−M, cMM) ∈RN×(d1+d2+d3), Back-
+ground input: concat(zb
+t, cb
+I−M, cMM) ∈RN×(d1+d2+d3).
+The final input to the DiT consists of two separate sequences
+of N tokens, one for the foreground and one for the back-
+ground, each with a token dimension of d1 + d2 + d3.
+3.5. Parameter Efficient Finetuning Protocol
+Inspired by prior work, we adopt a similar Parameter-
+Efficient Fine-Tuning (PEFT) protocol to adapt the frozen
+base inpainting DiT for our task. This allows the model to
+handle additional input channels and learn new capabilities
+efficiently with few training iterations. Specifically, we fine-
+tune the input projection layer and insert LoRA (Low-Rank
+Adaptation) layers into each attention and feed-forward layer
+of the DiT backbone.
+Notably, as demonstrated in our ablation study (Sec-
+tion 4.4.4), the LoRA rank plays a critical role in the de-
+tail preservation of foreground generation. It governs the
+trade-off between maintaining the generative power of the
+base inpainting model and learning the new capacity for
+foreground extraction, with the base model weights frozen.
+3.6. Decoding Foreground and Background
+The generated background is in RGB format, allowing us
+to directly reuse the pre-trained VAE encoder and decoder
+without modification. In contrast, the generated foreground
+is in RGBA format, which includes an additional alpha chan-
+16057
+
+
+Figure 5. Our training data consists three sources: backgrounds,
+real foregrounds, and synthetic foregrounds.
+nel for transparency. To support this, we finetune a separate
+RGBA encoder/decoder, following the same principles as
+prior works [41].
+3.7. Training Data Curation from Public Sources
+In this section, we explain how we curate our synthetic
+training dataset using public sources and tools. Our dataset
+includes key compositional elements commonly found in
+images, such as human, animals, objects, and indoor/outdoor
+scenes.
+We use the MULAN [30] dataset, a real-world layered im-
+age dataset, as one of the foundation for RGBA foreground
+layers. However, as shown in Figure 5, images in MULAN
+often suffer from imperfect foreground extraction due to oc-
+clusions and background entanglement. To address this, we
+explore a text-to-layer generative model LayerDiffuse [41] to
+generate cleaner foregrounds. While these models produce
+complete foreground object shapes, they tend to introduce
+over-smoothed textures and lack fine details, leading to de-
+graded training performance.
+To harness the strengths of both sources of images, we
+propose a hybrid data strategy that combines two comple-
+mentary foreground sources:1) Real foregrounds with rich
+detail but incomplete shapes, 2) Generated foregrounds with
+complete shapes but limited texture fidelity. By merging
+these two types, we construct a more balanced and effective
+training dataset.
+4. Experimental Results
+4.1. Datasets and Implementation Details
+For the base inpainting model, we adopt FLUX.1-Fill-dev
+[? ] as the pre-trained diffusion transformer (DiT)1. The
+default LoRA rank for training is 256. The input resolution
+is 1024x1024. The edge map is produced by Canny [5], the
+segmentation map is from SegFormer [35], and the depth
+map is from Depth-Anything-V2 [38]. We trained the model
+using standard flow matching loss with batch size 8, learning
+rate 5e −5 for 7200 iterations. Our curated training data is
+constructed entirely from public datasets and tools, ensur-
+ing both accessibility and reproducibility. Layered image
+datasets based on real images are extremely limited. To
+the best of our knowledge, MULAN [30] is the only stan-
+dard dataset in this domain. For foreground objects, we
+use real-world layered image from MULAN, as the primary
+source. We incorporate generated foreground layers from
+LayerDiffuse [41], guided by foreground prompts generated
+via ChatGPT-4o. We include examples of such prompts in
+the Supplementary Material. For background images, we
+sample from OpenImages [18], which are then overlayed by
+rescaled foregrounds to simulate realistic composite scenes.
+Each training image contains 1–3 foreground objects with
+possible occlusions. We intentionally use imperfect masks
+for training so the model learns to infer the accurate object
+boundary even in the cases of inaccurate input masks. In
+total, we assemble 100,000 image–foreground–background
+triplets, constructed entirely from public sources.
+4.2. Evaluation Strategy
+We compare our method against several state-of-the-art
+(SOTA) object removal baselines, including SD-XL Inpaint-
+ing [9], PowerPaint [44], BrushNet [16], OmniEraser [32],
+GeoRemover [43], Qwen-Image-Edit [33] and our base pre-
+trained model, FLUX.1-Fill-dev [3]. Quantitative evalua-
+tions are conducted on the 526 images from test sets of
+MULAN. Additionally, we perform qualitative comparisons
+on a diverse set of real-world images across various subjects
+and application domains to assess the quality of decomposed
+layers.
+For evaluation, we employ standard metrics widely used
+in image reconstruction and object removal tasks, including
+PSNR, SSIM [31], LPIPS [42] and FID [12]. To further
+validate the practical effectiveness of our method, we also
+include results from a user study on the foreground gener-
+ation quality, reflecting subjective human preferences and
+alignment with real-world use cases.
+1We use it only for research purpose and abide by their Non-Commercial
+License.
+16058
+
+
+Method
+PSNR ↑
+SSIM ↑
+LPIPS ↓
+FID ↓
+SDI
+20.92
+0.84
+0.17
+69.93
+PowerPaint
+23.46
+0.76
+0.17
+41.67
+BrushNet
+21.53
+0.85
+0.19
+88.46
+OmniEraser
+21.45
+0.72
+0.31
+55.80
+GeoRemover
+17.19
+0.76
+0.32
+92.77
+Qwen-Image-Edit
+19.07
+0.64
+0.24
+63.49
+FLUX.1-Fill-dev
+25.59
+0.92
+0.09
+35.96
+Ours
+27.30
+0.93
+0.08
+25.97
+Table 1. Quantitative comparison of background removal.
+Method
+PSNR ↑
+SSIM ↑
+LPIPS ↓
+FID ↓
+User Preference Rate ↑
+Matthing-Anything
+25.11
+0.95
+0.09
+56.61
+8.15%
+DiffMatte
+29.69
+0.98
+0.05
+28.50
+32.34%
+Ours
+28.38
+0.97
+0.07
+39.52
+59.51%
+Table 2. Quantitative comparison of foreground extraction. In
+addition to image quality metrics, we also conducted a user study
+comparing our foreground generation with two matting baselines
+on diverse real-world test images, evaluating practical effectiveness
+and visual quality from the perspective of professional end users.
+4.3. Qualitative and Quantitative Results
+We report quantitative results on the MULAN test set to
+demonstrate the effectiveness of our method compared with
+baselines, as shown in Table 1. The metrics are computed
+on background layers. Our adapted model achieves the best
+performance across all evaluation metrics, confirming the ef-
+fectiveness of our approach. Furthermore, when compared to
+our base FLUX.1-Fill-dev model, our adaptation yields sub-
+stantial improvements in background object removal, with a
+gain of 1.71 dB in PSNR and a reduction of 9.99 in FID.
+To better evaluate our model’s performance, and to fairly
+compare against baselines for the foreground layers on real-
+world images, we collect 40 diverse high-quality real-world
+images. Since there is no open-source methods dedicated to
+layer decomposition, we compare with two matting methods
+that produce RGBA foregrounds, MattingAnything [21] and
+DiffMatte [14]. We also conducted a user study with 18
+independent researchers to assess the fidelity of the extracted
+foreground layers. We present the quantitaive results in Table
+2. We also include some examples of qualitative comparison
+results in the Figure 6, image editing examples in Figure 7
+and more in the supplementary materials.
+4.4. Ablation Study
+To evaluate the effectiveness of our design in adapting a
+pre-trained image inpainting diffusion model for the image
+layer decomposition task, we conduct a comprehensive ab-
+lation study as shown in Table 3. This analysis underscores
+the contribution of each design component, demonstrating
+their roles in balancing generative capability with faithful
+preservation of input details and contextual information.
+4.4.1. The Impact of Base Model and Training Data
+To investigate the relationship between image inpainting and
+layer decomposition, we compare two base model choices:
+a pre-trained inpainting model (FLUX.1-Fill-dev) and a
+general image-to-image model (FLUX.1-Kontext-dev). As
+shown in Table 3 :Kontext, switching to the FLUX.1-Kontext-
+dev backbone leads to a performance drop, supporting our
+hypothesis that layer decomposition is best approached as an
+adaptation of the inpainting task. As expected, Table 3 also
+shows that incorporating synthetic foregrounds improves
+performance, validating one of the key advantages of our
+training data design.
+4.4.2. The Impact of Image-Mask Context
+As shown in Figure 8, the image-mask context plays a crucial
+role in our model by distinguishing between regions intended
+for generation and those meant for preservation. This allows
+the model to effectively control hallucinations arising from
+the inherent tension between completing missing content
+and faithfully retaining input details.
+We also conduct a quantitative ablation study to evalu-
+ate the impact of our carefully designed image-mask con-
+text, as illustrated in Figure 4. Specifically, we compare
+our full context design, using both foreground and back-
+ground image-mask context {cf
+I−M, cb
+I−M} , with the stan-
+dard background-only image-mask context cb
+I−M typically
+used in inpainting tasks. The results of this comparison
+are reported in Table 3. When the foreground image-mask
+context cf
+I−M, is removed, we observe a drop of 0.26 dB
+in PSNR on the object removal task. More importantly,
+as shown in Figure 9, the model’s ability to faithfully ex-
+tract foreground objects degrades significantly, beginning
+to hallucinate or alter content within the extracted regions.
+These findings validate the motivation behind our combined
+foreground-background image-mask context design: the in-
+clusion of cf
+I−M plays a crucial role in mitigating hallucina-
+tion and ensuring the faithful preservation of object regions
+during layer decomposition.
+4.4.3. The Impact of Multi-modal Context
+We present both quantitative and qualitative evaluations to
+assess the impact of multi-modal context. As shown in
+Table 3, incorporating multi-modal context significantly im-
+proves quantitative performance on the object removal task,
+as evidenced by the drop in performance for -w/o cMM. We
+further ablate each modality individually to analyze its contri-
+bution to the final performance. More noticeably, Figure 10
+demonstrates that the inclusion of multi-modal cues, such as
+depth, segmentation, and edge maps, helps the model better
+understand the semantics of the fill-in regions.
+4.4.4. The Impact of LoRA Rank
+As a general trade-off in LoRA-based Parameter-Efficient
+Fine-Tuning (PEFT) frameworks, the choice of LoRA rank
+16059
+
+
+Image
+SDI
+PowerPaint
+Flux-I
+Ours: Background
+Ours: Foreground
+Figure 6. We present examples comparing our method against baselines on our collected real-world image test set for the object removal task.
+These qualitative results highlight the visual differences in foreground removal accuracy, background reconstruction quality, and consistency
+across various challenging scenes. Please zoom in for the best viewing quality.
+Figure 7. Image editing examples. Layer decomposition enables manipulation of elements. Left: the original image, right: the edited image.
+plays a crucial role. This trade-off is especially significant in
+our case due to two key factors: 1) Our base model is a pre-
+trained image inpainting diffusion model, originally trained
+for a different task. Adapting it to the novel task of image
+layer decomposition requires learning new capabilities while
+preserving its existing generative priors. 2) Our training data
+is entirely curated from public datasets and tools, which is
+inferior compared to the commercial-grade datasets used for
+training the original model. Together, these factors motivate
+a careful investigation into how the LoRA rank impacts the
+adaptation process, seeking an optimal trade-off between
+preserving pre-trained priors and enabling the learning of
+new functionality. We report the quantitative ablation results
+in Table 3. As shown: a smaller rank 128 is insufficient for
+16060
+
+
+Figure 8. We compare foreground generation results from the
+same input image using two different masks. The top row uses
+an incomplete mask that excludes the human head, causing the
+model to hallucinate or alter that region. The bottom row uses a
+nearly complete mask that includes the head, allowing the model
+to preserve it faithfully. This illustrates the importance of the input
+mask in balancing generation and content preservation.
+Method
+PSNR ↑
+SSIM ↑
+LPIPS ↓
+FID ↓
+r128
+26.34
+0.92
+0.09
+33.92
+r1024
+27.15
+0.92
+0.09
+27.32
+-w/o cf
+I−M
+27.04
+0.92
+0.08
+27.49
+-w/o cMM
+27.16
+0.93
+0.08
+28.02
+No synthetic foreground
+27.18
+0.92
+0.08
+27.11
+Kontext
+26.22
+0.92
+0.09
+36.14
+w/o edge
+27.19
+0.92
+0.08
+27.61
+w/o seg
+27.22
+0.93
+0.08
+28.16
+w/o depth
+27.19
+0.93
+0.08
+28.10
+Ours
+27.30
+0.93
+0.08
+25.97
+Table 3. Ablation Study: Quantitative comparison on the object
+removal task to evaluate the effectiveness of our design, grouped by
+ablation type: 1) LoRA rank: r128 and r1024 denote LoRA ranks
+of 128 and 1024, respectively. 2) Context: -w/o cf
+I−M: removes
+the foreground image-mask context, -w/o cMM: removes the multi-
+modal context. 3) The effect of removeing generated foregrounds
+from training No synthetic foreground, 4) Base model: Kontext
+replaces the inpainting backbone, 5) w/o edge, w/o seg, w/o depth
+ablate each modality in the multi-modal context separately.
+the model to fully learn the new task of layer decomposition.
+A larger rank 1024 enables greater adaptation but overwrites
+pre-trained priors, leading to hallucinations and sub-optimal
+performance. Based on these findings, we select a LoRA
+rank of 256 for our final model configuration, achieving the
+best balance between adaptability and stability.
+5. Limitations and Future Work
+As shown in the Supplementary Material, our method fails
+on some complex images including cluttered objects, large
+occlusions, and objects held in fingers. We attribute it to
+the lack of such intricate samples in the synthetic training
+dataset, and believe it will be alleviated with better training
+data in the future work.
+(b)
+(a)
+Figure 9. Comparison of Ablation Models Using Different Image-
+Mask Contexts for Image Layer Decomposition. We compare
+models trained with the standard inpainting-only context cb
+I−M and
+our proposed dual-context design {cf
+I−M, cb
+I−M}. In (a), the fore-
+ground output is generated using only cb
+I−M, in (b), the foreground
+is generated using the combined context. The key difference is in
+content fidelity, model (a) tends to hallucinate or alter parts of the
+foreground, while model (b) better preserves the original object,
+demonstrating the importance of our dual-context design for faith-
+ful layer decomposition.
+(b)
+(a)
+Figure 10. Comparison of object removal with and without multi-
+modal context. We compare object removal under two settings:
+(a) without multi-modal context and (b) with multi-modal con-
+text. The left side shows the input image, mask, and multi-modal
+cues, including depth, segmentation, and edge maps; the right side
+shows the corresponding outputs. Incorporating multi-modal con-
+text clearly improves object removal by providing richer spatial
+and semantic cues, reducing hallucinations and producing more
+consistent, realistic reconstructions.
+6. Conclusion
+In this paper, we demonstrate that image layer decomposition
+shares intrinsic similarities with in/outpainting. Leveraging
+this insight, we show that unlike prior works, our approach
+can achieve generative layer decomposition using only pub-
+licly available data, a lightweight adaptation of an inpainting
+model, and carefully designed modules to preserve context
+and reduce hallucinations. Our method achieves state-of-the-
+art performance with significantly lower data and computa-
+tional requirements.
+16061
+
+
+References
+[1] Tomer Amit, Tal Shaharbany, Eliya Nachmani, and Lior Wolf.
+Segdiff: Image segmentation with diffusion probabilistic mod-
+els. arXiv preprint arXiv:2112.00390, 2021. 2
+[2] Aleksandr Nikolich Vladimir Arkhipkin Igor Pavlov Andrey
+Kuznetsov Denis Dimitrov Arseniy Shakhmatov, Anton Raz-
+zhigaev.
+Kandinsky 2.2.
+https://huggingface.
+co/kandinsky-community/kandinsky-2-2-
+decoder-inpaint, 2023. 2
+[3] Stephen Batifol, Andreas Blattmann, Frederic Boesel, Sak-
+sham Consul, Cyril Diagne, Tim Dockhorn, Jack English,
+Zion English, Patrick Esser, Sumith Kulal, et al. Flux. 1
+kontext: Flow matching for in-context image generation and
+editing in latent space. arXiv e-prints, pages arXiv–2506,
+2025. 2, 5
+[4] Andreas Blattmann, Tim Dockhorn, Sumith Kulal, Daniel
+Mendelevitch, Maciej Kilian, Dominik Lorenz, Yam Levi,
+Zion English, Vikram Voleti, Adam Letts, et al.
+Stable
+video diffusion: Scaling latent video diffusion models to
+large datasets. arXiv preprint arXiv:2311.15127, 2023. 2
+[5] John Canny. A computational approach to edge detection.
+IEEE Transactions on pattern analysis and machine intelli-
+gence, (6):679–698, 2009. 5
+[6] Jingxi Chen, Brandon Y Feng, Haoming Cai, Tianfu Wang,
+Levi Burner, Dehao Yuan, Cornelia Fermuller, Christopher A
+Metzler, and Yiannis Aloimonos. Repurposing pre-trained
+video diffusion models for event-based video interpolation. In
+Proceedings of the Computer Vision and Pattern Recognition
+Conference, pages 12456–12466, 2025. 2
+[7] Jingxi Chen, Zongxia Li, Zhichao Liu, Guangyao Shi, Xiyang
+Wu, Fuxiao Liu, Cornelia Fermuller, Brandon Y Feng, and
+Yiannis Aloimonos. First frame is the place to go for video
+content customization.
+arXiv preprint arXiv:2511.15700,
+2025. 2
+[8] Ciprian Corneanu, Raghudeep Gadde, and Aleix M Martinez.
+Latentpaint: Image inpainting in latent space with diffusion
+models. In Proceedings of the IEEE/CVF winter conference
+on applications of computer vision, pages 4334–4343, 2024.
+2
+[9] diffusers. stable-diffusion-xl-1.0-inpainting-0.1. https:
+//huggingface.co/diffusers/stable-diffus
+ion-xl-1.0-inpainting-0.1, 2023. 2, 5
+[10] Sicheng Gao, Xuhui Liu, Bohan Zeng, Sheng Xu, Yan-
+jing Li, Xiaoyan Luo, Jianzhuang Liu, Xiantong Zhen, and
+Baochang Zhang. Implicit diffusion models for continuous
+super-resolution. In Proceedings of the IEEE/CVF conference
+on computer vision and pattern recognition, pages 10021–
+10030, 2023. 2
+[11] Ian J Goodfellow, Jean Pouget-Abadie, Mehdi Mirza, Bing
+Xu, David Warde-Farley, Sherjil Ozair, Aaron Courville, and
+Yoshua Bengio. Generative adversarial nets. Advances in
+neural information processing systems, 27, 2014. 2
+[12] Martin Heusel, Hubert Ramsauer, Thomas Unterthiner, Bern-
+hard Nessler, and Sepp Hochreiter. Gans trained by a two
+time-scale update rule converge to a local nash equilibrium.
+Advances in neural information processing systems, 30, 2017.
+5
+[13] Jonathan Ho, Ajay Jain, and Pieter Abbeel. Denoising diffu-
+sion probabilistic models. Advances in neural information
+processing systems, 33:6840–6851, 2020. 2
+[14] Yihan Hu, Yiheng Lin, Wei Wang, Yao Zhao, Yunchao Wei,
+and Humphrey Shi. Diffusion for natural image matting. In
+European Conference on Computer Vision, pages 181–199.
+Springer, 2024. 2, 6
+[15] Andrew Jaegle, Felix Gimeno, Andy Brock, Oriol Vinyals,
+Andrew Zisserman, and Joao Carreira. Perceiver: General
+perception with iterative attention. In International confer-
+ence on machine learning, pages 4651–4664. PMLR, 2021.
+3
+[16] Xuan Ju, Xian Liu, Xintao Wang, Yuxuan Bian, Ying Shan,
+and Qiang Xu. Brushnet: A plug-and-play image inpainting
+model with decomposed dual-branch diffusion. In European
+Conference on Computer Vision, pages 150–168. Springer,
+2024. 5
+[17] Diederik P Kingma and Max Welling. Auto-encoding varia-
+tional bayes. arXiv preprint arXiv:1312.6114, 2013. 2
+[18] Alina Kuznetsova, Hassan Rom, Neil Alldrin, Jasper Uijlings,
+Ivan Krasin, Jordi Pont-Tuset, Shahab Kamali, Stefan Popov,
+Matteo Malloci, Alexander Kolesnikov, et al. The open im-
+ages dataset v4: Unified image classification, object detection,
+and visual relationship detection at scale. International jour-
+nal of computer vision, 128(7):1956–1981, 2020. 5
+[19] Gihyun Kwon and Jong Chul Ye. Diffusion-based image
+translation using disentangled style and content representa-
+tion. arXiv preprint arXiv:2209.15264, 2022. 2
+[20] Black Forest Labs. Flux. https://github.com/bla
+ck-forest-labs/flux, 2024. 2
+[21] Jiachen Li, Jitesh Jain, and Humphrey Shi. Matting anything.
+In Proceedings of the IEEE/CVF Conference on Computer
+Vision and Pattern Recognition, pages 1775–1785, 2024. 6
+[22] Andreas Lugmayr, Martin Danelljan, Andres Romero, Fisher
+Yu, Radu Timofte, and Luc Van Gool. Repaint: Inpainting us-
+ing denoising diffusion probabilistic models. In Proceedings
+of the IEEE/CVF conference on computer vision and pattern
+recognition, pages 11461–11471, 2022. 1, 2
+[23] Kangfu Mei, Hossein Talebi, Mojtaba Ardakani, Vishal M Pa-
+tel, Peyman Milanfar, and Mauricio Delbracio. The power of
+context: How multimodality improves image super-resolution.
+In Proceedings of the Computer Vision and Pattern Recogni-
+tion Conference, pages 23141–23152, 2025. 3
+[24] William Peebles and Saining Xie. Scalable diffusion models
+with transformers. In Proceedings of the IEEE/CVF inter-
+national conference on computer vision, pages 4195–4205,
+2023. 2
+[25] Fabio Quattrini, Vittorio Pippi, Silvia Cascianelli, and Rita
+Cucchiara. Alfie: Democratising rgba image generation with
+no. In European Conference on Computer Vision, pages
+38–55. Springer, 2024. 2
+[26] Robin Rombach, Andreas Blattmann, Dominik Lorenz,
+Patrick Esser, and Björn Ommer. High-resolution image
+synthesis with latent diffusion models. In Proceedings of
+the IEEE/CVF conference on computer vision and pattern
+recognition, pages 10684–10695, 2022. 2
+16062
+
+
+[27] Shuyao Shang, Zhengyang Shan, Guangxing Liu, LunQian
+Wang, XingHua Wang, Zekai Zhang, and Jinglin Zhang. Res-
+diff: Combining cnn and diffusion model for image super-
+resolution. In Proceedings of the AAAI Conference on Artifi-
+cial Intelligence, pages 8975–8983, 2024. 1
+[28] Roman Suvorov, Elizaveta Logacheva, Anton Mashikhin,
+Anastasia Remizova, Arsenii Ashukha, Aleksei Silvestrov,
+Naejin Kong, Harshith Goka, Kiwoong Park, and Victor Lem-
+pitsky. Resolution-robust large mask inpainting with fourier
+convolutions. In Proceedings of the IEEE/CVF winter confer-
+ence on applications of computer vision, pages 2149–2159,
+2022. 2
+[29] Keyu Tian, Yi Jiang, Zehuan Yuan, Bingyue Peng, and Li-
+wei Wang. Visual autoregressive modeling: Scalable image
+generation via next-scale prediction. Advances in neural
+information processing systems, 37:84839–84865, 2024. 2
+[30] Petru-Daniel Tudosiu, Yongxin Yang, Shifeng Zhang, Fei
+Chen, Steven McDonagh, Gerasimos Lampouras, Ignacio
+Iacobacci, and Sarah Parisot. Mulan: A multi layer annotated
+dataset for controllable text-to-image generation. In Proceed-
+ings of the IEEE/CVF Conference on Computer Vision and
+Pattern Recognition, pages 22413–22422, 2024. 2, 5
+[31] Zhou Wang, Alan C Bovik, Hamid R Sheikh, and Eero P
+Simoncelli. Image quality assessment: from error visibility to
+structural similarity. IEEE transactions on image processing,
+13(4):600–612, 2004. 5
+[32] Runpu Wei, Zijin Yin, Shuo Zhang, Lanxiang Zhou, Xueyi
+Wang, Chao Ban, Tianwei Cao, Hao Sun, Zhongjiang He,
+Kongming Liang, et al. Omnieraser: Remove objects and
+their effects in images with paired video-frame data. arXiv
+preprint arXiv:2501.07397, 2025. 5
+[33] Chenfei Wu, Jiahao Li, Jingren Zhou, Junyang Lin, Kaiyuan
+Gao, Kun Yan, Sheng-ming Yin, Shuai Bai, Xiao Xu, Yilei
+Chen, et al. Qwen-image technical report. arXiv preprint
+arXiv:2508.02324, 2025. 5
+[34] Bin Xia, Yulun Zhang, Shiyin Wang, Yitong Wang, Xinglong
+Wu, Yapeng Tian, Wenming Yang, Radu Timotfe, and Luc
+Van Gool. Diffi2i: Efficient diffusion model for image-to-
+image translation. IEEE Transactions on Pattern Analysis
+and Machine Intelligence, 2024. 1
+[35] Enze Xie, Wenhai Wang, Zhiding Yu, Anima Anandkumar,
+Jose M Alvarez, and Ping Luo.
+Segformer: Simple and
+efficient design for semantic segmentation with transformers.
+Advances in neural information processing systems, 34:12077–
+12090, 2021. 5
+[36] Shaoan Xie, Zhifei Zhang, Zhe Lin, Tobias Hinz, and Kun
+Zhang. Smartbrush: Text and shape guided object inpainting
+with diffusion model. In Proceedings of the IEEE/CVF con-
+ference on computer vision and pattern recognition, pages
+22428–22437, 2023. 2
+[37] Jinrui Yang, Qing Liu, Yijun Li, Soo Ye Kim, Daniil Pakho-
+mov, Mengwei Ren, Jianming Zhang, Zhe Lin, Cihang Xie,
+and Yuyin Zhou. Generative image layer decomposition with
+visual effects. In Proceedings of the Computer Vision and
+Pattern Recognition Conference, pages 7643–7653, 2025. 1,
+2
+[38] Lihe Yang, Bingyi Kang, Zilong Huang, Zhen Zhao, Xiao-
+gang Xu, Jiashi Feng, and Hengshuang Zhao. Depth anything
+v2. Advances in Neural Information Processing Systems, 37:
+21875–21911, 2024. 5
+[39] Jiahui Yu, Zhe Lin, Jimei Yang, Xiaohui Shen, Xin Lu, and
+Thomas S Huang. Generative image inpainting with con-
+textual attention. In Proceedings of the IEEE conference on
+computer vision and pattern recognition, pages 5505–5514,
+2018. 2
+[40] Tao Yu, Zongyu Guo, Xin Jin, Shilin Wu, Zhibo Chen, Weip-
+ing Li, Zhizheng Zhang, and Sen Liu. Region normalization
+for image inpainting. In Proceedings of the AAAI conference
+on artificial intelligence, pages 12733–12740, 2020. 2
+[41] Lvmin Zhang and Maneesh Agrawala. Transparent image
+layer diffusion using latent transparency.
+arXiv preprint
+arXiv:2402.17113, 2024. 2, 5
+[42] Richard Zhang, Phillip Isola, Alexei A Efros, Eli Shechtman,
+and Oliver Wang. The unreasonable effectiveness of deep
+features as a perceptual metric. In Proceedings of the IEEE
+conference on computer vision and pattern recognition, pages
+586–595, 2018. 5
+[43] Zixin Zhu, Haoxiang Li, Xuelu Feng, He Wu, Chunming
+Qiao, and Junsong Yuan. Georemover: Removing objects and
+their causal visual artifacts. arXiv preprint arXiv:2509.18538,
+2025. 5
+[44] Junhao Zhuang, Yanhong Zeng, Wenran Liu, Chun Yuan,
+and Kai Chen. A task is worth one word: Learning with
+task prompts for high-quality versatile image inpainting. In
+European Conference on Computer Vision, pages 195–211.
+Springer, 2024. 5
+16063

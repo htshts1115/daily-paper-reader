@@ -1,0 +1,357 @@
+Title: PromptStereo: Zero-Shot Stereo Matching via Structure and Motion Prompts
+
+URL Source: https://openaccess.thecvf.com/content/CVPR2026/papers/Wang_PromptStereo_Zero-Shot_Stereo_Matching_via_Structure_and_Motion_Prompts_CVPR_2026_paper.pdf
+
+Published Time: Sat, 16 May 2026 16:47:49 GMT
+
+Number of Pages: 11
+
+Markdown Content:
+# PromptStereo: Zero-Shot Stereo Matching via Structure and Motion Prompts 
+
+## Xianqi Wang 1, Hao Yang 1, Hangtian Wang 1
+
+## Junda Cheng 1, Gangwei Xu 1, Min Lin 1, Xin Yang 2,1†
+
+> 1
+
+## Huazhong University of Science and Technology 2Optics Valley Laboratory 
+
+{xianqiw, haoyang2002, htwang, jundacheng, gwxu, minlin, xinyang2014 }@hust.edu.cn 
+
+## Abstract 
+
+Modern stereo matching methods have leveraged monocu-lar depth foundation models to achieve superior zero-shot generalization performance. However, most existing meth-ods primarily focus on extracting robust features for cost volume construction or disparity initialization. At the same time, the iterative refinement stage, which is also crucial for zero-shot generalization, remains underexplored. Some methods treat monocular depth priors as guidance for it-eration, but conventional GRU-based architectures strug-gle to exploit them due to the limited representation ca-pacity. In this paper, we propose Prompt Recurrent Unit (PRU), a novel iterative refinement module based on the decoder of monocular depth foundation models. By in-tegrating monocular structure and stereo motion cues as prompts into the decoder, PRU enriches the latent repre-sentations of monocular depth foundation models with ab-solute stereo-scale information while preserving their in-herent monocular depth priors. Experiments demonstrate that our PromptStereo achieves state-of-the-art zero-shot generalization performance across multiple datasets, while maintaining comparable or faster inference speed. Our findings highlight prompt-guided iterative refinement as a promising direction for zero-shot stereo matching. Code: https://github.com/Windsrain/PromptStereo. 
+
+## 1. Introduction 
+
+Stereo matching aims to estimate dense pixel-wise dispar-ities from a pair of rectified images, providing essential depth information for 3D scene understanding. It plays a crucial role in applications such as autonomous driving. With the rapid advancement of monocular depth founda-tion models [3, 12, 20, 40, 48, 51], zero-shot stereo match-ing has recently gained increasing attention. This growing interest comes from a clear shift in strategy: instead of de-signing complex modules to extract robust features from 
+
+> †Corresponding author. Training Set: Scene Flow Training Set: Unlimited
+> Bad 2.0: 0.61% PromptStereo (Ours) Bad 2.0: 6.36% Bad 2.0: 12.39% MonSter BridgeDepth Left Image
+
+Figure 1. Comparison of zero-shot generalization. Row 1: Our PromptStereo outperforms previous methods. Row 2-3: A visual-ization example from Middlebury 2021 [36]. 
+
+weak backbones [6, 16, 35, 53, 54], recent methods leverage strong monocular depth priors learned by powerful monoc-ular models. By directly adapting pre-trained representa-tions, these methods [2, 14, 18, 21, 43, 45, 52] achieve sim-pler designs and stronger generalization performance. However, the iterative refinement stage has been rela-tively underexplored. Recent methods utilize monocular depth foundation models to extract depth-aware features, construct robust cost volumes, and obtain accurate initial disparities for iteration. Some methods further introduce monocular depth priors to guide GRU [15], a recurrent unit popularized by RAFT-Stereo [26]. Such recurrent units are increasingly limited by their restricted capacity and scala-bility. First, GRU is independent of vision foundation mod-This CVPR paper is the Open Access version, provided by the Computer Vision Foundation. Except for this watermark, it is identical to the accepted version; the final published version of the proceedings is available on IEEE Xplore. 12565 els and must be trained from scratch, preventing it from inheriting strong priors. As a result, it’s hard to gain vi-sual understanding capacity. Second, GRU constrains its hidden states within a narrow range, making it challeng-ing to handle extreme disparity variations or complex ge-ometric structures. Finally, GRU fuses inputs and hidden states through direct convolutions, which not only distort the original state information but also compress external in-puts, leading to ambiguous guidance. To overcome these limitations, we propose Prompt Re-current Unit (PRU), a novel recurrent unit that rethinks it-erative refinement from the perspective of vision founda-tion models. While past methods rely on multi-level GRU for coarse-to-fine disparity update, we find that the decoder of monocular depth foundation models, such as DPT [34], also follows a similar multi-resolution refinement architec-ture. Therefore, PRU adopts this decoder architecture as a unified multi-level recurrent unit, naturally inheriting rich monocular depth priors. To integrate additional inputs with-out disrupting these priors, we propose Structure Prompt (SP) and Motion Prompt (MP), which prompt monocular structure and stereo motion cues into PRU. Compared to previous prompt-based attempts in monocular depth estima-tion [25, 44], stereo matching enables richer prompts with-out the need for external sensors. To enable iterative re-finement similar to GRU, we design a simple yet effective update strategy for PRU, which removes range constraints on hidden states, bringing more straightforward and flexible iterative refinement. Furthermore, Affine-Invariant Fusion (AIF) merges the initial disparity and monocular depth un-der a normalized scale, resulting in faster convergence and better geometric consistency. By replacing GRU with PRU in existing methods, we propose PromptStereo. As shown in Fig. 1, PromptStereo achieves state-of-the-art zero-shot generalization perfor-mance across multiple datasets. The performance on un-limited training sets demonstrates the superior representa-tion capacity and scalability of PRU. Subsequent experi-ments also prove that PromptStereo maintains comparable or faster inference speed. Our contributions can be summarized as follows: • We propose Prompt Recurrent Unit (PRU), a novel re-current unit built upon the decoder of monocular depth foundation models. It directly inherits monocular depth priors and holds better representation capacity and scala-bility than GRU. • We propose Structure Prompt (SP) and Motion Prompt (MP), which prompt monocular structure and stereo mo-tion cues into PRU, avoiding distorted state information and ambiguous guidance. • We propose a simple yet effective update strategy for PRU and Affine-Invariant Fusion (AIF) for the initial disparity, both beneficial to iterative refinement. • Our PromptStereo achieves state-of-the-art zero-shot gen-eralization performance across various datasets, while maintaining comparable or faster inference speed. 
+
+## 2. Related Work 
+
+Deep Stereo Matching. Deep learning has advanced stereo matching by replacing hand-crafted features with learnable representations. Since DispNet [29] and GC-Net [22], end-to-end architectures have been widely adopted in this field. These aggregation-based methods [5, 10, 11, 19, 38, 46, 49] follow a four-step pipeline of feature extraction, cost vol-ume construction, cost aggregation, and disparity regres-sion, progressively improving accuracy and efficiency. Af-ter that, iterative-based methods have become the main-stream of research. These methods [7–9, 23, 24, 26, 41, 47, 55] utilize local cost volume lookup and iterative refinement to replace cost aggregation, achieving more accurate and efficient high-resolution inference. More recently, many methods [2, 13, 14, 18, 21, 43, 45, 52] have leveraged vi-sion foundation models, particularly monocular depth foun-dation models, to enhance model performance. They utilize these models to extract robust features [43, 45], construct cost volumes [2], and treat monocular depth priors as guid-ance [14, 18, 21, 52], achieving superior performance. 
+
+Zero-Shot Stereo Matching. The demand for zero-shot stereo matching is gradually increasing, aiming to enable models to adapt to various scenarios. Initially, most meth-ods introduce new modules for zero-shot generalization. DSMNet [53] proposes domain normalization layers and non-local graph-based filters to learn domain-invariant fea-tures. ITSA [16] borrows the concept of shortcut learning to avoid domain-specific shortcuts during training. MRL-Stereo [35] utilizes mask representation learning to learn domain-invariant structure information. With the develop-ment of visual foundation models, many methods [2, 27, 42, 43, 45] directly utilize these models to improve zero-shot generalization performance. GraftNet [27] firstly incorpo-rates pre-trained features to obtain task-related information. FoundationStereo [45] introduces a large-scale dataset to help zero-shot generalization. Stereo Anywhere [2] con-structs a normal cost volume and proposes novel volume augmentations. SMoE-Stereo [43] dynamically selects suit-able features from several vision foundation models. MG-Stereo [52] explores the fusion of monoculor priors via ordering local fusion and registered global fusion. Some methods [14, 21] also achieve strong generalization results, even though their original purpose is in-domain perfor-mance. However, these methods overlook the limited repre-sentation capacity and scalability of GRU, which constrains their generalization ability. Our PromptStereo is the first to enable the iterative refinement to inherit monocular depth priors, achieving impressive zero-shot generalization per-formance across various datasets. 12566 Right Image 
+
+Feature Encoder Feature Encoder 
+
+Left Image 
+
+Cost Volume Cost Aggregation Init Disparity 
+
+Final Disparity Relative Depth 
+
+Fused Disparity 
+
+Aggregated Volume W
+
+Depth Feature 
+
+Hidden State 
+
+Affine Invariant Fusion 
+
+> Depth Anything
+> Prompt Recurrent Unit Prompt Recurrent Unit Prompt Recurrent Unit
+
+LLL... ... ... ... 
+
+Freeze WLWarp Lookup Figure 2. Overview of PromptStereo. It builds upon MonSter [14], sharing the same feature extraction and cost volume construction. The initial disparity and relative depth are first fused via Affine-Invariant Fusion (Sec. 3.3). The fused disparity is then refined iteratively by our Prompt Recurrent Unit (Sec. 3.4), which replaces the GRU used in previous methods. It enables effective, prompt-guided iterative refinement, yielding the final high-quality disparity. 
+
+## 3. Method 
+
+In this section, we present an overview of our PromptStereo (Fig. 2) and details of our proposed modules, including Affine-Invariant Fusion and Prompt Recurrent Unit. 
+
+3.1. Feature Extraction 
+
+We take MonSter [14] as our baseline. Given a stereo im-age pair IL, IR ∈ R3×H×W , the monocular feature branch utilizes a pre-trained Depth Anything V2 [51] to extract a relative depth dM ∈ R1×H×W and the depth feature before the last layer FM ∈ RC× H   
+
+> 4×W
+> 4
+
+. This branch is frozen dur-ing training to maintain robust monocular depth priors. The stereo feature branch utilizes MonSter’s feature encoder, which consists of a pre-trained Depth Anything V2 and a feature transfer network, to extract multi-level stereo fea-tures FiL, FiR ∈ RCi× H   
+
+> 2i+2 ×W
+> 2i+2
+
+(i = 0 , 1, 2, 3) . We fol-low the original setting to freeze the DINOv2 [31] encoder and keep other networks trainable. We do not use Mon-Ster’s checkpoint initialization during training to ensure a fair comparison. 
+
+3.2. Cost Volume Construction 
+
+We follow the cost volume construction strategy of Mon-Ster [14], derived from IGEV-Stereo [47]. Specifically, we first use F0
+
+> L
+
+, F0 
+
+> R
+
+to build a group-wise correlation vol-ume [19] VG ∈ RG× D     
+
+> 4×H
+> 4×W
+> 4
+
+, and then use a lightweight 3D aggregation network [1] to filter it, yielding the geom-etry encoding volume VE ∈ RG× D     
+
+> 4×H
+> 4×W
+> 4
+
+. In parallel, an all-pair correlation volume [26] VA ∈ R1× W    
+
+> 4×H
+> 4×W
+> 4
+
+is computed to capture global feature similarity. Finally, volumes are pooled to form multi-level volume pyramids, which are collectively referred to as the combined geome-try encoding volume VC . The cost volume construction is formulated as: 
+
+VG(g, d, h, w ) = GC0
+
+· ⟨ F0 
+
+> L,g
+
+(h, w ), F0 
+
+> R,g
+
+(h, w − d)⟩
+
+VA(w′, h, w ) = ⟨F0
+
+> L
+
+(h, w ), F0
+
+> R
+
+(h, w ′)⟩
+
+(1) where ⟨·⟩ is the inner product operation; g is the group in-dex; d is the disparity index; F0 
+
+> L,g
+
+is the g-th group of fea-ture along the channel dimension, and F0 
+
+> R,g
+
+is the same. 12567 Init Disparity  
+
+> Fused Disparity Relative Depth
+> Confidence Left Feature
+> Right Feature Warped Right Feature W
+> Aligned Depth
+> Conv Sigmoid Align Fusion Refinement Layer Refinement Layer Refinement Layer Refinement Layer Refinement Layer Refinement Layer Refinement Layer Refinement Layer Structure Motion
+
+Figure 3. Overview of modules. Left: Affine-Invariant Fusion. Right: Prompt Recurrent Unit (refinement layers are adopted from DPT). 
+
+3.3. Affine-Invariant Fusion 
+
+While the cost volume construction can provide a reason-able initial disparity, it lacks global geometric consistency due to its limited disparity range. On the other hand, the rel-ative depth offers a strong structure prior, but suffers from affine ambiguity in scale and shift. To obtain a more reliable initialization, we propose Affine-Invariant Fusion (Fig. 3). Given the relative depth dM and the initial disparity 
+
+d0 regressed from VE , we normalize them in an affine-invariant manner to obtain ˆdM , ˆd0:
+
+t(d) = median (d)
+
+s(d) = 1
+
+N
+
+> N
+
+X
+
+> i=1
+
+|d − t(d)|
+
+ˆd = d − t(d)
+
+s(d)
+
+(2) where t(d), s (d) are used to normalize d. This operation is commonly used in monocular depth estimation as an affine-invariant loss supervision [33, 51]. We adopt it for the ini-tial alignment because the operation is simple and robust. Although the alignment may not be perfectly accurate, the subsequent iterative refinement can effectively correct any residual misalignment. Then, we project ˆdM into the dis-parity space: 
+
+d′ 
+
+> M
+
+= s(d0) · ˆdM + t(d0) (3) Next, d0 is used to warp the right feature F0
+
+> R
+
+, which is then concatenated with the left feature F0
+
+> L
+
+. A convolutional block followed by a sigmoid function produces the confi-dence map c, representing the reliability of d0. The fused disparity dF is obtained as follows: 
+
+dF = c ⊙ d0 + (1 − c) ⊙ d′ 
+
+> M
+
+(4) where ⊙ is the element-wise product operation; dF serves as the starting point for the subsequent iterative refinement. 
+
+3.4. Prompt Recurrent Unit 
+
+To overcome the limitations of GRU, we propose Prompt Recurrent Unit (PRU), a novel recurrent unit built upon the decoder of monocular depth foundation models. 
+
+State Initialization. We adopt the refinement layers of the DPT [34] decoder from Depth Anything V2 [51], which naturally form a multi-resolution architecture. These layers are initialized with pre-trained weights, allowing PRU to in-herit monocular depth priors while maintaining scalability for stereo refinement. For the hidden state initialization, we concatenate the left features FiL and the warped right fea-tures FiR using d0, and feed them into convolutional blocks to generate the initial hidden state hi 
+
+> 0
+
+(i = 0 , 1, 2, 3) . Com-pared to traditional GRU initialization, which only uses left features, our initialization encourages hidden states to learn stereo correspondences at an earlier stage. 
+
+Structure Prompt. The frozen monocular depth feature 
+
+FM and relative depth dM provide robust global geomet-ric information, but would distort the stereo disparity range if using them directly. To address this, we normalize the current disparity dk to ˆdk as Sec. 3.3 does, and compute difference with the normalized relative depth ˆdM :
+
+D = |ˆdk − ˆdM | (5) where D is the difference. This difference captures affine-invariant geometric discrepancies between monocular and stereo predictions, highlighting regions where geometric alignment is inconsistent. Such information serves as an effective structure-aware cue to guide iterative refinement. Structure Prompt (SP) is formulated as follows: 
+
+PS = Encoder (FM , D)
+
+h = h + ConvBlock (PS ) (6) where Encoder is the structure encoder with the same ar-chitecture as previous methods [26, 47]; ConvBlock is a convolutional block; h is the intermediate hidden state. This residual addition serves as a feature-level prompt, guiding the hidden state without disrupting the inherited priors. 12568 Motion Prompt. Motion information encodes stereo-related cues such as correlation and disparity. We adopt a motion encoder similar to previous methods [26, 47], and define our Motion Prompt (MP) as follows: 
+
+PkM = Encoder (Vk, dk)
+
+h = h + ConvBlock (PkM ) (7) where Encoder is the motion encoder; Vk is the local cost volume. This residual prompting allows the model to inte-grate stereo motion cues adaptively. 
+
+Update Strategy. Unlike GRU, which updates the hid-den state through both reset and update gates, we design a simple and efficient update strategy for PRU. The following equations summarize PRU’s internal operations, including prompt encoding, prompt fusion, and state update: 
+
+zk =
+
+(
+
+σ(ConvBlock ([ hik, hi−1 
+
+> k
+
+])) , i > 0
+
+σ(ConvBlock ([ hik, PS , PkM ])) , i = 0 ˆhik = hik + ResBlock (hi+1 
+
+> k+1
+
+), i < 3ˆhik = ResBlock (ˆhik)ˆhik = ˆhik + ConvBlock (PS ), i = 0 ˆhik = ˆhik + ConvBlock (PkM ), i = 0 ˆhik = Conv 1×1(ˆhik)
+
+hik+1 = (1 − zk) ⊙ hik + zk ⊙ ˆhik
+
+dk+1 = dk + ConvBlock (hik+1 )
+
+(8) where [·] is the concatenation operation; σ is the sigmoid function; ResBlock is a residual convolutional block. Due to the multi-resolution architecture, some operations are ap-plied conditionally. For instance, prompts are only injected at the highest resolution. As shown in Equ. 8, PRU does not constrain the hidden state as GRU does, providing a more flexible representation space. Moreover, we remove the reset gate and only use the update gate zk. zk is com-puted using the higher-resolution hidden state, while the in-put to the current hidden state comes solely from the lower-resolution hidden state. Unlike GRU, which updates the medium-resolution hidden state using both, this design re-duces computational complexity and improves both training efficiency and inference speed. 
+
+3.5. Loss Function 
+
+We follow IGEV-Stereo [47] to build the loss function: 
+
+L = || d0 − dgt || smooth +
+
+> K
+
+X
+
+> k=1
+
+γK−i|| dk − dgt || 1 (9) where || · || smooth is the smooth L1 loss; || · || 1 is the L1 loss; d0 is the initial disparity; dgt is the ground-truth dis-parity; dk is the predicted disparity each iteration; K is the iteration number; γ = 0 .9.
+
+## 4. Experiment 
+
+In this section, we present our implementation details, eval-uation datasets, evaluation metrics, and experiment results. We also refer readers to our supplementary materials for ex-tra experiments and comparisons with specific methods not included in the main text. These methods include the use of special data augmentations, training strategies, and other techniques, which make a fair comparison infeasible. 
+
+4.1. Implementation Detail 
+
+We implement our PromptStereo using PyTorch and train it on 4 NVIDIA RTX 4090 GPUs. We use MonSter [14] as our baseline. For all training, we use the AdamW optimizer and the one-cycle learning rate scheduler with a learning rate of 2e-4. For Scene Flow evaluation, we train it on Scene Flow [29] with a batch size of 8 for 200k steps from scratch. For unlimited evaluation, we train it on a mixed dataset con-sisting of FoundationStereo [45], CREStereo [23], Falling Things [39], Scene Flow [29], and Virtual KITTI 2 [4] from the Scene Flow checkpoint. We apply standard data aug-mentations following RAFT-Stereo [26] with a crop size of 
+
+384 × 768 . We use 16 iterations during training and 32 iter-ations during inference. 
+
+4.2. Evaluation Dataset and Metric 
+
+Evaluation Datasets. We use 5 datasets for basic eval-uation. KITTI 2012 [17] and KITTI 2015 [30] are datasets for outdoor driving scenarios, containing 194 and 200 training pairs with sparse LiDAR ground truth, respec-tively. Middlebury V3 Benchmark Training Set (Midd-T) [36] contains 15 training pairs with high-quality dispar-ity ground truth for high-resolution indoor scenarios. Mid-dlebury 2021 (Midd-2021) [36] also includes 24 training pairs for such scenarios obtained with a mobile device on a robot arm. ETH3D [37] contains 27 training grayscale stereo image pairs with semi-dense disparity ground truth for low-resolution indoor/outdoor scenarios. Besides, we consider 2 datasets for advanced evaluation, covering chal-lenging scenarios. DrivingStereo [50] comprises 4 sub-sets with varying challenging weather conditions for out-door driving scenarios. Each subset has 500 training pairs with sparse LiDAR ground truth. Booster [32] contains 228 training pairs with high-quality disparity ground truth for high-resolution indoor scenarios. It provides specular and transparent surfaces, which are the leading cause of failures in modern stereo matching. 
+
+Evaluation Metrics. We evaluate our PromptStereo us-ing two standard metrics: EPE, which computes the per-pixel absolute disparity error, and Bad τ , which calculates the percentage of pixels with a disparity error greater than τ
+
+pixels. If possible, we compute all pixels, referred to as All ,and non-occluded pixels, referred to as Noc .12569 Method KITTI 2012 KITTI 2015 Midd-T (H) Midd-2021 ETH3D EPE Bad 3.0 EPE Bad 3.0 EPE Bad 2.0 EPE Bad 2.0 EPE Bad 1.0 All Noc All Noc All Noc All Noc All Noc All Noc All Noc All Noc All Noc All Noc Training Set Scene Flow RAFT-Stereo [26] 0.90 0.83 4.34 3.86 1.13 1.11 5.68 5.45 1.40 1.03 11.07 8.41 1.40 0.93 11.11 6.38 0.27 0.24 2.61 2.29 IGEV-Stereo [47] 1.03 0.93 5.13 4.50 1.21 1.17 6.03 5.79 1.48 0.88 9.95 7.09 1.33 0.86 10.00 5.35 0.33 0.29 4.05 3.61 DEFOM-Stereo [21] 0.83 0.78 3.90 3.52 1.06 1.04 4.99 4.76 0.94 0.65 6.77 4.17 1.24 0.76 8.62 4.98 0.35 0.33 2.40 2.16 MonSter * [14] 0.93 0.88 4.62 4.12 1.17 1.15 5.52 5.32 1.04 0.94 8.97 7.27 1.70 1.21 15.55 10.58 0.35 0.26 3.20 2.86 BridgeDepth [18] 0.83 0.77 4.04 3.63 1.09 1.07 4.69 4.52 0.92 0.74 7.84 5.94 1.91 1.56 15.92 11.93 0.23 0.22 1.26 1.14 
+
+GREAT-IGEV [24] 1.02 0.93 5.31 4.71 1.16 1.14 5.88 5.64 1.41 0.86 9.23 6.17 1.25 0.95 9.46 5.37 0.37 0.28 4.47 3.80 MGStereo [52] 0.86 0.80 4.14 3.71 1.12 1.10 5.64 5.40 1.12 0.81 8.37 5.48 1.52 0.92 11.55 6.74 0.25 0.22 1.88 1.59 SMoE-Stereo [43] 0.83 0.77 4.23 3.76 1.06 1.04 4.94 4.77 1.54 1.29 7.38 7.06 4.61 3.50 21.02 16.51 0.27 0.22 2.44 2.08 PromptStereo (Ours) 0.79 0.73 3.77 3.32 1.09 1.06 4.59 4.39 0.96 0.60 6.03 3.76 0.95 0.75 8.26 4.84 0.23 0.20 1.56 1.30 Training Set Unlimited FoundationStereo † [45] 0.68 0.63 3.00 2.70 0.87 0.85 3.10 2.98 0.66 0.38 3.11 1.18 1.00 0.73 7.14 3.65 0.17 0.15 0.67 0.49 MonSter [14] 0.73 0.68 3.27 2.96 0.91 0.90 3.72 3.55 0.78 0.59 5.51 3.75 1.87 1.50 12.43 8.46 0.19 0.16 1.25 1.02 BridgeDepth [18] 0.70 0.65 5.31 4.71 0.91 0.89 3.61 3.48 0.74 0.57 3.36 2.33 1.52 1.23 13.66 10.13 0.19 0.18 1.22 1.07 PromptStereo (Ours) 0.70 0.65 3.33 3.05 0.88 0.87 3.40 3.27 0.59 0.44 3.90 2.21 0.78 0.61 5.97 2.78 0.16 0.15 0.97 0.79 
+
+Table 1. Zero-shot generalization basic benchmark. MonSter ∗ is re-trained with the official code. FoundationStereo † is reported for reference only, as it requires significantly large batch sizes and model parameters to train, making a fair comparison infeasible. Bad 2.0: 1.57% Bad 2.0: 3.04% Bad 2.0: 2.72% 
+
+> Left Image  MonSter  BridgeDepth  PromptStereo  Bad 2.0: 4.22% Bad 2.0: 7.89% Bad 2.0: 6.99%
+> Bad 2.0: 1.50% Bad 2.0: 22.07% Bad 2.0: 9.58%
+> Bad 2.0: 2.81% Bad 2.0: 12.69% Bad 2.0: 14.43%
+> Bad 2.0: 0.61% Bad 2.0: 6.36% Bad 2.0: 12.39%
+> Bad 2.0: 2.87% Bad 2.0: 16.30% Bad 2.0: 23.22%
+
+Figure 4. Visualization of Middlebury (unlimited training sets). The Bad 2.0 metric map is in the upper right corner. 
+
+4.3. Zero-Shot Generalization Benchmark 
+
+We construct two zero-shot generalization benchmarks, namely basic and advanced. Each benchmark is further di-vided into two training settings: Scene Flow [29] and unlim-ited, where the latter excludes samples from target datasets. All methods are evaluated using the same testing code. As shown in Tab. 1, our PromptStereo achieves state-of-the-art performance on the basic benchmark under the Scene Flow training setting, ranking first on most metrics and within the top three across all. Compared to the base-line MonSter [14], PromptStereo achieves a remarkable improvement, reducing the error on Midd-2021 by nearly 50%. It demonstrates that PromptStereo maintains robust performance even under challenging real-world conditions, such as imperfect rectification in mobile-captured scenes. Under the unlimited training setting, PromptStereo con-tinues to achieve state-of-the-art performance. Notably, it achieves over 50% improvement on Midd-2021 compared to MonSter [14] and BridgeDepth [18], and even surpasses FoundationStereo [45] that we do not include in direct com-parisons. As shown in Fig. 4, PromptStereo shows notice-able improvements in both details and texture-less regions. As shown in Tab. 2, our PromptStereo maintains state-of-the-art performance on the advanced benchmark under the Scene Flow training setting. Compared to the baseline MonSter [14], PromptStereo consistently achieves impres-sive improvements. It can also be observed that on Booster, which contains reflective and transparent surfaces, train-ing solely on Scene Flow is insufficient to demonstrate the model capacity and scalability provided by PRU. 12570 Method DrivingStereo (H) Booster (Q) Cloudy Foggy Rainy Sunny EPE Bad 2.0 Bad 4.0 Bad 6.0 Bad 8.0 EPE Bad 3.0 EPE Bad 3.0 EPE Bad 3.0 EPE Bad 3.0 Training Set Scene Flow RAFT-Stereo [26] 0.97 3.58 0.95 2.63 1.80 11.01 1.01 3.97 3.95 16.36 12.57 10.73 9.44 IGEV-Stereo [47] 1.11 4.84 1.12 4.58 2.34 14.87 1.18 5.05 4.01 16.15 12.66 11.06 10.02 DEFOM-Stereo [21] 0.98 3.59 1.01 3.51 1.35 11.04 0.98 3.77 2.92 12.77 9.53 8.22 7.42 MonSter * [14] 1.10 5.41 1.38 9.44 1.74 17.59 1.12 4.96 3.04 19.17 11.49 8.25 7.69 BridgeDepth [18] 0.94 2.98 1.07 4.34 1.19 6.40 0.99 3.40 3.13 14.74 9.71 8.01 7.03 Great-IGEV [24] 1.11 4.93 1.02 3.36 1.96 12.20 1.12 5.43 4.40 18.63 14.31 12.35 11.08 MGStereo [52] 0.92 3.36 0.94 2.85 1.29 9.39 0.94 3.70 2.14 9.97 6.84 5.75 5.23 
+
+SMoE-Stereo [43] 0.93 3.12 1.11 4.77 1.31 6.08 1.00 3.51 2.80 20.81 11.80 8.65 6.85 PromptStereo (Ours) 0.92 2.86 0.89 2.43 1.59 14.30 0.94 3.16 2.78 12.13 8.93 7.54 6.79 Training Set Unlimited FoundationStereo † [45] 0.91 2.94 0.92 2.52 1.44 11.26 0.94 3.50 1.23 5.15 3.87 3.39 3.03 MonSter [14] 0.99 3.28 1.15 5.30 1.15 5.36 1.03 3.66 1.76 11.55 7.16 5.49 4.49 BridgeDepth [18] 0.95 3.10 1.10 4.77 1.32 6.71 0.98 3.59 1.96 11.25 6.95 5.52 4.57 MGStereo ‡ [52] - - - - - - - - 1.24 7.91 5.97 4.08 3.44 PromptStereo (Ours) 0.92 3.09 0.94 2.71 1.39 10.25 0.90 3.29 0.67 3.67 2.35 1.95 1.70 
+
+Table 2. Zero-shot generalization advanced benchmark. MonSter ∗ is re-trained with the official code. FoundationStereo † is reported for reference only, as it requires significantly large batch sizes and model parameters to train, making a fair comparison infeasible. MGStereo ‡
+
+is reported from the official GitHub repository, which is fine-tuned on TranScene [28] without available checkpoints. Left Image  MonSter  BridgeDepth  PromptStereo  Bad 2.0: 0.09% Bad 2.0: 13.52% Bad 2.0: 13.52% 
+
+> Bad 2.0: 0.19% Bad 2.0: 21.50% Bad 2.0: 20.71%
+> Bad 2.0: 0.09% Bad 2.0: 31.44% Bad 2.0: 32.89%
+> Bad 2.0: 0.40% Bad 2.0: 7.58% Bad 2.0: 15.05%
+> Bad 2.0: 0.07% Bad 2.0: 13.02% Bad 2.0: 30.39%
+> Bad 2.0: 0.29% Bad 2.0: 10.18% Bad 2.0: 7.16%
+
+Figure 5. Visualization of Booster (unlimited training sets). The Bad 2.0 metric map is in the upper right corner. 
+
+However, under the unlimited training setting, Prompt-Stereo achieves remarkable improvements on Booster, sur-passing the second-best method, MGStereo ‡, by over 50%. Notably, MGStereo ‡ is fine-tuned on TransScene [28]. Furthermore, PromptStereo also outperforms Foundation-Stereo [45], highlighting the strong representation capacity and scalability of PRU. As shown in Fig. 5, our Prompt-Stereo performs well on the most challenging scenarios. It accurately predicts disparities even in regions with screens, reflective materials, and transparent surfaces, demonstrating that PRU effectively leverages monocular depth priors. 
+
+4.4. Ablation Study 
+
+We begin to study the contribution of each proposed com-ponent. For efficiency, our ablation studies may use reduced data augmentations, smaller crop size, or fewer training it-erations. Nevertheless, all studies within the same group share identical training configurations, ensuring a fair com-parison. Our ablation studies cover four aspects: module effectiveness, module universality, PRU design, and itera-tion number. Through these studies, we aim to provide a deeper understanding of how PRU leverages prompts and holds superior representation capacity and scalability. 12571 Model MP SP AIF Midd-T (H) ETH3D Time (s) EPE Bad 2.0 EPE Bad 1.0 Baseline (MonSter) 0.94 7.27 0.26 2.86 0.64 PRU + MP ✓ 0.66 4.18 0.22 1.38 0.35 PRU + MP + SP ✓ ✓ 0.62 3.90 0.21 1.35 0.36 Full model (PromptStereo) ✓ ✓ ✓ 0.60 3.76 0.20 1.30 0.36 
+
+Table 3. Ablation study of module effectiveness. Time is recorded when inferencing Scene Flow.                               
+
+> Model KITTI 2015 Midd-T (H) ETH3D Time (s) Bad 3.0 Bad 2.0 Bad 1.0 RAFT-Stereo 5.68 8.41 2.29 0.36 Prompt-RAFT 4.78 6.39 1.49 0.38 IGEV-Stereo 6.03 7.04 3.61 0.37 Prompt-IGEV 4.84 6.50 2.21 0.38 MonSter 5.52 7.27 2.86 0.64 PromptStereo 4.59 3.76 1.30 0.36
+
+Table 4. Ablation study of module universality.                  
+
+> Model KITTI 2015 Midd-T (H) ETH3D Bad 3.0 Bad 2.0 Bad 1.0 w/o pre-trained weights 5.03 4.39 1.39 w/ hidden state conv 4.86 4.37 1.34 w/ zero-init conv 4.83 4.04 1.42 PromptStereo 4.59 3.76 1.30
+
+Table 5. Ablation study of PRU design. 
+
+Module Effectiveness. As shown in Tab. 3, we take MonSter [14] as our baseline. Replacing its dual-branch GRU with our PRU + MP already brings superior improve-ments in both inference speed and accuracy. With SP and AIF further incorporated, performance consistently in-creases, while inference time grows only marginally. Our PRU unifies monocular and stereo cues within a single branch, achieving gains in both efficiency and accuracy. 
+
+Module Universality. As shown in Tab. 4, we replace GRU in RAFT-Stereo [26] and IGEV-Stereo [47] with PRU to evaluate its universality. The results show that PRU im-proves accuracy while maintaining nearly unchanged infer-ence time. It demonstrates that PRU serves as a generic and pluggable recurrent unit, improving the performance of it-erative stereo matching while preserving efficiency. 
+
+PRU Design. As shown in Tab. 5, when we remove the pre-trained weights, it leads to a clear performance drop, confirming the benefit of inheriting priors. Interestingly, even with random initialization, our model still achieves a competitive performance, suggesting that PRU’s archi-tecture is also effective. When we merge the hidden state and prompt into a single convolutional block, performance decreases, showing that such coupling disturbs the separa-tion of information. Additionally, replacing the last con-volutional layer of the prompt block with a zero-initialized convolution [25] also degrades performance, indicating that this design hinders training convergence when the prompt information is sufficiently rich.                            
+
+> Model Iteration Number 4812 16 32 Evaluation Set Midd-2021 MonSter 10.75 10.64 10.16 9.61 8.46 PromptStereo 4.35 3.28 2.93 2.79 2.78
+> Evaluation Set Booster (Q) MonSter 14.09 13.62 12.82 12.62 11.55 PromptStereo 5.25 4.39 4.24 4.09 3.67
+
+Table 6. Ablation study of iteration number. 
+
+Iteration Number. As shown in Tab. 6, we evaluate the impact of iteration numbers on Midd-2021 and Booster. It demonstrates that our PromptStereo converges significantly faster and achieves higher accuracy under the same num-ber of iterations. On Midd-2021, PromptStereo achieves near-optimal performance within 16 iterations, whereas on Booster, performance continues to improve up to 32 iter-ations, which is expected given the difficulty of reflective and transparent surfaces. These results further validate the improved convergence speed brought by PRU. 
+
+## 5. Conclusion 
+
+We propose PromptStereo, a novel iterative stereo match-ing method for zero-shot generalization. It replaces GRU with Prompt Recurrent Unit (PRU), which inherits monocu-lar depth priors and offers better representation capacity and scalability. Structure Prompt (SP) and Motion Prompt (MP) prompts monocular structure and stereo motion cues into PRU, providing clear guidance and maintaining indepen-dent state information. We further utilize Affine-Invariant Fusion (AIF) for global geometric consistent initialization, and introduce a simple yet effective update strategy for ef-ficient iterative refinement. Experiments demonstrate that our PromptStereo achieves state-of-the-art zero-shot per-formance across various datasets, including challenging real-world scenarios. Our work highlights the potential of prompt-guided iterative refinement in stereo matching. 
+
+Limitations. Despite its strong zero-shot generalization, PromptStereo’s performance in extreme adverse weather scenarios is still constrained. There may be various reasons that deserve further investigation in the future. 
+
+Acknowledgement. This research is supported by the National Natural Science Foundation of China (62472184, 62122029) and the Fundamental Research Funds for the Central Universities. 12572 References 
+
+[1] Antyanta Bangunharcana, Jae Won Cho, Seokju Lee, In So Kweon, Kyung-Soo Kim, and Soohyun Kim. Correlate-and-excite: Real-time stereo matching via guided cost volume excitation. In 2021 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , pages 3542–3548. IEEE, 2021. 3 [2] Luca Bartolomei, Fabio Tosi, Matteo Poggi, and Stefano Mattoccia. Stereo anywhere: Robust zero-shot deep stereo matching even where either stereo or mono fail. In Proceed-ings of the Computer Vision and Pattern Recognition Con-ference , pages 1013–1027, 2025. 1, 2 [3] Aleksei Bochkovskii, Ama ˜ AG ¸ l Delaunoy, Hugo Germain, Marcel Santos, Yichao Zhou, Stephan R Richter, and Vladlen Koltun. Depth pro: Sharp monocular metric depth in less than a second. arXiv preprint arXiv:2410.02073 , 2024. 1[4] Yohann Cabon, Naila Murray, and Martin Humenberger. Vir-tual kitti 2. arXiv preprint arXiv:2001.10773 , 2020. 5 [5] Jia-Ren Chang and Yong-Sheng Chen. Pyramid stereo matching network. In Proceedings of the IEEE conference on computer vision and pattern recognition , pages 5410–5418, 2018. 2 [6] Tianyu Chang, Xun Yang, Tianzhu Zhang, and Meng Wang. Domain generalized stereo matching via hierarchical visual transformation. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 9559– 9568, 2023. 1 [7] Ziyang Chen, Wei Long, He Yao, Yongjun Zhang, Bingshu Wang, Yongbin Qin, and Jia Wu. Mocha-stereo: Motif chan-nel attention network for stereo matching. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , pages 27768–27777, 2024. 2 [8] Ziyang Chen, Yongjun Zhang, Wenting Li, Bingshu Wang, Yong Zhao, and CL Chen. Motif channel opened in a white-box: Stereo matching via motif correlation graph. arXiv preprint arXiv:2411.12426 , 2024. [9] Ziyang Chen, Yang Zhao, Junling He, Yujie Lu, Zhongwei Cui, Wenting Li, and Yongjun Zhang. Feature distribution normalization network for multi-view stereo. The Visual Computer , 41(1):409–421, 2025. 2 [10] Junda Cheng, Xin Yang, Yuechuan Pu, and Peng Guo. Re-gion separable stereo matching. IEEE Transactions on Mul-timedia , 25:4880–4893, 2022. 2 [11] Junda Cheng, Gangwei Xu, Peng Guo, and Xin Yang. Coa-trsnet: Fully exploiting convolution and attention for stereo matching by region separation. International Journal of Computer Vision , 132(1):56–73, 2024. 2 [12] Junda Cheng, Wei Yin, Kaixuan Wang, Xiaozhi Chen, Shijie Wang, and Xin Yang. Adaptive fusion of single-view and multi-view depth for autonomous driving. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 10138–10147, 2024. 1 [13] Junda Cheng, Wenjing Liao, Zhipeng Cai, Longliang Liu, Gangwei Xu, Xianqi Wang, Yuzhou Wang, Zikang Yuan, Yong Deng, Jinliang Zang, et al. Monster++: Unified stereo matching, multi-view stereo, and real-time stereo with mon-odepth priors. arXiv preprint arXiv:2501.08643 , 2025. 2 [14] Junda Cheng, Longliang Liu, Gangwei Xu, Xianqi Wang, Zhaoxing Zhang, Yong Deng, Jinliang Zang, Yurui Chen, Zhipeng Cai, and Xin Yang. Monster: Marry monodepth to stereo unleashes power. In Proceedings of the Computer Vi-sion and Pattern Recognition Conference , pages 6273–6282, 2025. 1, 2, 3, 5, 6, 7, 8 [15] Kyunghyun Cho, Bart Van Merri¨ enboer, Caglar Gulcehre, Dzmitry Bahdanau, Fethi Bougares, Holger Schwenk, and Yoshua Bengio. Learning phrase representations using rnn encoder-decoder for statistical machine translation. arXiv preprint arXiv:1406.1078 , 2014. 1 [16] WeiQin Chuah, Ruwan Tennakoon, Reza Hoseinnezhad, Alireza Bab-Hadiashar, and David Suter. Itsa: An information-theoretic approach to automatic shortcut avoid-ance and domain generalization in stereo matching networks. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 13022–13032, 2022. 1, 2 [17] Andreas Geiger, Philip Lenz, and Raquel Urtasun. Are we ready for autonomous driving? the kitti vision benchmark suite. In 2012 IEEE conference on computer vision and pat-tern recognition , pages 3354–3361. IEEE, 2012. 5 [18] Tongfan Guan, Jiaxin Guo, Chen Wang, and Yun-Hui Liu. Bridgedepth: Bridging monocular and stereo reasoning with latent alignment. In Proceedings of the IEEE/CVF Interna-tional Conference on Computer Vision , pages 27681–27691, 2025. 1, 2, 6, 7 [19] Xiaoyang Guo, Kai Yang, Wukui Yang, Xiaogang Wang, and Hongsheng Li. Group-wise correlation stereo network. In 
+
+Proceedings of the IEEE/CVF conference on computer vi-sion and pattern recognition , pages 3273–3282, 2019. 2, 3 [20] Jing He, Haodong Li, Wei Yin, Yixun Liang, Leheng Li, Kaiqiang Zhou, Hongbo Zhang, Bingbing Liu, and Ying-Cong Chen. Lotus: Diffusion-based visual foundation model for high-quality dense prediction. arXiv preprint arXiv:2409.18124 , 2024. 1 [21] Hualie Jiang, Zhiqiang Lou, Laiyan Ding, Rui Xu, Minglang Tan, Wenjie Jiang, and Rui Huang. Defom-stereo: Depth foundation model based stereo matching. In Proceedings of the Computer Vision and Pattern Recognition Conference ,pages 21857–21867, 2025. 1, 2, 6, 7 [22] Alex Kendall, Hayk Martirosyan, Saumitro Dasgupta, Peter Henry, Ryan Kennedy, Abraham Bachrach, and Adam Bry. End-to-end learning of geometry and context for deep stereo regression. In Proceedings of the IEEE international confer-ence on computer vision , pages 66–75, 2017. 2 [23] Jiankun Li, Peisen Wang, Pengfei Xiong, Tao Cai, Zi-wei Yan, Lei Yang, Jiangyu Liu, Haoqiang Fan, and Shuaicheng Liu. Practical stereo matching via cascaded re-current network with adaptive correlation. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , pages 16263–16272, 2022. 2, 5 [24] Jiahao Li, Xinhong Chen, Zhengmin Jiang, Qian Zhou, Yung-Hui Li, and Jianping Wang. Global regulation and ex-citation via attention tuning for stereo matching. In Proceed-12573 ings of the IEEE/CVF International Conference on Com-puter Vision , pages 25539–25549, 2025. 2, 6, 7 [25] Haotong Lin, Sida Peng, Jingxiao Chen, Songyou Peng, Ji-aming Sun, Minghuan Liu, Hujun Bao, Jiashi Feng, Xiaowei Zhou, and Bingyi Kang. Prompting depth anything for 4k resolution accurate metric depth estimation. In Proceedings of the Computer Vision and Pattern Recognition Conference ,pages 17070–17080, 2025. 2, 8 [26] Lahav Lipson, Zachary Teed, and Jia Deng. Raft-stereo: Multilevel recurrent field transforms for stereo matching. In 
+
+2021 International Conference on 3D Vision (3DV) , pages 218–227. IEEE, 2021. 1, 2, 3, 4, 5, 6, 7, 8 [27] Biyang Liu, Huimin Yu, and Guodong Qi. Graftnet: Towards domain generalized stereo matching with a broad-spectrum and task-oriented feature. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition ,pages 13012–13021, 2022. 2 [28] Zhidan Liu, Chengtang Yao, Jiaxi Zeng, Yuwei Wu, and Yunde Jia. Multi-label stereo matching for transparent scene depth estimation. arXiv preprint arXiv:2505.14008 , 2025. 7 [29] Nikolaus Mayer, Eddy Ilg, Philip Hausser, Philipp Fischer, Daniel Cremers, Alexey Dosovitskiy, and Thomas Brox. A large dataset to train convolutional networks for disparity, optical flow, and scene flow estimation. In Proceedings of the IEEE conference on computer vision and pattern recog-nition , pages 4040–4048, 2016. 2, 5, 6 [30] Moritz Menze and Andreas Geiger. Object scene flow for au-tonomous vehicles. In Proceedings of the IEEE conference on computer vision and pattern recognition , pages 3061– 3070, 2015. 5 [31] Maxime Oquab, Timoth´ ee Darcet, Th´ eo Moutakanni, Huy Vo, Marc Szafraniec, Vasil Khalidov, Pierre Fernandez, Daniel Haziza, Francisco Massa, Alaaeldin El-Nouby, et al. Dinov2: Learning robust visual features without supervision. 
+
+arXiv preprint arXiv:2304.07193 , 2023. 3 [32] Pierluigi Zama Ramirez, Fabio Tosi, Matteo Poggi, Samuele Salti, Stefano Mattoccia, and Luigi Di Stefano. Open chal-lenges in deep stereo: the booster dataset. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 21168–21178, 2022. 5 [33] Ren´ e Ranftl, Katrin Lasinger, David Hafner, Konrad Schindler, and Vladlen Koltun. Towards robust monocular depth estimation: Mixing datasets for zero-shot cross-dataset transfer. IEEE transactions on pattern analysis and machine intelligence , 44(3):1623–1637, 2020. 4 [34] Ren´ e Ranftl, Alexey Bochkovskiy, and Vladlen Koltun. Vi-sion transformers for dense prediction. In Proceedings of the IEEE/CVF international conference on computer vision ,pages 12179–12188, 2021. 2, 4 [35] Zhibo Rao, Bangshu Xiong, Mingyi He, Yuchao Dai, Renjie He, Zhelun Shen, and Xing Li. Masked representation learn-ing for domain generalized stereo matching. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pat-tern Recognition , pages 5435–5444, 2023. 1, 2 [36] Daniel Scharstein, Heiko Hirschm¨ uller, York Kitajima, Greg Krathwohl, Nera Neˇ si´ c, Xi Wang, and Porter West-ling. High-resolution stereo datasets with subpixel-accurate ground truth. In German conference on pattern recognition ,pages 31–42. Springer, 2014. 1, 5 [37] Thomas Schops, Johannes L Schonberger, Silvano Galliani, Torsten Sattler, Konrad Schindler, Marc Pollefeys, and An-dreas Geiger. A multi-view stereo benchmark with high-resolution images and multi-camera videos. In Proceed-ings of the IEEE conference on computer vision and pattern recognition , pages 3260–3269, 2017. 5 [38] Zhelun Shen, Yuchao Dai, and Zhibo Rao. Cfnet: Cascade and fused cost volume for robust stereo matching. In Pro-ceedings of the IEEE/CVF conference on computer vision and pattern recognition , pages 13906–13915, 2021. 2 [39] Jonathan Tremblay, Thang To, and Stan Birchfield. Falling things: A synthetic dataset for 3d object detection and pose estimation. In Proceedings of the IEEE conference on com-puter vision and pattern recognition workshops , pages 2038– 2041, 2018. 5 [40] Ruicheng Wang, Sicheng Xu, Cassie Dai, Jianfeng Xiang, Yu Deng, Xin Tong, and Jiaolong Yang. Moge: Unlocking accurate monocular geometry estimation for open-domain images with optimal training supervision. In Proceedings of the Computer Vision and Pattern Recognition Conference ,pages 5261–5271, 2025. 1 [41] Xianqi Wang, Gangwei Xu, Hao Jia, and Xin Yang. Selective-stereo: Adaptive frequency information selection for stereo matching. In Proceedings of the IEEE/CVF Con-ference on Computer Vision and Pattern Recognition , pages 19701–19710, 2024. 2 [42] Xianqi Wang, Hao Yang, Gangwei Xu, Junda Cheng, Min Lin, Yong Deng, Jinliang Zang, Yurui Chen, and Xin Yang. Zerostereo: Zero-shot stereo matching from single images. In Proceedings of the IEEE/CVF International Conference on Computer Vision , pages 28177–28187, 2025. 2 [43] Yun Wang, Longguang Wang, Chenghao Zhang, Yongjian Zhang, Zhanjie Zhang, Ao Ma, Chenyou Fan, Tin Lun Lam, and Junjie Hu. Learning robust stereo matching in the wild with selective mixture-of-experts. In Proceedings of the IEEE/CVF International Conference on Computer Vision ,pages 21276–21287, 2025. 1, 2, 6, 7 [44] Zehan Wang, Siyu Chen, Lihe Yang, Jialei Wang, Ziang Zhang, Hengshuang Zhao, and Zhou Zhao. Depth anything with any prior. arXiv preprint arXiv:2505.10565 , 2025. 2 [45] Bowen Wen, Matthew Trepte, Joseph Aribido, Jan Kautz, Orazio Gallo, and Stan Birchfield. Foundationstereo: Zero-shot stereo matching. In Proceedings of the Computer Vi-sion and Pattern Recognition Conference , pages 5249–5260, 2025. 1, 2, 5, 6, 7 [46] Gangwei Xu, Junda Cheng, Peng Guo, and Xin Yang. Atten-tion concatenation volume for accurate and efficient stereo matching. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , pages 12981– 12990, 2022. 2 [47] Gangwei Xu, Xianqi Wang, Xiaohuan Ding, and Xin Yang. Iterative geometry encoding volume for stereo matching. In 
+
+Proceedings of the IEEE/CVF conference on computer vi-sion and pattern recognition , pages 21919–21928, 2023. 2, 3, 4, 5, 6, 7, 8 12574 [48] Gangwei Xu, Haotong Lin, Hongcheng Luo, Xianqi Wang, Jingfeng Yao, Lianghui Zhu, Yuechuan Pu, Cheng Chi, Haiyang Sun, Bing Wang, et al. Pixel-perfect depth with semantics-prompted diffusion transformers. arXiv preprint arXiv:2510.07316 , 2025. 1 [49] Haofei Xu and Juyong Zhang. Aanet: Adaptive aggrega-tion network for efficient stereo matching. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , pages 1959–1968, 2020. 2 [50] Guorun Yang, Xiao Song, Chaoqin Huang, Zhidong Deng, Jianping Shi, and Bolei Zhou. Drivingstereo: A large-scale dataset for stereo matching in autonomous driving scenarios. In Proceedings of the IEEE/CVF conference on computer vi-sion and pattern recognition , pages 899–908, 2019. 5 [51] Lihe Yang, Bingyi Kang, Zilong Huang, Zhen Zhao, Xiao-gang Xu, Jiashi Feng, and Hengshuang Zhao. Depth any-thing v2. Advances in Neural Information Processing Sys-tems , 37:21875–21911, 2024. 1, 3, 4 [52] Chengtang Yao, Lidong Yu, Zhidan Liu, Jiaxi Zeng, Yuwei Wu, and Yunde Jia. Diving into the fusion of monocular pri-ors for generalized stereo matching. In Proceedings of the IEEE/CVF International Conference on Computer Vision ,pages 14887–14897, 2025. 1, 2, 6, 7 [53] Feihu Zhang, Xiaojuan Qi, Ruigang Yang, Victor Prisacariu, Benjamin Wah, and Philip Torr. Domain-invariant stereo matching networks. In European conference on computer vision , pages 420–439. Springer, 2020. 1, 2 [54] Jiawei Zhang, Xiang Wang, Xiao Bai, Chen Wang, Lei Huang, Yimin Chen, Lin Gu, Jun Zhou, Tatsuya Harada, and Edwin R Hancock. Revisiting domain generalized stereo matching networks from a feature consistency perspective. In Proceedings of the IEEE/CVF conference on computer vi-sion and pattern recognition , pages 13001–13011, 2022. 1 [55] Haoliang Zhao, Huizhou Zhou, Yongjun Zhang, Jie Chen, Yitong Yang, and Yong Zhao. High-frequency stereo match-ing network. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , pages 1327–1336, 2023. 2 12575

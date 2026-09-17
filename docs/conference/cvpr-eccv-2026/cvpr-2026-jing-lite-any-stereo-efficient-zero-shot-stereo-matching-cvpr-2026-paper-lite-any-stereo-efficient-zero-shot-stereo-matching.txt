@@ -1,0 +1,466 @@
+Title: Lite Any Stereo: Efficient Zero-Shot Stereo Matching
+
+URL Source: https://openaccess.thecvf.com/content/CVPR2026/papers/Jing_Lite_Any_Stereo_Efficient_Zero-Shot_Stereo_Matching_CVPR_2026_paper.pdf
+
+Published Time: Sat, 16 May 2026 16:49:36 GMT
+
+Number of Pages: 11
+
+Markdown Content:
+# Lite Any Stereo: Efficient Zero-Shot Stereo Matching 
+
+# Junpeng Jing Weixun Luo Ye Mao † Krystian Mikolajczyk Imperial College London 
+
+https://tomtomtommi.github.io/LiteAnyStereo/ Left -RGB 
+
+> Disparity
+
+# ————  4K  Stereo Depth at  21 ms  on  GTX  1080  ———— 
+
+> Right -RGB
+> Metric Point Cloud
+> Left -RGB
+> Right -RGB
+> Disparity Metric Point Cloud
+
+Figure 1. Zero-shot prediction on in-the-wild stereo images. The proposed method achieves accurate disparity estimation across diverse scenarios and maintains high efficiency, even on older-generation GPUs. 
+
+# Abstract 
+
+Recent advances in stereo matching have focused on accu-racy, often at the cost of significantly increased model size. Traditionally, the community has regarded efficient models as incapable of zero-shot ability due to their limited capac-ity. In this paper, we introduce Lite Any Stereo , a stereo depth estimation framework that achieves strong zero-shot generalization while remaining highly efficient. To this end, we design a compact yet expressive backbone to ensure scalability, along with a carefully crafted hybrid cost ag-gregation module. We further propose a three-stage train-ing strategy on million-scale data to effectively bridge the sim-to-real gap. Together, these components demonstrate that an ultra-light model can deliver strong generaliza-tion, ranking 1st across four widely used real-world bench-marks. Remarkably, our model attains accuracy compara-ble to or exceeding state-of-the-art non-prior-based accu-rate methods while requiring less than 1% computational cost, setting a new standard for efficient stereo matching. 
+
+# 1. Introduction 
+
+From the foundational work of [37] through the classical ad-vances culminating in works such as [51], stereo vision has  
+
+> 2Corresponding author: ye.mao21@imperial.ac.uk
+
+seen decades of steady progress built on a wide range of al-gorithmic ideas. In the past decade, deep learning methods have driven a dramatic leap in accuracy—leading many re-searchers to view stereo vision as largely solved—yet these gains often rely on large, computationally expensive models that are difficult to deploy on resource-limited hardware. Learning-based methods [32, 35, 58, 67] achieve re-markable accuracy, continuously raising scores on standard benchmarks [14, 40, 46, 47]. These methods can be broadly categorized as accuracy-oriented. More recently, the emer-gence of foundation models trained on internet-scale data, such as the DepthAnything series [73, 74], has led to fur-ther advancement in the field. Stereo models augmented with depth priors [9, 23, 61] have demonstrated excellent zero-shot generalization: a single set of model weights can deliver strong results across diverse scenarios. However, de-spite these successes, such approaches prioritize accuracy over efficiency, which limits their practical applications. In contrast, efficiency-oriented approaches [20, 48, 68] trade accuracy for faster inference and lower resource use, however, the accuracy gap to large models remains signif-icant. The absence of light models with strong zero-shot generalization may lead to a conclusion that such mod-els lack capacity for zero-shot applications. Consequently, most approaches still rely on domain-specific fine-tuning, thus falling short of being practical off-the-shelf solutions. Training from large data is a key factor in enabling zero-This CVPR paper is the Open Access version, provided by the Computer Vision Foundation. Except for this watermark, it is identical to the accepted version; the final published version of the proceedings is available on IEEE Xplore. 21725 KITTI 2012 (D1)    
+
+> 3.17 3.54 3.92 1.41 1.21 1.01 10.27 9.09 7.99 0.48 0.41 0.34 5.24 4.50 3.77 1.10 1.06 1.01 4.80 4.40 4.00 0.94 0.88 0.81 Middlebury (EPE) Middlebury (Bad 2.0) ETH3D (EPE) ETH3D (Bad 1.0) KITTI 2015 (EPE) KITTI 2012 (EPE) KITTI 2015 (D1)
+> BANet-2D (36G) StereoAnything-L (84G)
+> Lite Any Stereo (33G)
+> Selective-IGEV (3619G) LightStereo-M (33G)
+
+Figure 2. Zero-shot performance. Our method achieves SOTA by a large margin, with even better or comparable non-prior-based accurate model, while requiring less than 1% of their MACs. 
+
+shot capability. StereoAnything [19] scaled training by using a monocular depth model [74] to generate pseudo-disparity maps, yielding 30M real-world samples. While large data improves zero-shot performance for efficient models [20], they remain far behind accuracy-oriented mod-els, primarily due to the limited quality of monocular depth. In this paper, we propose Lite Any Stereo, an ultra-lite stereo matching model designed for zero-shot generaliza-tion. We achieve this from two perspectives: architecture and training strategy. We design a backbone with a hybrid cost aggregation module that jointly leverages 2D and 3D representations, capturing complementary spatial and dis-parity cues. This carefully crafted backbone achieves very low computational cost and fast inference speed. To train for zero-shot capability, we scale the data to a million level with a three-stage strategy. Specifically, self-distillation on synthetic labeled data is performed after supervised train-ing. We further make use of real-world unlabeled data, which has long been overlooked in stereo, for knowledge distillation. This combination effectively mitigates the sim-to-real gap and proves to be universally beneficial across varied model architectures. Together, these innovations sig-nificantly improve performance. As shown in Fig. 1, our method shows strong generalization, producing accurate disparities on in-the-wild images with high efficiency. Our main contributions can be summarized as follows: • We present Lite Any Stereo, an efficient stereo matching model that achieves zero-shot capability. As shown in Fig. 2, it delivers the highest zero-shot accuracy among all efficient methods by a large margin. This is the first efficient model to outperform or match accuracy-oriented models that do not use foundational priors, while requir-ing less than 1% of their computational cost. • We propose a hybrid cost aggregation module that cap-tures complementary disparity and spatial information, enhancing representation at low cost. • We develop a three-stage training strategy that inte-grates synthetic supervision, self-distillation, and real-world knowledge distillation, effectively improving zero-shot generalization across diverse architectures. 
+
+# 2. Related Work 
+
+In this section, we first review accurate stereo matching methods, followed by a discussion of approaches focused on computational efficiency. 
+
+## 2.1. Accurate Stereo Methods 
+
+Modern stereo matching methods based on deep learning typically construct either 3D or 4D cost volumes to cap-ture pixel-level correspondences between the left and right views. These volumes serve as the foundation for dispar-ity estimation, with convolutional neural networks used to aggregate contextual information. Broadly, CNN-based ap-proaches can be categorized into two types: those that em-phasize cost aggregation [7, 10, 15, 17, 18, 21, 34, 42, 52, 69, 71, 76], and those that adopt iterative refinement strate-gies [32, 35, 58, 66] to progressively enhance disparity pre-dictions. Another line of research explores transformer-based stereo models [16, 33, 50, 60, 70], which leverage attention mechanisms to capture global context. In addi-tion, some methods explicitly address temporal consistency in stereo videos [26–29], aiming to produce consistent dis-parities across time. While these models perform well on domain-specific benchmarks [14, 40, 46, 47], generaliza-tion to unseen domains in zero-shot settings remains a ma-jor challenge. To address this, some works have focused on learning domain-invariant representations [8, 11, 44, 77] and robust modules [19, 25, 49], aiming to improve per-formance under domain shifts. A recent new direction in-volves leveraging prior knowledge from monocular founda-tion models [73, 74]. By integrating monocular depth cues into stereo pipelines, several methods [3, 9, 23, 61, 78, 79] demonstrate enhanced zero-shot generalization. However, these improvements often come at the cost of increased computational complexity, limiting their deployment in real-time or resource-constrained scenarios. 
+
+## 2.2. Efficient Stereo Matching 
+
+Real-time performance is critical for stereo matching in practical applications. Early approaches [13, 30, 56] ad-dress this by estimating disparities at reduced spatial res-olutions to lower computational cost, though at the ex-pense of accuracy. Subsequent methods aim to improve this efficiency and accuracy trade-off based on 3D ag-gregation. Representative advancements include guided cost volume excitation in CoEx [1], edge-aware upsam-pling in BGNet [64], and sparse attention for selective high-resolution matching in Fast-ACVNet [65, 67]. To 21726 Feature 
+
+> Extraction
+> Feature
+> Extraction
+
+## 𝐹 𝐿 
+
+## 𝐹 𝑅 
+
+## 𝑪 Left Image 𝐼 𝐿  
+
+> Right Image
+
+𝐼 𝑅  
+
+> shared
+> weights
+> cost volume
+> dhw
+> h
+> w
+> 2D Aggregation 3D Aggregation
+
+## ···d w  
+
+> cost volume d
+> h
+> Disparity 𝑫
+> Correlation
+> convex upsampling
+> Lite
+> Model
+> synthetic
+
+GT  
+
+> Lite
+> Teacher
+> Lite
+> Student ＋perturbation
+> feature alignment
+
+GT 
+
+Stage  ① (1.9M) 
+
+> Lite
+> Model
+> real world
+> Accuracy
+> Model
+
+GT 
+
+> pseudo
+> synthetic
+
+Stage  ② (1.9M)  Stage  ③ (0.5M)  
+
+> trainable frozen
+
+## 𝑪 agg 
+
+## 𝑮 3𝐷  𝑮 2𝐷 Figure 3. Overview of the proposed Lite Any Stereo. Given an input stereo image pair, features are first extracted using a shared-weight feature extraction module. A correlation module then constructs cost volume from extracted features, which is processed by a hybrid 3D-2D cost aggregation module to obtain aggregated cost volume along both disparity and spatial dimensions. Finally, low-resolution disparity map is estimated and a convex upsampling operation is applied to recover the full-resolution disparity map. Feature 
+
+Extraction 
+
+Feature 
+
+Extraction 
+
+# 𝐹 𝐿 
+
+# 𝐹 𝑅 
+
+# 𝑪 Left Image 𝐼 𝐿 
+
+Right Image 𝐼 𝑅  
+
+> shared
+> weights
+> cost volume
+> dhw
+> h
+> w
+
+2D Aggregation 3D Aggregation 
+
+# ···d w 
+
+> cost volume d
+> h
+
+Disparity 𝑫 
+
+Correlation 
+
+> convex upsampling
+
+Lite 
+
+Model 
+
+synthetic 
+
+GT 
+
+Lite 
+
+Teacher 
+
+Lite 
+
+Student ＋ perturbation 
+
+feature alignment 
+
+GT 
+
+Stage  ① (1. 8M)
+
+Lite 
+
+Model 
+
+real world 
+
+Accura te 
+
+Model 
+
+GT 
+
+pseudo 
+
+synthetic 
+
+Stage  ② (1. 8M) Stage  ③ (0.5M)  
+
+> trainable frozen
+
+# 𝑪 agg 
+
+# 𝑮 3𝐷  𝑮 2𝐷 
+
+Figure 4. Overview of the proposed three-stage training strategy. Stage ①: The lite model is trained using a standard supervised setup on a mixed of synthetic datasets including 1.8M labeled stereo image pairs. Stage ②: Self-distillation is employed, where both teacher and student models are initialized from the Stage ① weights. The teacher receives clean data, while the student is fed perturbed inputs to encourage learning of domain-invariant representations via feature alignment. Stage ③: The lite model is fine-tuned on unlabeled real-world data using pseudo labels generated by a frozen accurate model. 
+
+further reduce complexity, another line of works have explored 2D-based alternatives to traditional 3D convo-lutions. Notable examples include AANet [69], which employs deformable 2D convolutions for adaptive cost aggregation; HITNet [52], which reconstructs disparities through iterative warping without explicit cost volumes; and MobileStereoNet-2D [48], which adopts lightweight Mo-bileNet blocks. More recent efforts continue this trend with specialized strategies: uncertainty-aware adaptive warping in Lite-CREStereo++ [25], channel-wise enhancement in LightStereo [20], and frequency-disparity guided bilateral aggregation in BANet [68]. Despite these advances in ef-ficiency, most of these models are optimized for a specific domain, particularly the KITTI online benchmarks [14, 40], and still struggle to generalize well across diverse, unseen scenarios. Achieving strong zero-shot ability while main-taining real-time efficiency remains an open challenge. 
+
+# 3. Method 
+
+In this section, we introduce Lite Any Stereo, an efficient feed-forward network for zero-shot stereo matching. We first demonstrate the overall framework (Sec. 3.1), and then go through the training strategy (Sec. 3.2). 
+
+## 3.1. Framework 
+
+As shown in Fig. 3, the overall framework comprises four main stages: feature extraction, correlation, cost aggrega-tion, and disparity estimation. 
+
+Feature Extraction. Recent methods [9, 23, 61] have demonstrated remarkable improvements by leveraging depth features from DepthAnything (DA) [73, 74]. How-ever, we find that the additional computational overhead in-troduced by DA, even with the smallest DA-S variant, is prohibitive for an efficiency-oriented stereo model. There-fore, we adopt a conventional backbone [20, 68] pretrained on ImageNet [12] without external priors for feature extrac-tion. Moreover, we find that compared with more recent CNN backbones [36, 62], the channel configuration of Mo-bileNetV2 [45] is better aligned with the requirements of our task. Specifically, given a pair of rectified stereo images 
+
+{IL, IR} ∈ RH×W ×3, we employ two weight-sharing net-works to pyramidally generate multi-scale features {FsL}
+
+and {FsR}, where s ∈  14 , 18 , 116 , 132 denotes the downsam-pling ratio. To unify the spatial resolution for subsequent processing, features at all scales are upsampled to 14 resolu-tion using residual upsampling blocks, following [20]. 
+
+Correlation. Given the extracted left and right feature maps 21727 2D 
+
+3D  
+
+> (a) Bilateral (c) 3D+2D
+
+𝑪 agg 𝑪 
+
+> (b) 2D+3D
+
+𝑪 
+
+2D 
+
+3D 
+
+𝑪 
+
+3D 
+
+2D 
+
+𝑪 
+
+> (d) Interleaved
+
+𝑪 agg  𝑪 agg  𝑪 agg Figure 5. Design choices for hybrid cost aggregation module. 
+
+F 14 
+
+> L
+
+and F 14
+
+> R
+
+, the cost volume C for each disparity d within the range [0 , D max /4] is constructed as: 
+
+C(d, h, w ) = 1
+
+Nc
+
+D
+
+F 14 
+
+> L
+
+(h, w ), F 14
+
+> R
+
+(h, w − d)
+
+E
+
+, (1) where Dmax denotes the predefined maximum disparity value, ⟨· , ·⟩ denotes the inner product, Nc is the number of channels, and (h, w ) represents the pixel location. 
+
+Cost Aggregation. Recent efficient models adopt 2D cost aggregation [20, 48, 68], which reduces computation by col-lapsing the disparity into channels and performing spatial-only convolutions. However, this strategy does not explic-itly model structured continuity along the disparity dimen-sion, potentially limiting generalization. To address this, we introduce a hybrid aggregation module that combines com-plementary 2D and 3D reasoning. The 3D block G3D (·)
+
+jointly aggregates over disparity and spatial dimensions to capture cross-disparity structure, while the 2D block G2D (·)
+
+provides efficient spatial refinement. This design preserves geometric awareness with minimal overhead. Specifically, multi-scale 3D convolutions are employed in the 3D block, and ConvNeXt layers [36] are used in the 2D block. A naive half–half hybrid design is ineffective, as 3D convolutions dominate the compute budget along the disparity dimension, even though many disparity levels con-tribute little to the final results. Instead, we retain only a small proportion of 3D component to preserve disparity perception while maintaining efficiency. We also explore multiple design choices for integrating 2D and 3D branches while keeping the overall computational cost fixed, as illus-trated in Fig. 5. In particular: (a) follows [68], where bilat-eral aggregation is adopted and the outputs of 2D and 3D branches are summed; (b) and (c) apply serial connections, but with different ordering of 2D and 3D blocks; (d) inter-leaves 2D and 3D blocks. Through ablation studies (Sec-tion 4.3), we find that design (c) achieves the best perfor-mance. Therefore, we adopt (c) as the default configuration of our cost aggregation module, formulated as follows, 
+
+Cagg = G2D ( G3D (C) ) . (2) 
+
+Disparity Estimation. Similar to other efficient methods                            
+
+> Table 1. Overview of the real-world stereo datasets (0.5M samples in total) used for training our model.
+> Dataset Indoor Outdoor MPix Images
+> Flickr1024 [59] ✓✓0.73 1K InStereo2k [2] ✓0.93 2K Holopix50K [22] ✓✓0.74 49K Driving Stereo [72] ✓0.40 174K SouthKenSV [27] ✓✓0.92 113K UASOL [4] ✓2.74 156K Left image Stage ①
+> Stage ②Stage ③
+> Figure 6. Effects of the proposed three stages training strategy.
+
+[20, 68], we apply the soft-argmax operation to regress the disparity map d at 14 scale: 
+
+d =
+
+> Dmax /4−1
+
+X
+
+> d=0
+
+d × σ(Cagg (d)) , (3) where σ(·) is a softmax layer. Convex upsampling is then used to upsample d to the full-resolution D ∈ RH×W .
+
+## 3.2. Training Strategy 
+
+To achieve zero-shot capability, the proposed model is trained on a large amount of high-quality data by follow-ing carefully designed training stages, which we illustrate in Fig. 4. We compile datasets into two categories: synthetic annotated data and realistic unannotated data. Since syn-thetic datasets provide accurate ground-truth annotations, we first train our model on them from scratch to enhance model’s matching ability. Our synthetic datasets combine SceneFlow [38] (35K), FallingThings [53] (30K), FSD [61] (1.1M), CREStereo [32] (0.2M), VKITTI2 [6] (21K), Tar-tanAir [57] (0.31M), and Dynamic Replica [29] (0.14M), resulting in a total of 1.8M annotated samples. While other synthetic datasets are available, such as IRS [55], Sintel [5], Spring [39], and InfinigenSV [27], they are excluded due to annotation quality issues (e.g., inaccurate disparities for transparent objects in IRS) or domain mismatch (e.g., cine-matic or natural scenes in Spring and InfinigenSV). In Stage ①, the model is trained in a supervised, end-to-end manner without data augmentation, using the com-monly used disparity loss Ldisp :
+
+Ldisp = smooth L1 (D − Dgt ), (4) where Dgt denotes the ground-truth disparity. 21728 Table 2. Ablation study on KITTI 2012 [14] (K.12), KITTI 2015 [40] (K.15), ETH3D [47] (E.), and Middlebury [46] (M.). We report D1 for KITTI, Bad 1 for ETH3D, and Bad 2 for Middlebury. We also report MACs (Multiply-Accumulate Operations) for backbone design choices. Unless otherwise specified, models are trained for 200K iterations without data augmentation on a 1.4M-image subset from synthetic datasets [6, 32, 38, 53, 61] using the default operations in [68]. Default settings in final model are marked in gray . 
+
+> (a) Design choices for cost aggregation module, as shown in Fig. 5. In-troducing 3D block before 2D block in serial connection is effective.
+
+case K.12 K.15 E. M. MACs (G) 2D 5.02 5.01 6.48 11.29 32.9 
+
+bilateral 5.10 5.10 8.55 12.00 35.8 2D-3D 4.73 4.44 28.85 11.52 33.9 3D-2D 4.78 4.64 5.39 10.89 33.9 interleaved 4.61 4.73 6.20 11.34 35.2    
+
+> (b) 3D kernel size for cost aggregation module. Enlarging the kernel size along disparity dimension is not effective. We keep the general (3 ,3,3) .
+
+3D kernel K.12 K.15 E. M. MACs (G) (3, 3, 3) 4.38 4.84 5.75 9.50 32.8 (5, 3, 3) 4.65 4.88 6.29 10.36 32.5 (7, 3, 3) 4.84 4.85 6.37 9.64 32.6 (11, 3, 3) 4.86 4.87 6.87 10.39 32.8 (3, 1, 1) 4.70 4.85 6.63 10.06 32.1 
+
+> (c) Layer choices for 2D block in cost aggregation module. ConvNext is effective with a lowest computation cost.
+
+case K.12 K.15 E. M. MACs (G) MobileNet v2 4.78 4.64 5.39 10.89 33.9 ConvNeXt 4.38 4.84 5.75 9.50 32.8 
+
+ConvNeXt v2 4.79 4.81 5.03 10.52 34.0 
+
+> (d) 3D proportion for cost aggregation module. 4.8% is effective, while a larger one can be detrimental under the same computational budget.
+
+3D proportion K.12 K.15 E. M. MACs (G) 4.8% 4.38 4.84 5.75 9.50 32.8 9.5% 4.71 4.51 5.81 10.06 32.6 
+
+15.6% 4.49 4.68 5.54 10.34 32.7  
+
+> (e) Training strategy. knowledge distillation is more effective than direct data augmentation.
+
+case K.12 K.15 E. M. none 4.38 4.84 5.75 9.50 data aug. 4.31 4.79 5.73 11.14 know. dis. 3.64 4.63 6.82 8.86  
+
+> (f) Knowledge distillation choices in stage ②.Fixed teacher’s weights is more effective.
+
+case K.12 K.15 E. M. EMA 3.97 4.82 6.91 9.78 hard copy 4.22 4.71 6.35 10.07 fixed 3.64 4.63 6.82 8.86 
+
+> (g) Effects of the three stages training strategy on full training set. See Fig. 6 for visualization.
+
+case K.12 K.15 E. M. stage ① 4.05 4.55 4.43 8.49 stage ② 3.66 4.53 4.69 7.03 
+
+stage ③ 3.04 3.87 3.53 7.51 
+
+In Stage ②, we introduce a self-distillation strategy to improve feature robustness. Both teacher and student mod-els have the same architectures initialized from the first stage. The teacher model receives clean inputs, while the student model is exposed to strongly perturbed in-puts (see supplementary materials), encouraging domain-invariant representation learning. We employ a feature alignment loss Lf eat in addition to Ldisp :
+
+Lf eat = 1 − 1
+
+HW 
+
+> HW
+
+X
+
+> i=1
+
+cos( Fi, F ′ 
+
+> i
+
+), (5) where Fi and F ′ 
+
+> i
+
+are feature vectors from the teacher and student models, respectively. Here, we evaluate several dis-tillation schemes: (a) training only the student model with fixed teacher model weights, (b) updating the teacher model via Exponential Moving Average (EMA) [43], and (c) di-rectly copying student model weights to the teacher model at each iteration. Our ablation study (Section 4.3) shows that the simplest strategy (a) yields the best performance, and is therefore adopted in the second stage. High-quality real-world stereo data with annotations re-main scarce and sparse (e.g., Lidar-based ground truth), which constrains training scalability. In contrast, the vast amount of unlabeled real-world stereo data has not been used by the community. With the increasing availability and diversity of such data, in Stage ③, we leverage unannotated stereo pairs to improve model generalization, collecting a total of 0.5M pairs, as summarized in Tab. 1. Pseudo labels are generated using FoundationStereo [61], a strong accu-rate model. Importantly, even for datasets with ground-truth annotations (e.g., DrivingStereo [72]), we use pseudo but dense labels for stereo pairs (excluding the weather subset), as they provide stronger supervision than sparse data. We further observe that data quality is more critical than scale: incorporating low-quality or domain-specific data in the third stage can degrade zero-shot performance. For ex-ample, Stereo4D [24] contains 18M stereo pairs mined from internet videos but only at a limited resolution (512 ×512), HRWSI [63] suffers from poor rectification quality, and datasets such as SCOD [41] are restricted to narrow do-mains. Finally, we do not apply self-distillation here, as it provides no observable performance gains when training with pseudo labels. As shown in Fig. 6, the proposed strat-egy progressively improves the disparity estimation, mak-ing the leaves and background regions noticeably clearer. 
+
+# 4. Experiments 
+
+## 4.1. Benchmarks, Metrics, and Baselines 
+
+Benchmarks. We evaluate our method on five widely-used real-world stereo datasets. Middlebury [46] is an indoor dataset containing 15 stereo pairs with high-quality ground truth captured using structured light. In the main paper, we report results under half-resolution and non-occluded set-tings; full-resolution and quarter-resolution results are pro-vided in the supplementary materials. ETH3D [47] consists 21729 Table 3. Zero-shot generalization results on four public benchmarks: KITTI 2012 [14], KITTI 2015 [40], ETH3D [47], and Middlebury (H) [46]. The most commonly used metrics are adopted. In the first block, all efficient methods are trained only on Scene Flow [38]. In the second and third blocks, methods are allowed to train on any existing datasets excluding the four target domains. Accuracy-based methods are shown as reference. The weights and parameters are fixed for evaluation. MACs (G) are measured at the KITTI resolution of 1242 × 375 . ∗ indicates models retrained with original code on the same synthetic data as ours. † denotes results trained on 30M pseudo-labeled samples using the strategy in [19]. ‡ marks results reported by [61]. The best and second best are marked with colors. Method KITTI 2012 KITTI 2015 ETH3D Middlebury MACs (G) D1 EPE D1 EPE Bad 1.0 EPE Bad 2.0 EPE 
+
+Efficient methods: SceneFlow 
+
+CoEX [1] 22.30 3.37 17.33 3.00 31.97 14.05 26.42 4.90 54 MobileStereoNet-2D [48] 19.30 2.51 21.88 2.85 17.10 1.83 37.98 7.54 127 MobileStereoNet-3D [48] 19.59 2.67 17.89 3.01 18.42 3.02 25.26 4.61 564 FastACV [65] 13.90 2.05 11.83 2.21 7.84 1.05 19.61 4.66 72 FastACV+ [67] 16.69 2.29 15.28 3.27 11.50 2.43 27.34 7.16 85 Lite-CREStereo++ [25] 5.93 1.29 7.37 1.36 8.95 1.18 14.91 3.32 101 LightStereo-M [20] 6.76 1.26 6.79 1.42 13.93 0.73 16.99 2.06 33 
+
+LightStereo-L [20] 6.80 1.27 6.62 1.29 9.66 0.50 17.23 2.88 84 BANet-2D [68] 14.75 2.23 16.98 3.91 44.89 35.95 26.79 6.96 36 BANet-3D [68] 17.39 2.41 17.28 3.36 29.27 14.06 28.79 8.05 78 
+
+Lite Any Stereo 5.45 1.18 6.45 1.32 15.38 0.77 13.13 1.60 33 
+
+Efficient methods: Million-scale 
+
+LightStereo-M ∗ [20] 4.10 0.99 4.97 1.13 5.33 0.41 10.85 1.51 33 
+
+BANet-2D ∗ [68] 3.90 0.93 4.71 1.07 5.92 0.38 10.05 1.34 36 StereoAnything-L † [19] 4.00 0.92 4.81 1.10 3.81 0.31 9.82 1.21 84 
+
+Lite Any Stereo 3.04 0.79 3.87 0.99 3.53 0.32 7.51 0.94 33 
+
+Accurate methods: Million-scale 
+
+Selective-IGEV ‡ [58] 3.20 – 4.50 – 3.40 – 7.50 – 3619 FoundationStereo [61] 2.51 0.67 2.83 0.86 0.49 0.14 1.12 0.37 12824 Table 4. Comparison of model performance on DrivingStereo weather [72]. Lower value is better for both metrics. Method Rainy Sunny Foggy Cloudy Overall MACs (G) D1 EPE D1 EPE D1 EPE D1 EPE D1 EPE FoundationStereo [61] 27.01 3.96 4.31 1.57 7.67 1.82 3.85 1.53 10.71 2.22 12824 
+
+Lite Any Stereo 20.69 2.61 3.84 1.47 6.78 1.64 3.65 1.47 8.74 1.80 33 
+
+of 27 grayscale stereo pairs with laser-scanned ground truth, covering both indoor and outdoor scenes. KITTI 2012 [14] and KITTI 2015 [40] include 194 and 200 stereo pairs, re-spectively, captured in outdoor driving environments, with ground truth obtained via LiDAR. DrivingStereo weather [72] contains driving scene images under four different weather conditions, where each class of weather contains 500 frames. We report results at full resolution. Note that none of these datasets are used in the training process. 
+
+Evaluation Metrics. For all datasets, we report the average End-Point Error (EPE), which measures the mean per-pixel disparity error. For Middlebury and ETH3D, we also report the percentage of pixels with disparity errors greater than a threshold X (Bad-X). For KITTI datasets, we report the D1 error, defined as the percentage of pixels with disparity error exceeding 3 pixels and 5% of the ground truth disparity. 
+
+Baselines. To ensure fair comparison, we re-evaluate all baseline methods under consistent settings on our local ma-chine. This avoids discrepancies caused by differing bench-mark configurations, such as occlusion masking and metric definitions (e.g., D1 vs. Bad-3.0). Unless otherwise noted, we use the official checkpoints provided in each method. 
+
+## 4.2. Implementation Details 
+
+Lite Any Stereo is implemented using PyTorch. The model is trained for 150K, 50K, and 100K steps in stage 1, stage 2, and stage 3 with a total batch size of 176 on NVIDIA A100 GPUs. We adopt the AdamW optimizer [31] with a one-cycle learning rate schedule, where peak learning rate is set to 2 × 10 −4. During training, input images are randomly cropped to 256 × 512 , and then finetuned on 320 × 736 .The maximum disparity value D max , is set to 192, following the same configuration in previous works [20, 68]. 
+
+## 4.3. Ablation Study 
+
+We investigate various design choices and training strate-gies for our model. Unless otherwise specified, all models are trained for 100K iterations without data augmentation 21730 Left RGB  LightStereo -M BANet -2D  StereoAnything -L Lite Any Stereo (ours) Figure 7. Qualitative comparison of zero-shot inference on in-the-wild images. Each column shows disparity predictions from different methods using the same checkpoint (Tab. 3, second block), trained on million-scale data. The selected scenarios contain diverse real-world challenges, including reflections, complex lighting conditions, non-textured and repetitive textures. Comparison methods produce blurry boundaries, texture-copy artifacts, or fail to recover geometric details, while our method consistently preserves structural integrity, produces smooth yet accurate disparity maps, and demonstrates superior zero-shot generalization across diverse scenarios. 
+
+on a 1.4M-image subset of synthetic datasets [6, 32, 38, 53, 61]. We report D1 errors on KITTI 2012 [14] (K.12) and KITTI 2015 [40] (K.15), Bad 1.0 error on ETH3D [47] (E.), and Bad 2.0 error on Middlebury [46] (M.), as in Tab. 2. 
+
+Cost Aggregation Design. In Tab. 2(a), we first compare different aggregation choices (Fig. 5) and observe that the 3D–2D hybrid design is effective. We then evaluate alterna-tive 2D layer choices in Tab. 2(c), and find that ConvNeXt layers [36] provide the best trade-off between accuracy and efficiency. Building upon the ConvNeXt-based 2D layers, we further evaluate the influence of 3D convolution kernel sizes (Tab. 2(b)). Unlike the findings in [61], where larger kernels improved performance, our results show that stan-dard (3 , 3, 3) configuration achieves the highest accuracy in our baseline. Finally, as shown in Tab. 2(d), increasing the proportion of 3D blocks leads to performance degradation, particularly on the Middlebury dataset under limited MACs. Therefore, we retain only a small 3D component to preserve disparity perception while maintaining efficiency. 
+
+Training Strategy Choices. As shown in Tab. 2(e) and (f), we compare different training strategies in stage ②. Our self-distillation approach yields more robust feature rep-resentations than data augmentation, leading to stronger performance. Furthermore, keeping the teacher model’s weights fixed proves more effective than using EMA or hard copy updates. Tab. 2(g) highlights the benefits of our three-stage training scheme, which overall improves perfor-mance. The slight drop on Middlebury in stage 3 may be attributed to the limited scale of the indoor real-world data. 
+
+## 4.4. Evaluation 
+
+Zero-Shot Generalization. Tab. 3 presents a quantitative comparison of zero-shot generalization performance across four public datasets. In the first block of the table, we re-strict our model training to stage 2 on SceneFlow to ensure a fair comparison. Under this setting, our method achieves superior performance on most metrics while requiring the fewest MACs, highlighting the effectiveness of both model design and training strategy. We then evaluate under a more realistic setting as in [61], where methods are allowed to train on any available dataset except the target domains. In this setup, our approach consistently outperforms the other methods by a large margin. Our model achieves compara-ble or better results than non-prior-based accurate method [58] with less than 1% of its MACs. Fig. 7 presents quali-tative comparison on in-the-wild, high-resolution ( 2K) im-ages. Our method generates smooth yet accurate disparity maps across different real-world scenes, whereas the other methods struggle to preserve geometric details. 
+
+In-Domain Performance. Tab. 4 reports the results on the DrivingStereo weather subset. Interestingly, although our model is only trained via knowledge distillation on general datasets, it surpasses the teacher model (FoundationStereo [61]) by a significant margin. This highlights the strong ef-fectiveness of our proposed approach. Although in-domain performance is not the primary focus of this work, we also 21731 Table 5. Results on KITTI 2012 [14] and KITTI 2015 [40] leaderboard. The MACs are measured for an input size of 1242 × 375 . Our finetuned version ranks 1st on the leaderboards among all efficient methods at the time of submission. Method KITTI 2012 KITTI 2015 MACs (G) 3-noc 3-all 4-noc 4-all EPE-noc / all D1-bg D1-fg D1-all DispNetC [38] 4.11 4.65 2.77 3.20 0.9 / 1.0 4.32 4.41 4.34 -DeepPruner-Fast [13] - - - - - 2.32 3.91 2.59 194 AANet+ [69] 1.55 2.04 1.20 1.58 0.4 / 0.5 1.65 3.96 2.03 -DecNet [75] - - - - - 2.07 3.87 2.37 -BGNet+ [64] 1.62 2.03 1.16 1.48 0.5 / 0.6 1.81 4.09 2.19 77 HITNet [52] 1.41 1.89 1.14 1.53 0.4 / 0.5 1.74 3.20 1.98 47 CoEx [1] 1.55 1.93 1.15 1.42 0.5 / 0.5 1.79 3.82 2.13 54 MobileStereoNet-2D [48] - - - - - 2.49 4.53 2.83 127 MobileStereoNet-3D [48] - - - - - 2.75 3.87 2.10 564 Fast-ACVNet [65] 1.68 2.13 1.23 1.56 0.5 / 0.6 1.82 3.93 2.17 72 Fast-ACVNet+ [67] 1.45 1.85 1.06 1.36 0.5 / 0.5 1.70 3.53 2.01 85 Lite-CREStereo++ [25] 1.43 1.82 1.12 1.44 0.5 / 0.5 1.79 3.53 2.08 93 LightStereo-M [20] 1.56 1.91 1.10 1.36 0.5 / 0.5 1.81 3.22 2.04 33                                                                         
+
+> LightStereo-L [20] 1.55 1.87 1.10 1.33 0.5 / 0.5 1.78 2.64 1.93 84 BANet-2D [68] 1.38 1.79 1.01 1.32 0.5 / 0.5 1.59 3.03 1.83 36 BANet-3D [68] 1.27 1.72 0.95 1.27 0.5 / 0.5 1.52 3.02 1.77 78
+> Lite Any Stereo 1.09 1.49 0.76 1.04 0.4 / 0.5 1.36 3.45 1.71 33
+> Table 6. Performance of the proposed training strategy. Method K.12 K.15 E. M.
+> LightStereo-M [20] Stage ①4.34 5.27 6.68 10.29 Stage ②3.80 4.62 5.44 8.96
+> Stage ③3.35 4.14 4.22 9.85
+> BANet-2D [68] Stage ①4.34 4.78 7.71 10.54 Stage ②3.87 4.80 4.86 9.54
+> Stage ③3.28 4.08 4.05 10.30
+
+evaluate our model on the KITTI online leaderboard (test set) trained on [54] without using its original annotations. As can be seen in Tab. 5, our model achieves the highest ac-curacy among all published efficient methods across almost all metrics at the time of submission. 
+
+Effectiveness of the Training Strategy. To verify the gen-erality of our training strategy, we apply it to two represen-tative efficient methods, LightStereo-M [20] and BANet-2D [68]. In Tab. 6, our strategy consistently improves both methods across multiple benchmarks, which shows its broad applicability to different architectures. 
+
+Inference Time Analysis. Prior works report inference times measured on different hardware, making direct com-parisons unreliable. To ensure fairness, we benchmark all methods under the same hardware setup. In Tab. 7, our method consistently achieves the fastest speed across dif-ferent GPUs, highlighting its superior efficiency. Notably, it requires only 2.5 GB of GPU memory for 2K inputs, in-dicating strong potential for deployment on embedded de-vices, drones, and other resource-constrained platforms.                             
+
+> Table 7. Inference time (ms) evaluated locally on different GPU hardware under the same experimental setup. Method 1080 4090 A5000 A100 Lite-CREStereo++ [25] 63 38 55 40 LightStereo-M [20] 24 22 27 21 LightStereo-L [20] 34 30 35 27 BANet-2D [68] 58 30 63 27 BANet-3D [68] 40 25 44 22
+> Lite Any Stereo 21 19 23 17
+
+## 4.5. Limitations 
+
+While our method improves generalization, it still trails depth-prior-based approaches. A major bottleneck is the limited availability of high-quality real-world stereo data, which restricts performance gains. For instance, accuracy on Middlebury drops. Robustness under challenging cases such as transparency and reflection also can be improved. 
+
+# 5. Conclusion 
+
+We presented Lite Any Stereo, an efficient zero-shot stereo matching model. By integrating a compact backbone with a three-stage training strategy, our model generalizes well to in-the-wild scenarios while maintaining high efficiency. Extensive evaluations demonstrate state-of-the-art perfor-mance across multiple benchmarks, underscoring the po-tential of lightweight models for broad real-world deploy-ment. Future work includes scaling real-world data and de-veloping a model zoo with different model sizes for flexible deployment across diverse computational budgets. 
+
+Acknowledgments. This work was funded by the IC-CSC. 21732 References 
+
+[1] Antyanta Bangunharcana, Jae Won Cho, Seokju Lee, In So Kweon, Kyung-Soo Kim, and Soohyun Kim. Correlate-and-excite: Real-time stereo matching via guided cost volume excitation. In 2021 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , pages 3542–3548. IEEE, 2021. 2, 6, 8 [2] Wei Bao, Wei Wang, Yuhua Xu, Yulan Guo, Siyu Hong, and Xiaohu Zhang. Instereo2k: a large real dataset for stereo matching in indoor scenes. Science China Information Sci-ences , 63(11):1–11, 2020. 4 [3] Luca Bartolomei, Fabio Tosi, Matteo Poggi, and Stefano Mattoccia. Stereo anywhere: Robust zero-shot deep stereo matching even where either stereo or mono fail. arXiv preprint arXiv:2412.04472 , 2024. 2 [4] Zuria Bauer, Francisco Gomez-Donoso, Edmanuel Cruz, Sergio Orts-Escolano, and Miguel Cazorla. Uasol, a large-scale high-resolution outdoor stereo dataset. Scientific data ,6(1):162, 2019. 4 [5] D. J. Butler, J. Wulff, G. B. Stanley, and M. J. Black. Anaturalistic open source movie for optical flow evaluation. In ECCV , pages 611–625, 2012. 4 [6] Yohann Cabon, Naila Murray, and Martin Humenberger. Vir-tual kitti 2, 2020. 4, 5, 7 [7] Jia-Ren Chang and Yong-Sheng Chen. Pyramid stereo matching network. In CVPR , pages 5410–5418, 2018. 2 [8] Tianyu Chang, Xun Yang, Tianzhu Zhang, and Meng Wang. Domain generalized stereo matching via hierarchical visual transformation. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 9559– 9568, 2023. 2 [9] Junda Cheng, Longliang Liu, Gangwei Xu, Xianqi Wang, Zhaoxing Zhang, Yong Deng, Jinliang Zang, Yurui Chen, Zhipeng Cai, and Xin Yang. Monster: Marry monodepth to stereo unleashes power, 2025. 1, 2, 3 [10] Xuelian Cheng, Yiran Zhong, Mehrtash Harandi, Yuchao Dai, Xiaojun Chang, Tom Drummond, Hongdong Li, and Zongyuan Ge. Hierarchical neural architecture search for deep stereo matching. arXiv preprint arXiv:2010.13501 ,2020. 2 [11] WeiQin Chuah, Ruwan Tennakoon, Reza Hoseinnezhad, Alireza Bab-Hadiashar, and David Suter. Itsa: An information-theoretic approach to automatic shortcut avoid-ance and domain generalization in stereo matching networks. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 13022–13032, 2022. 2[12] Jia Deng, Wei Dong, Richard Socher, Li-Jia Li, Kai Li, and Li Fei-Fei. Imagenet: A large-scale hierarchical image database. In 2009 IEEE conference on computer vision and pattern recognition , pages 248–255. Ieee, 2009. 3 [13] Shivam Duggal, Shenlong Wang, Wei-Chiu Ma, Rui Hu, and Raquel Urtasun. Deeppruner: Learning efficient stereo matching via differentiable patchmatch. In Proceedings of the IEEE/CVF international conference on computer vision ,pages 4384–4393, 2019. 2, 8 [14] Andreas Geiger, Philip Lenz, and Raquel Urtasun. Are we ready for autonomous driving? the kitti vision benchmark suite. In CVPR , pages 3354–3361, 2012. 1, 2, 3, 5, 6, 7, 8 [15] Xiaodong Gu, Zhiwen Fan, Siyu Zhu, Zuozhuo Dai, Feitong Tan, and Ping Tan. Cascade cost volume for high-resolution multi-view stereo and stereo matching. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 2495–2504, 2020. 2 [16] Weiyu Guo, Zhaoshuo Li, Yongkui Yang, Zheng Wang, Rus-sell H Taylor, Mathias Unberath, Alan Yuille, and Yingwei Li. Context-enhanced stereo transformer. In European Con-ference on Computer Vision , pages 263–279. Springer, 2022. 2[17] Xiaoyang Guo, Kai Yang, Wukui Yang, Xiaogang Wang, and Hongsheng Li. Group-wise correlation stereo network. In 
+
+CVPR , pages 3273–3282, 2019. 2 [18] Xianda Guo, Chenming Zhang, Juntao Lu, Yiqi Wang, Yiqun Duan, Tian Yang, Zheng Zhu, and Long Chen. Openstereo: A comprehensive benchmark for stereo matching and strong baseline. arXiv preprint arXiv:2312.00343 , 2023. 2 [19] Xianda Guo, Chenming Zhang, Youmin Zhang, Dujun Nie, Ruilin Wang, Wenzhao Zheng, Matteo Poggi, and Long Chen. Stereo anything: Unifying stereo matching with large-scale mixed data. arXiv preprint arXiv:2411.14053 , 2024. 2, 6[20] Xianda Guo, Chenming Zhang, Youmin Zhang, Wenzhao Zheng, Dujun Nie, Matteo Poggi, and Long Chen. Light-stereo: Channel boost is all your need for efficient 2d cost aggregation, 2024. 1, 2, 3, 4, 6, 8 [21] Xianda Guo, Chenming Zhang, Ruilin Wang, Zhang Youmin, Wenzhao Zheng, Matteo Poggi, Hao Zhao, Qin Zou, and Long Chen. Stereocarla: A high-fidelity driving dataset for generalizable stereo. arXiv preprint arXiv:2509.12683 , 2025. 2 [22] Yiwen Hua, Puneet Kohli, Pritish Uplavikar, Anand Ravi, Saravana Gunaseelan, Jason Orozco, and Edward Li. Holopix50k: A large-scale in-the-wild stereo image dataset. In CVPR Workshop on Computer Vision for Augmented and Virtual Reality, Seattle, WA, 2020. , 2020. 4 [23] Hualie Jiang, Zhiqiang Lou, Laiyan Ding, Rui Xu, Minglang Tan, Wenjie Jiang, and Rui Huang. Defom-stereo: Depth foundation model based stereo matching, 2025. 1, 2, 3 [24] Linyi Jin, Richard Tucker, Zhengqi Li, David Fouhey, Noah Snavely, and Aleksander Holynski. Stereo4d: Learning how things move in 3d from internet stereo videos. arXiv preprint ,2024. 5 [25] Junpeng Jing, Jiankun Li, Pengfei Xiong, Jiangyu Liu, Shuaicheng Liu, Yichen Guo, Xin Deng, Mai Xu, Lai Jiang, and Leonid Sigal. Uncertainty guided adaptive warping for robust and efficient stereo matching. In Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV) , pages 3318–3327, 2023. 2, 3, 6, 8 [26] Junpeng Jing, Ye Mao, and Krystian Mikolajczyk. Match-stereo-videos: Bidirectional alignment for consistent dy-namic stereo matching. In European Conference on Com-puter Vision , pages 415–432. Springer, 2024. 2 21733 [27] Junpeng Jing, Ye Mao, Anlan Qiu, and Krystian Miko-lajczyk. Match stereo videos via bidirectional alignment. 
+
+arXiv preprint arXiv:2409.20283 , 2024. 4 [28] Junpeng Jing, Weixun Luo, Ye Mao, and Krystian Mikola-jczyk. Stereo any video: Temporally consistent stereo match-ing. In Proceedings of the IEEE/CVF International Confer-ence on Computer Vision , pages 20836–20846, 2025. [29] Nikita Karaev, Ignacio Rocco, Benjamin Graham, Natalia Neverova, Andrea Vedaldi, and Christian Rupprecht. Dy-namicstereo: Consistent dynamic depth from stereo videos. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 13229–13239, 2023. 2, 4 [30] Sameh Khamis, Sean Fanello, Christoph Rhemann, Adarsh Kowdle, Julien Valentin, and Shahram Izadi. Stereonet: Guided hierarchical refinement for real-time edge-aware depth prediction. In ECCV , pages 573–590, 2018. 2 [31] Diederik P Kingma and Jimmy Ba. Adam: A method for stochastic optimization. arXiv preprint arXiv:1412.6980 ,2014. 6 [32] Jiankun Li, Peisen Wang, Pengfei Xiong, Tao Cai, Ziwei Yan, Lei Yang, Jiangyu Liu, Haoqiang Fan, and Shuaicheng Liu. Practical stereo matching via cascaded recurrent net-work with adaptive correlation. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 16263–16272, 2022. 1, 2, 4, 5, 7 [33] Zhaoshuo Li, Xingtong Liu, Nathan Drenkow, Andy Ding, Francis X Creighton, Russell H Taylor, and Mathias Un-berath. Revisiting stereo depth estimation from a sequence-to-sequence perspective with transformers. In Proceedings of the IEEE/CVF international conference on computer vi-sion , pages 6197–6206, 2021. 2 [34] Zhengfa Liang, Yiliu Feng, Yulan Guo, Hengzhu Liu, Wei Chen, Linbo Qiao, Li Zhou, and Jianfeng Zhang. Learning for disparity estimation through feature constancy. In CVPR ,pages 2811–2820, 2018. 2 [35] Lahav Lipson, Zachary Teed, and Jia Deng. Raft-stereo: Multilevel recurrent field transforms for stereo matching. 
+
+arXiv preprint arXiv:2109.07547 , 2021. 1, 2 [36] Zhuang Liu, Hanzi Mao, Chao-Yuan Wu, Christoph Feicht-enhofer, Trevor Darrell, and Saining Xie. A convnet for the 2020s. In Proceedings of the IEEE/CVF conference on com-puter vision and pattern recognition , pages 11976–11986, 2022. 3, 4, 7 [37] D Marr and T Poggio. Cooperative computation of stereo disparity. In Neurocomputing: foundations of research ,pages 259–267. 1988. 1 [38] Nikolaus Mayer, Eddy Ilg, Philip Hausser, Philipp Fischer, Daniel Cremers, Alexey Dosovitskiy, and Thomas Brox. A large dataset to train convolutional networks for disparity, optical flow, and scene flow estimation. In CVPR , pages 4040–4048, 2016. 4, 5, 6, 7, 8, 2 [39] Lukas Mehl, Jenny Schmalfuss, Azin Jahedi, Yaroslava Nali-vayko, and Andr´ es Bruhn. Spring: A high-resolution high-detail dataset and benchmark for scene flow, optical flow and stereo. In Proc. IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , 2023. 4 [40] Moritz Menze and Andreas Geiger. Object scene flow for au-tonomous vehicles. In Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition (CVPR) , 2015. 1, 2, 3, 5, 6, 7, 8 [41] Junhong Min and Youngpil Jeon. Confidence aware stereo matching for realistic cluttered scenario. In 2024 IEEE In-ternational Conference on Image Processing (ICIP) , pages 3491–3497. IEEE, 2024. 5 [42] Jiahao Pang, Wenxiu Sun, Jimmy SJ Ren, Chengxi Yang, and Qiong Yan. Cascade residual learning: A two-stage con-volutional neural network for stereo matching. In CVPRW ,pages 887–895, 2017. 2 [43] Boris T Polyak and Anatoli B Juditsky. Acceleration of stochastic approximation by averaging. SIAM journal on control and optimization , 30(4):838–855, 1992. 5 [44] Zhibo Rao, Bangshu Xiong, Mingyi He, Yuchao Dai, Renjie He, Zhelun Shen, and Xing Li. Masked representation learn-ing for domain generalized stereo matching. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pat-tern Recognition , pages 5435–5444, 2023. 2 [45] Mark Sandler, Andrew Howard, Menglong Zhu, Andrey Zh-moginov, and Liang-Chieh Chen. Mobilenetv2: Inverted residuals and linear bottlenecks. In Proceedings of the IEEE conference on computer vision and pattern recogni-tion , pages 4510–4520, 2018. 3 [46] Daniel Scharstein and Richard Szeliski. A taxonomy and evaluation of dense two-frame stereo correspondence algo-rithms. IJCV , 47(1):7–42, 2002. 1, 2, 5, 6, 7 [47] Thomas Schops, Johannes L Schonberger, Silvano Galliani, Torsten Sattler, Konrad Schindler, Marc Pollefeys, and An-dreas Geiger. A multi-view stereo benchmark with high-resolution images and multi-camera videos. In CVPR , pages 3260–3269, 2017. 1, 2, 5, 6, 7 [48] Faranak Shamsafar, Samuel Woerz, Rafia Rahim, and An-dreas Zell. Mobilestereonet: Towards lightweight deep net-works for stereo matching. In Proceedings of the IEEE/CVF Winter Conference on Applications of Computer Vision ,pages 2417–2426, 2022. 1, 3, 4, 6, 8, 2 [49] Zhelun Shen, Yuchao Dai, and Zhibo Rao. Cfnet: Cascade and fused cost volume for robust stereo matching. In CVPR ,pages 13906–13915, 2021. 2 [50] Qing Su and Shihao Ji. Chitransformer: Towards reliable stereo from cues. In Proceedings of the IEEE/CVF Con-ference on Computer Vision and Pattern Recognition , pages 1939–1949, 2022. 2 [51] Tatsunori Taniai, Yasuyuki Matsushita, Yoichi Sato, and Takeshi Naemura. Continuous 3d label stereo matching us-ing local expansion moves. IEEE TPAMI , 40(11):2725– 2739, 2017. 1 [52] Vladimir Tankovich, Christian Hane, Yinda Zhang, Adarsh Kowdle, Sean Fanello, and Sofien Bouaziz. Hitnet: Hierar-chical iterative tile refinement network for real-time stereo matching. In CVPR , pages 14362–14372, 2021. 2, 3, 8 [53] Jonathan Tremblay, Thang To, and Stan Birchfield. Falling things: A synthetic dataset for 3d object detection and pose estimation. In CVPRW , pages 2038–2041, 2018. 4, 5, 7 [54] Jonas Uhrig, Nick Schneider, Lukas Schneider, Uwe Franke, Thomas Brox, and Andreas Geiger. Sparsity invariant cnns. 21734 In 2017 international conference on 3D Vision (3DV) , pages 11–20. IEEE, 2017. 8 [55] Qiang Wang, Shizhen Zheng, Qingsong Yan, Fei Deng, Kaiyong Zhao, and Xiaowen Chu. Irs: A large naturalis-tic indoor robotics stereo dataset to train deep models for disparity and surface normal estimation. arXiv preprint arXiv:1912.09678 , 2019. 4 [56] Qiang Wang, Shaohuai Shi, Shizhen Zheng, Kaiyong Zhao, and Xiaowen Chu. FADNet: A fast and accurate network for disparity estimation. In 2020 IEEE International Conference on Robotics and Automation (ICRA 2020) , pages 101–107, 2020. 2 [57] Wenshan Wang, Delong Zhu, Xiangwei Wang, Yaoyu Hu, Yuheng Qiu, Chen Wang, Yafei Hu, Ashish Kapoor, and Se-bastian Scherer. Tartanair: A dataset to push the limits of visual slam. 2020. 4 [58] Xianqi Wang, Gangwei Xu, Hao Jia, and Xin Yang. Selective-stereo: Adaptive frequency information selection for stereo matching. In Proceedings of the IEEE/CVF Con-ference on Computer Vision and Pattern Recognition , pages 19701–19710, 2024. 1, 2, 6, 7 [59] Yingqian Wang, Longguang Wang, Jungang Yang, Wei An, and Yulan Guo. Flickr1024: A large-scale dataset for stereo image super-resolution. In International Conference on Computer Vision Workshops , pages 3852–3857, 2019. 4 [60] Philippe Weinzaepfel, Thomas Lucas, Vincent Leroy, Yohann Cabon, Vaibhav Arora, Romain Br´ egier, Gabriela Csurka, Leonid Antsfeld, Boris Chidlovskii, and J´ erˆ ome Revaud. Croco v2: Improved cross-view completion pre-training for stereo matching and optical flow. In Proceedings of the IEEE/CVF International Conference on Computer Vi-sion , pages 17969–17980, 2023. 2 [61] Bowen Wen, Matthew Trepte, Joseph Aribido, Jan Kautz, Orazio Gallo, and Stan Birchfield. Foundationstereo: Zero-shot stereo matching, 2025. 1, 2, 3, 4, 5, 6, 7 [62] Sanghyun Woo, Shoubhik Debnath, Ronghang Hu, Xinlei Chen, Zhuang Liu, In So Kweon, and Saining Xie. Con-vnext v2: Co-designing and scaling convnets with masked autoencoders. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , pages 16133– 16142, 2023. 3 [63] Ke Xian, Jianming Zhang, Oliver Wang, Long Mai, Zhe Lin, and Zhiguo Cao. Structure-guided ranking loss for single image depth prediction. In The IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , 2020. 5 [64] Bin Xu, Yuhua Xu, Xiaoli Yang, Wei Jia, and Yulan Guo. Bilateral grid learning for stereo matching networks. In Pro-ceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 12497–12506, 2021. 2, 8 [65] Gangwei Xu, Junda Cheng, Peng Guo, and Xin Yang. Atten-tion concatenation volume for accurate and efficient stereo matching. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 12981– 12990, 2022. 2, 6, 8 [66] Gangwei Xu, Xianqi Wang, Xiaohuan Ding, and Xin Yang. Iterative geometry encoding volume for stereo matching. In 
+
+Proceedings of the IEEE/CVF Conference on Computer Vi-sion and Pattern Recognition , pages 21919–21928, 2023. 2 [67] Gangwei Xu, Yun Wang, Junda Cheng, Jinhui Tang, and Xin Yang. Accurate and efficient stereo matching via attention concatenation volume. IEEE Transactions on Pattern Anal-ysis and Machine Intelligence , 2023. 1, 2, 6, 8 [68] Gangwei Xu, Jiaxin Liu, Xianqi Wang, Junda Cheng, Yong Deng, Jinliang Zang, Yurui Chen, and Xin Yang. Banet: Bilateral aggregation network for mobile stereo matching. 
+
+arXiv preprint arXiv:2503.03259 , 2025. 1, 3, 4, 5, 6, 8, 2 [69] Haofei Xu and Juyong Zhang. Aanet: Adaptive aggregation network for efficient stereo matching. In CVPR , pages 1959– 1968, 2020. 2, 3, 8 [70] Haofei Xu, Jing Zhang, Jianfei Cai, Hamid Rezatofighi, Fisher Yu, Dacheng Tao, and Andreas Geiger. Unifying flow, stereo and depth estimation. IEEE Transactions on Pattern Analysis and Machine Intelligence , 2023. 2 [71] Gengshan Yang, Joshua Manela, Michael Happold, and Deva Ramanan. Hierarchical deep stereo matching on high-resolution images. In CVPR , pages 5515–5524, 2019. 2 [72] Guorun Yang, Xiao Song, Chaoqin Huang, Zhidong Deng, Jianping Shi, and Bolei Zhou. Drivingstereo: A large-scale dataset for stereo matching in autonomous driving scenarios. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 899–908, 2019. 4, 5, 6[73] Lihe Yang, Bingyi Kang, Zilong Huang, Xiaogang Xu, Jiashi Feng, and Hengshuang Zhao. Depth anything: Unleashing the power of large-scale unlabeled data. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 10371–10381, 2024. 1, 2, 3 [74] Lihe Yang, Bingyi Kang, Zilong Huang, Zhen Zhao, Xiao-gang Xu, Jiashi Feng, and Hengshuang Zhao. Depth any-thing v2. arXiv preprint arXiv:2406.09414 , 2024. 1, 2, 3 [75] Chengtang Yao, Yunde Jia, Huijun Di, Pengxiang Li, and Yuwei Wu. A decomposition model for stereo matching. In 
+
+Proceedings of the IEEE/CVF Conference on Computer Vi-sion and Pattern Recognition , pages 6091–6100, 2021. 8 [76] Feihu Zhang, Victor Prisacariu, Ruigang Yang, and Philip HS Torr. Ga-net: Guided aggregation net for end-to-end stereo matching. In CVPR , pages 185–194, 2019. 2 [77] Jiawei Zhang, Xiang Wang, Xiao Bai, Chen Wang, Lei Huang, Yimin Chen, Lin Gu, Jun Zhou, Tatsuya Harada, and Edwin R Hancock. Revisiting domain generalized stereo matching networks from a feature consistency perspective. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 13001–13011, 2022. 2[78] Yongjian Zhang, Longguang Wang, Kunhong Li, Yun Wang, and Yulan Guo. Learning representations from foundation models for domain generalized stereo matching. In European Conference on Computer Vision , pages 146–162. Springer, 2024. 2 [79] Jingyi Zhou, Haoyu Zhang, Jiakang Yuan, Peng Ye, Tao Chen, Hao Jiang, Meiya Chen, and Yangyang Zhang. All-in-one: Transferring vision foundation models into stereo matching. arXiv preprint arXiv:2412.09912 , 2024. 2 21735

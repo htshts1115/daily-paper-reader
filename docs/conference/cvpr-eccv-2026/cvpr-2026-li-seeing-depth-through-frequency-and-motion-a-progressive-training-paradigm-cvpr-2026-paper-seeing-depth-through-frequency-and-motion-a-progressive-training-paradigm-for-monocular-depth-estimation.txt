@@ -1,0 +1,264 @@
+Title: Seeing Depth Through Frequency and Motion: A Progressive Training Paradigm for Monocular Depth Estimation
+
+URL Source: https://openaccess.thecvf.com/content/CVPR2026/papers/Li_Seeing_Depth_Through_Frequency_and_Motion_A_Progressive_Training_Paradigm_CVPR_2026_paper.pdf
+
+Published Time: Sat, 16 May 2026 16:50:54 GMT
+
+Number of Pages: 10
+
+Markdown Content:
+# Seeing Depth Through Frequency and Motion: A Progressive Training Paradigm for Monocular Depth Estimation 
+
+# Ke Li Bolin Song Hongbo Liu †
+
+# Dalian Maritime University   
+
+> ikedlmu@gmail.com, songbl 95@163.com, lhb@dlmu.edu.cn
+
+# Abstract 
+
+Self-supervised monocular depth estimation has achieved remarkable progress in recent years, yet frequency alias-ing and the lack of fine-grained cross-frame motion mod-eling still lead to blurred depth boundaries and subop-timal camera motion estimation. To address these chal-lenges, we propose a progressive self-supervised frame-work that integrates a Frequency-Guided Depth Network (FGDepth) and a PoseQuery Network (PQNet). FGDepth incorporates a plug-and-play Frequency-Guided Sampling module that explicitly enhances high-frequency details and suppresses aliasing artifacts, producing depth maps with sharper boundaries. PQNet employs channel-aligned at-tention to model fine-grained cross-frame motion features, enabling more accurate and robust camera motion estima-tion. Furthermore, we design a progressive three-stage de-coupled training strategy that effectively leverages the com-plementarity between depth and pose estimation, further improving overall performance. Extensive experiments on the KITTI benchmark demonstrate state-of-the-art perfor-mance, achieving a 4.1% reduction in Sq Rel over strong baselines, and our method also exhibits excellent cross-dataset generalization on Make3D. Ablation studies further validate the effectiveness of each proposed component. 
+
+# 1. Introduction 
+
+Monocular depth estimation is a core task in 3D scene un-derstanding. Owing to its hardware efficiency, requiring only a single camera to infer spatial geometry, it has be-come a research focus in fields such as autonomous driving and augmented reality. Self-supervised monocular depth es-timation leverages unlabeled monocular videos with image reconstruction as a supervision signal, effectively avoiding the reliance on large-scale annotated datasets and offering great practical value [10, 39, 41]. Recent progress in self-supervised monocular depth es- 
+
+> †Corresponding author. Code: https://github.com/ACoTAI/FGDepth
+> Figure 1. Standard Sampling v.s. Our proposed Frequency-Guided Sampling (FGS). Standard downsampling aliases high-frequency components (e.g., depth-critical edges and textures) into low-frequency bands, while Standard upsampling fails to restore these attenuated details, resulting in blurred boundaries and lost geomet-ric cues. Our FGS block employs dual-path frequency guidance to preserve and enhance high-frequency details before downsam-pling and suppress aliasing during upsampling, thereby providing essential structural information for accurate depth estimation.
+
+timation (MDE)-including minimum reprojection loss [10], advanced network architectures [1], and multi-frame infer-ence strategies [7, 29] has significantly advanced the field. However, MDE remains highly challenging due to scale ambiguity, dynamic scene changes, textureless regions, and violations of the photometric consistency assumption, par-ticularly in recovering fine-grained structures around ob-ject boundaries. To overcome these challenges, prior works have explored various directions, including incorporating auxiliary cues such as optical flow and semantics [14, 20], adopting advanced architectures like Transformers and cost volumes [29, 36, 39], and developing multi-stage or pro-gressive training strategies [15]. While these methods have substantially improved overall depth quality, their ability to recover fine-grained structural details-especially near object boundaries-remains limited. This leads to information loss, manifesting as “boundary bleeding” artifacts and the inabil-ity to resolve thin structures (e.g., poles) during reconstruc-tion. Moreover, existing PoseNets typically fuse adjacent This CVPR paper is the Open Access version, provided by the Computer Vision Foundation. Except for this watermark, it is identical to the accepted version; the final published version of the proceedings is available on IEEE Xplore. 26845 frames early in the network, limiting their ability to model cross-frame geometric correspondences. In this paper, we aim to enhance self-supervised monoc-ular depth estimation by explicitly addressing two criti-cal limitations of existing methods. First, inspired by the Nyquist-Shannon sampling theorem, we argue that edge blurring and structural degradation in monocular depth es-timation originate from frequency aliasing introduced dur-ing the downsampling operations of encoder-decoder archi-tectures. As illustrated in Fig. 1, high-frequency compo-nents are folded into low-frequency content, they cannot be effectively recovered during subsequent upsampling. Sec-ond, while depth and pose networks are typically trained jointly, their complementary relationship-where accurate pose estimation can reinforce depth prediction and vice versa-remains largely underexploited, leaving the potential of leveraging reliable pose information for improving depth estimation insufficiently explored. These observations mo-tivate us to design a depth network capable of preserving high-frequency structural details and a more robust pose network, together with a tailored training paradigm to fully exploit their complementarity. Consequently, we propose a progressive self-supervised framework for monocular depth estimation. It consists of two core components: (1) FGDepth, a frequency-aware depth network equipped with plug-and-play, architecture-agnostic Frequency-Guided Sampling (FGS) blocks, which explicitly preserve high-frequency details via a high-pass enhancement path and suppress aliasing artifacts through a low-pass filtering path, thereby preserving the semantic integrity of low-frequency structures; and (2) PQNet with Channel-Aligned Attention, which captures fine-grained cross-frame correspondences for robust pose estimation. Furthermore, to fully leverage the complementarity be-tween pose and depth estimation, we introduce a progres-sive three-stage training strategy, theoretically equivalent to Block Coordinate Descent, that decouples and gradually op-timizes the two networks, significantly improving training stability and cross-dataset generalization. Our main contributions can be summarized as: 1. We propose FGDepth with FGS blocks—plug-and-play, architecture-agnostic sampling modules. FGDepth ex-plicitly models dual-path frequency information to re-cover high-frequency details and suppress aliasing arti-facts, thereby improving boundary precision. 2. We design a PQNet with Channel-Aligned Attention and learnable relative positional encoding. This de-sign enables the network to capture fine-grained cross-frame motion cues for more accurate pose estimation, by querying features across adjacent frames to establish geometric correspondences. 3. We introduce a progressive three-stage training strategy that decouples and gradually optimizes depth and pose networks, leveraging their complementary strengths to improve stability and overall performance, achieving a 
+
+3.55% reduction in Sq Rel compared to conventional single-stage joint training. 
+
+# 2. Related Work 
+
+## 2.1. Single-Stage Joint Optimization in MDE 
+
+In self-supervised monocular depth estimation, depth and camera ego-motion are jointly optimized in a single-stage framework from monocular videos, with supervision rooted in image reprojection loss [41]. Building on this method-ology, prior work has advanced the field through key im-provements. Refinements to loss functions have signifi-cantly improved the accuracy of depth estimation and mit-igated challenges like scale ambiguity [10, 24]. Some approaches enhance depth prediction by leveraging auxil-iary modalities, including optical flow and scene seman-tics [14, 20]. Recent efforts have been devoted to develop-ing more elaborate architectural designs for enhanced depth estimation [26, 36, 38, 39]. Despite these improvements, unified joint training frameworks often struggle with depth ambiguity and limited generalization. These limitations can be primarily attributed to two factors: the aliasing of high-frequency information during feature extraction, and the in-herent instability of single-stage joint training strategies. 
+
+## 2.2. Frequency-Aware and Multi-Stage Training in MDE 
+
+Early methods relied on Fourier domain analysis to explic-itly fuse multi-scale predictions [13]. Subsequently, spatial domain constraints, such as edge-aware smoothness losses guided by image gradients, were widely adopted to preserve structural boundaries [10]. More recently, researchers have sought to optimize the photometric loss in high-frequency regions from the perspective of spatial frequency [4]. Un-like computationally heavy global transforms, our method resolves aliasing via efficient spatial filtering, minimizing latency. Although single-stage joint optimization of depth and pose is a common strategy in MDE, its inherent complex-ity and instability have motivated multi-stage training ap-proaches. These include two-stage schemes based on un-certainty modeling [19] or inter-frame consistency [18], and teacher-student architectures [21]. To further improve convergence, recent works also explore finer-grained, self-evolving progressive refinements [5, 15]. However, these approaches often overlook the integration of reliable motion cues, which is crucial for further improving depth accuracy. 
+
+# 3. Main Method 
+
+## 3.1. FGDepth Architecture with FGS Blocks 
+
+Although neural downsampling primarily compresses fea-tures into higher dimensions, it inevitably reduces spatial 26846 Figure 2. Overview of our proposed framework comprising the FGDepth and PQNet, where FGDepth incorporates FGS block to enhance high-frequency details and suppress aliasing in low-frequency components through dual-path modeling, PQNet incorporates CA to effec-tively capture motion-sensitive features across consecutive frames for improved pose estimation.  
+
+> Figure 3. The PoseQuery Network (PQNet) consists of a Pose Stem for initial feature extraction, a PoseQuery Layer for cross-frame alignment, a Pose Trunk for motion modeling, and a Pose Head that regresses the final relative pose.
+
+resolution, which degrades boundary sharpness and depth continuity. Inspired by the Nyquist-Shannon theorem, we attribute this to high-frequency details aliasing into low-frequency information. To mitigate this issue, we introduce FGS blocks into our FGDepth network. The FGS Block is a plug-and-play, architecture-agnostic module that can be seamlessly integrated into various encoder–decoder or transformer-based depth networks. Each FGS block consists of two complementary paths: (1) a high-pass enhancement path that recovers and reinjects lost high-frequency details from encoder features, and (2) a low-pass filtering path that suppresses aliasing artifacts during upsampling in the decoder, as illustrated in Fig. 1. The high-frequency enhancement is defined as: 
+
+wLP = softmax (Conv 3×3(Flr )) ,wHP = I − wLP ,F ′ 
+
+> hr
+
+= wHP · Fhr + Fhr ,
+
+(1) where Fhr and Flr denote the high and low resolution fea-ture maps, wLP the adaptive low-pass kernel, and I denotes the identity kernel. The low-pass pathway produces an adaptively filtered upsampled feature. To explicitly address frequency aliasing, the final frequency-guided reconstruc-tion is formalized as a spectral compensation mechanism: 
+
+ˆFhr = wHP · Fhr + Fhr 
+
+| {z }
+
+> High-Frequency Compensation
+
++  wLP · Flr 
+
+ ↑
+
+| {z }
+
+> Band-Limited Base
+
+, (2) where ↑ denotes the upsampling operation. By explicitly modeling both frequency pathways, FGS preserves the se-mantic integrity of low-frequency features while restoring fine-grained structures such as edges and textures. The overall FGDepth architecture is illustrated in Fig. 2. A multi-path Transformer encoder extracts rich multi-scale features. The decoder uses FGS blocks to enhance features before upsampling, with skip connections fusing semantic and structural cues across scales. A multi-scale disparity head produces depth maps at 1/8, 1/4, 1/2, and full resolu-tions. 
+
+## 3.2. PQNet with Channel-Aligned Attention 
+
+To enable motion-aware pose regression, we propose a PoseQuery Network that captures fine-grained spatial align-ment between consecutive frames using Channel-Aligned Attention (CAA). In this network, we query the features from the previous frame and align them with the features of the next frame, explicitly modeling the inter-frame geomet-26847 Figure 4. Diagram of the progressive three-stage training pipeline. Photometric loss is applied throughout all stages: (1) joint self-supervised training; (2) training PQNet with the Depth Network frozen and an additional pose loss; and (3) fine-tuning FGDepth with the frozen PQNet. 
+
+ric correspondences. As shown in Fig. 3, the network com-prises four components: Pose Stem for feature extraction, PoseQuery Layer for cross-frame alignment, Pose Trunk for high-level motion representation, and Pose Head for final pose prediction. Given two input frames, we extract features ft and fs
+
+using a shared Pose Stem. These are processed by the Pose-Query Layer, which includes CAA, self-attention (SA), and a fusion module. CAA computes the attention-enhanced feature as: 
+
+Qt = Proj (ft;WQ), Ks, V s = Proj (fs; WK , W V ),CAA t→s = Softmax 
+
+ QtKTs
+
+√d + BE
+
+
+
+Vs, (3) where BE encodes relative spatial positions, and all projec-tions are channel-shared to ensure semantic consistency. Self-attention maps SA t and SA s are also computed in parallel. The final representation is obtained via channel-aware fusion: 
+
+ft→s = CAFuse ([ SA t, CAA t→s, SA s]) , (4) where CAFuse uses lightweight channel attention to rescale concatenated features and produce pose-aware outputs. To reduce complexity, features are partitioned into non-overlapping 7 × 7 windows. CAA and SA are computed within each window, preserving semantic alignment and improving efficiency. The resulting representations are re-assembled and passed to the Pose Trunk for refinement and final pose regression. 
+
+## 3.3. Progressive Three-Stage Training Strategy 
+
+We observe that more accurate pose estimation can enhance depth estimation performance, and vice versa, indicating that the two networks are capable of mutually reinforcing each other. Therefore, we propose a progressive three-stage training strategy that decouples the two networks during training and optimizes them under task-specific constraints at different stages, thereby fully exploiting their mutual in-teractions. The overall training pipeline is illustrated in Fig. 4. 
+
+Stage 1: Training a Self-supervised MDE Framework 
+
+This stage follows the standard self-supervised monocular depth estimation paradigm, adopting view synthesis from source image Is to target image It as the proxy task. With 
+
+It serving as ground truth, optimization is driven by mini-mizing photometric loss. Specifically, Tt→s and Dt denote predictions from the pose network and depth network, re-spectively, while ˆIs→t represents the warped image gener-ated through view synthesis. This process is formally de-fined as: 
+
+ˆpt→s ∼ K T t→s Dt K−1 pt,
+
+ˆIs→t = Is ⟨ˆpt→s⟩ ,Lp = (1 − α)|It − ˆIs→t| + α 1 − SSIM( It, ˆIs→t)2 ,
+
+(5) where K denotes the camera intrinsic matrix, and pt repre-sents the projected coordinates of points on the target image 
+
+It in the camera plane coordinate system, and SSIM stands for the Structural Similarity Index, a metric used to measure structural similarity between two images. 
+
+Stage 2: Training the Novel PoseQuery Network 
+
+To leverage the complementary benefits of pose and depth estimation, we freeze the pretrained DepthNet and train a novel PoseQuery Network featuring a channel-aligned attention mechanism for more accurate pose prediction. Building upon standard photometric loss, we introduce a reciprocal pose constraint based on the SE(3) Lie group and apply it directly to the PoseQuery Network. This constraint enforces that the estimated forward and backward poses be-tween adjacent frames are approximately inverse transfor-mations, thus enhancing temporal coherence in pose pre-diction. Specifically, each 4 × 4 transformation matrix  T
+
+is decomposed into a rotation matrix  R and a translation vector  t, and the pose loss is defined as: 
+
+Lpose = ∥Rt→sRs→t − I∥1 + ∥Rs→ttt→s + ts→t∥2. (6) We apply an L1-norm to the rotation term to enhance robustness to noise, and an L2-norm to the translation term 26848 Table 1. Quantitative results on KITTI at 640 × 192 resolution. Our method is compared with existing approaches using the Eigen split of the KITTI dataset, where all methods (including ours) are trained on monocular video from the dataset. The best results for each metric are highlighted in bold, and the second-best results are underlined. 
+
+Method Lower is better ↓ Higher is better ↑
+
+Abs Rel Sq Rel RMSE RMSE log δ < 1.25 1 δ < 1.25 2 δ < 1.25 3
+
+Zhou et al. [41] 0.183 1.595 6.709 0.270 0.734 0.902 0.959 Vid2Depth [17] 0.163 1.240 6.220 0.250 0.762 0.916 0.968 GeoNet [35] 0.155 1.296 5.857 0.233 0.793 0.931 0.973 Yang et al. [34] 0.182 1.481 6.501 0.267 0.725 0.906 0.963 DDVO [27] 0.151 1.257 5.583 0.228 0.810 0.936 0.974 Stuct2depth [3] 0.141 1.026 5.291 0.215 0.816 0.945 0.979 Monodepth2 [10] 0.115 0.903 4.863 0.193 0.877 0.959 0.981 CAdepth [33] 0.105 0.769 4.535 0.181 0.892 0.964 0.984 
+
+Zhao et al. [38] 0.139 1.034 5.264 0.214 0.821 0.942 0.978 R-MSFM6 [42] 0.112 0.806 4.704 0.191 0.878 0.960 0.981 Bian et al. [2] 0.118 0.861 4.803 0.193 0.866 0.958 0.981 MonoViT [39] 0.099 0.708 4.372 0.175 0.900 0.967 0.984 
+
+Zheng et al. [40] 0.111 0.905 4.749 0.189 0.886 0.961 0.981 SC-DepthV3 [25] 0.118 0.756 4.709 0.188 0.864 0.960 0.984 
+
+MonoFormer [1] 0.108 0.806 4.594 0.184 0.884 0.963 0.983 SwinDepth [23] 0.106 0.739 4.510 0.182 0.890 0.964 0.984 
+
+Lite-Mono [36] 0.107 0.765 4.561 0.183 0.886 0.963 0.983 Wang et al. [28] 0.130 0.978 5.129 0.208 0.836 0.949 0.981 Wei et al. [30] 0.109 0.789 4.467 0.186 0.881 0.961 0.983 DNA-Depth-B1 [26] 0.102 0.757 4.493 0.178 0.896 0.965 0.984 
+
+HiDNet [15] 0.108 0.733 4.454 0.184 0.887 0.962 0.983 RTIA-Mono [37] 0.118 0.858 4.810 0.196 0.865 0.955 0.980 Gao et al. [8] 0.097 0.692 4.373 - 0.900 0.967 -GeoDepth [31] 0.100 0.694 4.381 0.176 0.897 0.966 0.984 
+
+FGDepth (Ours) 0.096 0.679 4.303 0.174 0.902 0.967 0.984 
+
+to encourage smooth regression. Detailed derivations are provided in the supplementary material. 
+
+Stage 3: Fine-tuning the Final FGDepth Network 
+
+We initialize the FGDepth Network by adapting the prior Depth Network-replacing its upsampling blocks with FGS blocks while retaining other pre-trained parameters. Only modules involving FGS blocks are trained here, with the PoseQuery Network (from Stage 2) frozen. This targeted strategy avoids redundant retraining and lever-ages pre-trained weights to focus on recovering struc-tural information-such as edges and textures-from high-frequency cues. This three-stage training strategy, by de-coupling the optimization of depth and pose networks, aligns with the framework of Non-convex Inexact Block Coordinate Descent (BCD) [32]. Under this framework, al-ternating approximate updates ensure stable convergence to stationary points, thus facilitating effective training 1.
+
+# 4. Experimental 
+
+In this section, we (1) demonstrate the state-of-the-art per-formance and generalization ability of our method on stan-
+
+> 1The detailed mathematical context and proofs are provided in the sup-plementary material.
+
+dard benchmarks, (2) perform ablation studies to validate the effectiveness of the proposed models, and (3) investigate different training strategies. Additional results and ablation analyses are provided in the supplementary materials. 
+
+## 4.1. Datasets 
+
+We evaluate our method on three datasets to validate its depth and pose estimation performance, as well as its gen-eralization ability: 
+
+KITTI Depth Following standard practices [10, 39], we use the Eigen split for depth estimation, which includes 39,810 monocular triplets for training and 4,424 for vali-dation [6]. For testing, we use the official test split with raw LiDAR ground truth (697 images). 
+
+Make3D To assess generalization ability, we use 134 im-ages from this dataset [22], which covers both urban and natural scenes, as the test set without fine-tuning, with its original depth maps used as ground truth. 
+
+KITTI Odometry For pose estimation evaluation, we use the official odometry split [9], which includes 11 driv-ing sequences with ground truth odometry derived from IMU/GPS data (used solely for evaluation). We do not use 26849 Input  Zhou  Epc ++               
+
+> Epc ++ Mahjourian Geonet
+> Zhan Monodepth2 MonoVIT Ours Ground truth Input Zhou Epc ++
+> Epc ++ Mahjourian Geonet
+> Zhan Monodepth2 MonoVIT Ours Ground truth Figure 5. Qualitative monocular depth estimation on the KITTI Eigen split.
+
+this dataset for training, and follow standard protocols to test on sequences 09-10 [41]. 
+
+## 4.2. Implementation Details 
+
+The experiments were conducted on a 24-core Intel work-station equipped with 64GB of RAM and two NVIDIA RTX 3090 GPUs, each with 24GB of VRAM. The entire framework was implemented in PyTorch v1.9.0 , and all in-put images were resized to 640 × 192 before being fed into the network. To ensure fair comparison, the learning rate, number of epochs, batch size, and other training hyperpa-rameters were kept consistent with the baseline [39]. 
+
+## 4.3. Evaluation Details 
+
+Since our method performs self-supervised depth estima-tion (predicting relative depth), we adopt the depth estima-tion metrics defined in previous work [6], including Ab-solute Relative Error (Abs Rel), Squared Relative Error (Sq Rel), Root Mean Squared Error (RMSE), Root Mean Squared Log Error (RMSElog), and accuracy within thresh-olds ( δ < 1.25 1, 1.25 2, 1.25 3). For these metrics, lower val-ues indicate Abs Rel, Sq Rel, RMSE, and RMSElog indi-cate better performance, while higher values for the δ met-rics are preferred. It is worth noting that predicted depth is scaled to align with ground truth prior to evaluation, follow-ing standard practice [10]. For pose estimation, we use the 5-frame Absolute Trajectory Error (ATE) as the evaluation metric, consistent with previous approaches [41]. 
+
+## 4.4. Comparison with State-of-the-arts 
+
+Table 1 presents the quantitative results of depth estimation on the KITTI dataset [9]. FGDepth consistently outper-forms existing self-supervised methods under the monoc-ular training setting across all evaluation metrics. Our method achieves the lowest Abs Rel of 0.096 and the best Sq Rel of 0.679, significantly surpassing previous state-of-the-art approaches such as MonoViT [39] and DNA-Depth [26]. Notably, our method produces clearer depth maps with finer structural details, as reflected by the par-ticularly significant improvements in Sq Rel and RMSE. Compared with MonoViT, FGDepth estimates the object scale relationships in the scene more accurately (with a 
+
+4.1% reduction in Sq Rel) while effectively suppressing large prediction errors (with a 1.6% reduction in RMSE), thereby improving robustness and stability in complex en-vironments. Even when applied to the same backbone ar-chitecture, FGDepth still achieves consistent performance gains. Unlike methods relying on explicit ground priors, FGDepth introduces no additional scene assumptions and can be seamlessly integrated into various backbone mod-els to enhance overall performance. For brevity, the perfor-mance of FGS blocks paired with other backbones, as well as additional results on other datasets and different resolu-tions on the KITTI benchmark 2.Furthermore, Fig. 5 illustrates qualitative comparisons in challenging scenes. Our approach produces sharper object boundaries and more coherent structures, particularly in dy-namic or textureless regions, where previous methods of-ten suffer from blurred or distorted outputs. These results further confirm the effectiveness of FGDepth in generating sharper depth maps with improved structural fidelity. 
+
+Zero-Shot Generalization Ability 
+
+To evaluate the generalization capability of FGDepth, we extend the evaluation to the Make3D dataset [22], without using any training data from it, following the setup in prior works [10, 41]. As indicated in Table 2, FGDepth surpasses all existing self-supervised methods across all reported met-rics. Specifically, compared to the baseline method [39], our method achieves reductions of 4.75% and 1.86% in Sq Rel and RMSE, respectively. These consistent improve-ments across datasets demonstrate the strong zero-shot gen- 
+
+> 2Provided in the supplementary materials. 26850 Table 2. Generalization on Make3D. “S” denotes whether the method uses supervised training.
+
+Method S Sq Rel RMSE Abs Rel karsch et al. [11] Y 5.079 8.389 0.428 liu et al. [16] Y 6.562 10.05 0.475 laina et al. [12] Y 1.840 5.683 0.204 
+
+Zhou et al. [41] N 5.321 10.470 0.383 Wang et al. [27] N 4.720 8.090 0.387 Monodepth2 [10] N 3.589 7.417 0.322 MonoViT [39] N 2.758 6.623 0.286 Lite-Mono[36] N 3.060 6.981 0.305 Gao et al. [8] N 3.137 7.083 0.309 GeoDepth [31] N 2.750 6.735 0.296 
+
+FGDepth (Ours) N 2.627 6.500 0.283 Input  Zhou  Monodepth2   
+
+> MonoVIT Ours Ground truth
+> Figure 6. Qualitative depth estimation results on Make3D.
+
+eralization ability and robustness of our approach. Besides, Fig. 6 shows qualitative results on the Make3D dataset. Even without being trained on this dataset, our model per-forms noticeably better in regions with blurry boundaries. Moreover, these results further validate the effectiveness and robustness of our method. For reference, we also re-port the results of early supervised methods [12]. Although these models benefit from direct access to ground truth dur-ing training, the performance gap is steadily narrowed by the MDE-based approach, highlighting its potential in ap-proaching fully supervised performance. 
+
+## 4.5. Ablation Study 
+
+Effect of FGS Block on Fine-Grained Structures 
+
+To thoroughly analyze the role of the proposed FGS Block, we conduct ablation studies comparing models trained with and without this module, examining their behavior in both the spatial and frequency domains. In the spatial domain, we visualize depth maps and their corresponding texture and gradient responses along object boundaries to assess the block’s contribution to capturing fine-grained geometric details. As shown in Fig. 7, re-moving the FGS Block results in oversmoothed predictions and blurred object contours, whereas integrating it signifi-cantly enhances the preservation of thin or complex struc-tures (e.g., poles, pedestrians, and vegetation). The model  
+
+> Figure 7. Ablation study comparing models with and without the FGS Block. By restoring high-frequency information, the FGS Block more accurately captures fine-grained geometric structures in the scene.
+
+with FGS produces sharper boundaries and more coher-ent geometry, demonstrating its strong capability to recover fine-scale depth variations. From the frequency perspective, models without the FGS Block exhibit spectrum energy concentrated mainly in the low-frequency region, indicating attenuated high-frequency information and insufficient structural detail. In contrast, with the FGS Block, the spectral distribution becomes more balanced, with richer and more uniform high-frequency re-sponses, showing that the model can better retain detailed information and suppress low-frequency–dominated blur-ring artifacts. By restoring richer high-frequency compo-nents in the frequency domain, FGS Block enhances fine-grained geometric structures in the spatial domain, leading to sharper boundaries and more detailed depth predictions. Furthermore, the improvement remains consistent across diverse scenes and object scales, validating the robustness of the FGS Block in enhancing local structural details while preserving global geometric consistency. 
+
+Effectiveness of FGDepth and PQNet models 
+
+To evaluate the effectiveness of the proposed models for depth estimation, we present the ablation results in the up-per part of Table 3. Introducing FGDepth significantly im-proves depth estimation performance, confirming its ability to capture structural cues in the frequency domain. Inter-estingly, while PQNet is a pose network, it still provides a visible improvement in depth accuracy, indicating that a more accurate pose network can enhance depth estimation through joint optimization. When both improved depth and pose networks are jointly employed, our method achieves the best performance across all metrics, with Abs Rel and Sq Rel reduced by 3.92% and 3.16% , respectively, further confirming the effectiveness of joint optimization. Qualita-tive results are shown in Fig. 5, where sharper object bound-aries and reduced edge blurring demonstrate our method ca-26851 Table 3. Ablation study on the effectiveness of proposed models and training strategies. The first four rows investigate the individual and combined impacts of the FGDepth and PoseQuery Network (PQNet) under standard joint training. The last three rows compare three training paradigms: mini-batch alternating, epoch-wise alternating, and our proposed progressive three-stage training, using the model with both FGDepth and PQNet for fair comparisons.                                                                             
+
+> Ablation Method Lower is better ↓Higher is better ↑
+> FGDepth PQNet Strategy Abs Rel Sq Rel RMSE RMSE log δ < 1.25 1δ < 1.25 2δ < 1.25 3
+> Models Joint 0.102 0.727 4.428 0.176 0.895 0.966 0.982
+> ✓Joint 0.098 0.712 4.363 0.175 0.902 0.966 0.983
+> ✓Joint 0.099 0.723 4.399 0.176 0.900 0.966 0.984
+> ✓✓Joint 0.098 0.704 4.338 0.174 0.901 0.967 0.984
+> Training
+> ✓✓Batch 0.117 0.819 4.448 0.185 0.875 0.957 0.983
+> ✓✓Epoch 0.098 0.710 4.381 0.175 0.901 0.966 0.984
+> ✓✓Stage 0.096 0.679 4.303 0.174 0.902 0.967 0.984
+
+pability to recover structural details in frequency domain. To further assess the contribution of the proposed models to pose estimation, we report ablation results in Table 4. The proposed PQNet significantly improves pose estimation ac-curacy, confirming its ability to effectively capture motion cues between consecutive frames. Moreover, experiments show that a more stable depth network also improves pose estimation through joint optimization. In addition, we evaluate the performance of the Pose-Query Layer across different backbone networks and visu-alize the multiple variants of our method on KITTI Seq.09 and Seq.10. We investigate the impact of inserting the Pose-Query Layer at different layers within the pose network 3.
+
+Effectiveness of the Progressive Training Strategy 
+
+To investigate the impact of training strategies on model performance, we design three distinct training strategies and compare them with the standard joint optimization scheme, as shown in the lower part of Table 3. These three strategies employ different iterative training paradigms (i.e., Batch, Epoch, and Stage) after an initial joint training phase. The “Batch” strategy exhibits poor performance as it alternates updates between the two networks on a per-batch basis (similar to GAN-style training). Such frequent alterna-tions first disrupt the learning dynamics of both tasks, sub-sequently impeding model convergence, which results in significantly inferior performance compared to other ap-proaches. While the “Epoch” strategy achieves decent per-formance, it still lags behind standard joint training. Due to its alternating training mechanism, the optimizer’s internal state at the start of each epoch is consistently misaligned with the currently paired task model, hindering effective training 4.In contrast, our proposed progressive three-stage training strategy (i.e., Stage Strategy) not only outperforms all other strategies across all metrics but also achieves state-of-the-art results. This strategy strategically partitions the training                                   
+
+> 3More details are provided in the supplementary material.
+> 4More detailed discussion in the supplementary materials.
+> Table 4. Ablation study of pose estimation results on KITTI odom-etry sequences 09 and 10 (lower values are better).
+> Method Seq. 09 Seq. 10
+> FGDepth PQNet Strategy
+> ✓Joint 0.021 ±0.011 0.017 ±0.011
+> ✓Joint 0.019 ±0.009 0.015 ±0.011
+> ✓✓Joint 0.018 ±0.009 0.015 ±0.010
+> ✓✓Stage 0.016 ±0.008 0.014 ±0.010
+
+process into distinct phases, progressively enhancing each task within dedicated stages while effectively circumvent-ing the optimizer’s internal state invalidation issues induced by frequent alternations in the “Batch” and “Epoch” strate-gies. Notably, this well-structured paradigm not only guar-antees stable convergence but also improves pose estimation performance (see Table 4, row 4), enables effective disen-tanglement of the two tasks, thereby unlocking the model’s potential more fully than standard joint training and ulti-mately yielding superior performance. 
+
+# 5. Conclusion 
+
+In this paper, we proposed a progressive self-supervised framework for monocular depth estimation, integrating FGDepth with Frequency-Guided Sampling (FGS) block to effectively recover high-frequency structural details while suppressing aliasing-induced artifacts, and a PoseQuery Network (PQNet) with channel-aligned attention to fine-grained cross-frame motion cues. A three-stage decoupled training strategy fully leverages the complementarity be-tween depth and pose estimation, further improving over-all model performance. Extensive experiments on KITTI demonstrate state-of-the-art performance, including a 4.1% 
+
+reduction in Sq Rel over strong baselines. Moreover, our findings reveal a mutually reinforcing relationship between depth and pose networks, suggesting that progressive, de-coupled optimization may represent a promising paradigm for future self-supervised learning in this domain. 26852 Acknowledgments 
+
+This work was supported in part by the National Natural Science Foundation of China (Grant No. 62176036), in part by the Fundamental Research Funds for the Central Univer-sities (Grant No. 3132023523). 
+
+# References 
+
+[1] Jinwoo Bae, Sungho Moon, and Sunghoon Im. Deep digging into the generalization of self-supervised monocular depth estimation. In Proceedings of the AAAI Conference on Arti-ficial Intelligence , pages 187–196, 2023. [2] Jia-Wang Bian, Huangying Zhan, Naiyan Wang, Tat-Jun Chin, Chunhua Shen, and Ian Reid. Auto-Rectif network for unsupervised indoor depth estimation. IEEE Transac-tions on Pattern Analysis and Machine Intelligence , 44(12): 9802–9813, 2022. [3] Vincent Casser, Soeren Pirk, Reza Mahjourian, and Anelia Angelova. Depth prediction without the sensors: Leveraging structure for unsupervised learning from monocular videos. In Proceedings of the AAAI Conference on Artificial Intelli-gence , pages 8001–8008, 2019. [4] Xingyu Chen, Thomas H Li, Ruonan Zhang, and Ge Li. Frequency-aware self-supervised monocular depth estima-tion. In Proceedings of the IEEE/CVF Winter Conference on Applications of Computer Vision , pages 5808–5817, 2023. [5] Yue-Jiang Dong, Yuan-Chen Guo, Ying-Tian Liu, Fang-Lue Zhang, and Song-Hai Zhang. Ppea-depth: Progressive parameter-efficient adaptation for self-supervised monocular depth estimation. In Proceedings of the AAAI Conference on Artificial Intelligence , pages 1609–1617, 2024. [6] David Eigen and Rob Fergus. Predicting depth, surface nor-mals and semantic labels with a common multi-scale convo-lutional architecture. In IEEE International Conference on Computer Vision , pages 2650–2658, 2015. [7] Ziyue Feng, Liang Yang, Longlong Jing, Haiyan Wang, YingLi Tian, and Bing Li. Disentangling object motion and occlusion for unsupervised multi-frame monocular depth. In 
+
+Proceedings of the European Conference on Computer Vi-sion , pages 228–244. Springer, 2022. [8] Yanbo Gao, Huibin Bai, Huasong Zhou, Xingyu Gao, Shuai Li, Xun Cai, Hui Yuan, Wei Hua, and Tian Xie. Adap-tive depth-converted-scale convolution for self-supervised monocular depth estimation. IEEE Transactions on Circuits and Systems for Video Technology , pages 1–1, 2025. [9] Andreas Geiger, Philip Lenz, Christoph Stiller, and Raquel Urtasun. Vision meets robotics: The KITTI dataset. Inter-national Journal of Robotics Research , 32(11):1231–1237, 2013. [10] Cl´ ement Godard, Oisin Mac Aodha, Michael Firman, and Gabriel J Brostow. Digging into self-supervised monocular depth estimation. In Proceedings of the IEEE/CVF Inter-national Conference on Computer Vision , pages 3827–3837, 2019. [11] Kevin Karsch, Ce Liu, and Sing Bing Kang. Depth transfer: Depth extraction from video using non-parametric sampling. 
+
+IEEE Transactions on Pattern Analysis and Machine Intelli-gence , 36(11):2144–2158, 2014. [12] Iro Laina, Christian Rupprecht, Vasileios Belagiannis, Fed-erico Tombari, and Nassir Navab. Deeper depth prediction with fully convolutional residual networks. In Proceedings of the International Conference on 3D Vision , pages 239– 248, 2016. [13] Jae-Han Lee, Minhyeok Heo, Kyung-Rae Kim, and Chang-Su Kim. Single-image depth estimation based on fourier do-main analysis. In Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition , pages 330–339, 2018. [14] Seokju Lee, Sunghoon Im, Stephen Lin, and In So Kweon. Learning monocular depth in dynamic scenes via instance-aware projection consistency. In Proceedings of the AAAI Conference on Artificial Intelligence , pages 1863–1872, 2021. [15] Guanbin Li, Ricong Huang, Haofeng Li, Zunzhi You, and Weikai Chen. SENSE: Self-evolving learning for self-supervised monocular depth estimation. IEEE Transactions on Image Processing , 33:439–450, 2024. [16] Miaomiao Liu, Mathieu Salzmann, and Xuming He. Discrete-Continuous depth estimation from a single image. In Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition , pages 716–723, 2014. [17] Reza Mahjourian, Martin Wicke, and Anelia Angelova. Un-supervised learning of depth and ego-motion from monocu-lar video using 3D geometric constraints. In IEEE/CVF Con-ference on Computer Vision and Pattern Recognition , pages 5667–5675, 2018. [18] Andra Petrovai and Sergiu Nedevschi. Exploiting pseudo labels in a self-supervised learning framework for im-proved monocular depth estimation. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 1568–1578, 2022. [19] Matteo Poggi, Filippo Aleotti, Fabio Tosi, and Stefano Mat-toccia. On the uncertainty of self-supervised monocular depth estimation. In Proceedings of the IEEE/CVF Con-ference on Computer Vision and Pattern Recognition , pages 3224–3234, 2020. [20] Anurag Ranjan, Varun Jampani, Lukas Balles, Kihwan Kim, Deqing Sun, Jonas Wulff, and Michael J Black. Competitive collaboration: Joint unsupervised learning of depth, camera motion, optical flow and motion segmentation. In Proceed-ings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 12240–12249, 2019. [21] Weisong Ren, Lijun Wang, Yongri Piao, Miao Zhang, Huchuan Lu, and Ting Liu. Adaptive co-teaching for un-supervised monocular depth estimation. In European Con-ference on Computer Vision , pages 89–105. Springer, 2022. [22] Ashutosh Saxena, Min Sun, and Andrew Y. Ng. Make3D: Learning 3D scene structure from a single still image. IEEE Transactions on Pattern Analysis and Machine Intelligence ,31(5):824–840, 2009. [23] Dongseok Shim and H Jin Kim. Swindepth: Unsupervised depth estimation using monocular sequences via swin trans-former and densely cascaded network. In Proceedings of the 26853 IEEE International Conference on Robotics and Automation ,pages 4983–4990. IEEE, 2023. [24] Chang Shu, Kun Yu, Zhixiang Duan, and Kuiyuan Yang. Feature-metric loss for self-supervised learning of depth and egomotion. In Proceedings of the European Conference on Computer Vision , pages 572–588, Cham, 2020. Springer In-ternational Publishing. [25] Libo Sun, Jia-Wang Bian, Huangying Zhan, Wei Yin, Ian Reid, and Chunhua Shen. SC-DepthV3: Robust self-supervised monocular depth estimation for dynamic scenes. 
+
+IEEE Transactions on Pattern Analysis and Machine Intelli-gence , pages 1–12, 2023. [26] Boya Wang, Shuo Wang, Dong Ye, and Ziwen Dou. Deep neighbor layer aggregation for lightweight self-supervised monocular depth estimation. In Proceedings of the IEEE International Conference on Acoustics, Speech and Signal Processing , pages 4405–4409, 2024. [27] Chaoyang Wang, Jos´ e Miguel Buenaposada, Rui Zhu, and Simon Lucey. Learning depth from monocular videos us-ing direct methods. In Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition , pages 2022– 2030, 2018. [28] Zhuping Wang, Xinke Dai, Zhanyu Guo, Chao Huang, and Hao Zhang. Unsupervised monocular depth estimation with channel and spatial attention. IEEE Transactions on Neural Networks and Learning Systems , 35(6):7860–7870, 2024. [29] Jamie Watson, Oisin Mac Aodha, Victor Prisacariu, Gabriel Brostow, and Michael Firman. The temporal opportunist: Self-supervised multi-frame monocular depth. In Proceed-ings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 1164–1174, 2021. [30] Jiansheng Wei, Shuguo Pan, Wang Gao, and Peng Guo. Lam-depth: Laplace-attention module-based self-supervised monocular depth estimation. IEEE Transactions on Intelli-gent Transportation Systems , 25(10):13706–13716, 2024. [31] Haifeng Wu, Shuhang Gu, Lixin Duan, and Wen Li. Geodepth: From point-to-depth to plane-to-depth modeling for self-supervised monocular depth estimation. In Proceed-ings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 11525–11535, 2025. [32] Yangyang Xu and Wotao Yin. A block coordinate descent method for regularized multiconvex optimization with appli-cations to nonnegative tensor factorization and completion. 
+
+SIAM Journal on Imaging Sciences , 6(3):1758–1789, 2013. [33] Jiaxing Yan, Hong Zhao, Penghui Bu, and YuSheng Jin. Channel-wise attention-based network for self-supervised monocular depth estimation. In Proceedings of the Inter-national Conference on 3D Vision , pages 464–473, 2021. [34] Zhenheng Yang, Peng Wang, Wei Xu, Liang Zhao, and Ra-makant Nevatia. Unsupervised learning of geometry from videos with edge-aware depth-normal consistency. In Pro-ceedings of the AAAI Conference on Artificial Intelligence ,2018. [35] Zhichao Yin and Jianping Shi. GeoNet: Unsupervised learn-ing of dense depth, optical flow and camera pose. In Pro-ceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 1983–1992, 2018. [36] Ning Zhang, Francesco Nex, George Vosselman, and Nor-man Kerle. Lite-Mono: A lightweight CNN and transformer architecture for self-supervised monocular depth estimation. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 18537–18546, 2023. [37] Bowen Zhao, Hongdou He, Hang Xu, Peng Shi, Xiaobing Hao, and Guoyan Huang. Rtia-mono: real-time lightweight self-supervised monocular depth estimation with global-local information aggregation. Digital Signal Processing ,156:104769, 2025. [38] Chaoqiang Zhao, Gary G. Yen, Qiyu Sun, Chongzhen Zhang, and Yang Tang. Masked GAN for unsupervised depth and pose prediction with scale consistency. IEEE Trans-actions on Neural Networks and Learning Systems , 32(12): 5392–5403, 2021. [39] Chaoqiang Zhao, Youmin Zhang, Matteo Poggi, Fabio Tosi, Xianda Guo, Zheng Zhu, Guan Huang, Yang Tang, and Ste-fano Mattoccia. MonoViT: Self-supervised monocular depth estimation with a vision transformer. In Proceedings of the International Conference on 3D Vision , pages 668–678, 2022. [40] Mingkui Zheng, Lin Luo, Haifeng Zheng, Zhangfan Ye, and Zhe Su. A dual encoder-decoder network for self-supervised monocular depth estimation. IEEE Sensors Journal , 23(17): 19747–19756, 2023. [41] Tinghui Zhou, Matthew Brown, Noah Snavely, and David G. Lowe. Unsupervised learning of depth and ego-motion from video. In Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition , pages 6612–6619, 2017. [42] Zhongkai Zhou, Xinnan Fan, Pengfei Shi, and Yuanxue Xin. R-MSFM: Recurrent multi-scale feature modulation for monocular depth estimating. In Proceedings of the IEEE/CVF International Conference on Computer Vision ,pages 12757–12766, 2021. 26854

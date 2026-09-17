@@ -1,0 +1,319 @@
+Title: Beyond Appearance: Camouflaged Object Detection via Geometric Structure
+
+URL Source: https://openaccess.thecvf.com/content/CVPR2026/papers/Han_Beyond_Appearance_Camouflaged_Object_Detection_via_Geometric_Structure_CVPR_2026_paper.pdf
+
+Published Time: Sat, 16 May 2026 16:50:39 GMT
+
+Number of Pages: 11
+
+Markdown Content:
+# Beyond Appearance: Camouflaged Object Detection via Geometric Structure Jinyu Han 1* Changguang Wu 1* Fuming Sun 2 Jinhui Tang 3†
+
+> 1
+
+Nanjing University of Science and Technology, 2Dalian Minzu University, 3Nanjing Forestry University 
+
+{hanjinyu, changguangwu }@njust.edu.cn, sunfuming@dlnu.edu.cn, tangjh@njfu.edu.cn https://depthsam.github.io/ 
+
+## Abstract 
+
+Depth priors provide salient geometric structure that benefits camouflaged object detection (COD), but directly using Monocular Depth Estimation (MDE) causes a task misalignment that still fails to identify camouflaged objects. To address this issue, we propose the Depth Segment Anything Model (DepthSAM), a MDE-adapted method specifically designed to mitigate this misalignment. DepthSAM incorporates two core innovations: (1) a Sparse Mixture-of-Experts Adapter (SMEA) that enables MDE to learn semantic infor-mation unique to camouflaged scenes, and (2) a Ge-ometric–Semantic Fusion Module (GSFM) that effi-ciently integrates geometric cues with high-level se-mantics. With these components, DepthSAM achieves both robust semantic understanding in camouflaged en-vironments and accurate segmentation of camouflaged objects. Extensive experiments show that DepthSAM achieves new SOTA performance on three major bench-marks. For example, on COD10K, its Sα and F ωβ
+
+metrics surpass the best competing methods by 3.0% and 4.3%, respectively. 
+
+## 1. Introduction 
+
+Camouflaged Object Detection (COD), a significant challenge in computer vision, aims to identify objects that blend seamlessly into their surroundings. This capability is crucial for diverse visual tasks, including medical image analysis [39] [70], military reconnais-sance [4], and disaster damage assessment [13]. Meth-ods for COD evolve from custom Convolutional Neu-ral Networks (CNNs) to Transformer-based architec-tures [15, 44]. These earlier approaches, often trained exclusively on specialized datasets, suffer from limited generalizability and performance bottlenecks. There-fore, recent research methods shift towards leveraging more powerful Vision Transformers [62] or fine-tuning large foundation models [5], such as the Segment Any-thing Model (SAM) [23]. These models, benefiting *Equal Contribution. †Corresponding Author 
+
+> ŐĞŽŵĞƚƌǇ
+> ZHDN
+> ƐĞŵĂŶƚŝĐ
+> ZHDN
+> ŐĞŽŵĞƚƚƌǇ
+> ,QSXW LPDJH
+
+^D  KƵƌƐ  
+
+> SJ
+> ĞƉƚŚ ^ĞƉĂƌĂƚĞ ĞƉƚŚ /ŶƚĞƌƚǁŝŶĞ ŐĞŽŵĞƚƌǇ
+> VWURQJ
+> ƐĞŵĂŶƚŝĐ
+> ZHDN
+> ŐĞŽŵĞƚƌǇ
+> VWURQJ
+> ƐĞŵĂŶƚŝĐ
+> VWURQJ
+
+Figure 1. Motivation: Introducing Depth Priors and Chal-lenge, i.e. , task misalignment. (1) SAM’s features are seman-tically confused and geometrically unclear. (2) DA’s prior provides clear geometry, but suffers from semantic confusion in the “Depth Intertwine” scene due to task misalignment (it cannot distinguish the object from the background). (3) Ours resolves this misalignment, successfully capturing and highlighting the camouflaged object. from vast pre-training, aim to utilize their rich semantic representations and superior generalization to enhance detection performance. However, all of the aforemen-tioned methods rely heavily on mining weak appear-ance cues from RGB images. When extreme camou-flage renders these cues absent or deceptive (e.g., the generic priors of models like SAM offer limited help for high-confusion segmentation), it severely hinders performance. Consequently, there is a pressing need to introduce more robust information sources. To overcome this appearance-based bottleneck, we exploit geometric priors from monocular depth esti-mation (MDE) foundation models ( e.g ., Depth Any-thing (DA) [59, 60]). Owing to large-scale pre-training, MDE models learn to infer rich 3D geometry from 2D appearance. This 3D geometry provides a more robust cue for distinguishing object boundaries than color and texture [31]. As Figure 1 illustrates, in scenes where the object and background are clearly separated in depth ( e.g ., the object is distinctly in front), the raw MDE output provides a strong cue for camouflaged object detection. However, directly applying the MDE foundation models to COD confronts a severe task-misalignment This CVPR paper is the Open Access version, provided by the Computer Vision Foundation. Except for this watermark, it is identical to the accepted version; the final published version of the proceedings is available on IEEE Xplore. 25830 problem. As shown in Figure 1, the core conflict is that MDE aims to reconstruct all geometric shapes in a scene, whereas COD’s goal is to isolate specific objects. This misalignment occurs when an object’s geometry is intertwined with its background. The MDE models indiscriminately reconstruct both, causing the object’s structure to become confounded with the background. And geometry alone is often insufficient in these com-plex cases to separate the object from the background. Therefore, how to resolve this misalignment, i.e., how to highlight the object’s geometry and effectively fuse these depth priors with semantic information, remains a key challenge for COD. To overcome this core challenge of task misalign-ment, we propose the Depth Segment Anything Model (DepthSAM). This method explicitly adapts the MDE foundation models for COD. In the encoding stage, we introduce Sparse Mixture-of-Experts Adapters (SMEA) [38], injecting them into the frozen MDE encoder. Their responsibility is to adaptively steer internal features. This steering action compels the de-coder’s multi-scale outputs to suppress background ge-ometry and focus on the camouflaged object’s structure. In the fusion stage, our Geometric-Semantic Fusion Module (GSFM) efficiently integrates these geomet-ric cues with high-level semantic features. Through the synergistic action of these two components, Depth-SAM successfully resolves the task misalignment be-tween MDE’s scene-level reconstruction and COD’s object-level segmentation, accurately segmenting cam-ouflaged objects. Our main contributions can be summarized as fol-lows: 1) We propose DepthSAM. It is the first to adapt the Monocular Depth Estimation (MDE) for COD, set-ting a new state-of-the-art (SOTA) performance on three major benchmarks. 2) We introduce a Sparse Mixture-of-Experts Adapter (SMEA), which is injected into the MDE foundation model encoder to modulate generic, depth-centric features, steering them to be-come object-centric and task-aware. 3) We design a Geometric-Semantic Fusion Module (GSFM) that ef-ficiently integrates these modulated geometric cues with high-level semantic features to generate the final, precise prediction mask. 
+
+## 2. Related Work Camouflaged Object Detection. Early Camouflaged Object Detection (COD) research and many recent foundation model-based techniques [5, 16, 44] are de-signed to discern objects by learning subtle differences in color and texture from RGB images. Their perfor-mance hinges on the quality of these appearance cues. While effective in many scenarios, this dependency creates a significant performance limitation when ob-jects are under extreme camouflage, as these cues be-come ambiguous or deceptive [15]. Our work, Depth-SAM, aims to transcend this limitation by leveraging the MDE model. However, as established in our in-troduction, directly using MDE introduces the task misalignment problem. In this paper, our approach in-troduces two novel components, the Sparse Mixture-of-Experts Adapter (SMEA) and the Geometric-Semantic Fusion Module (GSFM), to effectively adapt MDE for the COD task. 
+
+Monocular Depth Estimation. The field of Monoc-ular Depth Estimation (MDE) has recently shifted to-ward zero-shot foundation models, led by MiDaS [41] and the Depth Anything (DA) series [59] [60]. Con-temporary state-of-the-art methods have significantly mitigated reconstruction artifacts [18] [53] and enabled metrically accurate, prompt-based inference [27]. Such advancements provide robust geometric priors for vari-ous downstream applications, including 3D reconstruc-tion [56], video object segmentation [29], and image restoration [49]. For Camouflaged Object Detection (COD) in particular, depth cues are essential for break-ing the visual mimicry of foreground targets. While previous approaches like RISNet [51] use depth out-puts for boundary refinement, and DSAM [63] adopts two-stream architectures to fuse RGB and depth fea-tures, they often struggle with the inherent cumulative error problem in depth estimation. In contrast, our method involves direct fine-tuning of the MDE model. By modulating the model’s internal features, we mini-mize accumulated errors and more effectively exploit the potential of geometric information. 
+
+## 3. Proposed Method 3.1. Overall Architecture 
+
+As depicted in Figure 2, our proposed DepthSAM method adapts the pre-trained MDE foundation model Depth Anything v2 (DAv2) [60] for the COD task. DAv2 consists of a DINOv2 [36] encoder for visual feature extraction and a DPT [40] decoder for feature upsampling. We introduce two core components. First, we inject Sparse Mixture-of-Experts Adapters (SMEA) into the DINOv2 encoder. These adapters modulate its features, causing the frozen DPT decoder’s multi-scale outputs {F1, F 2, F 3, F 4} to become biased to-wards the camouflaged object. Second, our Geometric-Semantic Fusion Module (GSFM) efficiently fuses these object-biased features into a single, high-quality representation. Finally, a convolutional prediction head maps this representation to the final segmentation mask. The entire model is supervised by a hybrid loss func-tion L = LBCE + LIOU , combining Binary Cross-Entropy [7] and Intersection over Union [42] losses. In addition, we introduce an Auxiliary Loss [11] to ensure the sparsity of SMEA. 
+
+3.2. Sparse Mixture-of-Experts Adapter 
+
+The features from the frozen DINOv2 encoder are op-timized for generic, scene-wide geometric understand-ing. They therefore lack the specific task-awareness required for the COD task. To resolve this task mis-25831 ΨE             
+
+> ZŽƵƚĞƌ
+> ǆƉĞƌƚϭ
+> ǆƉĞƌƚϮ ǆƉĞƌƚϯ
+> ǆƉĞƌƚE ͼͼͼ ;ĂͿ ^ƉĂƌƐĞ DŝǆƚƵƌĞͲŽĨͲǆƉĞƌƚƐ ĚĂƉƚĞƌ ;^DͿ dƌĂŶƐĨŽƌŵĞƌ ůŽĐŬ
+> ƌ;ďͿ 'ĞŽŵĞƚƌŝĐͲ^ĞŵĂŶƚŝĐ &ƵƐŝŽŶ DŽĚƵůĞ ;'^&DͿ
+> ^&ZD ^&ZD ^&ZD ĞĐŽĚĞƌ
+> ;ĐͿ ^ƉĂƚŝĂůͲ&ƌĞƋƵĞŶĐǇ ZĞĨŝŶĞŵĞŶƚ DŽĚƵůĞ ;^&ZDͿ
+> &
+> ŽŶǀ >ŝŶĞĂƌ Θ &&d  >ŝŶĞĂƌ
+> 4.9TNY
+> ℱି ଵቆ6RIWPD[ ቆ𝑄𝐾் 𝑑 ቇ ⋅ 𝑉ቇ ℱି ଵ൭ℱ ൭ Softmax ቆ𝑞𝑘் 𝑑 ቇ൱ ⋅ 𝑉൱ ℱି ଵ൭6RIWPD[ ቆQK ୘
+> dቇ൱ ⋅ v
+> 6RIWPD[ ቆ𝑞𝑘் 𝑑 ቇ ⋅ 𝑣
+> ŽŶĐĂƚĞŶĂƚŝŽŶ Θ ŽŶǀ
+> 𝑭𝟒 𝑭𝟑 𝑭𝟐 𝑭𝟏
+> )R
+> WƌĞĚŝĐƚŝŽŶ ŚĞĂĚ
+> 3
+
+Figure 2. The overall architecture of our proposed DepthSAM. Our method is based on the MDE Depth Anything v2 (DAv2) (encoder and decoder) architecture. We inject the Sparse Mixture-of-Experts Adapter (SMEA) into the frozen encoder and use our Geometric-Semantic Fusion Module (GSFM) to fuse the resulting multi-scale decoder features for final mask generation. Where F −1 represents Inverse Fast Fourier Transform, and F denotes Fast Fourier Transform. alignment, we must modulate these features before they are processed by the DPT decoder. We introduce the SMEA for this purpose. The goal of SMEA is not to fundamentally change the features. Instead, its aim is to influence the DPT decoder, steering it to perceive the camouflaged object’s geometry as the most salient information. As shown in Figure 2(a), we implement the SMEA in a serial fashion, injecting the module before each des-ignated encoder Transformer Block (TB) in the frozen DINOv2 encoder. This serial placement ensures that an input feature x is first modulated by our adapter into 
+
+xm, and only then is this xm passed as input to the subsequent frozen TB (i.e., its Self-Attention and FFN layers). The SMEA module itself consists of two key components: a set of N lightweight specialists known as Experts ( Ei) and a Gating Network ( G). The Gat-ing Network functions as a lightweight router, learning to adaptively select a sparse combination of these ex-perts based on the input x. To enforce sparsity and computational efficiency, the router computes weights 
+
+gi for all experts, but only the Top-K ( e.g ., K=2) ex-perts with the highest weights receive non-zero values. The modulated feature xm is then calculated as the sparsely weighted sum of the expert outputs, which is added back to the original input via an internal residual connection (as shown in the equation) to ensure stable training: 
+
+xm = x + ( 
+
+> N
+
+∑
+
+> i=1
+
+giEi(x)) /
+
+> N
+
+∑
+
+> i=1
+
+gi, (1) where gi ∈ Top-K (G(x)) , and + stands for the element-wise addition. By forcing all information to pass through the SMEA before entering the DINOv2 block, we ensure a powerful, task-specific modulation. The Gating Net-work G learns to select the set of experts that are most relevant for the final COD task. This routing mecha-nism allows the model to dynamically choose the most appropriate specialists for a given feature, thereby steer-ing the representation to become more object-centric. This pre-modulated signal ( xm) influences the sub-sequent DPT decoder, causing its multi-scale depth outputs {Fi} to highlight the geometric priors of the camouflaged object. This process sets the stage and provides the foundation for our fusion. 
+
+3.3. Geometric-Semantic Fusion Module 
+
+Following the SMEA’s modulation of the encoder, the operation of the DPT decoder is influenced. The SMEA’s guidance causes the (frozen) DPT decoder’s output features {F1, F 2, F 3, F 4} to become biased to-wards highlighting the camouflaged object’s geometric priors. However, since the DPT decoder is frozen, its outputs are still fundamentally representations for geometric understanding, not direct segmentation rep-resentations. Furthermore, these multi-level feature maps {F1, F 2, F 3, F 4} contain complementary infor-mation. The shallower features ( e.g ., F1) are rich in modulated geometric cues, while the deeper features (e.g ., F4) hold strong semantic information. To efficiently fuse this complementary information, we design the GSFM. As shown in Figure 2(b), the GSFM employs a Progressive Fusion Architecture. It systematically integrates these features in a shallow-to-deep manner by cascading our core component: the Spatial-Frequency Refinement Module (SFRM). This design allows for a multi-stage process where fine-grained geometric details from shallower layers can progressively guide and refine the semantic representa-tions of deeper layers. This progressive fusion process culminates in a single, high-quality feature output, Fo.Finally, this Fo is passed to a lightweight prediction head. This head, composed of two convolutional layers, maps the feature channels down to 1 to generate the final prediction mask P . This process can be described by the following formula: 
+
+Fo = SFRM (SFRM (SFRM (F4, F 3), F 2), F 1). (2) At each stage of the GSFM, the SFRM is designed to fuse two input feature maps ( e.g ., assuming the two input features are x1 and x2 respectively). As shown in Figure 2(c), its core is a dual-domain design. Fol-lowing an initial interaction ( e.g ., concatenation and convolution) to merge the inputs, the module processes the features in two parallel streams, the Spatial ( S)Stream, which is rich in local geometric details. The Frequency ( F) Stream (via FFT), which efficiently captures global semantic context. Comprehensive in-formation exchange is then enabled by four parallel 25832 Multi-Head Self-Attention (MHSA) mechanisms: (i) Spatial Self-Attention, which refines local structural de-tails within the S stream.(ii) Frequency Self-Attention, captures global contextual relationships within the F
+
+stream.(iii) Geometry-guided Semantics, leverages the spatial stream’s structural map to guide feature aggrega-tion in the frequency domain. This uses local geometry to anchor and calibrate the global semantic represen-tation. (iv) Semantics-guided Geometry, Leverages the attention map from the frequency stream to guide feature aggregation in the spatial domain. This allows high-level semantics to suppress background noise and enhance true object boundaries. By aggregating the results of these four MHSA operations, cross-domain reinforcement is achieved, yielding a fused feature map that is both semantically robust and structurally pre-cise. This process can be described by the following formula: 
+
+⎧⎪⎪⎪⎪⎪⎪⎨⎪⎪⎪⎪⎪⎪⎩
+
+FF = F −1(Softmax 
+
+( QK T
+
+> √d
+
+)
+
+· V ),FS = Softmax 
+
+( qk T
+
+> √d
+
+)
+
+· v, FS→F = F −1(F(Softmax 
+
+( qk T
+
+> √d
+
+)
+
+) · V ),FF→S = F −1(Softmax 
+
+( QK T
+
+> √d
+
+)
+
+) · v, 
+
+(3) where F −1 represents Inverse Fast Fourier Transform, and F denotes Fast Fourier Transform. 
+
+## 4. Experiments 4.1. Experimental Setup Datasets. To evaluate the performance of the proposed DepthSAM, we conducted extensive experiments on three public datasets: CAMO [24], COD10K [10], and NC4K [34]. CAMO is the first dataset for COD, con-taining 1,250 camouflaged images covering various categories, with 1,000 for training and 250 for test-ing. COD10K is a larger and more challenging dataset, comprising 3,040 images for training and 2,026 for testing. NC4K is another large-scale test dataset with 4,121 images. 
+
+Evaluation Metrics. We adopt four widely-used met-rics to evaluate model performance comprehensively: the S-measure ( Sα), the weighted F-measure ( F ωβ ), the E-measure ( Eξ), and the Mean Absolute Error (MAE, 
+
+M). Furthermore, to assess the parameter efficiency of our proposed DepthSAM, we report the number of its trainable parameters (Trainable Params). 
+
+Implementation Details. We implement our proposed method in PyTorch. During both training and test-ing, we resize all input images and their corresponding ground truths (GT) to 512×512. We employ standard data augmentation techniques, including random hor-izontal flipping and random cropping. We build the model on top of the pretrained full DAv2 [60] architec-ture. For our SMEA modules, we set the total number of experts to 8, with an activation of Top-K=2. We use the Adam optimizer with an initial learning rate of 5e-5, which we multiply by 0.1 every 150 epochs following a step decay schedule. We train the model for 300 epochs on four NVIDIA RTX 4090 GPUs with a total batch size of 8 (2 per GPU). 
+
+4.2. Comparison with SOTA Methods 
+
+To demonstrate its effectiveness, the proposed Depth-SAM is compared with 18 SOTA COD meth-ods, including traditional methods BGNet [46], FEDER [15], FSPNet [20], HITNet [19], Pop-Net [57], CamoFormer [62], DaCOD [52], RIS-Net [51], ZoomNeXt [37], FSEL [47], FocusDif-fuser [68], EUFNet [32], VSCode [33], RUN [16], CamoDiffusion [45], and large model-based methods DSAM [63], SAM-Adapter [5], CG-COD [64]. To ensure a fair comparison, we obtain the evaluation met-rics by using the authors’ prediction maps, running the codes provided by the corresponding authors with de-fault parameters, or using the reported results directly from the literature. 
+
+Quantitative Evaluation. The quantitative results are presented in Table 1. We introduce a family of models (DepthSAM-B/L) to show scalability, with our largest model, DepthSAM-L, establishing a new SOTA by outperforming all competitors across three benchmark datasets (improvement over the best competitor CG-COD is highlighted in green). For instance, on NC4K, our model achieves an Sα of 0.929 and an F ωβ of 0.909. As highlighted in green, this surpasses the best compet-ing method, CG-COD, by 2.5% and 4.0%, respectively. Furthermore, we analyze the impact of different input resolutions (Table 1). The results show that while re-ducing the resolution leads to a moderate performance decrease, our model still maintains a significant advan-tage over competing methods at the same resolution. This SOTA performance provides compelling evi-dence for our central thesis. Previous SOTA methods, such as FEDER and RISNet, primarily focus on de-signing complex modules to amplify faint appearance cues. Their performance is thus limited when these cues become ambiguous. In contrast, DepthSAM’s SOTA performance stems from leveraging robust geo-metric priors from MDE. Our results demonstrate that DepthSAM successfully resolves the task misalign-ment problem that arises from applying MDE founda-tion models to the COD task. This, in turn, confirms that our method can effectively harness MDE’s pow-erful geometric priors for this task. This advantage is fully reflected in all key metrics. For example, we achieved significant results in two key structural sim-ilarity metrics. Our leading Sα confirms its superior perception of the overall structure of objects ( e.g ., re-gion integrity). Meanwhile, our leading Eξ further demonstrates the model’s ability to accurately capture local structural information. Our leading F ωβ is a com-prehensive metric evaluating overall performance via a weighted average of precision and recall. This score further confirms that our model achieves an optimal 25833 Table 1. Quantitative comparison of our DepthSAM with 18 SOTA methods on three benchmark datasets for COD. ‘-’ denotes the results are not available. The best and second best results are shown in Red and Blue , respectively. 
+
+Methods Pub./Year Size Trainable Param(M) CAMO (250) COD10K (2026) NC4K (4121) 
+
+Sα ↑ F ωβ ↑ M ↓ Eξ ↑ Sα ↑ F ωβ ↑ M ↓ Eξ ↑ Sα ↑ F ωβ ↑ M ↓ Eξ ↑
+
+Traditional Methods 
+
+BGNet[46] IJCAI 22 352 ×352 60.47 0.812 0.789 0.073 0.870 0.831 0.753 0.033 0.901 0.851 0.820 0.044 0.907 DaCOD[52] ACM MM 23 448 ×448 186.26 0.855 0.796 0.051 0.911 0.840 0.729 0.028 0.908 0.874 0.814 0.035 0.923 FEDER[15] CVPR 23 384 ×384 37.37 0.807 0.785 0.069 0.873 0.823 0.740 0.032 0.900 0.823 0.817 0.045 0.905 FSPNet[20] CVPR 23 384 ×384 273.8 0.856 0.830 0.050 0.899 0.851 0.769 0.026 0.895 0.879 0.843 0.035 0.915 HITNet[19] AAAI 23 704 ×704 25.73 0.849 0.809 0.055 0.910 0.871 0.806 0.023 0.938 0.875 0.834 0.037 0.929 PopNet[57] ICCV 23 352 ×352 26.30 0.808 0.784 0.077 0.859 0.851 0.786 0.028 0.910 0.861 0.833 0.042 0.909 CamoFormer[62] TPAMI 24 384 ×384 71.00 0.872 0.831 0.046 0.931 0.869 0.786 0.023 0.931 0.892 0.847 0.030 0.941 RISNet[51] CVPR 24 704 ×704 30.60 0.870 0.827 0.050 0.922 0.873 0.799 0.025 0.931 0.882 0.834 0.037 0.925 ZoomNeXt[37] TPAMI 24 384 ×384 65.37 0.888 0.859 0.040 0.943 0.898 0.838 0.017 0.955 0.900 0.865 0.028 0.949 FSEL[47] ECCV 24 416 ×416 67.13 0.885 0.851 0.040 0.942 0.873 0.800 0.021 0.928 0.892 0.853 0.030 0.941 FocusDiffuser[68] ECCV 24 384 ×384 73.45 0.881 0.851 0.042 0.939 0.875 0.809 0.020 0.939 0.891 0.854 0.029 0.940 EUFNet [32] ICIP 24 416 ×416 135.66 0.870 0.831 0.047 0.922 0.874 0.798 0.022 0.934 0.889 0.847 0.031 0.936 VSCode[33] CVPR 24 352 ×352 74.72 0.873 0.843 0.046 0.907 0.869 0.784 0.023 0.925 0.891 0.858 0.032 0.930 RUN[16] ICML 25 384 ×384 71.06 0.877 0.861 0.045 0.934 0.878 0.810 0.021 0.941 0.892 0.868 0.030 0.940 CamoDiffusion[45] TPAMI 25 384 ×384 59.01 0.878 0.853 0.042 0.940 0.881 0.814 0.020 0.943 0.893 0.859 0.029 0.942 
+
+Large model-based methods 
+
+SAM-Adapter[5] ICCV 23 512 ×512 4.25 0.847 0.765 0.070 0.873 0.883 0.801 0.025 0.918 - - - -DSAM[63] ACM MM 24 512 ×512 32.25 0.832 0.821 0.061 0.913 0.846 0.789 0.033 0.921 0.871 0.847 0.040 0.932 CG-COD[64] ACM MM 25 448 ×448 78.92 0.896 0.864 0.036 0.947 0.890 0.824 0.018 0.948 0.904 0.869 0.026 0.949 
+
+DepthSAM methods DepthSAM-B Ours 384 ×384 9.09 0.904 0.884 0.034 0.945 0.893 0.836 0.018 0.947 0.914 0.885 0.025 0.951 
+
+DepthSAM-L Ours 384 ×384 27.45 0.911 0.896 0.031 0.953 0.905 0.839 0.017 0.954 0.922 0.899 0.022 0.956 DepthSAM-B Ours 512 ×512 9.09 0.908 0.888 0.033 0.948 0.907 0.845 0.016 0.956 0.921 0.897 0.023 0.955 
+
+DepthSAM-L Ours 512 ×512 27.45 0.919 0.906 0.028 0.958 0.920 0.867 0.014 0.964 0.929 0.909 0.021 0.961 Improvement(%) - - - 2.3% 4.2% 0.8% 1.1% 3.0% 4.3% 0.4% 1.6% 2.5% 4.0% 0.5% 1.2%          
+
+> 5*% *7 2XUV 96&RGH =RRP &DPR) )('(5 )6(/ )631HW +LW1HW 5,61HW
+> 'HJUDGHG VFHQDULR
+> 7LQ\ REMHFW %OXUUHG ERXQGDU\ )RUHJURXQG RFFOXVLRQ %DFNJURXQG PDWFKLQJ
+> 7UDQVSDUHQF\ REMHFW
+> &RPSOH[ FRQWRXUV
+> 0XOWL REMHFW
+
+Figure 3. Visual comparison of our DepthSAM with 8 representative SOTA methods on 8 typical COD complex scenes. precision and recall balance. Furthermore, we achieved an extremely low M, demonstrating our model’s high pixel-level accuracy. 
+
+Qualitative Evaluation. Figure 3 visually demon-strates the superiority of DepthSAM over eight SOTA methods. In Semantic Distractors scenes ( 1st row), where other methods fail due to background interfer-ence, DepthSAM consistently generates complete and clean masks. Similarly, in Background matching ( 2nd 
+
+row), the object’s texture is nearly indistinguishable from the background. This causes appearance-reliant methods, like FEDER and FSPNet, to suffer from se-vere missed detections, failing to identify the object. DepthSAM also exhibits superior robustness in han-dling extreme scales and occlusions. In Tiny object (4th row) and Multi-object ( 8th row) scenes, competi-25834 Table 2. Zero-shot generalization experiments on video cam-ouflaged object detection. The best results are shown in Red .                                                                                        
+
+> Methods Pub./Year MoCA-Mask
+> Sα↑Fωβ↑ M ↓ Eξ↑mDice ↑mIoU ↑
+> MG[58] ICCV 21 53.0 16.8 6.7 56.1 18.1 12.7 SLT-Net-LT[6] CVPR 22 63.1 31.1 2.7 75.9 36.0 27.2 FSPNet[20] CVPR 23 59.5 18.6 4.4 61.0 23.8 16.7 FEDER[15] CVPR 23 55.5 19.8 4.9 54.2 19.2 15.2 FSEL[47] ECCV 24 59.6 26.0 5.3 67.7 21.9 15.1 HGINet[61] TIP 24 61.0 25.1 3.0 72.6 30.3 22.1 ZoomNeXt[37] TPAMI 24 73.4 47.6 1.0 73.6 49.7 42.2 SAM-PM[35] CVPR 24 72.8 56.7 0.9 81.3 59.4 50.2 TSP-SAM[21] CVPR 24 68.9 44.4 0.8 80.8 45.8 38.8 EMIP[67] TIP 25 66.9 37.4 1.7 -42.4 32.6 DepthSAM-L Ours 78.4 60.9 0.9 87.1 63.7 54.9
+> )UDPHV *7 2XUV
+> 7636$0 6/71HW /7 6$030 =RRP1H[W
+
+Figure 4. On the VCOD task, our DepthSAM is intuitively compared with four representative SOTA methods. Table 3. Ablation study on different foundation models. The best results are shown in Red .                    
+
+> Methods COD10K
+> Sα↑Fωβ↑M ↓ Eξ↑
+> SAM ∗0.880 0.801 0.021 0.938 DepthSAM-L 0.920 0.867 0.014 0.964
+> 5*% *7 'HSWK 6$0
+
+2XUV 6$0 
+
+Figure 5. Qualitative comparison of foundation model priors. DAv2’s Depth priors clearly reveal the object’s structure. In contrast, SAM’s raw features are noisy and distracted by background textures. tors like RISNet and ZoomNeXt miss most or all of the objects. Our method, however, accurately iden-tifies and segments all individuals. In Foreground occlusion ( 3rd row), other methods ( e.g ., VSCode) incorrectly segment parts of the foreground occluder (the leaf), while DepthSAM precisely distinguishes the object from the occlusion. Furthermore, for extreme cases such as blurred boundaries ( 5th row), transpar-ent objects ( 6th row), and complex contours ( 7th row), DepthSAM leverages its understanding of geometric structure to delineate fine details. These results provide strong visual evidence for the robustness and superior-ity of our DepthSAM. 
+
+4.3. Zero-shot generalization in VCOD 
+
+To subject our approach to the most stringent test of generalization, we evaluated its zero-shot performance on the task of Video Camouflaged Object Detection (VCOD). VCOD introduces significant temporal arti-facts, such as motion blur, rapid lighting shifts, and video artifacts. These factors render appearance-based cues, which are already ambiguous in static images, even more deceptive. We directly applied our DepthSAM model, which was trained exclusively on static COD image datasets, to the challenging MoCA-Mask benchmark without any fine-tuning. As demonstrated in Table 2, Depth-SAM achieves remarkable new SOTA results. It out-performs SOTA methods specifically designed for the video domain, such as TSP-SAM and SAM-PM. No-tably, our Sα score reaches 78.4, surpassing the next best competitor, ZoomNeXt (73.4), by a significant margin of 5.0%. Figure 4 provides a visual explanation for this robust, zero-shot performance. The sequence is challenging, featuring significant motion blur and a tiny object, which corrupts appearance cues. Methods like SLT-Net-LT are severely affected by these artifacts, producing large, erroneous detections. Other strong competitors, such as ZoomNeXt and TSP-SAM, ex-hibit temporal instability and frequently miss the object (false negatives) in several frames. In contrast, Depth-SAM consistently produces clean and accurate masks in every frame. This outstanding zero-shot generalization SOTA re-sult provides the most compelling evidence for the gen-eralization capability of our DepthSAM. Our model re-lies on an MDE foundation model, whose core strength is precisely inferring underlying geometry from appear-ance. Our DepthSAM successfully modulates these geometric priors, making them highly discriminative for the camouflaged object. This ultimately confirms that by resolving the task misalignment, our model has learns a focus camouflaged object geometry capability. It is this capability that enables it to generalize to the VCOD domain. 
+
+4.4. Ablation Studies 
+
+To validate the effectiveness of each key component in our proposed DepthSAM, we conduct a series of abla-tion studies on the COD10K dataset. Our DepthSAM-L variant serves as the baseline for these experiments, with performance evaluated using the M, Sα, F ωβ , and 
+
+Eξ metrics. The following sections will analyze the contribution of each design choice in detail. 
+
+Ablation of different foundation models. To verify that our success stems from specific geometric priors 25835 Table 4. Ablation experiments of SMEA. The best results are shown in Red .                                 
+
+> ID Method Trainable Param(M) COD10K
+> Sα↑Fωβ↑M ↓ Eξ↑
+> 1w/o SMEA 24.54 0.845 0.719 0.037 0.889 2ID1+Adapter 26.13 0.914 0.840 0.017 0.957 3Top-K=4 27.60 0.920 0.869 0.014 0.966
+> 4DepthSAM-L 27.45 0.920 0.867 0.014 0.964
+
+Table 5. Ablation experiments of GSFM. The best results are shown in Red .                                  
+
+> ID Method Trainable Param(M) COD10K
+> Sα↑Fωβ↑M ↓ Eξ↑
+> 1w/ o GSFM 16.66 0.875 0.766 0.025 0.928 2ID1+FFN 21.32 0.909 0.829 0.016 0.952 3ID1+MHSA 18.88 0.899 0.809 0.018 0.944 4DepthSAM-L 27.45 0.920 0.867 0.014 0.964
+> ([SHUW  
+
+“body”, “seaside” 
+
+“slender creature”, “underwater”  
+
+> ([SHUW  
+
+“insect” ,“sand”   
+
+> ([SHUW  ([SHUW  
+
+“cat” ,“grass” 
+
+Figure 6. Visualization of expert specialization in SMEA.       
+
+> 5*% *7 3) ) ) )R )
+
+Figure 7. Qualitative analysis of GSFM. This figure shows GSFM successfully fusing the multi-scale features from the decoder. This fusion process combines the coarse semantics from the deep features with the fine-grained structure from the shallow layers to generate a high-quality final feature. rather than merely massive pre-training, we integrated DepthSAM’s key components into the generic founda-tion model, SAM (denoted as SAM ∗), for comparison. Despite SAM’s powerful general capabilities, it sig-nificantly underperforms DepthSAM in camouflaged scenarios (Table 3, lagging by 4.0% in Sα). The visualization in Figure 5 further reveals the rea-son: the depth maps generated by DAv2 clearly reveal the camouflaged object’s structure, whereas SAM’s raw features appear highly noisy and distracted by back-ground textures. Consequently, even when equipped with our components, SAM ∗ still fails to accurately localize the object, producing severe false positives in the 1st and 2nd rows, and missing details of the ob-ject in the 3rd row. In contrast, DepthSAM leverages its clear geometric priors to capture all camouflaged objects completely and accurately. This conclusively validates that generic large models are insufficient for camouflage; geometric priors play a significant role. 
+
+Ablation experiment for SMEA. We validated the SMEA design in Table 4. We designed four configu-rations to validate SMEA: (ID 1): Removing SMEA entirely (baseline), forcing GSFM to process raw DAv2 priors; (ID 2): Replacing SMEA with a standard, non-sparse adapter [5]; (ID 3): Our full model, but setting SMEA’s activated experts to K=4; (ID 4): Our default DepthSAM (SMEA, K=2). Specifically, removing SMEA (ID 1) resulted in the worst performance. Our full model (ID 4) achieved a massive gain (+7.5% Sα, +14.8% F ωβ ) over this base-line, confirming the necessity of SMEA. Our multi-expert SMEA (ID 4) clearly outperformed the standard adapter (ID 2) (+0.6% Sα, +2.7% F ωβ ), indicating its multi-expert mechanism is more effective. Increasing K from 2 (ID 4, F ωβ =0.867) to 4 (ID 3, F ωβ =0.869) offered a slight performance boost but added 0.15M parameters (27.45M vs 27.60M). This confirms K=2 as the optimal balance between cost and benefit. Figure 6 visualizes SMEA’s expert specialization mechanism, showing them learning to handle specific camouflage contexts. For instance, Experts 1 and 7 are activated for objects on flat, grainy textures ( e.g ., sand), while Experts 4 and 6 specialize in detecting objects hidden within complex foliage. This ability to adaptively in-voke task-specialized experts, rather than using one generic adapter, explains SMEA’s (ID 4) superior quan-titative performance over the standard adapter (ID 2). In summary, the quantitative data (Table 4) and qual-itative evidence (Figure 6) jointly validate SMEA as a critical component. Furthermore, this collectively vali-dates SMEA’s role in resolving the task misalignment. 
+
+Ablation experiment for GSFM. The ablation study for GSFM is presented in Table 5. We designed four configurations to validate GSFM: (ID 1): Removing GSFM (baseline), using simple feature concatenation; (ID 2): Replacing GSFM with a standard FFN; (ID 3): Swapping GSFM’s core SFRM module for a standard MHSA; (ID 4): Our default DepthSAM. Specifically, removing GSFM (ID 1) resulted in a sharp performance drop ( F ωβ to 0.766). This confirms that simple concatenation is insufficient and that in-telligent fusion is crucial. Replacing GSFM with an FFN (ID 2) was still suboptimal ( F ωβ =0.829). This indicates that an FFN cannot effectively fuse the het-erogeneous multi-scale features. Replacing GSFM’s core SFRM module with an MHSA (ID 3) also de-graded performance ( F ωβ =0.809). This to the fact that MHSA lacks the frequency-domain perspective nec-25836 Table 6. Quantitative comparison of our DepthSAM with 6 SOTA methods on the DUTS dataset for SOD. The best results are shown in Red .                                
+
+> Methods DUTS (SOD)
+> Sα↑Fωβ↑M ↓ Eξ↑
+> VST++[28] 0.909 0.861 0.029 0.939 VSCode[33] 0.926 0.891 0.024 0.954 MDSAM[12] 0.920 0.895 0.025 0.949 SODDCNet[9] 0.922 0.854 0.026 0.946 Samba[17] 0.932 0.902 0.021 0.961
+> DepthSAM-L 0.947 0.921 0.017 0.968
+
+Table 7. Quantitative comparison of our DepthSAM with 6 SOTA methods on the EORSSD datasets for ORSI SOD. The best results are shown in Red .Methods EORSSD (ORSI SOD)                               
+
+> Sα↑Fβ↑Eξ↑M ↓
+> GeleNet[26] 0.9376 0.8781 0.9766 0.0064 LSHNet[25] 0.9370 0.8643 0.9692 0.0064 WeightNet[8] 0.9427 0.8800 0.9760 0.0053 HFCNet[30] 0.9449 0.8646 0.9720 0.0049
+> RAMENet[14] 0.9419 0.8840 0.9778 0.0050 DepthSAM-L 0.9503 0.8910 0.9793 0.0053
+
+Table 8. Quantitative compar-ison of our DepthSAM with 6 SOTA methods on five polyp datasets for Polyp. Methods Polyp (5 datasets)                    
+
+> mDice ↑mIoU ↑
+> LDNet[66] 0.6425 0.7441 WeakPolyp[55] 0.7490 0.8066 UniverSeg[3] 0.5525 0.2610 SegGPT[54] 0.5677 0.7074 Spider[69] 0.7975 0.8550 DepthSAM-L 0.8156 0.8654
+> 5*% *7 2XUV 96& 0'6 6DP 'HSWK
+
+D 5*% 62' 5*% *7 2XUV /6+ *HOH 5$0 'HSWK E 256, 62'     
+
+> 5*% *7 2XUV :HDN /'1HW 6SLGHU
+
+F 3RO\S 
+
+> 'HSWK
+
+Figure 8. Visual comparison of our method with other SOTA methods on the three cross-domain tasks, namely, RGB SOD, ORSI SOD, and Polyp. essary to capture fine-grained geometric features. In contrast, our proposed SFRM is specifically designed to preserve these key details. To provide an intuitive understanding of GSFM’s effectiveness, Figure 7 visu-alizes its fusion inputs and result. As shown, GSFM receives the full multi-scale features from deep to shal-low ( F4, F 3, F 2, F 1). It can be clearly observed that the complementary information, from coarse seman-tics ( F4) to fine-grained structure ( F1), is effectively integrated into the final fused feature Fo. The result-ing feature ( Fo) successfully inherits both the semantic completeness of the deep layers and the sharp bound-ary details of the shallow layers, enabling the precise final prediction (P). In summary, both the quantitative results in Table 5 and the qualitative results in Figure 7 jointly confirm the effectiveness and necessity of our GSFM design and its core SFRM component. 
+
+4.5. Cross-Domain Adaptability 
+
+To validate its generalizability beyond COD, we re-trained DepthSAM on three diverse domains. Ad-ditionally, we introduce the mDice and mIoU 
+
+metrics to evaluate performance in medical scenar-ios. Specifically, these include natural scenes (RGB SOD, using DUTS [50]), optical remote sensing scenes (ORSI SOD, using EORSSD [65]), and med-ical polyp segmentation (using five datasets: CVC-300 [1], CVC-ClinicDB [2], CVC-ColonDB [48], ETIS-LaribPolypDB [43], and Kvasir [22]). In the natural scene SOD (Table 6), DepthSAM achieves SOTA performance, reaching an Sα of 0.947 and an F ωβ of 0.921 on the DUTS dataset, significantly surpassing existing models. This demonstrates that geometric cues provide a significant advantage even when appearance is abundant. For instance, Figure 8(a) visually shows that our model leverages geometry to achieve precise boundary localization for challenging objects like starfish, where traditional methods ( e.g ., VSCode) often fail. In remote sensing (ORSI SOD, Table 7), the model exhibits remarkable robustness, scoring 0.9503 in Sα on EORSSD. As Figure 8(b) con-firms, it accurately detects tiny objects (row 1) while effectively suppressing artifacts from the RGB image. For example, in row 2, the RGB image contains a clear airplane artifact or shadow that is absent in the depth map; our model (Ours) consequently remains unaf-fected by it, achieving a clean detection. Finally, in medical imaging (Table 8), the model yields highly competitive results, achieving leading average scores of 0.8156 mDice and 0.8654 mIoU across the five datasets. This is visually validated in Figure 8(c), which indicates that the model successfully exploits geometric protrusions to achieve precise localization, producing segmentations visibly closer to the ground truth (GT) than methods like Spider or WeakPolyp. In summary, these cross-domain experiments strongly attest to DepthSAM’s adaptability. 
+
+## 5. Conclusion 
+
+Our proposed DepthSAM method solves the task mis-alignment problem between scene-level Monocular Depth Estimation (MDE) and object-level Camou-flaged Object Detection (COD). Our method comprises two components: (1) a Sparse Mixture-of-Experts Adapter (SMEA), which guides the frozen MDE model to suppress background geometric information and fo-cus on the camouflaged object’s structure; and (2) a Geometric-Semantic Fusion Module (GSFM), which fuses the features output by the MDE decoder into a high-quality representation with rich semantics and clear boundaries for precise segmentation. Extensive experimental results validate the effectiveness of these two components, confirming the feasibility of leverag-ing and adapting MDE models for the segmentation task. 25837 Acknowledgments 
+
+This work was supported by the National Natural Science Foundation of China under Grant 62472067. 
+
+## References 
+
+[1] Jorge Bernal, Javier S´ anchez, and Fernando Vilarino. Towards automatic polyp detection with a polyp appear-ance model. PR , 45(9):3166–3182, 2012. 8 [2] Jorge Bernal, Francisco Javier S´ anchez, Gloria Fern´ andez-Esparrach, Debora Gil, Cristina Rodr´ ıguez de Miguel, and Fernando Vilari˜ no. WM-DOVA maps for accurate polyp highlighting in colonoscopy: Vali-dation vs. saliency maps from physicians. CMIG , 43: 99–111, 2015. 8 [3] Victor Ion Butoi, Jose Javier Gonzalez Ortiz, Tianyu Ma, Mert R. Sabuncu, John V. Guttag, and Adrian V. Dalca. UniverSeg: Universal medical image segmenta-tion. In ICCV , pages 21381–21394. IEEE, 2023. 8 [4] Christel Chappuis, Gencer S¨ umb¨ ul, Syrielle Montariol, Sylvain Lobry, and Devis Tuia. PAN-RSVQA: vision foundation models as pseudo-annotators for remote sensing visual question answering. In CVPRW , pages 3005–3016. IEEE, 2025. 1 [5] Tianrun Chen, Lanyun Zhu, Chaotao Ding, Runlong Cao, Yan Wang, Shangzhan Zhang, Zejian Li, Lingyun Sun, Ying Zang, and Papa Mao. SAM-Adapter: Adapt-ing segment anything in underperformed scenes. In 
+
+ICCVW , pages 3359–3367, 2023. 1, 2, 4, 5, 7 [6] Xuelian Cheng, Huan Xiong, Deng-Ping Fan, Yi-ran Zhong, Mehrtash Harandi, Tom Drummond, and Zongyuan Ge. Implicit motion handling for video camouflaged object detection. In CVPR , pages 13854– 13863. IEEE, 2022. 6 [7] Pieter-Tjerk De Boer, Dirk P Kroese, Shie Mannor, and Reuven Y Rubinstein. A tutorial on the cross-entropy method. Annals of Operations Research , 134(1):19–67, 2005. 2 [8] Lamei Di, Bin Zhang, and Yiming Wang. Multiscale and multidimensional weighted network for salient ob-ject detection in optical remote sensing images. IEEE TGRS , 62:1–14, 2024. 8 [9] Rohit Venkata Sai Dulam and Chandra Kambhamettu. Salient object detection with dynamic convolutions. In 
+
+CVPRW , pages 1692–1702. IEEE, 2025. 8 [10] Deng-Ping Fan, Ge-Peng Ji, Guolei Sun, Ming-Ming Cheng, Jianbing Shen, and Ling Shao. Camouflaged object detection. In CVPR , pages 2774–2784. IEEE, 2020. 4 [11] William Fedus, Barret Zoph, and Noam Shazeer. Switch Transformers: Scaling to trillion parameter mod-els with simple and efficient sparsity. JMLR , 23(120): 1–39, 2022. 2 [12] Shixuan Gao, Pingping Zhang, Tianyu Yan, and Huchuan Lu. Multi-scale and detail-enhanced segment anything model for salient object detection. In ACM MM , pages 9894–9903. ACM, 2024. 8 [13] Ananya Gupta, Elisabeth Welburn, Simon Watson, and Hujun Yin. Post disaster mapping with semantic change detection in satellite imagery. In CVPRW , pages 472– 474. IEEE, 2019. 1 [14] Jinyu Han, Fuming Sun, Yaoyao Hou, Jing Sun, and Haojie Li. Exploring a lightweight and efficient net-work for salient object detection in orsi. IEEE TGRS ,63:1–14, 2025. 8 [15] Chunming He, Kai Li, Yachao Zhang, Longxiang Tang, Yulun Zhang, Zhenhua Guo, and Xiu Li. Camouflaged object detection with feature decomposition and edge reconstruction. In CVPR , pages 22046–22055, 2023. 1, 2, 4, 5, 6 [16] Chunming He, Rihan Zhang, Fengyang Xiao, Chenyu Fang, Longxiang Tang, Yulun Zhang, Linghe Kong, Deng-Ping Fan, Kai Li, and Sina Farsiu. RUN: Re-versible unfolding network for concealed object seg-mentation. ICML , 2025. 2, 4, 5 [17] Jiahao He, Keren Fu, Xiaohong Liu, and Qijun Zhao. Samba: A unified mamba-based framework for general salient object detection. In CVPR , pages 25314–25324. IEEE, 2025. 8 [18] Mu Hu, Wei Yin, Chi Zhang, Zhipeng Cai, Xiaoxiao Long, Hao Chen, Kaixuan Wang, Gang Yu, Chunhua Shen, and Shaojie Shen. Metric3D v2: A versatile monocular geometric foundation model for zero-shot metric depth and surface normal estimation. IEEE TPAMI , 46(12):10579–10596, 2024. 2 [19] Xiaobin Hu, Shuo Wang, Xuebin Qin, Hang Dai, Wenqi Ren, Donghao Luo, Ying Tai, and Ling Shao. High-resolution iterative feedback network for camouflaged object detection. In AAAI , pages 881–889, 2023. 4, 5 [20] Zhou Huang, Hang Dai, Tian-Zhu Xiang, Shuo Wang, Huai-Xin Chen, Jie Qin, and Huan Xiong. Feature shrinkage pyramid for camouflaged object detection with transformers. In CVPR , pages 5557–5566. IEEE, 2023. 4, 5, 6 [21] Wenjun Hui, Zhenfeng Zhu, Shuai Zheng, and Yao Zhao. Endow SAM with keen eyes: Temporal-spatial prompt learning for video camouflaged object detection. In CVPR , pages 19058–19067, 2024. 6 [22] Debesh Jha, Pia H Smedsrud, Michael A Riegler, P˚ al Halvorsen, Thomas De Lange, Dag Johansen, and H˚ avard D Johansen. Kvasir-SEG: A segmented polyp dataset. In MMM , pages 451–462, 2020. 8 [23] Alexander Kirillov, Eric Mintun, Nikhila Ravi, Hanzi Mao, Chlo´ e Rolland, Laura Gustafson, Tete Xiao, Spencer Whitehead, Alexander C. Berg, Wan-Yen Lo, Piotr Doll´ ar, and Ross B. Girshick. Segment anything. In ICCV , pages 3992–4003. IEEE, 2023. 1 [24] Trung-Nghia Le, Tam V. Nguyen, Zhongliang Nie, Minh-Triet Tran, and Akihiro Sugimoto. Anabranch network for camouflaged object segmentation. CVIU ,184:45–56, 2019. 4 [25] S. Lee, S. Cho, C. Park, S. Park, J. Kim, and S. Lee. LSHNet: Leveraging Structure-prior with Hierarchical Features Updates for Salient Object Detection in Op-tical Remote Sensing Images. IEEE TGRS , 62:1–16, 2024. 8 [26] Gongyang Li, Zhen Bai, Zhi Liu, Xinpeng Zhang, and Haibin Ling. Salient object detection in optical remote sensing images driven by transformer. IEEE TIP , 32: 5257–5269, 2023. 8 [27] Haotong Lin, Sida Peng, Jingxiao Chen, Songyou Peng, Jiaming Sun, Minghuan Liu, Hujun Bao, Jiashi Feng, Xiaowei Zhou, and Bingyi Kang. Prompting depth any-25838 thing for 4k resolution accurate metric depth estimation. In CVPR , pages 17070–17080. IEEE, 2025. 2 [28] Nian Liu, Ziyang Luo, Ni Zhang, and Junwei Han. Vst++: Efficient and stronger visual saliency trans-former. IEEE TPAMI , 46(11):7300–7316, 2024. 8 [29] Weihuang Liu, Xi Shen, Haolun Li, Xiuli Bi, Bo Liu, Chi-Man Pun, and Xiaodong Cun. Depth-aware test-time training for zero-shot video object segmentation. In CVPR , pages 19218–19227, 2024. 2 [30] Y. Liu, M. Xu, T. Xiao, H. Tang, Y. Hu, and L. Nie. Het-erogeneous Feature Collaboration Network for Salient Object Detection in Optical Remote Sensing Images. 
+
+IEEE TGRS , 62:1–14, 2024. 8 [31] Yepeng Liu, Wenpeng Lai, Zhou Zhao, Yuxuan Xiong, Jinchi Zhu, Jun Cheng, and Yongchao Xu. LiftFeat: 3d geometry-aware local feature matching. In ICRA ,pages 11714–11720. IEEE, 2025. 1 [32] Dongni Lu, Jiaxuan Chen, Haiyan Chen, Ziyi Peng, Rong Quan, and Jie Qin. Camouflaged object detection via style transfer-based data augmentation. In ICIP ,pages 2229–2235, 2024. 4, 5 [33] Ziyang Luo, Nian Liu, Wangbo Zhao, Xuguang Yang, Dingwen Zhang, Deng-Ping Fan, Fahad Khan, and Junwei Han. VSCode: General visual salient and cam-ouflaged object detection with 2d prompt learning. In 
+
+CVPR , pages 17169–17180, 2024. 4, 5, 8 [34] Yunqiu Lv, Jing Zhang, Yuchao Dai, Aixuan Li, Bowen Liu, Nick Barnes, and Deng-Ping Fan. Simultaneously localize, segment and rank the camouflaged objects. In 
+
+CVPR , pages 11591–11601, 2021. 4 [35] Muhammad Nawfal Meeran, Gokul Adethya T, and Bhanu Pratyush Mantha. SAM-PM: enhancing video camouflaged object detection using spatio-temporal at-tention. In CVPRW , pages 1857–1866. IEEE, 2024. 6[36] Maxime Oquab, Timoth´ ee Darcet, Th´ eo Moutakanni, Huy V. Vo, Marc Szafraniec, Vasil Khalidov, Pierre Fer-nandez, Daniel Haziza, Francisco Massa, Alaaeldin El-Nouby, Mido Assran, Nicolas Ballas, Wojciech Galuba, Russell Howes, Po-Yao Huang, Shang-Wen Li, Ishan Misra, Michael Rabbat, Vasu Sharma, Gabriel Syn-naeve, Hu Xu, Herv´ e J´ egou, Julien Mairal, Patrick La-batut, Armand Joulin, and Piotr Bojanowski. Dinov2: Learning robust visual features without supervision. 
+
+TMLR , 2024, 2024. 2 [37] Youwei Pang, Xiaoqi Zhao, Tian-Zhu Xiang, Lihe Zhang, and Huchuan Lu. ZoomNeXt: A unified col-laborative pyramid network for camouflaged object de-tection. IEEE TPAMI , 46(12):9205–9220, 2024. 4, 5, 6[38] Joan Puigcerver, Carlos Riquelme Ruiz, Basil Mustafa, and Neil Houlsby. From sparse to soft mixtures of experts. In ICLR . OpenReview.net, 2024. 2 [39] Md Mostafijur Rahman, Mustafa Munir, Debesh Jha, Ulas Bagci, and Radu Marculescu. PP-SAM: perturbed prompts for robust adaption of segment anything model for polyp segmentation. In CVPRW , pages 4989–4995. IEEE, 2024. 1 [40] Ren´ e Ranftl, Alexey Bochkovskiy, and Vladlen Koltun. Vision transformers for dense prediction. In ICCV ,pages 12159–12168. IEEE, 2021. 2 [41] Ren´ e Ranftl, Katrin Lasinger, David Hafner, Konrad Schindler, and Vladlen Koltun. Towards robust monoc-ular depth estimation: Mixing datasets for zero-shot cross-dataset transfer. IEEE TPAMI , 44(3):1623–1637, 2022. 2 [42] Evan Shelhamer, Jonathan Long, and Trevor Darrell. Fully convolutional networks for semantic segmenta-tion. IEEE TPAMI , 39(4):640–651, 2017. 2 [43] Juan Silva, Aymeric Histace, Olivier Romain, Xavier Dray, and Bertrand Granado. Toward embedded de-tection of polyps in wce images for early diagnosis of colorectal cancer. IJCARS , 9:283–293, 2014. 8 [44] Fuming Sun, Jinyu Han, Weiyi Wu, Jing Sun, and Mengyin Wang. A unet-like transformer network for camouflaged object detection. IEEE TMM , 27:9267– 9280, 2025. 1, 2 [45] Ke Sun, Zhongxi Chen, Xianming Lin, Xiaoshuai Sun, Hong Liu, and Rongrong Ji. Conditional diffusion models for camouflaged and salient object detection. 
+
+IEEE TPAMI , 47(4):2833–2848, 2025. 4, 5 [46] Yujia Sun, Shuo Wang, Chenglizhao Chen, and Tian-Zhu Xiang. Boundary-guided camouflaged object de-tection. In IJCAI , pages 1335–1341. ijcai.org, 2022. 4, 5[47] Yanguang Sun, Chunyan Xu, Jian Yang, Hanyu Xuan, and Lei Luo. Frequency-spatial entanglement learning for camouflaged object detection. In ECCV , pages 343– 360. Springer, 2024. 4, 5, 6 [48] Nima Tajbakhsh, Suryakanth R Gurudu, and Jianming Liang. Automated polyp detection in colonoscopy videos using shape and context information. IEEE TMI , 35(2):630–644, 2016. 8 [49] Nisha Varghese, Ashish Kumar, and A. N. Rajagopalan. Self-supervised monocular underwater depth recovery, image restoration, and a real-sea video dataset. In ICCV ,pages 12214–12224. IEEE, 2023. 2 [50] Lijun Wang, Huchuan Lu, Yifan Wang, Mengyang Feng, Dong Wang, Baocai Yin, and Xiang Ruan. Learn-ing to detect salient objects with image-level supervi-sion. In CVPR , pages 3796–3805, 2017. 8 [51] Liqiong Wang, Jinyu Yang, Yanfu Zhang, Fangyi Wang, and Feng Zheng. Depth-aware concealed crop detection in dense agricultural scenes. In CVPR , pages 17201– 17211, 2024. 2, 4, 5 [52] Qingwei Wang, Jinyu Yang, Xiaosheng Yu, Fangyi Wang, Peng Chen, and Feng Zheng. Depth-aided cam-ouflaged object detection. In ACM MM , pages 3297– 3306. ACM, 2023. 4, 5 [53] Ruicheng Wang, Sicheng Xu, Cassie Dai, Jianfeng Xi-ang, Yu Deng, Xin Tong, and Jiaolong Yang. MoGe: Unlocking accurate monocular geometry estimation for open-domain images with optimal training supervision. In CVPR , pages 5261–5271. IEEE, 2025. 2 [54] Xinlong Wang, Xiaosong Zhang, Yue Cao, Wen Wang, Chunhua Shen, and Tiejun Huang. SegGPT: Towards segmenting everything in context. In ICCV , pages 1130– 1140. IEEE, 2023. 8 [55] Jun Wei, Yiwen Hu, Shuguang Cui, S. Kevin Zhou, and Zhen Li. WeakPolyp: You only look bounding box for polyp segmentation. In MICCAI , pages 757–766. Springer, 2023. 8 [56] Changguang WU, Jiangxin Dong, Chengjian Li, and Jinhui Tang. Plenodium: Underwater 3d scene recon-struction with plenoptic medium representation. In 
+
+NeurIPS , 2025. 2 25839 [57] Zongwei Wu, Danda Pani Paudel, Deng-Ping Fan, Jingjing Wang, Shuo Wang, C´ edric Demonceaux, Radu Timofte, and Luc Van Gool. Source-free depth for ob-ject pop-out. In ICCV , pages 1032–1042, 2023. 4, 5[58] Charig Yang, Hala Lamdouar, Erika Lu, Andrew Zis-serman, and Weidi Xie. Self-supervised video object segmentation by motion grouping. In ICCV , pages 7157–7168. IEEE, 2021. 6 [59] Lihe Yang, Bingyi Kang, Zilong Huang, Xiaogang Xu, Jiashi Feng, and Hengshuang Zhao. Depth anything: Unleashing the power of large-scale unlabeled data. In 
+
+CVPR , pages 10371–10381, 2024. 1, 2 [60] Lihe Yang, Bingyi Kang, Zilong Huang, Zhen Zhao, Xi-aogang Xu, Jiashi Feng, and Hengshuang Zhao. Depth anything V2. In NeurIPS , 2024. 1, 2, 4 [61] Siyuan Yao, Hao Sun, Tian-Zhu Xiang, Xiao Wang, and Xiaochun Cao. Hierarchical graph interaction trans-former with dynamic token clustering for camouflaged object detection. IEEE TIP , 33:5936–5948, 2024. 6 [62] Bowen Yin, Xuying Zhang, Deng-Ping Fan, Shaohui Jiao, Ming-Ming Cheng, Luc Van Gool, and Qibin Hou. CamoFormer: Masked separable attention for camouflaged object detection. IEEE TPAMI , 46(12): 10362–10374, 2024. 1, 4, 5 [63] Zhenni Yu, Xiaoqin Zhang, Li Zhao, Yi Bin, and Guobao Xiao. Exploring deeper! segment anything model with depth perception for camouflaged object detection. In ACM MM , pages 4322–4330, 2024. 2, 4, 5[64] Chenxi Zhang, Qing Zhang, Jiayun Wu, and Youwei Pang. CGCOD: Class-guided camouflaged object de-tection. In ACM MM , pages 4369–4377. ACM, 2025. 4, 5 [65] Qijian Zhang, Runmin Cong, Chongyi Li, Ming-Ming Cheng, Yuming Fang, Xiaochun Cao, Yao Zhao, and Sam Kwong. Dense attention fluid network for salient object detection in optical remote sensing images. IEEE TIP , 30:1305–1317, 2021. 8 [66] Ruifei Zhang, Peiwen Lai, Xiang Wan, De-Jun Fan, Feng Gao, Xiao-Jian Wu, and Guanbin Li. Lesion-aware dynamic kernel for polyp segmentation. In MIC-CAI , pages 99–109, 2022. 8 [67] Xin Zhang, Tao Xiao, Ge-Peng Ji, Xuan Wu, Keren Fu, and Qijun Zhao. Explicit motion handling and interac-tive prompting for video camouflaged object detection. 
+
+IEEE TIP , 34:2853–2866, 2025. 6 [68] Jianwei Zhao, Xin Li, Fan Yang, Qiang Zhai, Ao Luo, Zicheng Jiao, and Hong Cheng. FocusDiffuser: Perceiv-ing local disparities for camouflaged object detection. In ECCV , pages 181–198. Springer, 2024. 4, 5 [69] Xiaoqi Zhao, Youwei Pang, Wei Ji, Baicheng Sheng, Jiaming Zuo, Lihe Zhang, and Huchuan Lu. Spider: A unified framework for context-dependent concept segmentation. In ICML , pages 60906–60926. OpenRe-view.net, 2024. 8 [70] Yun Zhu, Dong Zhang, Yi Lin, Yifei Feng, and Jinhui Tang. Merging context clustering with visual state space models for medical image segmentation. IEEE TMI , 44 (5):2131–2142, 2025. 1 25840

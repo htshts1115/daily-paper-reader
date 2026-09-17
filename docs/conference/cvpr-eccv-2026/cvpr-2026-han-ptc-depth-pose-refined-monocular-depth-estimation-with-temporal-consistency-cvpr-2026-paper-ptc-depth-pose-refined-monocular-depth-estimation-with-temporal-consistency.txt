@@ -1,0 +1,1338 @@
+PTC-Depth: Pose-Refined Monocular Depth Estimation with Temporal
+Consistency
+Leezy Han1, Seunggyu Kim1, Dongseok Shim2, Hyeonbeom Lee1*
+1Ajou University
+2Sony Creative AI Lab
+Figure 1. PTC-Depth: metric-consistent monocular depth estimation. By fusing optical flow with metric displacement from wheel
+odometry or GPS, our method recovers metric scale and maintains temporal consistency across consecutive frames.
+Abstract
+Monocular depth estimation (MDE) has been widely
+adopted in the perception systems of autonomous vehicles
+and mobile robots.
+However, existing approaches often
+struggle to maintain temporal consistency in depth estima-
+tion across consecutive frames. This inconsistency not only
+causes jitter but can also lead to estimation failures when
+the depth range changes abruptly. To address these chal-
+lenges, this paper proposes a consistency-aware monocular
+depth estimation framework that leverages wheel odometry
+from a mobile robot to achieve stable and coherent depth
+predictions over time. Specifically, we estimate camera pose
+and sparse depth from triangulation using optical flow be-
+tween consecutive frames. The sparse depth estimates are
+used to update a recursive Bayesian estimate of the metric
+scale, which is then applied to rescale the relative depth pre-
+dicted by a pre-trained depth estimation foundation model.
+The proposed method is evaluated on the KITTI, TartanAir,
+MS2, and our own dataset, demonstrating robust and ac-
+curate depth estimation performance. The project page is
+available at https://ptc-depth.github.io.
+*Corresponding author: hbeomlee@ajou.ac.kr
+1. Introduction
+Deep learning–based depth estimation, which relies solely
+on a monocular camera, has recently been applied to a di-
+verse range of tasks, including surgical scene understand-
+ing [37], 3D scene reconstruction for autonomous vehicles
+[43, 51], and robotic perception [6, 29, 39, 45].
+To en-
+able its broader applicability, recent research has focused
+on improving the accuracy and robustness of depth es-
+timation techniques.
+With the emergence of foundation
+models for depth estimation trained on large-scale datasets
+[4, 18, 27, 41], the performance of monocular depth predic-
+tion has steadily advanced. Several of these models lever-
+age synthetic data generation to construct large-scale train-
+ing datasets, and employ zero-shot generalization to achieve
+strong performance across diverse environments. Neverthe-
+less, maintaining temporal consistency across consecutive
+frames remains a major challenge for real-world applica-
+tions.
+Several approaches have been proposed to address the
+problem of inconsistent depth estimation across consec-
+utive frames, including single-image relative depth esti-
+mation methods [28] extended to video sequences [17]
+and depth compensation techniques that incorporate sparse
+depth measurements [22, 34].
+However, in video-based
+This CVPR paper is the Open Access version, provided by the Computer Vision Foundation.
+Except for this watermark, it is identical to the accepted version;
+the final published version of the proceedings is available on IEEE Xplore.
+12617
+
+
+learning, the absence of absolute distance information lim-
+its its applicability to autonomous vehicles and robotic sys-
+tems. Furthermore, methods such as those in [22, 34] re-
+quire additional sensors and rely on metric depth images,
+making them incompatible with foundation models that
+provide only relative depth predictions.
+In this paper, we propose a depth estimation framework
+that enhances the temporal consistency of monocular depth
+predictions without relying on additional sparse depth data
+or depth sensors. Our contributions are:
+• Our method produces temporally consistent metric depth
+maps by tracking the metric scale of a foundation depth
+model’s relative output via recursive Bayesian updates.
+The key insight is that wheel odometry and optical flow
+directly constrain scale, and aggregating per-pixel es-
+timates via superpixels enables robust Bayesian scale
+tracking even under odometry noise.
+• By leveraging a foundation depth model, our method
+achieves metric depth estimation while preserving sharp
+boundary quality across diverse imaging modalities, in-
+cluding RGB and long-wave infrared (LWIR) images.
+• Our method achieves temporally consistent metric depth
+with higher accuracy than existing video-based depth
+methods [5, 17], without relying on additional depth sen-
+sors or pre-trained metric priors.
+• To evaluate the performance of our algorithm, we con-
+ducted experiments on several benchmark datasets, in-
+cluding RGB datasets such as KITTI[10], TartanAir[35],
+and a thermal dataset using MS2[32]. We also collected
+our own dataset in diverse environments, including forest
+and urban areas, for additional evaluation.
+2. Related Works
+2.1. Monocular Depth Estimation
+Deep learning–based depth estimation has motivated the
+development of self-supervised approaches [12, 14, 21,
+30, 33, 49, 50].
+Self-supervised monocular depth esti-
+mation methods jointly train a DepthNet and a PoseNet,
+where the PoseNet predicts the relative camera motion be-
+tween frames to enforce photometric consistency.
+How-
+ever, these self-supervised methods often suffer from per-
+formance degradation under illumination changes and in the
+presence of moving objects, leading to limited generaliza-
+tion capability.
+Metric depth estimation from a single RGB image [2–
+4, 26, 31, 44, 47] achieves state-of-the-art performance
+through large-scale supervised training.
+However, these
+approaches often exhibit limited generalization capabil-
+ity, showing blurred boundaries and degraded performance
+when applied to environments different from the training
+environment.
+Recent foundation model–based methods
+[4, 18, 27, 41] have explored learning frameworks that com-
+bine both metric depth and relative depth, where the latter
+captures per-pixel depth ratios without predicting absolute
+metric scale. Unlike metric depth prediction, relative depth
+estimation focuses on learning the geometric relationships
+between pixels rather than predicting absolute metric scales
+tied to specific camera intrinsics or scene configurations.
+Relative depth models are known to achieve superior zero-
+shot generalization performance across diverse domains and
+imaging conditions. DepthFM [13] further explores gener-
+ative approaches by formulating depth estimation as a flow
+matching problem, enabling fast inference through straight
+ODE trajectories.
+Due to these challenges, the development of video-based
+depth estimation models [5, 17, 19, 36, 48, 52] aimed at
+improving temporal consistency has been actively stud-
+ied.
+Most of these approaches estimate relative depth,
+which contributes to smoother temporal transitions and im-
+proved frame-to-frame coherence compared to conventional
+monocular camera–based methods. Since these depth mod-
+els do not provide absolute metric information, they are
+difficult to apply to tasks such as autonomous driving or
+3D mapping, where accurate scale estimation is essential.
+Some methods have attempted to address this by jointly
+estimating depth and camera motion [42], or by leverag-
+ing depth priors to improve camera pose estimation [8, 46].
+However, these approaches focus primarily on pose accu-
+racy and do not address temporal scale consistency in dense
+depth maps.
+2.2. Depth Completion
+Depth completion techniques produce dense depth maps by
+fusing RGB images with sparse depth point clouds. Early
+works relied on classical interpolation applied directly to
+sparse depth inputs [7] or used RGB images as guidance
+[24]. With advances in deep learning, more accurate depth
+completion methods have emerged, including stereo-based
+approaches [1] and diffusion-based methods that interpo-
+late sparse depth using RGB information [23]. These ap-
+proaches exhibit satisfactory performance across a wide
+range of scenarios. However, diffusion-based approaches
+such as [23] rely solely on relative depth and cannot pro-
+vide absolute metric depth information.
+While video-based depth estimation seeks to obtain tem-
+porally consistent depth from multi-frame inputs using rela-
+tive depth, recent depth completion approaches [22, 25, 34,
+38] aim to estimate highly reliable metric depth by com-
+bining reliable monocular depth with pre-provided sparse
+depth measurements. However, these methods require addi-
+tional depth sensors such as LiDAR, making them imprac-
+tical when only a camera and odometry are available. Our
+method eliminates this requirement, relying solely on wheel
+odometry as a lightweight metric reference.
+12618
+
+
+Figure 2. The overall framework of the proposed method. Camera pose and metric scale are estimated from optical flow and wheel
+odometry, respectively, and used to fuse triangulated metric depth with relative depth from a foundation model.
+3. Method
+The overall framework of the proposed method is shown in
+Fig. 2. Our approach first estimates the optical flow be-
+tween two consecutive image frames, from which camera
+pose and metric scale are recovered using wheel odometry.
+Subsequently, a sparse depth map is derived from the esti-
+mated pose and optical flow information. Finally, the sparse
+depth is fused with the relative depth predicted by a foun-
+dation model [41] through recursive Bayesian updates, re-
+sulting in a consistent depth map that incorporates accurate
+metric scale information.
+3.1. Observed Flow and Motion Field
+Following the classical Longuet-Higgins–Prazdny formula-
+tion [16], camera motion induces a motion field on the im-
+age plane. The components of this motion field in normal-
+ized camera coordinates (x, y) can be expressed in terms
+of the rotation Ωand translation T of the camera between
+frames as follows:
+˙p(x, y) = B(x, y) Ω+
+1
+αdrel A(x, y) T ,
+(1)
+where drel denotes the relative depth predicted by an affine-
+invariant monocular depth model. Note that drel is obtained
+by inverting the raw inverse-depth output of the monocular
+network. α is a single global scale factor that converts the
+relative depth into metric scale. For simplicity, we assume
+that the relative depth drel can be converted into the metric
+depth using a single scale parameter α. Although this as-
+sumption seems stronger than those employed in scale-and-
+shift depth compensation methods, we adopt it for the sake
+of simplicity. Since the depth refinement process divides
+the image into superpixels and assigns an individual scale
+to each cell, this assumption does not impose a strong limi-
+tation on the scale-and-shift problem. The matrices A(x, y)
+and B(x, y) in (1) are defined as
+A =
+−1
+0
+x
+0
+−1
+y
+
+, B =
+ xy
+−(1 + x2)
+y
+1 + y2
+−xy
+−x
+
+.
+Since the motion observed between consecutive image
+frames is closely related to the actual movement of the mo-
+bile robot, we can reformulate the translation vector T as
+T = b ˆT , where b denotes the odometry-derived baseline
+and ˆT represents the normalized direction vector. Given N
+flow measurements indexed by n = 1, . . . , N, the resulting
+motion constraints can be formulated as:
+
+
+˙p1
+...
+˙pN
+
+≈
+
+
+B1
+b
+drel
+1 A1
+...
+...
+BN
+b
+drel
+N AN
+
+
+"
+Ω
+ˆ
+T
+α
+#
+.
+(2)
+To recover [Ω, T ]T , we normalize the term ˆT /α, i.e.,
+ˆT
+α /∥
+ˆT
+α ∥= ˆT , given that ∥ˆT ∥= 1. The full translation
+T can then be reconstructed as T = b ˆT . The estimation of
+scale factor α will be described in a later section. To com-
+pute optical flow, we use DIS Flow [20] for RGB images.
+For thermal images, FieldScale [11] is applied as prepro-
+cessing prior to optical flow estimation.
+3.2. Robust Pose Estimation and Scale Recovery
+When estimating Ωand T from (2), two major issues must
+be addressed.
+Dynamic-object outliers Flow measurements from inde-
+pendently moving objects do not reflect camera motion and
+12619
+
+
+must be excluded (Fig. 2). However, because the motion
+field depends on the unknown parameters (Ω, T ), such out-
+liers cannot be identified without first knowing the motion
+parameters. For this reason, we employ RANSAC to obtain
+a robust estimate of the camera motion.
+We compute the residual between the observed optical
+flow and the predicted motion field. Since flow magnitude
+varies with depth, the residual is normalized by the flow
+magnitude to maintain a consistent inlier criterion across the
+image. Flow direction also provides a useful cue: when a
+flow vector deviates significantly in direction from the pre-
+dicted motion, it is classified as an outlier. If the matched
+flow vectors originate primarily from a small spatial region,
+the estimated motion may fail to represent the full scene.
+To mitigate this bias, we partition the image into grid cells
+and sample an equal number of flow vectors from each cell.
+RANSAC hypotheses with inliers covering a larger number
+of cells are preferred, ensuring that the final motion estimate
+is valid across the entire field of view. The best-performing
+RANSAC hypothesis is further refined using IRLS with Hu-
+ber weighting as described in [15]. The detailed equations
+and procedures are provided in the supplementary material.
+Scale ambiguity of translation The translation T is de-
+termined only up to an unknown scale factor, so external
+information is required to recover its true magnitude. The
+baseline b is obtained from wheel odometry or other sources
+such as GPS. However, these external sensors are not per-
+fectly synchronized with the RGB/thermal images, so the
+recovered scale can still be inaccurate. The resulting scale
+error manifests as noise in the triangulated depth observa-
+tions and is handled by the Bayesian fusion described in the
+next section.
+3.3. Triangulation and Sampson Residual
+Given the relative pose (Ω, T) estimated from the mo-
+tion field, we compute the metric depth at frame i by in-
+tersecting the viewing rays of a corresponding pixel pair
+(ui−1, vi−1) ↔(ui, vi), where xi
+= [ui, vi, 1]⊤and
+¯xi = K−1xi denotes its normalized camera coordinate
+with K the intrinsic matrix. We find (zi−1, zi) minimiz-
+ing the residual between points on the two viewing rays:
+(ztri
+i−1, ztri
+i ) = argmin
+zi−1, zi
+∥zi−1 Ω¯xi−1 + T −zi ¯xi∥.
+(3)
+Here, the minimizer ztri
+i
+gives the triangulated metric depth
+at frame i. These per-pixel values are assembled into the
+sparse depth map ztri
+i
+→Ztri
+i , used as the observation in the
+Bayesian fusion (Section 3.4). The triangulated observation
+and the temporal prior warped from the previous frame are
+fused to produce the posterior depth, which is then recur-
+sively propagated to the next frame.
+Sampson Residual Triangulation can fail due to flow er-
+rors, moving objects, or pose inaccuracies. Since reprojec-
+tion error requires known depth a priori, we instead use the
+Figure 3. Triangulation and temporal depth propagation. The
+posterior depth zpost
+i−1 from frame i−1 is lifted to the 3D point
+pi, transformed by the estimated pose (Ω, T ), and projected into
+frame i to form the temporal prior zprior
+i
+.
+Independently, tri-
+angulation from optical flow provides a new metric observation.
+Bayesian fusion combines the temporal prior with this observation
+to produce the refined posterior zpost
+i
+, which is recursively propa-
+gated to the next frame as zprior
+i+1 .
+Sampson residual [15], which evaluates how well each cor-
+respondence satisfies the epipolar constraint. We treat this
+as a per-pixel geometric reliability score: small values in-
+dicate epipolar-consistent matches, while large values flag
+unreliable triangulations. We assign each Sampson resid-
+ual to its corresponding pixel in frame i to form a Sampson
+residual map. It is used both to weight each triangulated
+depth observation and to adaptively inflate the prior vari-
+ance before fusion. The detailed computation of the Samp-
+son residual map is described in the supplementary mate-
+rial.
+Warping Previous Depth As shown in Fig. 3, to obtain
+a depth prior for the current frame, we warp the posterior
+depth map Zpost
+i−1, which represents the final metric depth
+inferred for the previous frame after Bayesian fusion (Sec-
+tion 3.4), into frame i using the estimated relative pose
+(Ω, T). Each pixel xi−1 is converted to a 3D point
+pi−1 = zpost
+i−1 ¯xi−1,
+(4)
+and transformed into frame i via the estimated pose:
+pi = Ωpi−1 + T,
+xi = proj(K pi).
+(5)
+zprior
+i
+is the depth at xi and can be computed from pi. For
+clarity in the subsequent exposition, we define the overall
+process described in (4)-(5) using the operator W as fol-
+lows:
+Zprior
+i
+= Wi−1→i(Zpost
+i−1; Ω, T, K).
+(6)
+In the following section, we describe how to estimate the
+true depth by fusing Ztri
+i
+and Zprior
+i
+through Bayesian fusion.
+3.4. Bayesian Scale Fusion
+Triangulation provides metrically meaningful depth but suf-
+fers from noise and instability under short baselines or im-
+12620
+
+
+perfect correspondence. In contrast, relative depth drel of-
+fers a smooth and structurally coherent representation but
+lacks metric scale.
+Rather than fusing the two directly
+in depth space, which would discard the structural coher-
+ence of drel, we estimate a latent scale field S such that
+Z = S · drel recovers metric depth, along with a per-pixel
+variance map V .
+Prior from previous frame
+From (6), the prior scale is
+Sprior = Zprior/drel, with V post
+i−1 propagated to V prior
+i
+via
+the same warp Wi−1→i. We drop the frame index hereafter.
+When the overall frame geometry is unreliable, the warp
+W itself may be inaccurate, making the propagated prior
+less trustworthy.
+We therefore use the median Sampson
+residual ˜ρ = median(ρ) over the current frame as a proxy
+for frame-level geometric quality and inflate the prior un-
+certainty uniformly:
+V prior ←V prior
+
+1 +
+˜ρ
+fxfy
+
+,
+(7)
+where fx and fy are the focal lengths in pixels, and dividing
+by fxfy converts the pixel-domain residual to an angular
+quantity invariant to image resolution.
+Observation from triangulation
+The triangulated depth
+Ztri directly induces an observed scale Sobs = Ztri/drel. Its
+per-pixel uncertainty is derived from the Sampson residual
+ρ at each pixel as V obs = σ2
+ρ
+fxfy . Here, σ2 is a fixed vari-
+ance scale. A larger correspondence error implies a larger
+angular uncertainty in the viewing ray, which propagates to
+a proportionally larger uncertainty in the triangulated depth
+and hence in Sobs.
+Bayesian update
+Given prior (Sprior, V prior) and obser-
+vation (Sobs, V obs), we adopt a scalar Bayesian update.
+The normalized squared innovation
+γ = (Sobs −Sprior)2
+V prior + V obs
+(8)
+is tested against the 99% chi-square threshold (1 DOF). Pix-
+els exceeding this threshold retain the lower-variance esti-
+mate, preserving the more reliable of the two rather than
+discarding the update entirely. For inlier pixels, the stan-
+dard Kalman gain is
+κraw =
+V prior
+V prior + V obs .
+(9)
+The raw gain in (9) can be aggressive where triangulation
+and prior only weakly agree. We therefore cap it using a
+per-pixel consistency score c ∈[0, 1] computed from the
+relative discrepancy |Sobs −Sprior|/Sobs via a Gaussian-
+like kernel, where the tolerance is estimated as a median ab-
+solute deviation (MAD) over the frame and smoothed with
+an exponential moving average across frames:
+κ = min(κraw, κmin + (1 −κmin) c) ,
+(10)
+where κmin is a lower bound ensuring a minimum update
+strength even in low-consistency regions.
+The posterior
+scale and variance then follow:
+Spost = Sprior + κ (Sobs −Sprior),
+V post = (1 −κ)2 V prior + κ2 V obs,
+(11)
+where the Joseph form of the variance update ensures nu-
+merical stability for suboptimal gains.
+Segment-wise scale consolidation
+As noted in Sec-
+tion 3.1, the scale recovered from wheel odometry is a mul-
+tiplicative correction to drel. A single global scale cannot
+fully account for the shift component inherent in affine-
+invariant model outputs. Partitioning the image into super-
+pixels reduces the influence of the shift within each local
+region, allowing per-segment scale estimation to better cap-
+ture the true metric depth. We therefore employ Felzen-
+szwalb segmentation [9] to partition the image into super-
+pixels whose boundaries follow the geometry of drel, and
+estimate a per-segment scale independently.
+Within each segment Λℓ, we compute the median scale
+¯sℓ= mediank∈Λℓ(Spost
+k
+) over the per-pixel posterior scales
+Spost
+k
+and evaluate the fitting error. Segments with sufficient
+evidence and low fitting error are assigned Sseg
+k
+= ¯sℓfor
+each pixel k ∈Λℓ. All other segments fall back to a global
+scale estimate.
+This approach is particularly effective in scenes with di-
+verse geometry such as TartanAir, where a single global
+scale is insufficient.
+Final depth
+The final metric depth is obtained as
+Zpost = Sseg · drel.
+(12)
+This fusion combines the geometric fidelity of triangulation,
+the temporal stability of propagated priors, and the struc-
+tural coherence of segment-wise scale selection, enabling
+robust and consistent metric depth under flow noise, dy-
+namic objects, and short baselines.
+4. Evaluation
+4.1. Evaluation Datasets
+We evaluate across six scenarios from five datasets without
+any dataset-specific fine-tuning or retraining. KITTI [10]
+provides RGB images with sparse LiDAR depth and RTK-
+GPS odometry. TartanAir [35] is a photo-realistic synthetic
+benchmark covering diverse visual conditions. The MS2
+dataset [32] provides thermal imagery with LiDAR depth,
+though odometry synchronization is suboptimal, which may
+affect our odometry-based method. To better reflect the in-
+tended deployment scenario, we additionally evaluate on
+our custom dataset equipped with wheel odometry, which
+provides more reliable baseline estimates than GPS-based
+12621
+
+
+Figure 4. Depth estimation on various datasets. We evaluated our method on both real-world RGB datasets, such as KITTI, and synthetic
+RGB datasets, such as TartanAir. We also perform the depth estimation on thermal and NIR imagery using the MS2 dataset as well as our
+newly collected dataset.
+Figure 5. Comparison result of 3D reconstruction. Compared to conventional depth estimation, our approach produces reliable depth
+closely aligned to the ground-truth data. Furthermore, when multiple frames are accumulated, the reconstructed point clouds exhibit
+sufficient geometric consistency.
+Figure 6.
+Comparison result of accumulated pointcloud.
+Through the accumulation of multiple point clouds, our algorithm
+consistently produces temporally coherent depth estimates.
+odometry that is susceptible to signal degradation and syn-
+chronization errors.
+The dataset comprises 2.8K urban
+roadside frames and 7K forest frames with RGB and ther-
+mal imagery.
+4.2. Evaluation Protocol
+Our proposed algorithm consists of two main components:
+(1) a pose estimation module from optical flow with a
+metric baseline from odometry, and (2) a depth fusion
+stage that converts relative depth into metric depth.
+To
+validate pose accuracy, we evaluate triangulated depth
+quality against two baselines:
+a method that estimates
+pose using a metric depth model, and ground-truth pose
+as a reference.
+Unlike the former, our method requires
+only a metric baseline from any odometry source in-
+stead of a pretrained metric depth model.
+For depth
+estimation, we compare against both single-image and
+video-based metric depth models, including Video Depth
+Anything (VDA) [5].
+To assess temporal consistency,
+we additionally report the Temporal Alignment Error
+(TAE) [40], defined as the bidirectional AbsRel between
+geometrically warped depth maps of consecutive frames:
+12622
+
+
+RGB
+Thermal
+KITTI
+TartanAir
+Roadside
+Forest
+MS2
+Roadside
+Method
+AbsRel↓
+δ<1.25 ↑
+AbsRel↓
+δ<1.25 ↑
+AbsRel↓
+δ<1.25 ↑
+AbsRel↓
+δ<1.25 ↑
+AbsRel↓
+δ<1.25 ↑
+AbsRel↓
+δ<1.25 ↑
+MADPose (UniDepth)
+0.115
+0.869
+0.481
+0.187
+0.423
+0.222
+0.473
+0.097
+1.381
+0.179
+0.509
+0.149
+Ours† (DA v2 rel)
+0.115
+0.867
+0.239
+0.645
+0.227
+0.649
+0.326
+0.540
+0.950
+0.332
+0.346
+0.484
+GT Pose
+0.130
+0.839
+0.168
+0.754
+-
+-
+-
+-
+1.465
+0.073
+-
+-
+Table 1. Triangulated depth evaluation. Each method triangulates sparse depth using its own pose source. MADPose relies on a
+pretrained metric depth model (UniDepth); ours uses odometry only. GT Pose serves as a reference to illustrate the effect of temporal
+misalignment in real sequences. Errors are robust means over valid pixels (top-90%).
+Figure 7. AbsRel error over time. The line plot shows the depth
+error at every individual frame, end of each curve indicates the
+average error across the image sequence.
+TAE
+=
+1
+2(T −2)
+PT −1
+k=0 AbsRel
+ f(ˆxk
+d, pk), ˆxk+1
+d
+
++
+AbsRel
+ f(ˆxk+1
+d
+, pk+1
+−
+), ˆxk
+d
+
+, where T is the number of
+frames, f(ˆxk
+d, pk) denotes the depth map of frame k
+projected into frame k + 1 using relative pose pk, and
+pk+1
+−
+is the reverse projection.
+This metric reflects the
+consistency between two consecutive depth estimates.
+4.3. Triangulation Evaluation
+Accurate triangulation requires metric-scale pose estima-
+tion.
+MADPose [46] recovers metric-scale camera pose
+by jointly solving for relative pose and affine corrections
+to depth predictions from a pretrained metric depth model
+(UniDepth), making it dependent on the depth model’s gen-
+eralization capability. In contrast, our method uses a rela-
+tive depth model only for depth structure, recovering met-
+ric scale solely from a single external odometry measure-
+ment—such as wheel odometry, VIO, or GPS—without
+depending on a metric depth model. We additionally in-
+clude triangulation with ground-truth pose to illustrate the
+effect of temporal misalignment: in real sequences, imper-
+fect synchronization between pose measurements and im-
+age frames can degrade triangulation accuracy, whereas in
+synthetic data such as TartanAir, perfect synchronization
+makes ground-truth pose the strongest baseline.
+The results are summarized in Table 1. On KITTI, where
+UniDepth generalizes well, MADPose achieves competi-
+tive triangulation accuracy comparable to ours.
+On out-
+of-distribution datasets—TartanAir, MS2, and our custom
+dataset—UniDepth performance degrades, and MADPose
+triangulation accuracy drops substantially as a result. Our
+method, relying only on optical flow and odometry, main-
+tains consistently high accuracy across all datasets. On our
+custom mobile robot dataset equipped with wheel odome-
+try, our method achieves approximately three times higher
+δ1 accuracy than MADPose.
+4.4. Depth Estimation Evaluation
+We compare our method against single-image metric depth
+models and a video-based depth model across all five
+datasets. Since all evaluated datasets cover outdoor scenes,
+we use the publicly available outdoor variant of DA v2 met-
+ric, fine-tuned on Virtual KITTI. Results are summarized in
+Table 2.
+UniDepth achieves the highest accuracy on KITTI,
+where its training distribution closely matches the evalu-
+ation domain.
+Our method, which uses a relative depth
+model not trained on KITTI, nonetheless achieves compet-
+itive performance on this benchmark. A key advantage of
+using a relative depth model is that sky regions are natu-
+rally suppressed and object boundaries are well-preserved,
+as shown in Fig. 4. On MS2 and our custom dataset—which
+include challenging conditions such as thermal imagery and
+dense forest scenes—our method achieves the highest over-
+all accuracy, demonstrating strong generalization to out-of-
+distribution environments. VDA achieves favorable tem-
+poral consistency (TAE) on in-distribution datasets, but its
+metric accuracy degrades significantly in out-of-distribution
+sequences, as video depth models are not designed for met-
+ric scale recovery. Note that a systematically biased depth
+estimate—such as a constant underestimation—can yield
+artificially low TAE, since temporal consistency measures
+frame-to-frame coherence rather than absolute accuracy; a
+consistently wrong prediction is still temporally consistent.
+Our method maintains competitive TAE while providing re-
+liable metric depth across all evaluated environments.
+12623
+
+
+RGB
+Thermal
+KITTI
+TartanAir
+Roadside
+Forest
+MS2
+Roadside
+Method
+AbsRel↓
+δ<1.25 ↑
+TAE↓
+AbsRel↓
+δ<1.25 ↑
+TAE↓
+AbsRel↓
+δ<1.25 ↑
+TAE↓
+AbsRel↓
+δ<1.25 ↑
+AbsRel↓
+δ<1.25 ↑
+TAE↓
+AbsRel↓
+δ<1.25 ↑
+TAE↓
+Full range (0–80 m)
+UniDepth
+0.047
+0.977
+4.34
+0.503
+0.176
+11.11
+0.465
+0.201
+11.92
+0.444
+0.088
+0.205
+0.698
+5.84
+0.394
+0.245
+11.92
+DA v2 (metric)
+0.171
+0.773
+5.21
+0.513
+0.372
+5.53
+0.494
+0.177
+3.28
+0.418
+0.336
+0.405
+0.187
+4.87
+0.527
+0.193
+2.89
+VDA
+0.356
+0.321
+5.06
+0.599
+0.342
+4.44
+2.198
+0.010
+1.98
+1.339
+0.041
+0.590
+0.078
+3.67
+2.275
+0.011
+1.98
+Ours
+0.137
+0.877
+5.35
+0.427
+0.688
+5.42
+0.309
+0.725
+5.27
+0.480
+0.520
+0.247
+0.700
+5.29
+0.570
+0.527
+5.27
+Table 2. Depth estimation and temporal consistency. Bold: best, underline: second best per dataset. VDA [5] is a video-based depth
+model evaluated for temporal consistency (TAE); DA v2 metric uses the publicly available outdoor model fine-tuned on Virtual KITTI.
+KITTI
+TartanAir
+Roadside
+Forest
+Method
+AbsRel↓
+δ<1.25 ↑
+AbsRel↓
+δ<1.25 ↑
+AbsRel↓
+δ<1.25 ↑
+AbsRel↓
+δ<1.25 ↑
+Near range (0–20 m)
+UniDepth
+0.039
+0.989
+0.485
+0.202
+0.432
+0.241
+0.428
+0.096
+DA v2 (metric)
+0.154
+0.821
+0.647
+0.322
+0.508
+0.168
+0.435
+0.331
+VDA
+0.313
+0.376
+0.575
+0.341
+1.369
+0.106
+1.081
+0.105
+Ours
+0.128
+0.880
+0.339
+0.712
+0.165
+0.860
+0.304
+0.617
+Far range (20–80 m)
+UniDepth
+0.075
+0.940
+0.430
+0.232
+0.374
+0.323
+0.480
+0.084
+DA v2 (metric)
+0.182
+0.732
+0.271
+0.447
+0.244
+0.509
+0.214
+0.558
+VDA
+0.408
+0.339
+0.448
+0.367
+1.488
+0.047
+0.881
+0.124
+Ours
+0.205
+0.749
+0.415
+0.559
+0.570
+0.361
+0.780
+0.228
+Table 3. Depth estimation accuracy across near and far ranges.
+We separately evaluate near (0–20 m) and far (20–80 m) regions
+on RGB sequences.
+KITTI
+Roadside
+TartanAir
+Method
+AbsRel
+δ<1.25
+TAE
+AbsRel
+δ<1.25
+TAE
+AbsRel
+δ<1.25
+TAE
+w/o fusion
+0.088
+0.945
+6.28
+0.428
+0.662
+12.99
+-
+0.517
+7.84
+w/o segment
+0.088
+0.952
+4.38
+0.270
+0.746
+6.16
+0.274
+0.685
+5.40
+Full
+0.087
+0.953
+4.79
+0.265
+0.743
+6.27
+0.218
+0.714
+4.65
+Table 4. Ablation study. Effect of removing Bayesian tempo-
+ral fusion (w/o fusion) and segment-wise scale consolidation (w/o
+segment). Each dataset is evaluated on a single representative se-
+quence.
+The temporal consistency of our method is further il-
+lustrated in Figs. 5–7. The accumulated 3D point cloud
+in Fig. 5 demonstrates that temporally consistent depth
+predictions yield high-precision reconstruction when mul-
+tiple frames are integrated.
+UniDepth, lacking temporal
+consistency, produces accumulated point clouds where ob-
+ject shapes are difficult to discern, whereas our method
+clearly reconstructs lane structures and building geometry,
+as shown in Fig. 6. Fig. 7 shows per-frame absolute error
+on our custom urban roadside dataset, where our method
+maintains consistently low error compared to the substan-
+tial frame-to-frame deviations exhibited by UniDepth.
+We further analyze depth accuracy across distance
+ranges in Table 3. In the near range (0–20 m), our method
+achieves the highest accuracy on all out-of-distribution
+datasets, benefiting from well-conditioned triangulation ge-
+ometry. In the far range (20–80 m), triangulation becomes
+less effective due to diminishing parallax, and single-image
+metric models such as DA v2 perform comparably or better.
+This is a fundamental limitation of geometry-based scaling
+shared by all monocular triangulation methods.
+4.5. Ablation Study
+We ablate two key components on KITTI, TartanAir, and
+Roadside (RGB): (1) removing the Bayesian temporal fu-
+sion (w/o fusion), and (2) removing the segment-wise scale
+consolidation (w/o segment). As shown in Table 4, the fu-
+sion module plays a critical role in reducing TAE. Note that
+AbsRel is not reported for w/o fusion on TartanAir, as met-
+ric scale cannot be recovered without the fusion stage. The
+segment-wise consolidation further improves accuracy, par-
+ticularly in geometrically diverse environments such as Tar-
+tanAir.
+4.6. Failure Cases
+Our method can fail under two conditions. First, when cam-
+era motion is dominated by forward translation with mini-
+mal lateral displacement, as in high-speed highway driving,
+triangulation becomes degenerate and reliable depth obser-
+vations cannot be obtained. Second, when dynamic objects
+occupy a large portion of the image (over 50%), optical flow
+estimation becomes unreliable, degrading pose estimation
+and subsequent depth fusion.
+5. Conclusion
+In this paper, we introduce an algorithm that leverages
+wheel odometry to achieve metric depth estimation with
+strong temporal consistency, generalizing to unseen envi-
+ronments without additional training. By integrating rel-
+ative depth from a foundation model trained on large-scale
+data with sparse depth obtained from optical flow and wheel
+odometry, our method produces accurate and reliable met-
+ric depth estimates. We evaluated our approach on KITTI,
+TartanAir, and MS2 datasets, and additionally collected ap-
+proximately 10k frames in urban and forest environments
+to validate zero-shot generalization.
+The results demon-
+strate stable performance even in completely unseen envi-
+ronments.
+For future work, we aim to address performance degra-
+dation in rotation-dominant segments, where epipolar ge-
+ometry degenerates, and to investigate learned geometric
+reasoning that improves robustness in such cases while pre-
+serving zero-shot generalizability.
+12624
+
+
+Acknowledgements.
+This work was supported in part by
+the Unmanned Vehicles Core Technology Research and De-
+velopment Program through the National Research Foun-
+dation of Korea (NRF) and Unmanned Vehicle Advanced
+Research Center (NRF2020M3C1C1A01086411); and in
+part by the National Research Foundation of Korea (NRF)
+grant (No.RS2023-00213897); in part by Institute of Infor-
+mation & communications Technology Planning & Evalu-
+ation (IITP) under the Artificial Intelligence Convergence
+Innovation Human Resources Development (IITP-2026-
+RS-2023-00255968) grant funded by the Korea govern-
+ment(MSIT)
+References
+[1] Luca Bartolomei, Matteo Poggi, Andrea Conti, Fabio Tosi,
+and Stefano Mattoccia. Revisiting depth completion from a
+stereo matching perspective for cross-domain generalization.
+In 2024 International Conference on 3D Vision (3DV), pages
+1360–1370. IEEE, 2024. 2
+[2] Shariq Farooq Bhat, Ibraheem Alhashim, and Peter Wonka.
+Adabins: Depth estimation using adaptive bins. In Proceed-
+ings of the IEEE/CVF conference on computer vision and
+pattern recognition, pages 4009–4018, 2021. 2
+[3] Shariq Farooq Bhat, Reiner Birkl, Diana Wofk, Peter
+Wonka, and Matthias M¨uller.
+Zoedepth: Zero-shot trans-
+fer by combining relative and metric depth. arXiv preprint
+arXiv:2302.12288, 2023.
+[4] Aleksei Bochkovskii, Ama ˜AG¸ l Delaunoy, Hugo Germain,
+Marcel Santos, Yichao Zhou, Stephan R Richter, and
+Vladlen Koltun. Depth pro: Sharp monocular metric depth in
+less than a second. arXiv preprint arXiv:2410.02073, 2024.
+1, 2
+[5] Sili Chen, Hengkai Guo, Shengnan Zhu, Feihu Zhang, Zi-
+long Huang, Jiashi Feng, and Bingyi Kang. Video depth any-
+thing: Consistent depth estimation for super-long videos. In
+Proceedings of the Computer Vision and Pattern Recognition
+Conference, pages 22831–22840, 2025. 2, 6, 8
+[6] Euihyeon Cho, Hyeongjin Kim, Pyojin Kim, and Hyeon-
+beom Lee. Obstacle avoidance of a uav using fast monocular
+depth estimation for a wide stereo camera. IEEE Transac-
+tions on Industrial Electronics, 72(2):1763–1773, 2025. 1
+[7] Nathaniel Chodosh, Chaoyang Wang, and Simon Lucey.
+Deep convolutional compressed sensing for lidar depth com-
+pletion. In Asian conference on computer vision, pages 499–
+513. Springer, 2018. 2
+[8] Yaqing Ding, Viktor Kocur, V´aclav V´avra, Zuzana Berger
+Haladov´a, Jian Yang, Torsten Sattler, and Zuzana Kukelova.
+Reposed:
+Efficient relative pose estimation with known
+depth information. arXiv preprint arXiv:2501.07742, 2025.
+2
+[9] Pedro F Felzenszwalb and Daniel P Huttenlocher. Efficient
+graph-based image segmentation. International journal of
+computer vision, 59(2):167–181, 2004. 5
+[10] Andreas Geiger, Philip Lenz, Christoph Stiller, and Raquel
+Urtasun. Vision meets robotics: The kitti dataset. Interna-
+tional Journal of Robotics Research (IJRR), 2013. 2, 5
+[11] Hyeonjae Gil, Myung-Hwan Jeon, and Ayoung Kim. Field-
+scale: Locality-aware field-based adaptive rescaling for ther-
+mal infrared image. IEEE Robotics and Automation Letters,
+9(7):6424–6431, 2024. 3
+[12] Cl´ement Godard, Oisin Mac Aodha, Michael Firman, and
+Gabriel J Brostow. Digging into self-supervised monocular
+depth estimation.
+In Proceedings of the IEEE/CVF inter-
+national conference on computer vision, pages 3828–3838,
+2019. 2
+[13] Ming
+Gui,
+Johannes
+Schusterbauer,
+Ulrich
+Prestel,
+Pingchuan Ma, Dmytro Kotovenko, Olga Grebenkova,
+Stefan Andreas Baumann, Vincent Tao Hu, and Bj¨orn Om-
+mer. Depthfm: Fast generative monocular depth estimation
+with flow matching. In Proceedings of the AAAI Conference
+on Artificial Intelligence, pages 3203–3211, 2025. 2
+[14] Vitor Guizilini, Kuan-Hui Lee, Rares¸ Ambrus¸, and Adrien
+Gaidon. Learning optical flow, depth, and scene flow without
+real-world labels. IEEE Robotics and Automation Letters, 7
+(2):3491–3498, 2022. 2
+[15] Richard Hartley and Andrew Zisserman. Multiple view ge-
+ometry in computer vision.
+Cambridge university press,
+2003. 4
+[16] David J. Heeger and Allan D. Jepson. Subspace methods for
+recovering rigid motion i: Algorithm and implementation.
+International Journal of Computer Vision, 7:95–117, 1992.
+3
+[17] Bingxin Ke, Dominik Narnhofer, Shengyu Huang, Lei Ke,
+Torben Peters, Katerina Fragkiadaki, Anton Obukhov, and
+Konrad Schindler. Video depth without video models. In
+Proceedings of the IEEE/CVF Conference on Computer Vi-
+sion and Pattern Recognition (CVPR), 2025. 1, 2
+[18] Bingxin Ke, Kevin Qu, Tianfu Wang, Nando Metzger,
+Shengyu Huang, Bo Li, Anton Obukhov, and Konrad
+Schindler.
+Marigold: Affordable adaptation of diffusion-
+based image generators for image analysis. IEEE Transac-
+tions on Pattern Analysis and Machine Intelligence, pages
+1–18, 2025. 1, 2
+[19] Johannes Kopf, Xuejian Rong, and Jia-Bin Huang.
+Ro-
+bust consistent video depth estimation. In Proceedings of
+the IEEE/CVF Conference on Computer Vision and Pattern
+Recognition, pages 1611–1621, 2021. 2
+[20] Till Kroeger, Radu Timofte, Dengxin Dai, and Luc Van Gool.
+Fast optical flow using dense inverse search. In European
+conference on computer vision, pages 471–488. Springer,
+2016. 3
+[21] Mykola Lavreniuk and Alla Lavreniuk. Spidepth: strength-
+ened pose information for self-supervised monocular depth
+estimation. In Proceedings of the Computer Vision and Pat-
+tern Recognition Conference, pages 874–884, 2025. 2
+[22] Haotong Lin, Sida Peng, Jingxiao Chen, Songyou Peng, Ji-
+aming Sun, Minghuan Liu, Hujun Bao, Jiashi Feng, Xiaowei
+Zhou, and Bingyi Kang. Prompting depth anything for 4k
+resolution accurate metric depth estimation. In Proceedings
+of the Computer Vision and Pattern Recognition Conference,
+pages 17070–17080, 2025. 1, 2
+[23] Zhiheng Liu, Ka Leong Cheng, Qiuyu Wang, Shuzhe Wang,
+Hao Ouyang, Bin Tan, Kai Zhu, Yujun Shen, Qifeng Chen,
+12625
+
+
+and Ping Luo. Depthlab: From partial to complete. arXiv
+preprint arXiv:2412.18153, 2024. 2
+[24] Fangchang Ma and Sertac Karaman. Sparse-to-dense: Depth
+prediction from sparse depth samples and a single image.
+In 2018 IEEE international conference on robotics and au-
+tomation (ICRA), pages 4796–4803. IEEE, 2018. 2
+[25] R´emi Marsal, Alexandre Chapoutot, Philippe Xu, and David
+Filliat. A simple yet effective test-time adaptation for zero-
+shot monocular metric depth estimation.
+arXiv preprint
+arXiv:2412.14103, 2024. 2
+[26] Duc-Hai Pham, Tung Do, Phong Nguyen, Binh-Son Hua,
+Khoi Nguyen, and Rang Nguyen.
+Sharpdepth: Sharpen-
+ing metric depth predictions using diffusion distillation. In
+Proceedings of the Computer Vision and Pattern Recognition
+Conference, pages 17060–17069, 2025. 2
+[27] Luigi Piccinelli, Yung-Hsu Yang, Christos Sakaridis, Mattia
+Segu, Siyuan Li, Luc Van Gool, and Fisher Yu. UniDepth:
+Universal monocular metric depth estimation. In Proceed-
+ings of the IEEE/CVF Conference on Computer Vision and
+Pattern Recognition (CVPR), 2024. 1, 2
+[28] Ren´e Ranftl,
+Katrin Lasinger,
+David Hafner,
+Konrad
+Schindler, and Vladlen Koltun. Towards robust monocular
+depth estimation: Mixing datasets for zero-shot cross-dataset
+transfer. IEEE Transactions on Pattern Analysis and Ma-
+chine Intelligence, 44(3), 2022. 1
+[29] Manuel Rey-Area, Mingze Yuan, and Christian Richardt.
+360monodepth: High-resolution 360deg monocular depth
+estimation.
+In Proceedings of the IEEE/CVF Conference
+on Computer Vision and Pattern Recognition, pages 3762–
+3772, 2022. 1
+[30] Dongseok Shim and H. Jin Kim. Swindepth: Unsupervised
+depth estimation using monocular sequences via swin trans-
+former and densely cascaded network.
+In 2023 IEEE In-
+ternational Conference on Robotics and Automation (ICRA),
+pages 4983–4990, 2023. 2
+[31] Dongseok Shim and H Jin Kim. Sediff: Structure extraction
+for domain adaptive depth estimation via denoising diffusion
+models. In European Conference on Computer Vision, pages
+37–53. Springer, 2024. 2
+[32] Ukcheol Shin, Jinsun Park, and In So Kweon.
+Deep
+depth estimation from thermal image.
+In Proceedings of
+the IEEE/CVF Conference on Computer Vision and Pattern
+Recognition, pages 1043–1053, 2023. 2, 5
+[33] Ziyang Song, Ruijie Zhu, Jing Wang, Chuxin Wang, Jian-
+feng He, Jiacheng Deng, Wenfei Yang, and Tianzhu Zhang.
+Er-depth:
+Enhancing the robustness of self-supervised
+monocular depth estimation in challenging scenes.
+ACM
+Transactions on Multimedia Computing, Communications
+and Applications, 2025. 2
+[34] Massimiliano Viola, Kevin Qu, Nando Metzger, Bingxin Ke,
+Alexander Becker, Konrad Schindler, and Anton Obukhov.
+Marigold-dc: Zero-shot monocular depth completion with
+guided diffusion.
+In Proceedings of the IEEE/CVF Inter-
+national Conference on Computer Vision, pages 5359–5370,
+2025. 1, 2
+[35] Wenshan Wang, Delong Zhu, Xiangwei Wang, Yaoyu Hu,
+Yuheng Qiu, Chen Wang, Yafei Hu, Ashish Kapoor, and Se-
+bastian Scherer. Tartanair: A dataset to push the limits of
+visual slam. In IEEE/RSJ International Conference on Intel-
+ligent Robots and Systems (IROS), pages 4909–4916, 2020.
+2, 5
+[36] Yiran Wang, Min Shi, Jiaqi Li, Zihao Huang, Zhiguo Cao,
+Jianming Zhang, Ke Xian, and Guosheng Lin. Neural video
+depth stabilizer. In Proceedings of the IEEE/CVF Interna-
+tional Conference on Computer Vision, pages 9466–9476,
+2023. 2
+[37] Ruofeng Wei, Bin Li, Fangxun Zhong, Hangjie Mo, Qi Dou,
+Yun-Hui Liu, and Dong Sun.
+Absolute monocular depth
+estimation on robotic visual and kinematics data via self-
+supervised learning. IEEE Transactions on Automation Sci-
+ence and Engineering, 22:4269–4282, 2025. 1
+[38] Diana Wofk, Ren´e Ranftl, Matthias M¨uller, and Vladlen
+Koltun.
+Monocular visual-inertial depth estimation.
+In
+IEEE International Conference on Robotics and Automation
+(ICRA), pages 6095–6101, 2023. 2
+[39] Cho-Ying Wu, Jialiang Wang, Michael Hall, Ulrich Neu-
+mann, and Shuochen Su. Toward practical monocular in-
+door depth estimation. In Proceedings of the IEEE/CVF con-
+ference on computer vision and pattern recognition, pages
+3814–3824, 2022. 1
+[40] Honghui Yang, Di Huang, Wei Yin, Chunhua Shen, Haifeng
+Liu, Xiaofei He, Binbin Lin, Wanli Ouyang, and Tong He.
+Depth any video with scalable synthetic data. arXiv preprint
+arXiv:2410.10815, 2024. 6
+[41] Lihe Yang, Bingyi Kang, Zilong Huang, Zhen Zhao, Xiao-
+gang Xu, Jiashi Feng, and Hengshuang Zhao. Depth any-
+thing v2. Advances in Neural Information Processing Sys-
+tems, 37:21875–21911, 2024. 1, 2, 3
+[42] Nan Yang, Lukas von Stumberg, Rui Wang, and Daniel
+Cremers.
+D3vo: Deep depth, deep pose and deep uncer-
+tainty for monocular visual odometry.
+In Proceedings of
+the IEEE/CVF conference on computer vision and pattern
+recognition, pages 1281–1292, 2020. 2
+[43] Yi Yang, Miaoxin Pan, Sitan Jiang, Jianhang Wang, Wei
+Wang, Junbo Wang, and Meiling Wang.
+Towards au-
+tonomous parking using vision-only sensors.
+In 2021
+IEEE/RSJ International Conference on Intelligent Robots
+and Systems (IROS), pages 2038–2044, 2021. 1
+[44] Wei Yin, Chi Zhang, Hao Chen, Zhipeng Cai, Gang Yu,
+Kaixuan Wang, Xiaozhi Chen, and Chunhua Shen. Metric3d:
+Towards zero-shot metric 3d prediction from a single image.
+In Proceedings of the IEEE/CVF international conference on
+computer vision, pages 9043–9053, 2023. 2
+[45] Boxiao Yu, Jiayi Wu, and Md Jahidul Islam. Udepth: Fast
+monocular depth estimation for visually-guided underwater
+robots. In 2023 IEEE International Conference on Robotics
+and Automation (ICRA), pages 3116–3123, 2023. 1
+[46] Yifan Yu, Shaohui Liu, R´emi Pautrat, Marc Pollefeys, and
+Viktor Larsson.
+Relative pose estimation through affine
+corrections of monocular depth priors.
+In Proceedings of
+the IEEE/CVF Conference on Computer Vision and Pattern
+Recognition (CVPR), 2025. 2, 7
+[47] Weihao Yuan, Xiaodong Gu, Zuozhuo Dai, Siyu Zhu, and
+Ping Tan.
+New crfs:
+Neural window fully-connected
+crfs for monocular depth estimation.
+arXiv preprint
+arXiv:2203.01502, 2022. 2
+12626
+
+
+[48] Haokui Zhang, Chunhua Shen, Ying Li, Yuanzhouhan Cao,
+Yu Liu, and Youliang Yan.
+Exploiting temporal consis-
+tency for real-time video depth estimation. In Proceedings of
+the IEEE/CVF international conference on computer vision,
+pages 1725–1734, 2019. 2
+[49] Tianyu Zhang, Dongchen Zhu, Guanghui Zhang, Wenjun
+Shi, Yanqing Liu, Xiaolin Zhang, and Jiamao Li.
+Spa-
+tiotemporally enhanced photometric loss for self-supervised
+monocular depth estimation.
+In 2022 IEEE/RSJ Interna-
+tional Conference on Intelligent Robots and Systems (IROS),
+pages 01–08, 2022. 2
+[50] Yourun Zhang, Maoguo Gong, Jianzhao Li, Mingyang
+Zhang, Fenlong Jiang, and Hongyu Zhao. Self-supervised
+monocular depth estimation with multiscale perception.
+IEEE Transactions on Image Processing, 31:3251–3266,
+2022. 2
+[51] Junhao Zheng, Chenhao Lin, Jiahao Sun, Zhengyu Zhao,
+Qian Li, and Chao Shen.
+Physical 3d adversarial attacks
+against monocular depth estimation in autonomous driving.
+In Proceedings of the IEEE/CVF Conference on Computer
+Vision and Pattern Recognition, pages 24452–24461, 2024.
+1
+[52] Shengjie Zhu and Xiaoming Liu. Lighteddepth: Video depth
+estimation in light of limited inference view angles. In Pro-
+ceedings of the IEEE/CVF Conference on Computer Vision
+and Pattern Recognition, pages 5003–5012, 2023. 2
+12627

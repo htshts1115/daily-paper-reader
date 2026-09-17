@@ -1,0 +1,309 @@
+Title: LiteSense: Lifting Lightweight ToF with RGB for High-Resolution Metric Depth Estimation
+
+URL Source: https://openaccess.thecvf.com/content/CVPR2026/papers/Li_LiteSense_Lifting_Lightweight_ToF_with_RGB_for_High-Resolution_Metric_Depth_CVPR_2026_paper.pdf
+
+Published Time: Sat, 16 May 2026 16:46:52 GMT
+
+Number of Pages: 10
+
+Markdown Content:
+# LiteSense: Lifting Lightweight ToF with RGB for High-Resolution Metric Depth Estimation 
+
+# Yusheng Li Lizhi Lou Yan Tang Zekai Miao Shaoming Zhang † Jianmei Wang College of Surveying and Geo-Infomatics, Tongji University 
+
+# Abstract 
+
+Metric depth estimation aims to recover depth maps with absolute scale, high resolution, and cross-scene consis-tency from visual observations. Existing approaches ei-ther rely on large-scale models or costly sensors to pre-serve metric accuracy and generalization, both ill-suited to resource-constrained deployment. In this paper, we propose 
+
+LiteSense , a lightweight RGB-ToF fusion framework that leverages compact normalized histogram (CNH) signals to-gether with RGB cues to achieve efficient and reliable met-ric depth estimation. Specifically, LiteSense leverages a U-Net-style encoder-decoder that forms an RGB-D input by concatenating RGB with upsampled ToF depth, providing explicit metric priors. To address resolution disparity and recover fine details, we introduce the Patch-wise CNH Spa-tial Injection (PCSI) module, which leverages zone-wise histogram measurements via cross-attention to guide high-level feature fusion. Extensively evaluated on NYUv2 and SUN RGB-D, LiteSense consistently outperforms monocu-lar baselines and DELTAR with substantially lower compu-tational cost, and demonstrates promising zero-shot gener-alization. We further introduce THDR3K , the first indoor RGB-ToF-CNH dataset, where LiteSense achieves real-world accuracy comparable to—and in challenging cases surpassing—Intel RealSense. All the relevant source codes and the collected dataset are available at GitHub. 
+
+# 1. Introduction 
+
+Metric depth estimation is a fundamental component of 3D perception in applications such as autonomous driv-ing [46], robotic navigation [43], and virtual reality [37]. Its goal is to reconstruct depth maps from visual observa-tions that preserve absolute scale, achieve high spatial reso-lution, and remain consistent across diverse scenes. Depth information is typically obtained through two classes of approaches: active sensing and vision-based estimation .Active sensing methods, such as LiDAR [2], structured   
+
+> †Corresponding author : zhangshaoming@tongji.edu.cn I. Sensor (Camera + Lightweight ToF)
+> x64
+> II. Data (RGB + Auxiliary-Prior)
+> V. Advantage
+> III. Method (Auxiliary-Guided MDE)
+> IV. Result
+> ToF-CNH RGB + ToF-D
+> Metric Depth Map
+> Patch-wise
+> Fusion
+> U-Net-style Encoder-Decoder
+
+Figure 1. Overview of LiteSense. Sensor : A low-cost RGB cam-era is paired with a lightweight ToF sensor to acquire synchronized multimodal measurements. Data : Spatial partitioning and his-togram statistics are used to construct ToF-CNH features aligned with the RGB image. Method : A U-Net-based encoder–decoder fuses RGB, ToF-D, and ToF-CNH to estimate metric depth. Re-sult & Advantage : The proposed design yields accurate, scale-consistent depth maps with preserved fine details under low pa-rameter and computation budgets. 
+
+light [15], and time-of-flight (ToF) cameras [19], directly measure distances and provide physically grounded metric accuracy, but are typically expensive and bulky. In contrast, vision-based methods infer scene structure from single im-ages [9, 34, 36, 39] or image sequences [41, 44, 58] via geo-metric reasoning or learning-based models, offering higher flexibility and spatial resolution but lacking inherent metric scale priors. Recent advances in lightweight ToF technology have enabled the deployment of multi-zone ToF sensors ( e.g ., VL53L8CH), which output compact normalized histogram (CNH) signals to represent the distribution of photon re-turns across discrete depth bins, providing sparse yet met-This CVPR paper is the Open Access version, provided by the Computer Vision Foundation. Except for this watermark, it is identical to the accepted version; the final published version of the proceedings is available on IEEE Xplore. 5783 rically calibrated depth priors. Concurrently, monocular depth estimation methods based on deep learning, such as MiDaS [35], ZoeDepth [5], Metric3D [16, 54], and Depth Anything [52, 53], leverage large-scale, multi-domain train-ing data to achieve high accuracy and robust cross-scene generalization. However, both approaches exhibit inherent limitations: (1) lightweight ToF sensors typically provide only low-resolution measurements ( e.g ., 8 × 8), which are insufficient to reconstruct dense scene geometry on their own; (2) monocular models, in the absence of explicit met-ric supervision, struggle to reliably recover a stable and ab-solute scale. These observations naturally motivate a hy-brid paradigm that integrates the absolute depth priors from lightweight ToF sensors with the high-resolution texture in-formation from RGB images, thereby enabling efficient and stable metric depth estimation. Representative efforts that incorporate sensor priors for metric depth estimation include: (1) constraining the scale of monocular networks using sparse LiDAR point clouds as prompts or prior-feature embeddings [29, 48], and (2) guiding fusion with lightweight ToF measurements by inte-grating depth and variance maps with RGB features via at-tention [22]. While demonstrating improved scale discrim-inability and cross-scene robustness, these methods suffer from high computational overhead and detail loss due to resolution mismatch. To address these issues, we propose 
+
+LiteSense , an RGB-ToF fusion framework guided by CNH data, as illustrated in Fig. 1. LiteSense adopts a U-Net-style [38] encoder–decoder ar-chitecture for dense depth prediction. In contrast to Li-DAR, which provides sparse discrete points, a lightweight ToF sensor outputs a low-resolution but spatially continu-ous depth map. This map is upsampled and concatenated with the RGB image to form an RGB-D input, providing an explicit metric prior. However, the significant resolution disparity between ToF and RGB modalities makes the up-sampled depth map alone insufficient to recover fine struc-tural details. To mitigate this issue, CNH measurements from the ToF sensor are incorporated. For each zone, the CNH yields a normalized return histogram, depicting sig-nal counts versus range, which summarizes the within-zone depth distribution. Exploiting the zone-wise nature of CNH and its block-wise alignment with RGB-D data, we introduce the patch-wise CNH spatial injection (PCSI) module, inspired by tile-based super-resolution [25, 26, 28, 30]. Within each local patch, PCSI projects the aligned CNH features and in-tegrates them into the RGB-D features via cross-attention to obtain locally fused representations. Subsequently, the per-patch outputs are stitched together and aggregated on a tile-wise basis to form comprehensive fusion features. No-tably, the PCSI module operates exclusively at high-level features, thereby preserving the integrity of early-stage rep-resentations and mitigating potential tiling artifacts. We extensively evaluate LiteSense on NYUv2 and SUN RGB-D. Our method consistently outperforms monocular baselines and DELTAR [22] while incurring substantially lower computational cost, and it demonstrates promising zero-shot generalization capabilities. To further assess its real-world applicability, we construct THDR3K , an indoor RGB-ToF dataset with CNH measurements. Experimen-tal results indicate that LiteSense produces depth estimates comparable to, and in challenging cases even surpassing, those obtained from Intel RealSense. The main contribu-tions of our work are as follows: • We propose LiteSense, a lightweight RGB-ToF fusion framework that leverages CNH signals together with RGB cues to deliver high-resolution and accurate depth. • We are the first to introduce CNH into depth estimation and design the PCSI module to exploit their zone-wise statistics for effective region-wise RGB-D fusion. • We construct THDR3K, the first indoor dataset that jointly provides RGB images, lightweight ToF depth, and CNH signals to support research on RGB-ToF fusion for metric depth estimation. 
+
+# 2. Related Work 
+
+Metric Monocular Depth Estimation (MMDE) MMDE aims to recover pixel-level metric depth from a single RGB image. Early supervised methods generally adopt an encoder–decoder framework to directly regress depth [9, 11, 18, 20, 21, 24, 36, 51, 55]. Later works further reformulate depth regression as adaptive depth distribution estimation to enhance performance [1, 3, 4, 10, 27], yet accuracy still tends to degrade on unseen data. To address this limitation, recent research increasingly shifts toward self-supervised relative depth estimation, us-ing large-scale datasets to improve robustness across di-verse scenes [6, 23, 35, 52, 53]. These models demon-strate strong zero-shot performance, but still require either fine-tuning [5, 13] or the incorporation of camera intrin-sics [7, 12, 16, 32, 54] to achieve high accuracy in metric depth. Moreover, such models usually involve high com-plexity, making real-time inference difficult. Even some lightweight networks have been explored [49, 56], they are generally less effective in preserving metric scale. 
+
+Auxiliary-Guided Depth Estimation In many 3D appli-cations requiring metric scale, active depth sensors remain the default for reliable measurements [17], but obtaining dense depth is costly. Recent work therefore augments monocular depth estimation with sparse sensor cues. A stream of research utilizes sparse LiDAR depth, where LiDAR measurements are treated as prompts [29, 31] or embedded as features [48] into depth foundation mod-els [52, 53]. Another thread incorporates lightweight low-5784 Spatial  
+
+> Block
+> Spatial
+> Block
+> Spatial
+> Block
+> Spatial
+> Block
+> Histogram
+> Block
+> Histogram
+> Block
+> PCSI
+> Module
+> PCSI
+> Module
+> Upsample
+> Block
+> Upsample Block
+> Upsample
+> Block
+> Upsample Block
+> 1/2
+> 1/4
+> 1/8
+> 1/16
+> ×64
+> Input RGB-Image
+> Input Sparse Depth
+> Input CNH Output Depth Map
+> Concat
+> Upsample Block
+> 3×3 Conv
+> BatchNorm
+> LeakyRelu
+> 3×3 UpConv
+> BatchNorm
+> LeakyRelu
+> Histogram Block
+> Conv1D
+> LeakyRelu
+> ×2
+> MobileNetV4 Block
+
+Figure 2. Architecture of the proposed LiteSense framework. The model takes an RGB image, ToF distance and CNH measurements as inputs. Each modality is encoded separately, fused across multiple scales, and decoded to produce a high-resolution metric depth map. The Spatial Block is implemented using MobileNetV4-based [33] blocks, and PCSI is a module specifically designed to fuse CNH information. 
+
+resolution ToF depth [22], in which a multi-zone ToF mod-ule is fused with RGB images for the first time. However, the resulting model was still not sufficiently lightweight and did not achieve the desired deployment performance on edge devices. Motivated by this limitation, we aim to explore the CNH data provided by the latest generation of ToF sensors and design a simpler and more efficient fusion strategy, enabling a fully lightweight end-to-end network. 
+
+Depth Super-Resolution This task focuses on recover-ing high-frequency details in low-resolution depth maps. Guided Depth Super-Resolution [8, 47, 50] has become the mainstream approach in this domain, with existing methods broadly categorized into filtering-based refinement [14] and prior-constrained geometric reconstruction [45]. Among these , tile-based learning methods [25, 26, 28, 30] provide valuable insights for our fusion design in particular. 
+
+# 3. Method 
+
+We propose LiteSense, a lightweight framework as de-picted in Fig. 2. It integrates high-resolution RGB im-ages with low-resolution ToF data to enable end-to-end, high-resolution metric depth estimation. The framework begins with specialized feature extractors for RGB-D cues and CNH distribution features, followed by the proposed PCSI module, which performs localized cross-modal fusion within their corresponding spatial regions. Finally, a multi-stage decoder progressively reconstructs the fused repre-sentation into a dense depth map within the spatial region jointly covered by the camera and ToF sensor. 
+
+3.1. Leveraging ToF Auxiliary 
+
+A key challenge in this task is how to fully exploit the information contained in ToF measurements. In the DELTAR [22], the mean and variance of the depth are used to approximate a single Gaussian distribution. Sub-sequently, a fixed sampling strategy is applied to obtain a set of discrete depth values around the distribution peak, thereby utilizing the auxiliary information. Although this design enriches the representation beyond a single depth value, it inevitably discards much of the distributional de-tail present in the raw sensor output. This motivates us to instead leverage the CNH data, a highly structured repre-sentation produced directly by the sensor firmware, which compactly preserves the underlying depth distribution and allows the model to better exploit the full auxiliary infor-mation provided by the ToF sensor. However, designing a unified representation that jointly encodes both depth values and histogram distributions in a form suitable for network learning is non-trivial. Several intuitive approaches, such as depth-weighted histogram ag-gregation or Gaussian mixture fitting, fail to preserve the physical interpretability of the raw signals. Therefore, we choose to represent the depth value and the CNH distribu-tion separately. Considering the inherent spatial correlation in depth data, the ToF depth map is first upsampled and con-catenated with the RGB image to form an RGB-D input, where the depth channel provides an initial scale prior. And for the CNH, its information is extracted independently and injected into higher-dimensional feature spaces to provide complementary guidance during subsequent processing. 5785 3.2. Hybrid Feature Extraction 
+
+Spatial Block From the perspective of lightweight de-sign, we adopt and modify the MobileNetV4 [33] architec-ture, which offers strong efficiency performance trade-offs, to extract features from the RGB-D input. Specifically, we utilize four downsampling blocks from the Small variant and refine their channel widths and stride configurations to progressively capture multi-scale features at 1/2, 1/4, 1/8, and 1/16 resolutions. This design en-ables the encoder to retain fine-grained texture cues from the RGB image while simultaneously integrating the abso-lute scale priors introduced by the ToF depth measurements. 
+
+Histogram Block Since the ToF regions operate indepen-dently, we first normalize the CNH of each region sepa-rately to ensure that each histogram consistently reflects the internal depth distribution within its own local range. Each region yields a one-dimensional distribution with 
+
+18 bins, leading to a total of 64 independent distributions. To encode these signals, we adopt an MLP-based encoder without any downsampling, thereby preserving the original structure of the distributions. This design allows the model to extract subtle variations in the depth distribution across different spatial regions. 
+
+3.3. Patch-wise CNH Spatial Injection (PCSI) 
+
+During feature encoding, the low-resolution ToF depth map is already fused with the RGB input to provide a coarse global scale prior. The remaining challenge is to effectively integrate the CNH distribution features with the RGB-D spatial representations. As attention mechanisms are widely employed in multimodal fusion, we adopt a cross-attention strategy to capture the complementary relationship between RGB-D and CNH features. In particular, the RGB-D fea-tures serve as the Query, while the CNH features are used as the Key and Value, allowing the RGB-D branch to selec-tively attend to structural cues embedded in the CNH. However, applying attention globally introduces interfer-ence between spatially unrelated areas, because the CNH distributions exhibit no correlation across different regions. To mitigate this issue, we propose the Patch-wise CNH Spa-tial Injection (PCSI) module, as illustrated in Fig. 3, which enforces localized cross-modal guidance. Given the en-coded RGB-D feature map F ∈ RH×W ×CI and CNH em-beddings H ∈ RN 2×CH , we uniformly partition both into 
+
+N × N non-overlapping spatial patches, each of which is embedded into a unified dimension through a Conv 1 × 1:
+
+F = {F1, F 2, . . . , F N 2 }, Fi ∈ R HN × WN ×C , (1) 
+
+H = {H1, H 2, . . . , H N 2 }, Hi ∈ R1×C . (2) Each patch Fi is paired with its corresponding CNH feature 
+
+Hi , and localized modulation is performed as: 
+
+˜Fi = ϕ(Fi, H i), (3) RGB-D Features                       
+
+> CNH Features
+> Fusion Features
+> Reshape Reshape & Embed.
+> Reshape & Embed.
+> QK
+> V
+> 𝑯𝑯 ×𝑾𝑾 ×𝑪𝑪𝑰𝑰
+> 𝟔𝟔𝟔𝟔 ×𝑪𝑪𝑯𝑯
+> 𝟔𝟔𝟔𝟔 ×�𝑯𝑯 𝟖𝟖 ×�𝑾𝑾 𝟖𝟖 ×𝑪𝑪 𝑯𝑯 ×𝑾𝑾 ×𝑪𝑪
+> 𝟔𝟔𝟔𝟔 ×𝟏𝟏 ×𝑪𝑪
+> Cross Attention
+
+Figure 3. Details of Patch-wise CNH Spatial Injection (PCSI). 
+
+The RGB-D and CNH features are divided into paired patches and projected to a shared feature space. Then each patch is fused via cross-attention individually. Finally the results are aggregated into the full map. The blue text indicates the unit shape at each stage. 
+
+where ϕ(·) denotes a conditional modulation function. In our implementation, ϕ(·) is instantiated as a cross-attention mechanism, allowing the CNH features to refine depth-relevant structural estimation within each patch. After the injection is applied independently across all patches, the en-hanced features are reassembled into the original layout: 
+
+˜F = Concat ( ˜F1, ˜F2, . . . , ˜FN 2 ), (4) and forwarded to the decoder for depth reconstruction. This localized, structure-aware fusion effectively miti-gates the cross-region interference observed in global atten-tion mechanisms. By enabling each region to independently learn fine-grained depth distributions under the guidance of CNH priors, PCSI enables effective integration of RGB tex-ture cues with region-specific depth distributions. 
+
+3.4. Depth Decoder 
+
+The decoder follows a U-Net-style progressive upsampling structure, in which semantic cues and spatial details are gradually integrated to reconstruct a full-resolution depth map. During the decoding process, CNH-enhanced repre-sentations are fused only at the 1/2 and 1/4 scales, whereas the deeper and lower-resolution stages rely solely on the original RGB-D features without CNH injection. There are two key motivations behind this design. First, as discussed in Sec. 3.3, PCSI module requires partition-ing the RGB-D feature map into 64 patches, each aligned with a ToF measurement region. To ensure that each patch contains sufficient spatial samples to interact meaningfully with its corresponding CNH distribution, the patches can-not be too small. At the 1/2 and 1/4 resolutions, the re-sulting patch sizes correspond to 1/16 or 1/32 of the full-5786 resolution grid, representing the smallest spatial granular-ity that still preserves informative local structure. Second, restricting fusion to these intermediate resolutions helps maintain global spatial continuity throughout the recon-struction process. If fusion were applied at all stages, the re-peated patch partitioning could introduce noticeable block-boundary artifacts in the final depth map. 
+
+3.5. Loss Function 
+
+Monocular depth estimation, whether predicting relative structure or absolute metric scale, consistently benefits from accurately modeling relative depth relationships. However, conventional pixel-wise regression losses such as L1 or L2
+
+tend to penalize absolute errors uniformly, making it hard to optimize. To mitigate this issue better, we employ the com-monly used scale-invariant logarithmic loss (SILog) [9] to-gether with a gradient-based mean absolute error term (Gra-dient MAE), which jointly emphasize relative depth consis-tency while preserving fine-grained depth boundary details. The total loss is defined as: 
+
+L = LSILog + LGrad . (5) We adopt the scaled SILog variant [3] given by: 
+
+LSILog = α
+
+vuut 1
+
+T
+
+X
+
+> i
+
+g2 
+
+> i
+
++ λ 1
+
+T
+
+X
+
+> i
+
+gi
+
+!2
+
+, (6) where the residual term is defined as: 
+
+gi = log( di) − log( dgt,i ), (7) with di representing the predicted depth, dgt,i denoting the ground-truth depth, and T indicating the number of valid pixels. In our experiments, we set λ = 0 .85 and α = 10 as the default parameters. And we compute the Gradient MAE as: 
+
+LGrad = 1
+
+HW 
+
+X
+
+> i,j
+
+|∇ di,j − ∇ dgt,i,j | , (8) where ∇di,j denotes the gradient of the depth at pixel (i, j ),and H, W represent the image height and width. 
+
+# 4. Experiment 
+
+4.1. Experimental Setting 
+
+THDR3K To evaluate our method on real sensor data, we constructed an RGB-ToF acquisition setup to collect a ded-icated dataset. As shown in Fig. 4, the suite is composed of an Intel RealSense depth camera and an STM VL53L8CH ToF sensor. After performing joint calibration [22], we captured spatially aligned RGB images, dense depth maps, low-resolution ToF depth maps and CNH measurements. ToF Sensor RGB Camera              
+
+> Figure 4. RGB-ToF hardware setup. The Intel RealSense D435i provides RGB images and dense depth ground truth, while the STM VL53L8CH ToF module supplies low-resolution distance measurements for lightweight sensing.
+> Figure 5. ToF depth and CNH measurements visualization.
+> The left panel shows the 8×8ToF depth grid aligned with the RGB image. The right panel depicts CNH data from the top-left
+> 4×4zones, where each zone is represented by an 18 -bin signed histogram, with each bin corresponding to a 0.3m depth interval.
+
+As displayed in Fig. 5, the ToF sensor produces an 18 -bin CNH distribution covering distances from 0 to 5.4 m, with an effective operating range of approximately 4.0 m. In total, the dataset consists of 2738 paired samples acquired from 16 indoor scenes spanning 31 rooms. 
+
+Benchmarks Since training requires a substantial amount of data, we adopt widely used indoor depth benchmarks to simulate ToF measurements. Specifically, we compute the depth distribution for each spatial region determined by the FOV configuration. Based on the sensing principle and valid range, the peak of the distribution is extracted as the depth value, while all depth samples are discretized into bins to form the CNH data. Following the prior work [21], we select a 24 K subset of NYUv2 [40] for training. In addition, 2860 samples from SUN RGB-D [42] are used for zero-shot evaluation. 
+
+Evaluation Metrics We evaluate the quality of depth es-timation using several common metrics, including abso-lute relative error (AbsRel) and root mean squared error (RMSE). We also report the threshold accuracy δi that mea-sures the proportion of pixels with max( ˆd/d, d/ ˆd) < 1.25 i.In addition, the number of model parameters and computa-tional cost (FLOPs) are provided as efficiency indicators. 5787 Table 1. Quantitative comparison on NYUv2. Our method is the most lightweight model, achieves accuracy close to SOTA-level MMDE methods, and surpasses auxiliary-guided approaches. All computational costs are reported under an input resolution of 416 × 416 . And a comparison of training data scales is also provided, covering relative depth pre-training and metric depth fine-tuning. We highlight the best, second-best, and third-best results in bold , underline, and italic , respectively. ( ∗: tested using publicly released weights. )                                                                                                              
+
+> Methods Pretrain Fine-tune δ1↑δ2↑δ3↑RMSE ↓(m) AbsRel ↓#Params ↓(M) #FLOPs ↓(G)
+> Monocular Metric Depth Estimation
+> AdaBins [3] -24 K 0.903 0.984 0.997 0.364 0.103 77.89 210.20 UniDepth [32] 3 M -0.984 0.997 0.999 0.201 0.057 345.53 1053.21 ZoeDepth [5] 3 M 24 K 0.953 0.995 0.999 0.277 0.077 266.16 428.92 Metric3D-V2-L [16] 12 M 24 K 0.989 0.998 1.000 0.183 0.047 302.91 548.05 DA-V2-L [53] 62 M 24 K 0.984 0.998 1.000 0.206 0.056 332.68 1171.97 DA-V2-S [53] 62 M 24 K 0.961 0.996 0.999 0.228 0.063 24.18 82.61
+> HybridDepth [12] 1 M 24 K 0.989 1.000 1.000 0.128 0.026 59.15 377.82
+> Auxiliary-Guided Monocular Metric Depth Estimation
+> PriorDA-S ∗[48] 62 M -0.843 0.909 0.953 0.697 0.134 48.58 163.83 DELTAR [22] -24 K 0.952 0.988 0.996 0.311 0.064 18.55 79.98 LiteSense (Ours) -24 K 0.982 0.997 1.000 0.197 0.029 5.48 33.87
+
+Implement Details All experiments are implemented us-ing the PyTorch framework. We adopt AdamW as the op-timizer with an initial learning rate of 0.001 and a weight decay of 0.01 . A warm-up phase followed by a cosine an-nealing schedule is applied to the learning rate. The models are trained on a single NVIDIA RTX 3090 GPU with an in-put resolution of 416 × 416 . We set the batch size to 32 and train the model for 50 epochs without pretrained. 
+
+Baselines We compare our method with two categories of approaches: (1) MMDE methods, including AdaBins [3], UniDepth [32], ZoeDepth [5], Metric3D [16], DA-V2 [53] and HybridDepth [12]; (2) Auxiliary-guided depth estima-tion methods, such as DELTAR [22] and PriorDA [48]. 
+
+4.2. Comparison with State-of-the-Art 
+
+Results on the In-Domain Dataset Tab. 1 reports the quantitative results for all models trained or fine-tuned on the NYUv2 dataset. Compared with MMDE methods, our method achieves competitive performance, while its gap to the SOTA (HybridDepth) remains small, with less than an 
+
+8% difference in δ1 and less than a 12% difference in Ab-sRel. When compared with auxiliary-guided approaches, our method also demonstrates clear advantages. PriorDA shows limited ability to exploit low-resolution ToF mea-surements, whereas our method outperforms representative RGB-ToF fusion methods such as DELTAR across all met-rics: δ1 improves from 0.952 → 0.982 , AbsRel decreases from 0.064 → 0.029 . Moreover, our model has the smallest parameter count among all compared methods, containing only 5.5 M parameters and achieving a 70% reduction rela-tive to DELTAR, thereby further mitigating the deployment bottleneck for real-time estimation on edge devices. Fig. 6 provides a qualitative comparison of the predicted 
+
+Table 2. Zero-shot quantitative comparison on SUN RGB-D. 
+
+All models are trained on NYUv2 and directly evaluated on SUN RGB-D without fine-tuning. And the results are reproduced using publicly released weights. Our method demonstrates strong gen-eralization capability. The best, second-best, and third-best results are highlighted in bold , underline, and italic , respectively.                          
+
+> Methods δ1↑RMSE ↓(m) AbsRel ↓
+> AdaBins 0.642 0.656 0.185 ZoeDepth 0.918 0.402 0.105
+> Metric3D-V2-L 0.962 0.410 0.107 DA-V2-S 0.880 0.442 0.132 DELTAR 0.950 0.367 0.063 LiteSense (Ours) 0.980 0.228 0.032
+
+Table 3. Quantitative comparison on THDR3K. Our method maintains strong generalization under simulated conditions and achieves robust performance on real sensor data after fine-tuning. The best, second-best, and third-best results under the same set-tings, are highlighted in bold , underline, and italic , respectively.                             
+
+> Methods δ1↑RMSE ↓(m) AbsRel ↓
+> AdaBins 0.818 0.786 0.153 ZoeDepth 0.842 0.718 0.153
+> Metric3D-V2-L 0.837 0.519 0.166 DA-V2-S 0.466 1.213 0.369 DELTAR 0.907 0.552 0.088 LiteSense-Sim. (Ours) 0.959 0.570 0.054
+> LiteSense-Real (Ours) 0.914 0.538 0.091
+
+depth maps. Although our method may produce slightly weaker boundaries for very small objects, the ToF auxil-iary prior enables more accurate global scale relationships, resulting in smoother and more consistent depth variation across the entire scene. 5788 Input  GT  Ours  DELTAR  Metric3D-V2-L  DA-V2-S  Prior-DA-S Figure 6. Qualitative results of LiteSense compared with previous methods. Our results provide more accurate estimations of relative distance relationships in the real metric scale. GT refers to the ground-truth depth. Contour lines are overlaid to indicate equal depth levels, where black , blue , green , and red correspond to 1.0 m, 2.0 m, 3.0 m, and 5.0 m, respectively. 
+
+Zero-shot Generalization Evaluation We conduct azero-shot evaluation on the SUN RGB-D dataset by directly applying the model trained on NYUv2 without any fine-tuning. The quantitative results are reported in Tab. 2. From the results, auxiliary-guided approaches generally outper-form MMDE methods, highlighting the importance of in-corporating scale priors for improving metric generaliza-tion across diverse scenes. In comparison, our method achieves the highest accuracy among all compared ap-proaches, demonstrating superior generalization capability in previously unseen indoor environments. 
+
+Performance on THDR3K We further evaluate our method on the real-sensor dataset collected by our suite, where all compared approaches are tested without fine-tuning. During comparison, DELTAR continues to rely on simulated inputs due to its data-usage design. And for a fair and comprehensive evaluation, we report results for our method under both simulated-input and fully real-data set-tings. The quantitative results are summarized in Tab. 3. Consistent with the zero-shot evaluation, auxiliary-guided approaches perform well, while our method attains a better accuracy overall. Given the substantial discrepancies between simulated and real ToF measurements, particularly in the CNH distributions, we fine-tune the model before ap-plying it to the real dataset. The final results show strong robustness, confirming the effectiveness of our fusion strat-egy under real-world sensing conditions and demonstrating that incorporating both CNH and depth auxiliary informa-tion from ToF sensor is highly beneficial. 
+
+4.3. Ablation Study 
+
+To investigate the impact of the introduced auxiliary priors and the fusion strategy on the final performance, we conduct comprehensive ablation experiments. The baseline used in this study is a lightweight network that takes only RGB im-ages as input. Quantitative results are reported in Tab. 4, providing a detailed comparison of each component. 
+
+Effect of Different ToF Auxiliary First, we use the same linear feature extractor to encode both the ToF depth and the CNH distribution, and fuse each with the RGB encoder features via cross-attention. We also evaluate an alternative auxiliary input by replacing CNH with the sampled depth distribution used in DELTAR. The results show that the native CNH distribution significantly outperforms both the depth-only input and the sampled distribution. This demon-strates that the CNH measurements is essential and effective for achieving accurate depth estimation. 
+
+Contribution of RGB-D Input We train a model that uses only the low-resolution ToF depth, which is upsampled to form an RGB-D representation. The results show that this model achieves performance relatively close to the full fu-sion design, indicating that directly incorporating depth as an additional channel is a better way to exploit the spatial cues embedded in ToF measurements. 5789 0.00 0.05 0.10 Error (m)            
+
+> Bias
+> LiteSense RealSense
+> 1234Distance (m) 0.0 0.1 Error (m)
+> Jitter
+> LiteSense RealSense (a) Bias and jitter evaluation. These metrics are used to evaluate reflect the systematic and random error characteristics of estimation method. III
+> III
+> III IV
+> III IV
+> (b) Depth map comparison on real indoor samples. I: RGB image, II: sparse ToF distance measurements, III: RealSense depth output, IV: depth predicted by out method. White regions indicate missing or invalid measurements of the sensor.
+
+Figure 7. Depth quality compared with RealSense. The qualitative and quantitative results demonstrate the advantages of LiteSense. Table 4. Ablation study of our method components on NYUv2. 
+
+All variants use RGB input; the first row is the RGB-only baseline and the last row is the full model with the best performance. Feat. :fusion with features extracted from ToF depth; Chan. : ToF depth concatenated as a input channel; Samp. : sampling from a Gaussian distribution parameterized by the mean and variance.                                    
+
+> ToF-Dist. ToF-Hist. PCSI δ1↑RMSE ↓(m) AbsRel ↓
+> Feat. Chan. Samp. CNH 0.663 0.718 0.216
+> ✓0.891 0.449 0.099
+> ✓0.888 0.453 0.100
+> ✓0.926 0.359 0.080
+> ✓0.948 0.352 0.056
+> ✓✓0.962 0.290 0.046
+> ✓✓✓0.982 0.197 0.029
+
+Impact of PCSI Module We further evaluate the role of the proposed PCSI module by removing it and replac-ing localized fusion with global cross-attention between the RGB-D and CNH features. This variant exhibits a clear per-formance degradation compared with the full model. This demonstrates that the proposed PCSI module plays a cru-cial role in ensuring reliable cross-modal guidance, as it en-ables each spatial region to be modulated solely by its cor-responding CNH distribution. Such localized fusion allows the model to accurately localize structural depth priors and effectively learn high-resolution features under lightweight model settings without cross-region interference. 
+
+4.4. Application 
+
+Deployment Performance We test the deployment per-formance of LiteSense across multiple hardware platforms. With a 480 ×480 input, the model achieves inference speeds of approximately 15 ms on a GPU (NVIDIA RTX-3060), 
+
+160 ms on a CPU (Intel i5-12400F), and 570 ms on a NPU (Rockchip RK3576) without quantization, demonstrating real-time capability across heterogeneous devices. 
+
+Quality of the Predicted Depth We adopt two com-monly used depth evaluation metrics, bias and jitter, for quantitative assessment [57]. The device is placed at a 60 ◦
+
+angle toward a planar wall, and measurements are collected from 0.5 m to 4.0 m. For each frame, a plane is fitted as the reference surface. The mean L1 error between the measured depth and the fitted plane is reported as bias, and the standard deviation of the error as jitter. As presented in Fig. 7a, LiteSense achieves overall distance accuracy comparable to RealSense in the mid-range, demonstrating the benefit of fusing RGB information with ToF auxiliary. Meanwhile, accuracy decreases beyond 3.5 m, as this dis-tance approaches the operational limit of this ToF sensor. 
+
+Advantage of RGB-ToF Fusion Method The qualitative comparisons in Fig. 7b show that LiteSense produces more complete and stable depth maps in low-texture regions and occluded areas, whereas stereo-based depth cameras ( e.g ., RealSense) frequently produce invalid measurements. This advantage arises from the ToF sensor providing spatially continuous depth within its effective range. Furthermore, even when the scene extends beyond the ToF sensing dis-tance, LiteSense can still rely on RGB structural cues to preserve object geometry and maintain depth continuity. 
+
+# 5. Conclusions 
+
+In this work, we present LiteSense , a depth estimation net-work that fuses low-resolution depth and CNH measure-ments from a lightweight ToF sensor with RGB imagery, enabling high-quality dense depth reconstruction within the overlapping region of the two sensors. Through a U-Net-style encoder–decoder architecture and the proposed PCSI module, the model effectively enhances both structural de-tail and metric consistency in the predicted depth maps. Experimental results demonstrate that LiteSense achieves depth quality comparable to RealSense while retaining a lightweight architecture and real-time inference capability. 5790 References 
+
+[1] Ashutosh Agarwal and Chetan Arora. Attention attention everywhere: Monocular depth prediction with skip attention. In WACV , 2023. 2 [2] Behnam Behroozpour, Phillip AM Sandborn, Ming C Wu, and Bernhard E Boser. Lidar system architectures and cir-cuits. IEEE Commun. Mag. , 55(10):135–142, 2017. 1 [3] Shariq Farooq Bhat, Ibraheem Alhashim, and Peter Wonka. AdaBins: Depth estimation using adaptive bins. In CVPR ,2021. 2, 5, 6 [4] Shariq Farooq Bhat, Ibraheem Alhashim, and Peter Wonka. LocalBins: Improving depth estimation by learning local dis-tributions. In ECCV , 2022. 2 [5] Shariq Farooq Bhat, Reiner Birkl, Diana Wofk, Peter Wonka, and Matthias M¨ uller. ZoeDepth: Zero-shot trans-fer by combining relative and metric depth. arXiv preprint arXiv:2302.12288 , 2023. 2, 6, 4 [6] Reiner Birkl, Diana Wofk, and Matthias M¨ uller. MiDaS v3.1 – a model zoo for robust monocular relative depth estimation. 
+
+arXiv preprint arXiv:2307.14460 , 2023. 2 [7] Aleksei Bochkovskii, Ama¨ el Delaunoy, Hugo Germain, Marcel Santos, Yichao Zhou, Stephan R. Richter, and Vladlen Koltun. Depth pro: Sharp monocular metric depth in less than a second. In ICLR , 2025. 2 [8] Riccardo De Lutio, Alexander Becker, Stefano D’Aronco, Stefania Russo, Jan D Wegner, and Konrad Schindler. Learn-ing graph regularisation for guided super-resolution. In 
+
+CVPR , 2022. 3 [9] David Eigen, Christian Puhrsch, and Rob Fergus. Depth map prediction from a single image using a multi-scale deep net-work. In NeurIPS , 2014. 1, 2, 5 [10] Huan Fu, Mingming Gong, Chaohui Wang, Kayhan Bat-manghelich, and Dacheng Tao. Deep ordinal regression net-work for monocular depth estimation. In CVPR , 2018. 2 [11] Yukang Gan, Xiangyu Xu, Wenxiu Sun, and Liang Lin. Monocular depth estimation with affinity, vertical pooling, and label enhancement. In ECCV , 2018. 2 [12] Ashkan Ganj, Hang Su, and Tian Guo. HybridDepth: Ro-bust metric depth fusion by leveraging depth from focus and single-image priors. In WACV , 2025. 2, 6 [13] Vitor Guizilini, Igor Vasiljevic, Dian Chen, Rares , Ambrus , ,and Adrien Gaidon. Towards zero-shot scale-aware monoc-ular depth estimation. In ICCV , 2023. 2 [14] Xiaojie Guo, Yu Li, Jiayi Ma, and Haibin Ling. Mutually guided image filtering. IEEE TPAMI , 42(3):694–707, 2020. 3[15] Daniel Herrera, Juho Kannala, and Janne Heikkil¨ a. Joint depth and color camera calibration with distortion correc-tion. IEEE TPAMI , 34(10):2058–2064, 2012. 1 [16] Mu Hu, Wei Yin, Chi Zhang, Zhipeng Cai, Xiaoxiao Long, Hao Chen, Kaixuan Wang, Gang Yu, Chunhua Shen, and Shaojie Shen. Metric3D v2: A versatile monocular geo-metric foundation model for zero-shot metric depth and sur-face normal estimation. IEEE TPAMI , 64(12):10579–10596, 2024. 2, 6, 4 [17] Shahram Izadi, David Kim, Otmar Hilliges, David Molyneaux, Richard Newcombe, Pushmeet Kohli, Jamie Shotton, Steve Hodges, Dustin Freeman, Andrew Davison, and Andrew Fitzgibbon. KinectFusion: Real-time 3D recon-struction and interaction using a moving depth camera. In 
+
+UIST , 2011. 2 [18] Iro Laina, Christian Rupprecht, Vasileios Belagiannis, Fed-erico Tombari, and Nassir Navab. Deeper depth prediction with fully convolutional residual networks. In 3DV , 2016. 2 [19] Robert Lange and Peter Seitz. Solid-state time-of-flight range camera. IEEE J. Quantum Electron. , 37(3):390–397, 2001. 1 [20] Jae-Han Lee, Minhyeok Heo, Kyung-Rae Kim, and Chang-Su Kim. Single-image depth estimation based on fourier do-main analysis. In CVPR , 2018. 2 [21] Jin Han Lee, Myung-Kyu Han, Dong Wook Ko, and Il Hong Suh. From big to small: Multi-scale local planar guidance for monocular depth estimation. arXiv preprint arXiv:1907.10326 , 2019. 2, 5 [22] Yijin Li, Xinyang Liu, Wenqi Dong, Han Zhou, Hujun Bao, Guofeng Zhang, Yinda Zhang, and Zhaopeng Cui. DELTAR: Depth estimation from a light-weight ToF sensor and RGB image. In ECCV , 2022. 2, 3, 5, 6, 4 [23] Zhengqi Li and Noah Snavely. MegaDepth: Learning single-view depth prediction from internet photos. In CVPR , 2018. 2[24] Zhenyu Li, Zehui Chen, Xianming Liu, and Junjun Jiang. DepthFormer: Exploiting long-range correlation and local information for accurate monocular depth estimation. Mach. Intell. Res. , 20(6):837–854, 2023. 2 [25] Zhenyu Li, Shariq Farooq Bhat, and Peter Wonka. Patch-Fusion: An end-to-end tile-based framework for high-resolution monocular metric depth estimation. In CVPR ,2024. 2, 3 [26] Zhenyu Li, Shariq Farooq Bhat, and Peter Wonka. PatchRe-finer: Leveraging synthetic data for real-domain high-resolution monocular metric depth estimation. In CVPR ,2024. 2, 3 [27] Zhenyu Li, Xuyang Wang, Xianming Liu, and Junjun Jiang. BinsFormer: Revisiting adaptive bins for monocular depth estimation. IEEE TIP , 33:3964–3976, 2024. 2 [28] Zhenyu Li, Wenqing Cui, Shariq Farooq Bhat, and Peter Wonka. PatchRefinerV2: Fast and lightweight real-domain high-resolution metric depth estimation. arXiv preprint arXiv:2501.01121 , 2025. 2, 3 [29] Haotong Lin, Sida Peng, Jingxiao Chen, Songyou Peng, Ji-aming Sun, Minghuan Liu, Hujun Bao, Jiashi Feng, Xiaowei Zhou, and Bingyi Kang. Prompting depth anything for 4K resolution accurate metric depth estimation. In CVPR , 2025. 2[30] S Mahdi H Miangoleh, Sebastian Dille, Long Mai, Sylvain Paris, and Yagiz Aksoy. Boosting monocular depth estima-tion models to high-resolution via content-adaptive multi-resolution merging. In CVPR , 2021. 2, 3 [31] Jin-Hwi Park, Chanhwi Jeong, Junoh Lee, and Hae-Gon Jeon. Depth prompting for sensor-agnostic depth estimation. In CVPR , 2024. 2 [32] Luigi Piccinelli, Yung-Hsu Yang, Christos Sakaridis, Mattia Segu, Siyuan Li, Luc Van Gool, and Fisher Yu. UniDepth: 5791 Universal monocular metric depth estimation. In CVPR ,2024. 2, 6 [33] Danfeng Qin, Chas Leichner, Manolis Delakis, Marco Fornoni, Shixin Luo, Fan Yang, Weijun Wang, Colby Ban-bury, Chengxi Ye, Berkin Akin, et al. MobileNetV4: Uni-versal models for the mobile ecosystem. In ECCV , 2024. 3, 4, 2 [34] Rene Ranftl, Vibhav Vineet, Qifeng Chen, and Vladlen Koltun. Dense monocular depth estimation in complex dy-namic scenes. In CVPR , 2016. 1 [35] Ren´ e Ranftl, Katrin Lasinger, David Hafner, Konrad Schindler, and Vladlen Koltun. Towards robust monocular depth estimation: Mixing datasets for zero-shot cross-dataset transfer. IEEE TPAMI , 44(3):1623–1637, 2020. 2 [36] Ren´ e Ranftl, Alexey Bochkovskiy, and Vladlen Koltun. Vi-sion transformers for dense prediction. In ICCV , 2021. 1, 2[37] Alex Rasla and Michael Beyeler. The relative importance of depth cues and semantic edges for indoor mobility using simulated prosthetic vision in immersive virtual reality. In 
+
+VRST , 2022. 1 [38] Olaf Ronneberger, Philipp Fischer, and Thomas Brox. U-Net: Convolutional networks for biomedical image segmen-tation. In MICCAI , 2015. 2 [39] Ashutosh Saxena, Min Sun, and Andrew Y Ng. Make3D: Learning 3D scene structure from a single still image. IEEE TPAMI , 31(5):824–840, 2008. 1 [40] Nathan Silberman, Derek Hoiem, Pushmeet Kohli, and Rob Fergus. Indoor segmentation and support inference from RGBD images. In ECCV , 2012. 5, 2, 4 [41] Noah Snavely, Steven M Seitz, and Richard Szeliski. Photo tourism: exploring photo collections in 3D. ACM Trans. Graph. , 25(3):835–846, 2006. 1 [42] Shuran Song, Samuel P Lichtenberg, and Jianxiong Xiao. SUN RGB-D: A RGB-D scene understanding benchmark suite. In CVPR , 2015. 5, 4 [43] Yifu Tao, Marija Popovi´ c, Yiduo Wang, Sundara Tejaswi Digumarti, Nived Chebrolu, and Maurice Fallon. 3d lidar re-construction with probabilistic depth completion for robotic navigation. In IROS , 2022. 1 [44] Chaoyang Wang, Jos´ e Miguel Buenaposada, Rui Zhu, and Simon Lucey. Learning depth from monocular videos using direct methods. In CVPR , 2018. 1 [45] Jin Wang, Wei Xu, Jian-Feng Cai, Qing Zhu, Yunhui Shi, and Baocai Yin. Multi-direction dictionary learning based depth map super-resolution with autoregressive modeling. IEEE TIP , 22(6):1470–1484, 2020. 3 [46] Yan Wang, Wei-Lun Chao, Divyansh Garg, Bharath Hariha-ran, Mark Campbell, and Kilian Q Weinberger. Pseudo-lidar from visual depth estimation: Bridging the gap in 3d object detection for autonomous driving. In CVPR , 2019. 1 [47] Zhengxue Wang, Zhiqiang Yan, and Jian Yang. SGNet: Structure guided network via gradient-frequency awareness for depth map super-resolution. In AAAI , 2024. 3 [48] Zehan Wang, Siyu Chen, Lihe Yang, Jialei Wang, Ziang Zhang, Hengshuang Zhao, and Zhou Zhao. Depth anything with any prior. arXiv preprint arXiv:2505.10565 , 2025. 2, 6 [49] Diana Wofk, Fangchang Ma, Tien-Ju Yang, Sertac Karaman, and Vivienne Sze. FastDepth: Fast monocular depth estima-tion on embedded systems. In ICRA , 2019. 2 [50] Huikai Wu, Shuai Zheng, Junge Zhang, and Kaiqi Huang. Fast end-to-end trainable guided filter. In CVPR , 2018. 3 [51] Guanglei Yang, Hao Tang, Mingli Ding, Nicu Sebe, and Elisa Ricci. Transformer-based attention networks for con-tinuous pixel-wise prediction. In ICCV , 2021. 2 [52] Lihe Yang, Bingyi Kang, Zilong Huang, Xiaogang Xu, Jiashi Feng, and Hengshuang Zhao. Depth anything: Unleashing the power of large-scale unlabeled data. In CVPR , 2024. 2 [53] Lihe Yang, Bingyi Kang, Zilong Huang, Zhen Zhao, Xiao-gang Xu, Jiashi Feng, and Hengshuang Zhao. Depth any-thing v2. In NeurIPS , 2024. 2, 6, 4 [54] Wei Yin, Chi Zhang, Hao Chen, Zhipeng Cai, Gang Yu, Kaixuan Wang, Xiaozhi Chen, and Chunhua Shen. Met-ric3D: Towards zero-shot metric 3D prediction from a single image. In ICCV , 2023. 2 [55] Weihao Yuan, Xiaodong Gu, Zuozhuo Dai, Siyu Zhu, and Ping Tan. Neural window fully-connected CRFs for monoc-ular depth estimation. In CVPR , 2022. 2 [56] Ning Zhang, Francesco Nex, George Vosselman, and Nor-man Kerle. Lite-Mono: A lightweight CNN and Transformer architecture for self-supervised monocular depth estimation. In CVPR , 2023. 2, 1 [57] Yinda Zhang, Sameh Khamis, Christoph Rhemann, Julien Valentin, Adarsh Kowdle, Vladimir Tankovich, Michael Schoenberg, Shahram Izadi, Thomas Funkhouser, and Sean Fanello. ActiveStereoNet: End-to-end self-supervised learn-ing for active stereo systems. In ECCV , 2018. 8 [58] Tinghui Zhou, Matthew Brown, Noah Snavely, and David G Lowe. Unsupervised learning of depth and ego-motion from video. In CVPR , 2017. 1 5792
