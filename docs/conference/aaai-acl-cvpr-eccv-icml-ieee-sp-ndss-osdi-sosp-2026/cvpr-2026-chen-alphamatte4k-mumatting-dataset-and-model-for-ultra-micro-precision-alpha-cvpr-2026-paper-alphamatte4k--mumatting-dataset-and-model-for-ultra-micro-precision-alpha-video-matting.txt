@@ -1,0 +1,310 @@
+Title: $\alpha$Matte4K & $\mu$Matting: Dataset and Model for Ultra-Micro Precision Alpha Video Matting
+
+URL Source: https://openaccess.thecvf.com/content/CVPR2026/papers/Chen_alphaMatte4K__muMatting_Dataset_and_Model_for_Ultra-Micro_Precision_Alpha_CVPR_2026_paper.pdf
+
+Published Time: Sat, 16 May 2026 16:47:49 GMT
+
+Number of Pages: 10
+
+Markdown Content:
+# αMatte4K & μMatting: Dataset and Model for Ultra-Micro Precision Alpha Video Matting 
+
+# Xinyi Chen 1⋆†, Hang Dong 2⋆†, Baowei Jiang 3⋆,Shenkun Xu 3, Youqi Guan 4†, Kanle Shi 3, Kun Gai 3, Haichuan Song 1
+
+> 1
+
+# East China Normal University, 2Lucerne University of Applied Sciences and Arts, 
+
+> 3
+
+# Kuaishou Technology, 4Beijing Normal University  
+
+> {chenxinyi07,donghang,jiangbaowei }@kuaishou.com, hcsong@cs.ecnu.edu.cn
+
+# Abstract 
+
+High-resolution human video matting aims to predict ac-curate alpha mattes for semi-transparent regions while en-suring temporal consistency across frames. Despite notable progress, current methods still fail to achieve a satisfactory trade-off between quality and efficiency, with limitations in subject stability, temporal modeling, and computational cost. In this paper, we introduce μMatting, an innova-tive resolution-agnostic two-stage framework for video mat-ting: (1) coarse matte localization using a portrait-aware masked autoencoder; (2) refinement of critical regions via sparse 3D convolution, augmented by a temporal modula-tor that injects global spatio-temporal cues for enhanced consistency and contextual awareness. From data perspec-tive, existing research remains limited by the insufficient quality of datasets, including (1) inaccurate alpha frac-tional values resulting from imperfect annotation, and (2) visual inconsistencies arising from arbitrary foreground-background compositions that lack natural coherence. To address this, we introduce αMatte4K, a large-scale 4K-resolution human video matting dataset, which achieves ac-curate annotations and physical consistency through physi-cally based rendering (PBR). Extensive experiments show that μMatting surpasses state-of-the-art methods in ac-curacy and spatio-temporal consistency, while αMatte4K boosts baseline performance, driving applications in real-world scenarios. The project is open-sourced at https: //github.com/kadatec/mu-Matting .
+
+# 1. Introduction 
+
+The urgent need for high-quality human video matting has been brought to light by the rapid spread of 4K-resolution    
+
+> *Equal contribution. Corresponding author.
+> †Work performed during an internship at Kuaishou Technology.
+> Figure 1. Example RGB-alpha pairs from existing datasets and our αMatte4K. Zoomed-in views reveal annotation errors and FG-BG inconsistencies (e.g., (b) and (d)) in existing data, while our dataset provides clean and accurate mattes by PBR.
+
+video content in industries like virtual conferencing, short-form video platforms, and AIGC applications. For video matting in these real-world scenarios, it is necessary to sat-isfy three fundamental requirements simultaneously: (1) spatial fidelity to capture accurate details; (2) temporal con-sistency to avoid flickering artifacts; (3) high-resolution scalability to support 4K+ inference without degradation. Despite significant progress, current methods still face clear bottlenecks in temporal modeling, computational cost, and subject stability, hindering quality-efficiency balance in high-resolution scenarios. In terms of temporal model-ing, current approaches can be broadly classified into two categories. The first includes frame-by-frame techniques, such as RVM[16] and AdaM[14], which process each frame independently while incorporating temporal information through ConvGRU decoders or transformer-based attention mechanisms that capture both short- and long-term depen-This CVPR paper is the Open Access version, provided by the Computer Vision Foundation. Except for this watermark, it is identical to the accepted version; the final published version of the proceedings is available on IEEE Xplore. 12491 Figure 2. Top : (a) The down-and-up sampling process leads to matte inaccuracies. (b) μMatting refines specific coarse region, en-abling a lossless process. Bottom : Initial frame (left) and heatmap (right) visualizing temporal variance of alpha over a 2s clip. Red: fixed foreground; blue: static background; transitional colors: dy-namic alpha changes. It shows that only a small portion of pixels (13.7%) vary over time. 
+
+dencies. The second group consists of chunk-based meth-ods, like VMFormer[13], which improve temporal reason-ing by jointly processing multiple frames, but multi-frame self-attention becomes extremely expensive in computa-tion and memory at high resolutions. To reduce compu-tational cost, these methods often have to rely on down-sampling followed by upsampling, leading to blurred al-pha predictions in semi-transparent regions. Recent work SparseMat [22] attempts to address this through sparse in-ference strategies, allocating computation only to the most relevant regions. While efficient, it remains rooted in im-age matting, deprived of temporal continuity due to its re-liance on simple frame-difference mechanisms. Regard-ing subject stability, some methods incorporate auxiliary inputs to improve foreground robustness. For example, MaGGie[7] and MatAnyone[25] rely on initial masks pre-dicted by SAM2[19]. This dependency introduces sys-tem complexity and runtime overhead, and also makes the pipeline vulnerable: errors or ambiguities in the external model’s predictions can directly propagate to the matting stage, resulting in incorrect and degraded alpha estimates. To address these challenges, we propose μMatting , a novel framework tailored for high-resolution video mat-ting, as shown in Fig.2(Top). In contrast to prior works, 
+
+μMatting is designed to operate directly on 4K content while maintaining temporal continuity. To achieve this, we revisit the temporal structure of natural video content. As illustrated in Fig.2(Bottom), our empirical analysis re-veals that temporal variation is sparsely distributed: only 13.7% of pixels exhibit noticeable change over time, pre-dominantly near boundaries and fine-grained regions, while most of the foreground remains static. This observation motivates our staged design for processing high-resolution videos. In the first stage, a coarse matte is generated us-ing a pre-trained masked autoencoder (MAE) backbone [9] that encodes strong human-centric priors, enabling robust foreground localization. In the second stage, alpha val-ues in specific regions, such as hair, clothing edges, and translucent areas, are refined. This is achieved via 3D sparse convolutions that aggregate spatio-temporal features across neighboring frames. To enhance temporal coherence and global awareness, we further introduce a Temporal Sparse Context Modulator (TSCM), which compensates for con-textual gaps caused by sparse sampling. Beyond architectural shortcomings, the absence of high-quality datasets further hinders progress. Although all methods strive to pursue temporal coherence and prediction accuracy, the available data lack these qualities. According to the classical composition formulation I = αF + (1 −
+
+α)B, accurate and temporally coherent alpha supervision are fundamental to effective supervised learning. However, current matting datasets, e.g. VideoMatte240K (VM) [15] and HHM50K[22], construct alpha mattes via manual anno-tation, matting algorithms or chroma-key technique, all of which result in imprecise and noisy annotations, as shown in Fig. 1. Furthermore, due to the complexity of video dataset construction, some datasets, such as VM, provide only human foregrounds and corresponding alpha mattes, requiring compositing with external background datasets. This composition can lead to physically implausible spatial cues, which may limit prediction accuracy and generaliza-tion to real-world scenarios. To address this root cause, we present αMatte4K , a first-of-its-kind 4K-resolution video matting dataset featuring both accurate and temporally coherent α mattes. Unlike prior datasets, αMatte4K is constructed entirely through PBR via a four-stage pipeline, encompassing a wider range of subjects, motion dynamics, scenes, and camera settings. However, when processing data with extremely high reso-lution and dense details, existing models require downsam-pling or per-frame processing, which undermines the spatial precision and temporal consistency. In summary, our contributions are as follows: 1. We construct a large-scale human video matting dataset αMatte4K, which contains 900 videos of 115K high-resolution (2160×3840) frames with pixel-accurate al-pha mattes via PBR. It covers a wide range of foreground subjects and background scenes. To the best of our knowl-edge, this is the largest and most diverse dataset for this task and is expected to facilitate future research. 2. We propose a novel framework μMatting, which en-ables uncompressed 4K video matting for the first time. It combines robust subject prior estimation with selective spatio-temporal refinement in detail-critical regions. Exper-iments demonstrate strong overall stability and pixel-level accuracy in high-resolution scenarios. 12492 Figure 3. Comparison of various dimensions for mainstream im-age and video matting datasets. The horizontal axis denotes the re-lease time, while the vertical axis denotes the average resolution of images or videos. Circles and rectangles distinguish image/video dataset types, with shape size corresponds to the data scale. 
+
+# 2. Related Works 
+
+2.1. Matting Datasets 
+
+Existing image/video matting datasets are typically built via manual annotation[17, 23, 24], matting/generation algorithms[2, 22, 26], or chroma-key[2, 15], as illustrated in Fig.3. For static images, representative datasets include AIM[24], D646[17], PhotoMatte85[22], MAGICK[2], and SynthHuman[20]. The development trend ileans toward expanding data scales, with production methods gradually shifting from traditional manual annotation to algorithms or PBR[5, 20] to balance quantity and quality. In video matting, scale is limited by the difficulty of annotating con-secutive frames. Currently, the most widely used dataset is VideoMatte240K(VM)[15], which is divided into VM-SD and VM-HD by resolution. Based on chroma-key technol-ogy, VM scales its data volume through the composition of annotated foregrounds and external backgrounds, yet this stitching approach introduces FG-BG inconsistency. Differ-ent from VM, CRGNN[23] offers carefully annotated real-world data and is served as a standard benchmark for prac-tical evaluation. As 4K+ inference grows, existing training datasets reveal clear limitations in annotation quality (e.g., artifacts, insufficient precision) and temporal consistency, which restricts the development of the matting field. 
+
+2.2. Video Matting and Temporal Consistency 
+
+Video matting[4, 6, 11, 12, 14, 16] requires consistent pre-diction across frames, making it more complex than static image matting. DVM[21] introduces the spatio-temporal feature aggregation module for temporal alignment, but its reliance on extra trimaps limits scalability. Like DVM, certain mask-guided methods require preprocessed guid-ance masks as an additional input to assist inference. For example, MaGGIe[7] and MatAnyone[25] rely heavily on SAM2[19], where imperfect masks can severely degrade matting quality. In terms of maintaining temporal consis-tency, later methods utilize memory modules to fusion in-formation from previous frame to retain continuity, such as RVM[16]. BiMatting[18], built on RVM, lowers computa-tion while preserving visual quality. Recently, transformer-based models advance temporal reasoning: AdaM[14] pro-cesses frames sequentially with memory from past sev-eral frames, while VMFormer[13] jointly models multiple frames using feature- and query-based attention. 
+
+2.3. High-Resolution Matting 
+
+High-resolution matting imposes significant computational demands, often exceeding GPU memory limits and neces-sitating approximations. Some solutions such as RVM[16] downsample and later upsample, sacrificing fine details. Other works adopt local refinement strategies to focus computation on detail-critical regions. For example, BGMv2[15], inspired by PointRend[10], applies patch-wise refinement, though it lacks inter-patch continuity and suf-fers at boundaries. SparseMat[22] improves upon this by performing pixel-level selection for precise refinement. To address spatial and temporal challenges jointly, we propose a principled 3D convolutional framework that mod-els long-range dependencies across time while preserving high-resolution alpha fidelity, bridging the gap in video mat-ting under high-resolution settings. 
+
+# 3. Dataset-αMatte4K 
+
+As discussed earlier, most existing video matting datasets suffer from two critical limitations: (1) imprecise alpha an-notations, resulting from manual labeling or chroma keying; and (2) compositing-based pipelines that neglect the physi-cal consistency between foreground and background, lead-ing to mismatches in lighting, geometry, and motion. To address these issues, we construct a large-scale video mat-ting dataset designed to fulfill the following goals: accurate alpha mattes, physically plausible details, temporal coher-ence, and full 4K resolution. To achieve these objectives, we adopt a structured four-stage pipeline (see Fig. 4(b)). 
+
+3.1. Dataset Construction Pipeline 
+
+1. Digital Character Setup . We begin with 30 high-quality human models sourced from MetaHuman 1, featuring di-verse appearances in skin tone, age, hairstyle, and clothing. These characters are then animated using skeletal motion from Mixamo 2, covering a broad range of natural behav-iors, including walking, dancing, and interacting. 2. 3D Scene Construction . We construct 22 large-scale urban and natural 3D environments in Unreal Engine (UE),     
+
+> 1https://www.unrealengine.com/en-US/metahuman
+> 2https://www.mixamo.com 12493 Figure 4. We introduce αMatte4K , a high-resolution video matting dataset generated through PBR. (a) αMatte4K includes diverse subject assets and virtual scenes. (b) The construction pipeline integrates digital humans, 3D virtual backgrounds, camera trajectories, and rendering components to generate (c) RGBA video sequences with temporal smoothness. (d) All rendered frames provide pixel-perfect alpha mattes with physically accurate annotations for challenging translucent structures, including semi-transparent hair strands and eyelashes. Please zoom in for clarity.
+
+including streets, studios, parks, and more. From these, we sample 900 distinct locations to place the characters. 3. Camera Trajectories . To ensure diverse perspectives, cameras are positioned at varying locations within each scene with multiple predefined motion trajectories. The camera perspective and character actions change approxi-mately every 130 frames to introduce sufficient temporal variation and avoid repetitiveness (Fig. 4(c)). 4. Rendering . Each character–scene–camera triplet is ren-dered using a portrait camera configuration (9:16 aspect ra-tio) to match the common formats used in short-form videos and live-streaming platforms. 
+
+3.2. Accuracy and Fidelity 
+
+We adopt a PBR pipeline to compute per-pixel alpha, yield-ing numerically precise ground truth. Unlike hand-crafted masks, physically rendered mattes preserve fine details and boundaries even at full 4K resolution, especially in chal-lenging areas such as hair and motion blur, which are dif-ficult, almost impossible, to manually annotate (Fig. 4(d)). Beyond accuracy, high-fidelity video matting also requires adherence to physical plausibility across time and space. We explicitly model effects such as hair dynamics, spatial layout, physical perspective, lighting, and shadows. 
+
+3.3. Diversity and Scalability 
+
+In addition to fidelity, diversity is equally crucial for model generalization. Our dataset’s diversity is systematically en-gineered across four core axes: 
+
+Character assets : αMatte4K includes a wide variety of human subjects with different genders, ages, body types, hairstyles, and clothing styles. 
+
+Motion types : αMatte4K incorporates a broad spec-trum of activities, including dancing, standing, walking, and multi-person interactions, with motion clipping, splicing, and speed variation applied to the these motion patterns to further enhance diversity. 
+
+Environmental contexts : Scenes cover indoor settings such as bedrooms and offices, and outdoor scenarios includ-ing streets and open areas. Lighting conditions encompass natural light (e.g., sunset, sunny, and cloudy weather) and artificial illumination such as indoor warm/cool light, fully accounting for the complexity of real-world scenarios. 
+
+Camera settings : In terms of shot sizes, our dataset in-cludes headshots, half-body, and full-body views, covering a wide range of common human subjects; for camera move-ments, it encompasses static shots as well as dynamic move-ments such as pushing in, pulling out, orbiting, and track-ing. This diversity ensures that the dataset can simulate a wide range of real-world shooting scenarios and enhances robustness across heterogeneous filming conditions. Overall, αMatte4K contains: 900 video sequences with over 115K frames; 4K resolution; Diverse humans, mo-tions, backgrounds, and camera movements; Accurately an-notated alpha mattes. To date, αMatte4K represents the largest-scale high-quality human video matting dataset. 12494 Figure 5. The workflow of μMatting. (a) Coarse Alpha Predictor takes a video clip I and produces coarse prediction A↓ 
+
+> c
+
+. The key region K
+
+is obtained via morphological operations followed by upsampling. (b) The Fractional Alpha Refiner utilizes K as spatio-temporal queries to construct a compact representation of target regions from the 4-channel video clip I′
+
+, followed by a refinement network. (c) Finally, the refined alpha matte Ad is fused with Ac to produce the final output A. (d) The structure of Temporal Sparse Context Modulator (TSCM). 
+
+# 4. Method-μMatting 
+
+We propose μMatting, a novel high-resolution video mat-ting framework, specifically designed for spatio-temporal reasoning under computational constraints. As illustrated in Fig.5, our architecture consists of two main components: (a) a Coarse Alpha Predictor (CAP) that performs robust subject localization and generates a coarse matte A↓ 
+
+> c
+
+. We also obtain key-region masks K for refinement by erosion and dilation from Ac; and (b) a Fractional Alpha Refiner (FAR) that refines K using sparse 3D convolutions and TSCM, producing a refined matte Ad. The final output matte A is obtained by combining the coarse prediction Ac
+
+and the refined result Ad.
+
+4.1. Coarse Alpha Predictor (CAP) 
+
+Given an input video segment I ∈ RT ×H×W ×3, where 
+
+T denotes the number of frames (we use T = 4), we first perform spatial downsampling to reduce computational overhead. The downsampled output I↓ (i.e., resolution 512×512) is then passed to Sapiens-0.3B[9], a masked au-toencoder (MAE) pretrained on over 300 million human-centric images. We select this specific backbone to incor-porate strong human priors, introduced to video matting for the first time. This design ensures that the coarse prediction 
+
+A↓ 
+
+> c
+
+maintains foreground integrity and structural coherence, critical for downstream refinement. The encoder transforms each frame into a set of patch-level tokens, along with a global [CLS] token. These tokens are decoded to gener-ate a coarse alpha matte prediction A↓ 
+
+> c
+
+, where each pixel represents the estimated foreground probability. To identify regions requiring further refinement, we apply morphologi-cal operations (erosion and dilation) to the non-binary areas of A↓ 
+
+> c
+
+where α ∈ (0 , 1) . This yields a smoothed and ex-panded key region mask K↓, capturing boundary areas and semi-transparent structures such as hair strands and body edges. These regions are flagged for selective refinement in the next stage. Both the coarse matte A↓ 
+
+> c
+
+and the key region mask K↓ are subsequently upsampled to the original input resolution. To supervise the coarse output A↓ 
+
+> c
+
+, we define a loss function Lstage 1, which combines a L1 and a Laplacian loss [1] to capture both pixel-wise accuracy and multi-scale structural consistency:               
+
+> Lstage 1=1
+> |N|
+> X
+> i∈N
+> |A↓(i)
+> c−A↓(i)
+> gt |
+> |{z }
+> L1
+> +
+> 5X
+> l=1
+> 122l∥L l(A↓
+> c)− L l(A↓
+> gt )∥1
+> |{z }
+> Laplacian Loss
+> ,
+
+(1) where N represents the number of pixels in the frames, A↓
+
+> gt
+
+is downsampled Agt , and Ll(·) denotes the l-th level of the Laplacian pyramid decomposition. 
+
+4.2. Fractional Alpha Refiner (FAR) 
+
+The FAR focuses on refining localized regions K by lever-aging a 3D sparse convolutional network and TSCM. We first concatenate the original video input I and the upsam-pled coarse matte Ac along the channel dimension, yield-ing I′ ∈ RT ×H×W ×4. Based on the key-region masks 
+
+K, we extract the pixels requiring optimization and convert them into a sparse representation, denoted as Sin ∈ RNk ×4,where Nk represents the number of extracted pixels. Next, 
+
+Sin is passed through a 3D sparse encoder, which hierar-chically compresses the input while preserving multi-scale features at each resolution. A 3D sparse decoder then pro-gressively reconstructs the refined features, integrating in-termediate encoding features at matching resolutions to re-cover spatial detail within the targeted regions. The result is a refined sparse alpha matte Sout ∈ RNk ×1, which is mapped back to full resolution using the original sparse in-12495 Figure 6. Qualitative comparison with state-of-the-art matting methods. Frames in rows 1-2 are from CRGNN and in rows 3-5 are from VM. Our method exhibits superior performance in both foreground stability and boundary precision. 
+
+dices, yielding the dense prediction Ad. Here, only the pix-els within K are updated with refined values. We noticed that sparse functions focus on selected re-gions, ignoring global information. Therefore, we intro-duce the TSCM — a low-overhead yet effective mod-ule that enhances sparse features with global temporal awareness (see Fig. 5(d)). Specifically, TSCM injects global context to the encoded sparse feature fenc using the [CLS] token extracted from CAP encoder, as fenc =
+
+σ (FC (GRU (Proj ([CLS] )))) ⊙ fenc . [CLS] is projected to a hidden dimension (set to 256, denoted as dim h), and then processed by a GRU [3] to model spatio-temporal de-pendencies across frames. The hidden state hT ∈ R1×dim h
+
+is passed through a fully connected layer, activated by a sig-moid function, and then multiplied element-wise with fenc 
+
+to produce contextually enhanced features. To supervise the refined output Ad in region K, we spatially compute the region loss Lregion and temporally introduce temporal consistency loss Ltemporal , enforcing smooth transitions between adjacent frames in overlapping region K∩, where K∩ = Kt ∩ Kt+1 :            
+
+> Lregion =1
+> |K|
+> X
+> i∈K
+> |A(i)
+> d−A(i)
+> gt |
+> |{z }
+> L1
+> +
+> 5X
+> l=1
+> 122l∥L l(Ad)− L l(Agt )∥1
+> |{z }
+> Laplacian Loss
+> ,
+
+(2)            
+
+> Ltemporal =P
+> t
+> 1
+> |K∩|
+> P
+> i∈K∩
+> (( A(i,t )
+> d−A(i,t +1)
+> d)−(A(i,t )
+> gt −A(i,t +1)
+> gt )) 2.
+
+(3) To obtain the final matte A ∈ RT ×H×W ×1, we fuse the coarse matte Ac and the refined matte Ad using A = K ×
+
+Ad + (1 − K) × Ac, ensuring that non-critical regions retain the stable coarse prediction Ac, while key areas K benefit from refinement via Ad. To ensure consistency over the entire matte, we apply a global supervision loss Lentire :       
+
+> Lentire =1
+> |N|
+> P
+> i∈N
+> |A(i)−A(i)
+> gt |.
+
+(4) Finally, the total loss for second stage is defined as: 
+
+Lstage 2 = λr Lregion + λeLentire + λtLtemporal , (5) with weights λr = 1, λe = 0.5, and λt = 0.5. 
+
+# 5. Experiments 
+
+We conduct extensive experiments to address two core questions: whether αMatte4K enhance the performance of existing matting models, and whether μMatting outperform prior methods in terms of spatial fidelity, temporal consis-tency and high-resolution scalability. To this end, we per-form (a) comparisons with state-of-the-arts methods, (b) dataset effectiveness experiments, and (c) ablation studies to isolate the contributions of individual components. 
+
+5.1. Experimental setting 
+
+We use three datasets for training: HHM50K[22] is primar-ily used to enhance the foreground localization capability of CAP. The HD split of VideoMatte240K (VM-HD), compos-ited with DVM backgrounds[21], along with our proposed 
+
+αMatte4K, are used throughout model training. For eval-uation, we adopt CRGNN[23] to assess generalization and robustness on real-world video data, as well as a classical spliced test set VM 1920×1080 from RVM[16]. We also in-troduce VM-4K, a test set consisting of 50 videos created by compositing VM-HD foregrounds with new backgrounds as RVM. Notably, VM-4K serves to benchmark model perfor-mance on high-resolution video matting as each video con-tains 100 frames at a resolution of 3840×2160. 12496 Table 1. Performance on the real-world benchmark CRGNN and the spliced test set VM 1920×1080 from RVM.                                                          
+
+> Method CRGNN VM 1920×1080 MAD ↓MSE ↓Grad ↓dtSSD ↓MAD ↓MSE ↓Grad ↓dtSSD ↓
+> MODNet [8] 9.50 4.33 16.94 6.22 11.13 5.54 15.3 3.08 RVM [16] 6.18 2.87 13.75 5.07 6.57 1.93 10.55 1.90 BiMatting [18] 14.58 8.78 21.62 7.76 18.16 11.15 21.90 3.25 SparseMat [22] 6.23 2.86 14.01 6.43 7.97 3.08 9.39 3.97 VMFormer [13] 144.99 132.82 36.50 14.39 6.21 1.52 6.27 1.78
+> μMatting 4.50 1.57 13.57 4.74 4.21 1.62 8.49 1.69
+
+Table 2. Evaluation of high-resolution scalability across models capable of 4K inference using the VM-4K test set. μMatting shows outstanding per-formance on 4K videos.                 
+
+> Method VM-4K MAD ↓MSE ↓Grad ↓dtSSD ↓
+> RVM 5.85 1.34 23.26 1.85 SparseMat 6.82 2.32 16.28 3.44
+> μMatting 2.71 0.74 7.07 1.11
+
+Figure 7. Qualitative comparison at 20-frame intervals. Compet-ing methods exhibit flickering artifacts, while our approach (bot-tom row) maintains stable temporal coherence. 
+
+To quantify matting accuracy and temporal stability, we adopt four standard metrics: Mean Absolute Difference (MAD), Mean Squared Error (MSE), Gradient error (Grad), and direct temporal Sum of Squared Differences (dtSSD). Following established conventions, MAD and MSE are scaled by 10 3, Grad by 10 −3, and dtSSD by 10 2.
+
+5.2. Model performance 
+
+To evaluate the performance of μMatting, we perform com-prehensive comparisons with several representative mat-ting approaches using real-world CRGNN test dataset and VM 1920×1080 benchmark in Tab. 1. Quantitative results demonstrate the effectiveness of our method, especially in real-world scenes. For VMFormer, we strictly use official inference scripts/weights and reproduce VM reported re-sults, and the weak performance on CRGNN is due to se-vere subject-missing artifacts likely caused by domain in-suitability. In addition, we test high-resolution capabilities on 4K videos, and as shown in Tab. 2, our method achieves superior results, underscoring the effectiveness of our archi-tecture in handling the challenges of 4K video matting. Qualitative comparisons of single-frame outputs (Fig.6) and frame-by-frame sequences (Fig.7) further demonstrate the advantages of μMatting. Our method delivers sharper and more accurate alpha estimations, especially in fine-detail regions, while maintaining stable temporal consis-
+
+Table 3. Evaluation of αMatte4K’s effectiveness. The top 3 rows show results of fine-tuning existing methods for 5 epochs. -V and -M indicate finetuning on VM alone, and on the mixed dataset (VM + αMatte4K), respectively. The bottom row shows results for μMatting trained on both settings.                                     
+
+> Method CRGNN MAD ↓MSE ↓Grad ↓dtSSD ↓
+> RVM-V6.45 3.08 14.91 5.28 RVM-M6.14 2.88 14.27 5.13
+> BiMatting-V22.01 15.53 23.44 3.23 BiMatting-M16.61 10.66 20.23 3.00
+> VMFormer-V93.16 78.12 31.89 13.20 VMFormer-M59.57 47.93 28.34 11.53
+> μMatting-V5.79 2.33 16.84 5.69
+> μMatting 4.50 1.57 13.57 4.74
+
+tency under fast motion. In contrast, competing methods often suffer from edge degradation and temporal flickering, particularly in dynamic scenes. 
+
+5.3. Dataset Effectiveness 
+
+We evaluate the effectiveness of αMatte4K by fine-tuning representative video matting models on two training sets: one with only VM and another combining of VM and 
+
+αMatte4K (ratio ≈30:13). We select three methods with reproducible training scripts, covering frame-based and chunk-based, CNN and transformer architectures. We fine-tune them according to their original protocols and evalu-ate the generalization on real-world videos. As shown in Tab. 3, incorporating αMatte4K in fine-tuning consistently enhances performance across all metrics. This demon-strates that the physical realism and precise annotations of 
+
+αMatte4K improve model predictions and consistency. 
+
+Why does adding αMatte4K to the VM dataset, both of which are synthetic, enhances the handling of real-world video? To investigate, we visualized the distribution of dif-ferent human matting datasets. We extracted embeddings of 1000 randomly selected images from each dataset using the Sapiens-0.3B[9] encoder and visualized them in 2D us-ing t-SNE. As shown in Fig. 8, both VM and our dataset closely match the overall real distribution, but our dataset aligns even more closely with real video data. This align-12497 Figure 8. Distribution of human matting datasets. We use t-SNE visualized the data distribution, where circles represent im-age datasets, triangles represent video datasets. Table 4. Ablation study of the CAP. Results for LPN and CAP are reported on the downsampled HHM2K test set (512×512), while LPN+SHM and CAP+SHM are evaluated on the original high-resolution test set.                   
+
+> Method HHM2K Res. MAD ↓MSE ↓Grad ↓
+> LPN LR 8.21 4.38 3.33
+> CAP 7.61 4.01 2.17
+> LPN+SHM HR 7.24 4.10 23.45
+> CAP +SHM 6.25 3.48 20.51
+
+ment explains the performance gains on real-world data. 
+
+5.4. Ablation Studies 
+
+To rigorously assess the contribution of each component in our framework, we conduct a series of ablation studies by progressively removing or replacing key modules. The ob-jective is to isolate and quantify their respective impact on foreground stability, edge quality, and temporal consistency. 
+
+5.4.1. Effectiveness of CAP 
+
+We adopt the modular design of SparseMat and replace its original Low-resolution Prior Network (LPN) with our CAP, while keeping its Sparse High-resolution Module (SHM) unchanged. This setup allows us to directly eval-uate whether CAP yields more reliable low-resolution pre-dictions than LPN. All models are trained on HHM50K and evaluated on the HHM2K test set under both low-resolution (LR) and high-resolution (HR) settings. As shown in Tab. 4, CAP consistently outperforms LPN across all metrics. Vi-sual comparisons in Fig. 9 further confirm that CAP+SHM produces cleaner and more complete foreground masks, es-pecially in challenging regions such as hair. These results demonstrate that CAP improves the structural integrity and independence of human foregrounds, effectively reducing internal voids and suppressing external artifacts. 
+
+5.4.2. Effectiveness of TSCM 
+
+We further assess the role of the TSCM by removing it from the full μMatting pipeline, while keeping all other com-ponents intact. Both the complete model and its ablated variant are trained on the same data setup and evaluated on                                   
+
+> Figure 9. Examples of RGB images and blue-background variants using different primary alpha predictors. Our CAP enhances fore-ground integrity in human matting. Table 5. Ablation study of TSCM. Results validate module’s con-tribution to video matting.
+> Method CRGNN VM-4K MAD ↓MSE ↓Grad ↓dtSSD ↓MAD ↓MSE ↓Grad ↓dtSSD ↓
+> w/o TSCM 4.64 1.61 14.08 4.81 2.76 0.77 7.49 1.13
+> μMatting 4.50 1.57 13.57 4.74 2.71 0.74 7.07 1.11
+> Table 6. Efficiency of μMatting in processing 2K/4K videos.
+> Dataset Params. Mem. allocated FPS CRGNN 381.71M 5.3GB 15.2 VM-4K 6.8GB 11.8
+
+CRGNN and VM-4K. Notably, the TSCM adds only 0.79M parameters, which is just 0.21% of the total model param-eters, while enhancing performance across all metrics, as shown in Tab. 5. This confirms that it enhances global spatio-temporal reasoning by injecting cross-frame context, all without imposing significant computational burden. 
+
+5.5. Efficiency Analysis 
+
+For serial two-stage video inference at 2K/4K resolu-tions, the parameters, GPU memory allocation, and FPS of 
+
+μMatting on the RTX 4090 are presented in Tab. 6. While efficiency is not our primary focus, the framework holds the potential to achieve real-time 4K performance. 
+
+# 6. Conclusion 
+
+Current video matting methods heavily rely on the mini-mally enhanced VM dataset. To address this, we intro-duce αMatte4K: a large-scale, diverse dataset with high-precision matte supervision specifically for high-resolution human video matting, overcoming long-standing limita-tions and introducing a novel data paradigm. For 4K pro-cessing, we propose μMatting—a framework delivering ex-ceptional alpha fidelity and temporal consistency without resolution loss. Extensive benchmarks confirm μMatting’s superiority. Future work will refine both components to-ward real-time 4K processing, catalyzing efficient high-resolution video matting solutions. 12498 Acknowledgements This work is supported by the Min-istry of Industry and Information Technology of China un-der Grant No. CEIEC-2024-ZM02-0073. 
+
+# References 
+
+[1] Piotr Bojanowski, Armand Joulin, David Lopez-Paz, and Arthur Szlam. Optimizing the latent space of generative net-works. arXiv preprint arXiv:1707.05776, 2017. 5 [2] Ryan D Burgert, Brian L Price, Jason Kuen, Yijun Li, and Michael S Ryoo. Magick: A large-scale captioned dataset from matting generated images using chroma keying. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition, pages 22595–22604, 2024. 3[3] Kyunghyun Cho, Bart Van Merri¨ enboer, Caglar Gulcehre, Dzmitry Bahdanau, Fethi Bougares, Holger Schwenk, and Yoshua Bengio. Learning phrase representations using rnn encoder-decoder for statistical machine translation. arXiv preprint arXiv:1406.1078, 2014. 6 [4] Inchang Choi, Minhaeng Lee, and Yu-Wing Tai. Video matting using multi-frame nonlocal matting laplacian. In Computer Vision–ECCV 2012: 12th European Conference on Computer Vision, Florence, Italy, October 7-13, 2012, Proceedings, Part VI 12, pages 540–553. Springer, 2012. 3 [5] Salehe Erfanian Ebadi, You-Cyuan Jhang, Alex Zook, Saurav Dhakad, Adam Crespi, Pete Parisi, Steven Borkman, Jonathan Hogins, and Sujoy Ganguly. Peoplesanspeople: a synthetic data generator for human-centric computer vision. arXiv preprint arXiv:2112.09290, 2021. 3 [6] Wei-Lun Huang and Ming-Sui Lee. End-to-end video matting with trimap propagation. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition, pages 14337–14347, 2023. 3 [7] Chuong Huynh, Seoung Wug Oh, Abhinav Shrivastava, and Joon-Young Lee. Maggie: Masked guided gradual human in-stance matting. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition, pages 3870– 3879, 2024. 2, 3 [8] Zhanghan Ke, Jiayu Sun, Kaican Li, Qiong Yan, and Ryn-son WH Lau. Modnet: Real-time trimap-free portrait mat-ting via objective decomposition. In Proceedings of the AAAI Conference on Artificial Intelligence, pages 1140– 1147, 2022. 7 [9] Rawal Khirodkar, Timur Bagautdinov, Julieta Martinez, Su Zhaoen, Austin James, Peter Selednik, Stuart Anderson, and Shunsuke Saito. Sapiens: Foundation for human vision mod-els. arXiv preprint arXiv:2408.12569, 2024. 2, 5, 7 [10] Alexander Kirillov, Yuxin Wu, Kaiming He, and Ross Girshick. Pointrend: Image segmentation as rendering. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition, pages 9799–9808, 2020. 3 [11] Sun-Young Lee, Jong-Chul Yoon, and In-Kwon Lee. Tem-porally coherent video matting. Graphical Models, 72(3): 25–33, 2010. 3 [12] Dingzeyu Li, Qifeng Chen, and Chi-Keung Tang. Motion-aware knn laplacian for video matting. In Proceedings of the IEEE International Conference on Computer Vision, pages 3599–3606, 2013. 3 [13] Jiachen Li, Vidit Goel, Marianna Ohanyan, Shant Navasardyan, Yunchao Wei, and Humphrey Shi. Vmformer: End-to-end video matting with transformer. In Proceedings of the IEEE/CVF Winter Conference on Applications of Computer Vision, pages 6678–6687, 2024. 2, 3, 7 [14] Chung-Ching Lin, Jiang Wang, Kun Luo, Kevin Lin, Linjie Li, Lijuan Wang, and Zicheng Liu. Adaptive human mat-ting for dynamic videos. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition, pages 10229–10238, 2023. 1, 3 [15] Shanchuan Lin, Andrey Ryabtsev, Soumyadip Sengupta, Brian L Curless, Steven M Seitz, and Ira Kemelmacher-Shlizerman. Real-time high-resolution background matting. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition, pages 8762–8771, 2021. 2, 3[16] Shanchuan Lin, Linjie Yang, Imran Saleemi, and Soumyadip Sengupta. Robust high-resolution video matting with tem-poral guidance. In Proceedings of the IEEE/CVF Winter Conference on Applications of Computer Vision, pages 238– 247, 2022. 1, 3, 6, 7 [17] Yu Qiao, Yuhao Liu, Xin Yang, Dongsheng Zhou, Min-gliang Xu, Qiang Zhang, and Xiaopeng Wei. Attention-guided hierarchical structure aggregation for image matting. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition, pages 13676–13685, 2020. 3[18] Haotong Qin, Lei Ke, Xudong Ma, Martin Danelljan, Yu-Wing Tai, Chi-Keung Tang, Xianglong Liu, and Fisher Yu. Bimatting: Efficient video matting via binarization. Advances in Neural Information Processing Systems, 36: 43307–43321, 2023. 3, 7 [19] Nikhila Ravi, Valentin Gabeur, Yuan-Ting Hu, Ronghang Hu, Chaitanya Ryali, Tengyu Ma, Haitham Khedr, Roman R¨ adle, Chloe Rolland, Laura Gustafson, et al. Sam 2: Segment anything in images and videos. arXiv preprint arXiv:2408.00714, 2024. 2, 3 [20] Fatemeh Saleh, Sadegh Aliakbarian, Charlie Hewitt, Lohit Petikam, Xian Xiao, Antonio Criminisi, Thomas J Cashman, and Tadas Baltrusaitis. David: Data-efficient and accurate vision models from synthetic data. In Proceedings of the IEEE/CVF International Conference on Computer Vision, pages 5348–5358, 2025. 3 [21] Yanan Sun, Guanzhi Wang, Qiao Gu, Chi-Keung Tang, and Yu-Wing Tai. Deep video matting via spatio-temporal align-ment and aggregation. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition, pages 6975–6984, 2021. 3, 6 [22] Yanan Sun, Chi-Keung Tang, and Yu-Wing Tai. Ultra-high resolution image/video matting with spatio-temporal sparsity. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition, pages 14112– 14121, 2023. 2, 3, 6, 7 [23] Tiantian Wang, Sifei Liu, Yapeng Tian, Kai Li, and Ming-Hsuan Yang. Video matting via consistency-regularized 12499 graph neural networks. In Proceedings of the IEEE/CVF International Conference on Computer Vision, pages 4902– 4911, 2021. 3, 6 [24] Ning Xu, Brian Price, Scott Cohen, and Thomas Huang. Deep image matting. In Proceedings of the IEEE conference on computer vision and pattern recognition, pages 2970– 2979, 2017. 3 [25] Peiqing Yang, Shangchen Zhou, Jixin Zhao, Qingyi Tao, and Chen Change Loy. Matanyone: Stable video matting with consistent memory propagation. In Proceedings of the Computer Vision and Pattern Recognition Conference, pages 7299–7308, 2025. 2, 3 [26] Lvmin Zhang and Maneesh Agrawala. Transparent image layer diffusion using latent transparency. arXiv preprint arXiv:2402.17113, 2024. 3 12500

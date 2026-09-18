@@ -1,0 +1,1422 @@
+VideoMaMa: Mask-Guided Video Matting via Generative Prior
+Sangbeom Lim1†
+Seoung Wug Oh2
+Jiahui Huang2
+Heeji Yoon3
+Seungryong Kim3
+Joon-Young Lee2
+1Korea University
+2Adobe Research
+3KAIST AI
+https://cvlab-kaist.github.io/VideoMaMa
+Input Video
+VideoMaMa
+Input Mask
+Model-generated Mask to Matte
+GT Mask to Matte
+Figure 1. We introduce Video Mask-to-Matte Model (VideoMaMa), a diffusion-based model that generates high-quality alpha mattes from
+input binary segmentation masks obtained either from existing models such as SAM2 [31] or from ground-truth segmentation masks in
+existing datasets such as SA-V [31]. Examples shown highlights our VideoMaMa’s ability to capture ﬁne-grained details including motion
+blur, and intricate boundary structures on natural video footage.
+Abstract
+Generalizing video matting models to real-world videos re-
+mains a signiﬁcant challenge due to the scarcity of labeled
+data.
+To address this, we present Video Mask-to-Matte
+Model (VideoMaMa) that converts coarse segmentation
+masks into pixel accurate alpha mattes, by leveraging pre-
+trained video diffusion models. VideoMaMa demonstrates
+strong zero-shot generalization to real-world footage, even
+though it is trained solely on synthetic data.
+Building
+on this capability, we develop a scalable pseudo-labeling
+pipeline for large-scale video matting and construct the
+†Work done during an internship at Adobe Research.
+Matting Anything in Video (MA-V) dataset, which offers
+high-quality matting annotations for more than 50K real-
+world videos spanning diverse scenes and motions. To vali-
+date the effectiveness of this dataset, we ﬁne-tune the SAM2
+model on MA-V to obtain SAM2-Matte, which outperforms
+the same model trained on existing matting datasets in
+terms of robustness on in-the-wild videos. These ﬁndings
+emphasize the importance of large-scale pseudo-labeled
+video matting and showcase how generative priors and ac-
+cessible segmentation cues can drive scalable progress in
+video matting research.
+This CVPR paper is the Open Access version, provided by the Computer Vision Foundation.
+Except for this watermark, it is identical to the accepted version;
+the final published version of the proceedings is available on IEEE Xplore.
+3845
+
+
+1. Introduction
+Video matting, the task of extracting foreground objects
+with pixel-level precision from video, serves as a fundamen-
+tal component in video editing applications, including back-
+ground replacement [6, 32, 51], visual composition [3, 48],
+and relighting [2, 32, 43].
+Despite its importance, training a video matting model
+that performs robustly across diverse real-world videos re-
+mains challenging for two key reasons. First, high-quality
+video matting annotations are extremely scarce. Ground-
+truth mattes are typically captured in controlled environ-
+ments such as chroma key studios [26, 52] or with special-
+ized camera setups [5], which makes it difﬁcult to scale an-
+notation efforts and to capture diverse objects, scenes, and
+camera angles. As a result, existing datasets are often lim-
+ited to human portraits.
+Second, most video matting models are trained on syn-
+thetic videos, where foregrounds are composited onto arbi-
+trary backgrounds. Such synthetic compositions often intro-
+duce unrealistic artifacts in lighting, motion blur, and tem-
+poral coherence. These two factors, limited data diversity
+and the domain gap between synthetic and real videos, sig-
+niﬁcantly hinder the ability of current models to generalize
+to real-world footage where complex interactions between
+foregrounds and backgrounds naturally occur.
+In this work, we propose a novel bootstrapping strat-
+egy that effectively bridges the gap between synthetic and
+real-world videos, enabling more robust video matting. We
+introduce Video Mask-to-Matte Model (VideoMaMa), a
+diffusion-based model that converts binary segmentation
+masks into continuous alpha mattes (see Figure 1). Built
+upon pretrained video diffusion models [1], VideoMaMa
+demonstrates remarkable zero-shot generalization to real-
+world videos, even though the model is trained exclusively
+on synthetic data. This strong generalization ability stems
+from diffusion priors trained on internet-scale image and
+video data, which can generate high-quality content across
+diverse domains [1, 9, 42]. To adapt these priors for video
+matting while preserving their generative capabilities, we
+introduce a two-stage training strategy that separately op-
+timizes spatial and temporal layers, along with semantic
+knowledge injection via DINOv3 [39] features.
+To evaluate the robustness of the VideoMaMa model,
+we conduct experiments on video matting guided by binary
+masks from diverse sources, including those produced by
+existing video segmentation models. The results show that
+VideoMaMa consistently generates high-quality video mat-
+ting outputs regardless of the input mask type, demonstrat-
+ing strong robustness. These ﬁndings suggest that Video-
+MaMa can be effectively utilized as a pseudo-labeler for
+constructing large-scale video matting annotations.
+In addition, by leveraging VideoMaMa, we propose a
+simple but scalable pipeline for constructing large-scale
+video matting annotations and introduce the Matting Any-
+thing in Videos (MA-V) dataset, the ﬁrst large-scale pseudo
+video matting dataset built by converting segmentation la-
+bels from the SA-V dataset [31]. Unlike existing video mat-
+ting datasets [8, 14, 26, 49, 52], which rely on synthetic or
+composited content, MA-V provides high-quality matting
+annotations for over 50K real-world videos covering diverse
+scenes, objects, and motion dynamics, as summarized in Ta-
+ble 1. This scalable pipeline demonstrates the potential of
+leveraging generative priors and segmentation labels, which
+are considerably easier to obtain than video alpha matte, to
+efﬁciently construct large-scale, high-quality video matting
+datasets.
+To validate the effectiveness of large-scale pseudo video
+matting annotations, we ﬁne-tune the SAM2 [31] model for
+video matting using MA-V, referred to as SAM2-Matte.
+Trained without any architectural modiﬁcations, the SAM2-
+Matte model achieves substantially more robust matting
+performance on in-the-wild videos than the same SAM2
+model ﬁne-tuned on existing video matting datasets, as
+well as other existing video matting methods. The results
+demonstrate the strong potential of large-scale pseudo an-
+notations to drive advancements in video matting research.
+Our contributions can be summarized as follows.
+• VideoMaMa: A diffusion-based model that generates re-
+alistic video matting annotations from binary masks, en-
+abling scalable matting label creation with easily obtain-
+able segmentation labels.
+• MA-V Dataset: The ﬁrst large-scale, high-quality video
+matting dataset built on real captured footage, consisting
+of over 50K diverse videos.
+2. Related Work
+Video matting.
+Video matting methods can be catego-
+rized into auxiliary-free and auxiliary-guided approaches.
+Auxiliary-free methods [16, 25, 27] typically focus on por-
+trait matting, restricting their applicability to human-centric
+scenarios. Trimap-guided approaches [13, 37] require man-
+ual trimap annotations, limiting their practicality for zero-
+shot inference. Recent mask-based guidance methods ad-
+dress these limitations: MaGGIe [14] decouples tracking
+from matting using binary mask tracks, MatAnyone [49]
+propagates target-assigned matting through a memory-
+augmented architecture, and GVM [8] employs diffusion
+models for portrait matting. Despite these advances, ex-
+isting methods remain constrained by domain speciﬁcity.
+Beyond algorithmic limitations, existing datasets also
+constrain progress. Representative datasets include Video-
+Matte240K [26] (484 videos), VideoMatting108 [52] (108
+videos), and VM800 [49] (826 videos), predominantly fo-
+cusing on human subjects in controlled settings [8, 40, 45].
+Critically, all rely on composition-based generation where
+foreground objects are composited onto random back-
+3846
+
+
+grounds, creating artiﬁcial scene compositions. No large-
+scale real video matting dataset exists where foreground and
+background naturally co-occur.
+Diffusion models for perception tasks. Recent advances
+have demonstrated that diffusion models [1, 20, 34, 42] en-
+code rich priors about natural scenes, motion dynamics, and
+temporal coherence. Marigold [15] pioneered this direc-
+tion by ﬁnetuning Stable Diffusion for monocular depth es-
+timation, achieving strong zero shot generalization despite
+training only on synthetic data. This success has extended
+to semantic segmentation [44, 53] and video depth estima-
+tion [11, 38]. These models exhibit remarkable zero shot
+generalization across perception tasks [7, 10, 11, 46, 53],
+maintaining strong performance on real data even when
+trained exclusively on synthetic data, suggesting they can
+bridge the synthetic to real domain gap. For matting, SD-
+Matte [12] applies diffusion models to interactive image
+matting, while GVM [8] focuses on portrait video matting
+with emphasis on hair details. However, these methods are
+limited to either single images or speciﬁc domains like hu-
+man portraits, lacking the scale and generality needed for
+diverse video matting scenarios.
+Pseudo-label generation in segmentation/matting
+has
+become a key driver of recent progress. In the Segment
+Anything Model [19, 31], the authors demonstrated that it
+is possible to create an iterative self-training loop by build-
+ing a strong segmentation model and bootstrapping it with
+its own outputs. ZIM [17] trained a converter model that
+transforms image binary masks into alpha mattes using ex-
+isting image matting datasets.
+Inspired by the recent successes, we address video mat-
+ting, which presents distinct challenges. Unlike image mat-
+ting [21, 23, 24, 35] and video object segmentation, where
+abundant manually annotated ground-truth data [4, 29, 31,
+47] enables training strong labeler models, video matting
+datasets remain scarce and predominantly synthetic. This
+limitation hinders model generalization to real-world sce-
+narios. To overcome the challenge, we exploit the genera-
+tive priors of pre-trained video diffusion models and train
+a robust pseudo-labeler using small-scale synthetic video
+matting annotations.
+3. Video Mask-to-Matte Model
+3.1. Problem Formulation
+Video matting is mathematically deﬁned by the alpha com-
+positing equation, I = ωF + (1 →ω)B, where I is the
+observed image, F is the foreground, B is the background,
+and ω ↑[0, 1] is the alpha matte representing pixel-level
+opacity. Unlike binary segmentation masks M ↑{0, 1}, al-
+pha mattes capture ﬁne-grained details such as hair strands,
+motion blur, and intricate regions, which are critical for re-
+alistic video compositing.
+There are several ways to specify the target object in
+Concat.
+Latent 
+Decoder
+!
+Latent 
+Encoder
+ℰ
+Guide Masks
+Latent 
+Encoder
+ℰ
+Video Frames
+Spatial layer
+Temporal layer
+Prediction
+Video
+Diffusion
+U-Net
+ℒ!"#
+Semantic injection
+DINOv3
+ℒ$%&
+GT Matte
+Trainable
+Freeze
+MLP
+Figure 2. Overview of VideoMaMa architecture. RGB frames
+and guide masks are processed through video diffusion U-Net lay-
+ers to generate high-quality video mattes. Semantic injection with
+DINO features is applied during training.
+video matting. One approach is to predeﬁne the target se-
+mantic class, for example human portraits [8, 21], while an-
+other is to condition the model on additional signals such as
+points, boxes, or masks [12, 14, 50].
+We adopt binary segmentation masks as conditioning
+signals for two critical reasons: (1) masks allow the diffu-
+sion model to focus solely on generating ﬁne-grained mat-
+ting details (e.g., hair strands, motion blur) rather than infer-
+ring object boundaries, since shape information is already
+provided by the mask.
+This design decouples the chal-
+lenges of object localization and matte generation, making
+the pipeline more robust and generalizable and (2) Finally,
+since binary masks can be obtained through various sources,
+the applicability of a model can be greatly expanded. In
+this paper, we demonstrate that VideoMaMa can not only
+perform video matting in various settings when combined
+with existing video segmentation models, but also enables
+the conversion of existing video segmentation datasets into
+matting datasets.
+3.2. Architecture Design
+We build VideoMaMa on top of Stable Video Diffusion
+(SVD) [1], a pretrained video diffusion model originally de-
+signed for image-to-video generation. By leveraging gener-
+ative priors, it can generate high-quality video matting an-
+notations that exhibit realistic characteristics such as natural
+motion blur, proper edge detail, and temporal consistency,
+effectively transferring the model’s learned understanding
+of video dynamics to the matting task.
+We adapt the SVD architecture for mask-guided video
+matting by introducing mask-based conditioning in the la-
+tent space and employing single-step inference for im-
+proved efﬁciency.
+In addition, we propose a semantic
+knowledge injection technique that enhances the model’s
+understanding of object boundaries and strengthens tem-
+poral consistency when tracking complex objects with ﬁne
+structural details. An overview of the model is shown in
+Figure 2.
+Latent space formulation. Following modern video dif-
+fusion models, we operate in a compressed latent space
+to alleviate the computational overhead of processing high
+3847
+
+
+resolution videos. We leverage a Variational Autoencoder
+(VAE) [18] for efﬁcient encoding and decoding. All inputs,
+including video frames V = {It}T
+t=1, binary mask track
+M = {Mt}T
+t=1, and alpha mattes ω = {ωt}T
+t=1, are en-
+coded into the same latent space: zx = E(x), ˆx = D(zx),
+where E and D denote the encoder and decoder of the VAE,
+respectively, and x may represent V , M, or ω. Since all
+three modalities share the same spatial dimensions, this uni-
+ﬁed encoding approach naturally allows them to be pro-
+cessed together in the compressed latent space, reducing
+memory requirements while preserving spatial correspon-
+dence.
+Single-step diffusion formulation. We formulate Video-
+MaMa as a single-timestep generative model that directly
+synthesizes high-ﬁdelity alpha matte latents ˆzω in a single
+forward pass, where h and w represent the compressed spa-
+tial dimensions and c is the latent channel dimension. Un-
+like traditional diffusion models that require iterative de-
+noising steps, our model performs direct prediction from
+noise to clean latents, making it signiﬁcantly more efﬁcient
+for large-scale dataset generation.
+The generation process takes as input the frame-wise
+concatenation of video latents zV , mask latents zM, and
+Gaussian noise ε ↓N(0, I) along the channel dimension:
+ˆzω = FSVD(concat(zV , zM, ε)),
+(1)
+where FSVD represents our adapted SVD model, and
+concat(·) denotes a concatenation. We modify SVD’s archi-
+tecture by replacing the original image conditioning input
+with this concatenated tensor, allowing the model to lever-
+age SVD’s strong temporal modeling capabilities while
+conditioning on both appearance (from zV ) and shape infor-
+mation (from zM). The ﬁnal alpha matte video is obtained
+by decoding the predicted latents through the VAE decoder:
+ˆω = D(ˆzω).
+3.3. Training Recipe
+Mask augmentation. While providing binary masks as in-
+put conditioning signals simpliﬁes the task for the diffusion
+model, it also introduces the risk of copy-paste behavior.
+For objects with simple shapes (e.g., cars or desks) or masks
+that already contain ﬁne-grained details (e.g., binarized al-
+pha mattes), the model may trivially copy the mask instead
+of generating realistic matting details by reasoning about
+the RGB image.
+To prevent this, we apply mask augmentation during
+training to remove ﬁne-grained information from the in-
+put masks, forcing the model to infer matting details from
+the RGB image. Our mask augmentation strategy consists
+of two operations (see Figure 3): (1) Polygonization: We
+approximate the mask boundary with a polygon, simplify-
+ing the contour and removing ﬁne details. (2) Downsam-
+ple degradation: We downsample and upsample the mask at
+Polygonization 
+Weak
+Strong
+Downsample Degradation
+Weak
+Strong
+Polygonization
+Original Matte
+Binarization
+Downsample Degradation
+or
+Figure 3.
+Examples of mask augmentation methods.
+Poly-
+gonization and downsample degradation are applied at weak and
+strong augmentation levels.
+the same scale, which effectively removes high-frequency
+details while preserving the overall shape. These augmen-
+tations create a gap between the coarse input mask and the
+ﬁne-grained target alpha matte, encouraging the model to
+leverage appearance cues from the RGB video to generate
+realistic matting details.
+Two-stage training. For matting tasks, both training and
+inference resolution are critical. As matting operates at the
+pixel level with continuous values, downsampling to lower
+resolutions can degrade ﬁne-grained matting details. How-
+ever, training video diffusion models at high resolution is
+computationally prohibitive. To address this challenge, we
+propose a two-stage training strategy that decomposes the
+learning process: ﬁrst training spatial layers at high resolu-
+tion on single frames to capture ﬁne details, then training
+temporal layers at lower resolution on video sequences to
+learn temporal consistency. In the ﬁrst stage, we freeze the
+temporal layers of SVD and train only the spatial layers,
+enabling the model to focus on capturing pixel-level details
+at high resolution. While this stage allows the model to
+learn ﬁne-grained features within individual frames, it lacks
+temporal consistency across video sequences. In the second
+stage, we freeze the spatial layers to preserve the learned
+detail-capturing capability and ﬁne-tune only the temporal
+layers to learn temporal coherence and video-speciﬁc char-
+acteristics. This decomposed training strategy enables our
+model to achieve both high-resolution detail and tempo-
+ral consistency without requiring full high-resolution video
+training.
+Matting loss function. We adopt v-parameterization [36]
+for single-step generation, where the model is trained to di-
+rectly convert noise into clean alpha matte latents. The pre-
+dicted latent ˆzω is decoded to pixel space ˆω = D(ˆzω), and
+the loss is computed at the pixel level:
+Lmat = Eω,zV ,zM,ε [sim(D(ˆzω), ω)] ,
+(2)
+where sim(·, ·) comprises pixel-wise similarity loss terms
+3848
+
+
+RGB
+RGB
+RGB
+SA-V
+MA-V
+SA-V
+MA-V
+SA-V
+MA-V
+Figure 4. Qualitative examples from our MA-V dataset. We show RGB frames with our high-quality MA-V annotations and original
+SA-V [31] masks for comparison. MA-V provides reﬁned alpha mattes for diverse scenarios.
+between the decoded prediction and ground-truth alpha
+matte. This pixel-level supervision enables direct optimiza-
+tion for visual quality, capturing ﬁne-grained details such as
+motion blur and intricate boundary structures.
+Semantic knowledge injection. While diffusion priors are
+powerful for generating precise alpha mattes, they struggle
+with semantic understanding of object boundaries and con-
+sistently tracking objects, particularly for complex objects
+with intricate structures. To address this, we inject seman-
+tic knowledge into VideoMaMa by aligning SVD features
+with robust semantic representations from DINOv3 [39]
+throughout training.
+We ﬁrst extract DINO features hdino = Fdino(V ) from
+the video frames V . Then, we extract intermediate features
+hl from the l-th layer of the diffusion model and project
+them into the DINO feature space using a learnable MLP
+pϑ with parameters ϑ. We minimize the alignment loss that
+maximizes patch-wise cosine similarities:
+Lreg = →Eω,zV ,zM,ε,V
+!
+cos-sim(hdino, pϑ(hl))
+"
+,
+(3)
+where n indexes patches and cos-sim(·, ·) denotes cosine
+similarity.
+This design allows the model to leverage se-
+mantic understanding of object categories and structures
+while maintaining the generative capabilities of the diffu-
+sion backbone, enabling more accurate matte generation for
+challenging cases such as overlapping objects or complex
+articulated structures.
+4. Matte Anything in Videos (MA-V) Dataset
+The difﬁculty of obtaining video matting annotations has
+severely limited existing datasets. As shown in Table 1,
+prior datasets contain at most hundreds of videos, pre-
+Table 1. Dataset statistics for video matting.
+Dataset
+Category
+# Videos
+Composition Required
+SynHairMan [8]
+Human
+200
+Yes
+VideoMatte240K [26]
+Human
+478
+Yes
+V-HIM2K5 [14]
+Human
+443
+Yes
+VideoMatting108 [52]
+Various
+108
+Yes
+CRGNN [45]
+Various
+60
+Yes
+VM800 [49]
+Human
+826
+Yes
+MA-V (Ours)
+Various
+50,541
+No
+dominantly focusing on human subjects captured in con-
+trolled environments [26, 52] or through manual annota-
+tion [21, 22, 30, 41]. While composition-based approaches
+enable scaling and precise annotations, they create artiﬁcial
+scene compositions that differ fundamentally from natural
+video footage, limiting model generalization to real world
+scenarios.
+4.1. Dataset construction
+To address these limitations, we introduce Matte Anything
+in Videos (MA-V), created by applying VideoMaMa to an-
+notate SA-V’s [31] diverse mask annotations. As shown
+in Table 1, MA-V provides 50,541 videos captured in nat-
+ural settings, nearly 50! larger than existing real-video
+datasets.
+Unlike prior work that focuses predominantly
+on humans, MA-V encompasses diverse object categories
+at multiple scales, from small objects to full scenes. The
+dataset construction process is straightforward yet effec-
+tive: we leverage VideoMaMa’s ability to generate high-
+quality alpha mattes from binary masks, converting SA-
+V’s segmentation annotations into continuous matting la-
+bels while preserving the natural scene context. Critically,
+MA-V is the ﬁrst large-scale video matting dataset where
+both foreground and background naturally co-occur in real
+captured footage, eliminating the synthetic composition gap
+3849
+
+
+Figure 5. Qualitative comparison on in-the-wild videos. We evaluate two settings: (1) all-frame mask-guided video matting where
+VideoMaMa is compared against MaGGIe [14], and (2) ﬁrst-frame mask-guided matting where SAM2-Matte is compared against MatAny-
+one [49]. All methods use SAM2 [31] to generate mask inputs.
+that limits previous datasets.
+Figure 4 illustrates the vi-
+sual quality and diversity of MA-V compared to SA-V’s
+binary masks, demonstrating how VideoMaMa generates
+ﬁne-grained matting details including semi-transparent re-
+gions, motion blur, and intricate boundary structures regard-
+less of the target category that are absent in the source seg-
+mentation masks.
+4.2. Fine-tuning SAM2 with MA-V
+We ﬁnetune SAM2 [31] on our MA-V dataset, referred to
+as SAM2-Matte hereafter. SAM2, originally designed for
+binary segmentation, requires minimal adaptation for mat-
+ting: we apply a sigmoid function after the mask logits
+to produce continuous alpha values in the range [0,1]. To
+assess MA-V quality, we also ﬁnetune SAM2 on existing
+video matting datasets and evaluate their performance on
+standard matting benchmarks.
+5. Experiments
+5.1. Experimental Details
+Implementation details. We train VideoMaMa based on
+the Stable Video Diffusion [1] (SVD) model using diverse
+image and video matting datasets. Our two-stage training
+strategy employs different resolutions optimized for each
+stage’s objective. In stage 1, we train the spatial layers of
+SVD on single images at high resolution (1024!1024) to
+capture ﬁne-grained matting details such as hair strands and
+intricate boundary structures. We freeze the temporal layers
+during this stage to focus learning on spatial precision. In
+stage 2, we freeze the learned spatial layers and train only
+the temporal layers on video sequences. To balance compu-
+tational efﬁciency with temporal modeling, we use 3-frame
+clips at 704!704 resolution, which enables the model to
+learn temporal consistency and motion-aware matting char-
+acteristics. To inject semantic knowledge, we incorporate
+features from a frozen DINOv3 [39] encoder, aligning the
+DINO features with the ﬁrst upsampling block of the SVD
+decoder. This integration provides the diffusion model with
+semantic understanding of object structures while preserv-
+ing its generative capabilities.
+Training details. For both stages, we use a batch size of 64
+and a learning rate of 5 ↔10→5 with the AdamW optimizer.
+The training objective, Lmat, combines L1 loss for pixel-
+wise accuracy and Laplacian loss for preserving edge sharp-
+ness and boundary details. Each stage is trained for 10,000
+iterations until convergence. All experiments are conducted
+on NVIDIA A100 GPUs with mixed-precision training for
+efﬁciency. SAM2-Matte is trained on the combination of
+existing video matting datasets and MA-V. Details of the
+existing datasets are provided in the appendix.
+5.2. Quantitative Evaluations
+All-frame mask-guided video matting.
+We evaluate
+VideoMaMa following the protocol in [14], where input
+binary masks for every frame are provided. We use two
+3850
+
+
+Table 2. All-frame mask-guided video matting comparison on V-HIM60 and YouTubeMatte benchmarks. We compare VideoMaMa
+(Ours) against mask-guided matting methods: MaGGIe [14] (video mask-guided) and MGM [50] (image mask-guided). We evaluate on
+two mask types: Synthetically Degraded Masks including downsampling (8→, 32→) and polygonization with varying difﬁculty levels, and
+Model-Generated Masks from SAM2 [31]. Lower values indicate better performance.
+V-HIM60 (Hard)
+YouTubeMatte (1920 ↔1080)
+MAD ↗
+Gradient ↗
+MAD ↗
+Gradient ↗
+Input Mask
+Input
+MGM
+MGM-IW
+MaGGIe
+MaGGIe-FT
+Ours
+Input
+MGM
+MGM-IW
+MaGGIe
+MaGGIe-FT
+Ours
+Input
+MGM
+MGM-IW
+MaGGIe
+MaGGIe-FT
+Ours
+Input
+MGM
+MGM-IW
+MaGGIe
+MaGGIe-FT
+Ours
+Synthetically Degraded Masks
+Downsample 8x
+2.744
+63.8374
+2.1646
+2.3790
+2.6521
+1.306
+11.127
+16.5609
+3.7015
+5.4150
+6.4137
+2.363
+1.946
+3.4973
+2.2504
+1.6420
+1.5311
+0.934
+8.034
+4.0822
+3.9363
+4.9733
+5.5547
+2.031
+Downsample 32x
+5.132
+79.2273
+2.9092
+2.5375
+2.8960
+1.461
+33.664
+22.2024
+6.3100
+5.9073
+7.1486
+2.849
+4.203
+3.9061
+2.6610
+1.8171
+1.6897
+1.029
+36.540
+5.3603
+5.6704
+5.6318
+6.1760
+2.560
+Polygon. (Easy)
+3.636
+64.5457
+2.8187
+2.5808
+3.1009
+1.416
+16.000
+17.3675
+4.5335
+5.5572
+6.8035
+2.480
+3.619
+4.1390
+3.4547
+2.2250
+2.5933
+1.206
+19.155
+4.8579
+5.4951
+5.6773
+6.6425
+2.335
+Polygon. (Hard)
+6.771
+75.5501
+3.3274
+2.7771
+3.4456
+1.640
+43.228
+20.5516
+5.9860
+5.9636
+7.4698
+3.024
+9.470
+4.4549
+4.2821
+2.3111
+2.9929
+1.404
+65.844
+5.6132
+8.4066
+5.9184
+7.7936
+3.237
+Model-Generated Masks
+SAM2
+4.666
+66.5221
+3.4520
+3.1567
+3.6435
+2.435
+21.960
+18.2103
+5.7615
+6.4121
+7.6520
+4.180
+3.569
+4.1136
+3.3100
+1.9499
+2.1968
+1.737
+24.729
+5.0448
+5.2508
+5.7877
+6.3664
+3.635
+Table 3. First-frame mask-guided video matting comparison on V-HIM60 and YouTubeMatte benchmarks. We evaluate video
+matting performance across different difﬁculty levels in V-HIM60. The best and second-best results are highlighted.
+Method
+V-HIM60 [14]
+YouTubeMatte [49]
+Easy
+Medium
+Hard
+1920 ↔1080
+MAD
+MAD-T
+MSE
+GRAD
+MAD
+MAD-T
+MSE
+GRAD
+MAD
+MAD-T
+MSE
+GRAD
+MAD
+MAD-T
+MSE
+GRAD
+SAM2 [31]
+2.7978
+91.5246
+1.4799
+13.3307
+4.9618
+105.2547
+2.9401
+25.6735
+7.8517
+130.0338
+6.0075
+26.3355
+3.8530
+103.2181
+2.6133
+37.4074
+MatAnyone [49]
+3.5803
+92.8273
+1.9905
+7.0763
+7.1955
+100.0465
+4.7586
+11.4541
+5.7195
+102.4861
+3.4620
+9.8199
+1.9909
+51.0939
+0.7085
+8.9019
+SAM2+VideoMaMa
+1.3539
+40.6830
+0.4063
+2.8876
+2.3132
+49.0329
+0.9335
+4.6944
+2.7757
+53.4392
+1.4428
+4.8276
+1.3559
+35.5064
+0.2940
+3.5742
+SAM2-Matte
+1.3446
+49.0329
+0.2932
+3.1245
+2.2710
+51.8996
+0.6669
+5.2227
+2.6112
+58.7796
+1.0750
+5.0869
+1.2695
+33.5268
+0.2831
+3.4640
+categories of input masks:
+(1) Synthetically Degraded
+Masks through downsampling (8↔, 32↔) and polygoniza-
+tion (easy, hard), mimicking imperfect user annotations,
+and (2) Model-Generated Masks from SAM2 [31], repre-
+senting automatic segmentation pipelines. This diverse set
+evaluates VideoMaMa’s robustness across different mask
+quality levels.
+In Table 2, we compare VideoMaMa against MaG-
+GIe [14] and MGM [50].
+We ﬁne-tune MaGGIe using
+all training datasets employed by VideoMaMa (denoted as
+MaGGIe-FT). For MGM, which is an image-based method,
+we perform inference on each frame independently.
+We
+additionally report results for MGM-IW [28]. We report
+metrics comparing both input masks and generated results
+against ground-truth alpha mattes. All evaluations use 12-
+frame sequences.
+We adopt standard metrics:
+MAD for overall accu-
+racy and Gradient error [33] for boundary quality. Results
+are reported on V-HIM60 Hard [14] and YouTubeMatte
+1920↔1080 [49].
+VideoMaMa consistently outperforms existing mask-
+guided matting models across both synthetically degraded
+and model-generated masks. Our evaluation across differ-
+ent mask styles demonstrates that VideoMaMa can han-
+dle various types of mask inputs and produce high-quality
+video mattes consistently.
+First-frame mask-guided video matting. In Table 3, we
+evaluate VideoMaMa and SAM2-Matte following a setting
+proposed in [49] where a binary mask guidance is provided
+only for the ﬁrst frame. For VideoMaMa, the binary mask
+guidance across all frames is generated by propagating the
+mask from the ﬁrst frame using SAM2 [31], denoted as
+SAM2+VideoMaMa. We also report the score of the bi-
+nary masks produced by SAM2 to provide a baseline for
+the improvements achieved by VideoMaMa.
+We employ multiple evaluation metrics: MAD for over-
+all semantic accuracy, MSE for pixel-level error, MAD-T
+(trimap-based MAD) which computes MAD only within
+the uncertain trimap region derived from the ground-truth
+alpha map, and Gradient error [33] for assessing bound-
+ary detail extraction quality. The trimap-based evaluation
+is particularly important as it focuses on the challenging
+boundary regions where precise matting is most critical.
+SAM2-Matte trained on the combined dataset sur-
+passes previous state-of-the-art methods, MatAnyone [49],
+on challenging benchmarks:
+V-HIM60 Hard [14] and
+YouTubeMatte [49].
+This demonstrates that MA-V pro-
+vides high-quality training data for video matting models,
+enabling to extract matting quality and temporal consis-
+tency over the video frames. Note that, for VideoMaMa
+in this experiment, we processed each of the 12-frame seg-
+ments and merged the results to obtain the complete video
+matting.
+5.3. Qualitative Evaluations
+To further evaluate the model’s performance on real-world
+videos, we present qualitative comparisons in Figure 5. We
+categorize the methods into two settings: ﬁrst-frame mask-
+guided and all-frame mask-guided. The initial binary masks
+are obtained manually using the SAM2 model. Unlike pre-
+vious matting methods [14, 49], VideoMaMa and SAM2-
+Matte not only perform well on human portraits but also
+generalize to a wide range of object categories and in-the-
+wild video content. Moreover, the high-quality results from
+SAM2-Matte demonstrate that MA-V’s large-scale and di-
+verse annotations effectively enhance video matting perfor-
+mance beyond what existing datasets can achieve.
+5.4. Ablation Studies
+Number of inference frames. We evaluate VideoMaMa’s
+performance across varying numbers of frames. Although
+3851
+
+
+Table 4. Ablation study on the number of frame during infer-
+ence. We report the mask reﬁnement performance in MAD metric
+on YouTubeMatte dataset [49] with different input masks.
+Number of Frames per Inference
+Mask Input
+24
+18
+12
+6
+1
+Downsample 32x
+Input
+4.2411
+4.2455
+4.2029
+4.1377
+4.1336
+Reﬁned
+1.0237
+1.0272
+1.0292
+1.0418
+1.1024
+Polygon. (Hard)
+Input
+9.5559
+9.6224
+9.4700
+8.7498
+8.5455
+Reﬁned
+1.4472
+1.4847
+1.4042
+1.3382
+1.5598
+SAM2 [31]
+Input
+3.6023
+3.5991
+3.5693
+3.5476
+3.8711
+Reﬁned
+1.6921
+1.7273
+1.7370
+1.7948
+1.8828
+Table 5. Ablation study on training recipe. We evaluate MAD
+with different training conﬁgurations on YouTubeMatte [49].
+Scores for input masks are shown below the each input mask
+type. Percentages in parentheses indicate the relative improvement
+(green) or degradation (red) compared to the input score.
+S1
+S2
+DINO
+Downsample 32x
+Input: 4.2029
+Polygon. (Hard)
+Input: 9.4700
+SAM2
+Input: 3.5693
+✁
+✂
+✂
+3.7620 (10.49%)
+4.8306 (49.00%)
+4.0496 (-13.46%)
+✂
+✁
+✂
+1.2350 (70.62%)
+2.2372 (76.38%)
+2.3124 (35.21%)
+✁
+✁
+✂
+1.2552 (70.13%)
+1.9975 (78.91%)
+1.9404 (45.64%)
+✁
+✁
+✁
+1.0292 (75.51%)
+1.4042 (85.17%)
+1.7370 (51.34%)
+Table 6. Ablation study for training data on V-HIM60 Hard [14]
+and DAVIS val [29], including (a) ED, (B) MA-V, (c) ED + MA-V.
+ED denotes that existing dataset.
+Method
+V-HIM60 (Hard)
+DAVIS
+MAD
+MSE
+GRAD
+J&F
+J
+F
+MatAnyone [49]
+4.6655
+2.5870
+8.8870
+79.7
+76.5
+82.9
+(a) ED
+7.5798
+5.6824
+8.7091
+77.0
+74.1
+80.0
+(b) MA-V
+3.1830
+1.5603
+5.7869
+87.9
+85.2
+90.6
+(c) ED + MA-V
+2.6112
+1.0750
+5.0869
+85.9
+83.5
+88.3
+trained on maximum 3 frames, VideoMaMa successfully
+handles diverse frame counts from single frames to 24
+frames at inference time. As shown in Table 4, the model
+maintains consistent performance across different frame
+counts, demonstrating strong temporal generalization.
+Training recipe. We ablate our two-stage training strategy
+and semantic knowledge injection on YouTubeMatte [49]
+with four conﬁgurations: (1) image only (stage 1), (2) video
+only (stage 2), (3) two-stage without semantic knowledge,
+and (4) two-stage training with DINO features. As shown in
+Table 5, having both stage 1 and stage 2 training stages led
+to the best results. Adding DINO semantic features further
+improves performance enabling better object understanding
+and boundary localization. The results validate that both
+components are necessary and complementary for optimal
+performance.
+Impact of MA-V Dataset. We assess the impact of MA-V
+on matting and tracking performance on ﬁrst-frame mask-
+guided matting task. We evaluate SAM2-Matte trained un-
+der different data conﬁgurations by comparing (a) existing
+datasets only (ED), (b) MA-V only, and (c) both combined.
+Time
+RGB
+MatAnyone
+SAM2-Matte (MA-V)
+SAM2-Matte (ED)
+Figure 6. Comparison on a real video between MatAnyone [49]
+and SAM2-Matte variants. Red arrows highlight regions where
+our method achieves the best results.
+A detailed list of the existing matting datasets used in this
+experiment will be included in the appendix.
+To validate the impact of MA-V on matting task, we re-
+port matting quality metrics on the V-HIM60 (Hard) [14].
+As shown in Table 6, Conﬁguration (a) shows limited per-
+formance due to the small scale and lack of diversity in ex-
+isting datasets. Remarkably, (b) signiﬁcantly outperforms
+(a) and even surpasses state-of-the-art results, demonstrat-
+ing the effectiveness of MA-V. When combining the ex-
+isting matting datasets with MA-V in (c), we achieve the
+best overall matting quality. We hypothesize that the shared
+synthetic nature of both the existing matting datasets and
+V-HIM60 contributes to this improved performance.
+We evaluate tracking performance on DAVIS [29] us-
+ing VOS metrics by binarizing matting results. As shown
+in Table 6, conﬁguration (b) substantially improves perfor-
+mance over (a), demonstrating the effectiveness of MA-V.
+Interestingly, adding the existing matting datasets in con-
+ﬁguration (c) leads to degraded tracking performance com-
+pared to using MA-V alone, suggesting that existing syn-
+thetic datasets introduce domain biases that reduce tracking
+robustness on in-the-wild videos.
+In Figure 6, we compare MatAnyone [49] and SAM2-
+Matte variants. The results show that using MA-V enables
+robust tracking even along ambiguous boundaries.
+6. Conclusion
+We introduce VideoMaMa, a diffusion-based model that
+leverages generative priors to perform robust video mat-
+ting. By exploiting VideoMaMa’s strong generalization ca-
+pability, we construct MA-V, the ﬁrst large-scale pseudo
+video matting dataset built on real-world videos, by con-
+verting segmentation masks from SA-V. Through compre-
+hensive experiments, we demonstrate that both VideoMaMa
+and models trained on MA-V (e.g., SAM2-Matte) achieve
+state-of-the-art performance across diverse video matting
+benchmarks, validating the effectiveness of our data gen-
+eration approach. We believe that VideoMaMa and MA-V
+will signiﬁcantly contribute to advancing video matting re-
+search by providing both a VideoMaMa and a large-scale,
+high-quality dataset that bridges the synthetic-to-real do-
+main gap.
+3852
+
+
+Acknowledgements.
+This research was supported by Institute of Infor-mation
+& communications Technology Planning & Evaluation
+(IITP) grant funded by the Korea government (MSIT) (RS-
+2019-II190075, RS-2024-00509279, RS-2025-II212068,
+RS-2023-00227592,
+RS-2025-
+02214479,
+RS-2024-
+00457882,
+RS-2025-25441838,
+RS-2025-25441838,
+RS-2025-02214479, RS-2025-02217259) and the Culture,
+Sports, and Tourism R&D Program through the Korea
+Creative Content Agency grant funded by the Ministry
+of Culture, Sports and Tourism (RS-2024-00345025, RS-
+2024-00333068, RS-2023-00222280, RS-2023-00266509),
+and National Research Foundation of Korea (RS-2024-
+00346597).
+References
+[1] Andreas Blattmann, Tim Dockhorn, Sumith Kulal, Daniel
+Mendelevitch, Maciej Kilian, Dominik Lorenz, Yam Levi,
+Zion English, Vikram Voleti, Adam Letts, et al. Stable video
+diffusion: Scaling latent video diffusion models to large
+datasets. arXiv preprint arXiv:2311.15127, 2023. 2, 3, 6,
+1
+[2] Sumit Chaturvedi, Mengwei Ren, Yannick Hold-Geoffroy,
+Jingyuan Liu, Julie Dorsey, and Zhixin Shu. Synthlight: Por-
+trait relighting with diffusion model by learning to re-render
+synthetic faces. In Proceedings of the Computer Vision and
+Pattern Recognition Conference, pages 369–379, 2025. 2
+[3] Yusuf Dalva, Yijun Li, Qing Liu, Nanxuan Zhao, Jianming
+Zhang, Zhe Lin, and Pinar Yanardag. Layerfusion: Harmo-
+nized multi-layer text-to-image generation with generative
+priors. arXiv preprint arXiv:2412.04460, 2024. 2
+[4] Henghui Ding, Chang Liu, Shuting He, Xudong Jiang,
+Philip HS Torr, and Song Bai.
+Mose: A new dataset for
+video object segmentation in complex scenes. In Proceed-
+ings of the IEEE/CVF international conference on computer
+vision, pages 20224–20234, 2023. 3
+[5] Kenji Enomoto, Scott Cohen, Brian Price, and TJ Rhodes.
+Polarized color screen matting. In Proceedings of the Com-
+puter Vision and Pattern Recognition Conference, pages
+391–399, 2025. 2
+[6] Wenshuo Gao, Xicheng Lan, and Shuai Yang.
+Anypor-
+tal: Zero-shot consistent video background replacement. In
+Proceedings of the IEEE/CVF International Conference on
+Computer Vision, pages 18990–18999, 2025. 2
+[7] Gonzalo Martin Garcia,
+Karim Abou Zeid,
+Christian
+Schmidt, Daan De Geus, Alexander Hermans, and Bastian
+Leibe.
+Fine-tuning image-conditional diffusion models is
+easier than you think. In 2025 IEEE/CVF Winter Conference
+on Applications of Computer Vision (WACV), pages 753–
+762. IEEE, 2025. 3
+[8] Yongtao Ge, Kangyang Xie, Guangkai Xu, Li Ke, Mingyu
+Liu, Longtao Huang, Hui Xue, Hao Chen, and Chunhua
+Shen.
+Generative video matting.
+In Proceedings of the
+Special Interest Group on Computer Graphics and Interac-
+tive Techniques Conference Conference Papers, pages 1–10,
+2025. 2, 3, 5
+[9] Yoav HaCohen, Nisan Chiprut, Benny Brazowski, Daniel
+Shalem, Dudu Moshe, Eitan Richardson, Eran Levin, Guy
+Shiran, Nir Zabari, Ori Gordon, Poriya Panet, Sapir Weiss-
+buch, Victor Kulikov, Yaki Bitterman, Zeev Melumian, and
+Oﬁr Bibi. Ltx-video: Realtime video latent diffusion. arXiv
+preprint arXiv:2501.00103, 2024. 2
+[10] Jing He, Haodong Li, Wei Yin, Yixun Liang, Leheng Li,
+Kaiqiang Zhou, Hongbo Zhang, Bingbing Liu, and Ying-
+Cong Chen.
+Lotus:
+Diffusion-based visual foundation
+model for high-quality dense prediction.
+arXiv preprint
+arXiv:2409.18124, 2024. 3
+[11] Wenbo Hu, Xiangjun Gao, Xiaoyu Li, Sijie Zhao, Xiaodong
+Cun, Yong Zhang, Long Quan, and Ying Shan. Depthcrafter:
+Generating consistent long depth sequences for open-world
+videos. In Proceedings of the Computer Vision and Pattern
+Recognition Conference, pages 2005–2015, 2025. 3
+[12] Longfei Huang, Yu Liang, Hao Zhang, Jinwei Chen, Wei
+Dong, Lunde Chen, Wanyu Liu, Bo Li, and Peng-Tao Jiang.
+Sdmatte: Grafting diffusion models for interactive matting.
+arXiv preprint arXiv:2508.00443, 2025. 3
+[13] Wei-Lun Huang and Ming-Sui Lee.
+End-to-end video
+matting with trimap propagation.
+In Proceedings of the
+IEEE/CVF Conference on Computer Vision and Pattern
+Recognition, pages 14337–14347, 2023. 2
+[14] Chuong Huynh, Seoung Wug Oh, Abhinav Shrivastava, and
+Joon-Young Lee. Maggie: Masked guided gradual human in-
+stance matting. In Proceedings of the IEEE/CVF Conference
+on Computer Vision and Pattern Recognition, pages 3870–
+3879, 2024. 2, 3, 5, 6, 7, 8
+[15] Bingxin Ke, Anton Obukhov, Shengyu Huang, Nando Met-
+zger, Rodrigo Caye Daudt, and Konrad Schindler. Repurpos-
+ing diffusion-based image generators for monocular depth
+estimation. In Proceedings of the IEEE/CVF conference on
+computer vision and pattern recognition, pages 9492–9502,
+2024. 3
+[16] Zhanghan Ke, Jiayu Sun, Kaican Li, Qiong Yan, and Ryn-
+son WH Lau. Modnet: Real-time trimap-free portrait mat-
+ting via objective decomposition.
+In Proceedings of the
+AAAI Conference on Artiﬁcial Intelligence, pages 1140–
+1147, 2022. 2
+[17] Beomyoung
+Kim,
+Chanyong
+Shin,
+Joonhyun
+Jeong,
+Hyungsik Jung, Se-Yun Lee, Sewhan Chun, Dong-Hyun
+Hwang, and Joonsang Yu. Zim: Zero-shot image matting
+for anything. arXiv preprint arXiv:2411.00626, 2024. 3
+[18] Diederik P Kingma and Max Welling. Auto-encoding varia-
+tional bayes. arXiv preprint arXiv:1312.6114, 2013. 4
+[19] Alexander Kirillov, Eric Mintun, Nikhila Ravi, Hanzi Mao,
+Chloe Rolland, Laura Gustafson, Tete Xiao, Spencer White-
+head, Alexander C Berg, Wan-Yen Lo, et al. Segment any-
+thing. In Proceedings of the IEEE/CVF international confer-
+ence on computer vision, pages 4015–4026, 2023. 3
+[20] Weijie Kong, Qi Tian, Zijian Zhang, Rox Min, Zuozhuo Dai,
+Jin Zhou, Jiangfeng Xiong, Xin Li, Bo Wu, Jianwei Zhang,
+et al. Hunyuanvideo: A systematic framework for large video
+generative models. arXiv preprint arXiv:2412.03603, 2024.
+3
+3853
+
+
+[21] Jizhizi Li, Sihan Ma, Jing Zhang, and Dacheng Tao. Privacy-
+preserving portrait matting. In Proceedings of the 29th ACM
+international conference on multimedia, pages 3501–3509,
+2021. 3, 5
+[22] Jizhizi Li, Jing Zhang, and Dacheng Tao. Deep automatic
+natural image matting.
+arXiv preprint arXiv:2107.07235,
+2021. 5
+[23] Jizhizi Li, Jing Zhang, Stephen J Maybank, and Dacheng
+Tao. Bridging composite and real: towards end-to-end deep
+image matting. International Journal of Computer Vision,
+130(2):246–266, 2022. 3
+[24] Jizhizi Li, Jing Zhang, and Dacheng Tao. Referring image
+matting. In Proceedings of the IEEE Computer Vision and
+Pattern Recognition, 2023. 3
+[25] Jiachen
+Li,
+Vidit
+Goel,
+Marianna
+Ohanyan,
+Shant
+Navasardyan, Yunchao Wei, and Humphrey Shi. Vmformer:
+End-to-end video matting with transformer.
+In Proceed-
+ings of the IEEE/CVF Winter Conference on Applications of
+Computer Vision, pages 6678–6687, 2024. 2
+[26] Shanchuan Lin, Andrey Ryabtsev, Soumyadip Sengupta,
+Brian L Curless, Steven M Seitz, and Ira Kemelmacher-
+Shlizerman. Real-time high-resolution background matting.
+In Proceedings of the IEEE/CVF Conference on Computer
+Vision and Pattern Recognition, pages 8762–8771, 2021. 2,
+5
+[27] Shanchuan Lin, Linjie Yang, Imran Saleemi, and Soumyadip
+Sengupta. Robust high-resolution video matting with tempo-
+ral guidance. In Proceedings of the IEEE/CVF Winter Con-
+ference on Applications of Computer Vision, pages 238–247,
+2022. 2
+[28] Kwanyong Park, Sanghyun Woo, Seoung Wug Oh, In So
+Kweon, and Joon-Young Lee. Mask-guided matting in the
+wild. In Proceedings of the IEEE/CVF conference on com-
+puter vision and pattern recognition, 2023. 7
+[29] Jordi Pont-Tuset, Federico Perazzi, Sergi Caelles, Pablo Ar-
+bel´aez, Alex Sorkine-Hornung, and Luc Van Gool. The 2017
+davis challenge on video object segmentation. arXiv preprint
+arXiv:1704.00675, 2017. 3, 8
+[30] Yu Qiao, Yuhao Liu, Xin Yang, Dongsheng Zhou, Mingliang
+Xu, Qiang Zhang, and Xiaopeng Wei. Attention-guided hi-
+erarchical structure aggregation for image matting. In The
+IEEE Conference on Computer Vision and Pattern Recogni-
+tion (CVPR), 2020. 5
+[31] Nikhila Ravi, Valentin Gabeur, Yuan-Ting Hu, Ronghang
+Hu, Chaitanya Ryali, Tengyu Ma, Haitham Khedr, Roman
+R¨adle, Chloe Rolland, Laura Gustafson, et al.
+Sam 2:
+Segment anything in images and videos.
+arXiv preprint
+arXiv:2408.00714, 2024. 1, 2, 3, 5, 6, 7, 8
+[32] Mengwei Ren, Wei Xiong, Jae Shin Yoon, Zhixin Shu,
+Jianming Zhang, HyunJoon Jung, Guido Gerig, and He
+Zhang. Relightful harmonization: Lighting-aware portrait
+background replacement. In Proceedings of the IEEE/CVF
+Conference on Computer Vision and Pattern Recognition,
+pages 6452–6462, 2024. 2
+[33] Christoph Rhemann, Carsten Rother, Jue Wang, Margrit
+Gelautz, Pushmeet Kohli, and Pamela Rott.
+A perceptu-
+ally motivated online benchmark for image matting. In 2009
+IEEE conference on computer vision and pattern recogni-
+tion, pages 1826–1833. IEEE, 2009. 7
+[34] Robin Rombach, Andreas Blattmann, Dominik Lorenz,
+Patrick Esser, and Bj¨orn Ommer.
+High-resolution image
+synthesis with latent diffusion models.
+In Proceedings of
+the IEEE/CVF conference on computer vision and pattern
+recognition, pages 10684–10695, 2022. 3
+[35] Fatemeh Saleh, Sadegh Aliakbarian, Charlie Hewitt, Lo-
+hit Petikam, Antonio Criminisi, Thomas J Cashman, Tadas
+Baltruˇsaitis,
+et al.
+David:
+Data-efﬁcient and accu-
+rate vision models from synthetic data.
+arXiv preprint
+arXiv:2507.15365, 2025. 3
+[36] Tim Salimans and Jonathan Ho.
+Progressive distillation
+for fast sampling of diffusion models.
+arXiv preprint
+arXiv:2202.00512, 2022. 4
+[37] Hongje Seong, Seoung Wug Oh, Brian Price, Euntai Kim,
+and Joon-Young Lee.
+One-trimap video matting.
+In Eu-
+ropean Conference on Computer Vision, pages 430–448.
+Springer, 2022. 2
+[38] Jiahao Shao, Yuanbo Yang, Hongyu Zhou, Youmin Zhang,
+Yujun Shen, Vitor Guizilini, Yue Wang, Matteo Poggi, and
+Yiyi Liao. Learning temporally consistent video depth from
+video diffusion priors.
+In Proceedings of the Computer
+Vision and Pattern Recognition Conference, pages 22841–
+22852, 2025. 3
+[39] Oriane Sim´eoni, Huy V Vo, Maximilian Seitzer, Federico
+Baldassarre, Maxime Oquab, Cijo Jose, Vasil Khalidov,
+Marc Szafraniec, Seungeun Yi, Micha¨el Ramamonjisoa,
+et al. Dinov3. arXiv preprint arXiv:2508.10104, 2025. 2,
+5, 6, 1
+[40] Yanan Sun, Guanzhi Wang, Qiao Gu, Chi-Keung Tang, and
+Yu-Wing Tai. Deep video matting via spatio-temporal align-
+ment and aggregation. In Proceedings of the IEEE/CVF Con-
+ference on Computer Vision and Pattern Recognition, pages
+6975–6984, 2021. 2
+[41] Yanan Sun, Chi-Keung Tang, and Yu-Wing Tai. Ultrahigh
+resolution image/video matting with spatio-temporal spar-
+sity. In Proceedings of the IEEE/CVF Conference on Com-
+puter Vision and Pattern Recognition (CVPR), pages 14112–
+14121, 2023. 5
+[42] Team Wan, Ang Wang, Baole Ai, Bin Wen, Chaojie Mao,
+Chen-Wei Xie, Di Chen, Feiwu Yu, Haiming Zhao, Jianxiao
+Yang, et al. Wan: Open and advanced large-scale video gen-
+erative models. arXiv preprint arXiv:2503.20314, 2025. 2,
+3
+[43] Junying Wang, Jingyuan Liu, Xin Sun, Krishna Kumar
+Singh, Zhixin Shu, He Zhang, Jimei Yang, Nanxuan Zhao,
+Tuanfeng Y Wang, Simon S Chen, et al. Comprehensive re-
+lighting: Generalizable and consistent monocular human re-
+lighting and harmonization. In Proceedings of the Computer
+Vision and Pattern Recognition Conference, pages 380–390,
+2025. 2
+[44] Jiepeng Wang, Zhaoqing Wang, Hao Pan, Yuan Liu, Dong-
+dong Yu, Changhu Wang, and Wenping Wang. Mmgen: Uni-
+ﬁed multi-modal image generation and understanding in one
+go. arXiv preprint arXiv:2503.20644, 2025. 3
+[45] Tiantian Wang, Sifei Liu, Yapeng Tian, Kai Li, and Ming-
+Hsuan Yang.
+Video matting via consistency-regularized
+3854
+
+
+graph neural networks.
+In Proceedings of the IEEE/CVF
+International Conference on Computer Vision, pages 4902–
+4911, 2021. 2, 5
+[46] Guangkai Xu, Yongtao Ge, Mingyu Liu, Chengxiang Fan,
+Kangyang Xie, Zhiyue Zhao, Hao Chen, and Chunhua Shen.
+What matters when repurposing diffusion models for general
+dense perception tasks?
+arXiv preprint arXiv:2403.06090,
+2024. 3
+[47] Ning Xu, Linjie Yang, Yuchen Fan, Dingcheng Yue, Yuchen
+Liang, Jianchao Yang, and Thomas Huang.
+Youtube-vos:
+A large-scale video object segmentation benchmark. arXiv
+preprint arXiv:1809.03327, 2018. 3
+[48] Jinrui Yang, Qing Liu, Yijun Li, Soo Ye Kim, Daniil Pakho-
+mov, Mengwei Ren, Jianming Zhang, Zhe Lin, Cihang Xie,
+and Yuyin Zhou. Generative image layer decomposition with
+visual effects. In Proceedings of the Computer Vision and
+Pattern Recognition Conference, pages 7643–7653, 2025. 2
+[49] Peiqing Yang, Shangchen Zhou, Jixin Zhao, Qingyi Tao,
+and Chen Change Loy. Matanyone: Stable video matting
+with consistent memory propagation. In Proceedings of the
+Computer Vision and Pattern Recognition Conference, pages
+7299–7308, 2025. 2, 5, 6, 7, 8, 3
+[50] Qihang Yu, Jianming Zhang, He Zhang, Yilin Wang, Zhe
+Lin, Ning Xu, Yutong Bai, and Alan Yuille. Mask guided
+matting via progressive reﬁnement network. arXiv preprint
+arXiv:2012.06722, 2020. 3, 7
+[51] Jianshu Zeng, Yuxuan Liu, Yutong Feng, Chenxuan Miao,
+Zixiang Gao, Jiwang Qu, Jianzhang Zhang, Bin Wang, and
+Kun Yuan. Lumen: Consistent video relighting and harmo-
+nious background replacement with video generative mod-
+els. arXiv preprint arXiv:2508.12945, 2025. 2
+[52] Yunke Zhang, Chi Wang, Miaomiao Cui, Peiran Ren, Xuan-
+song Xie, Xian-Sheng Hua, Hujun Bao, Qixing Huang, and
+Weiwei Xu. Attention-guided temporally coherent video ob-
+ject matting. In Proceedings of the 29th ACM International
+Conference on Multimedia, pages 5128–5137, 2021. 2, 5
+[53] Canyu Zhao, Yanlong Sun, Mingyu Liu, Huanyi Zheng,
+Muzhi Zhu, Zhiyue Zhao, Hao Chen, Tong He, and Chun-
+hua Shen. Diception: A generalist diffusion model for visual
+perceptual tasks. arXiv preprint arXiv:2502.17157, 2025. 3
+3855

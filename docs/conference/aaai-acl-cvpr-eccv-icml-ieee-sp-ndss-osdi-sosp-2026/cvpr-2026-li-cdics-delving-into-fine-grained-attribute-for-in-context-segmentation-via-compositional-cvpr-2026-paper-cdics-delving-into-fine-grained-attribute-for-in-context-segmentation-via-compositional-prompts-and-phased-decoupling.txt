@@ -1,0 +1,386 @@
+Title: CDICS: Delving Into Fine-Grained Attribute for In-Context Segmentation via Compositional Prompts and Phased Decoupling
+
+URL Source: https://openaccess.thecvf.com/content/CVPR2026/papers/Li_CDICS_Delving_Into_Fine-Grained_Attribute_for_In-Context_Segmentation_via_Compositional_CVPR_2026_paper.pdf
+
+Published Time: Sat, 16 May 2026 16:47:56 GMT
+
+Number of Pages: 10
+
+Markdown Content:
+# CDICS: Delving Into Fine-Grained Attribute for In-Context Segmentation via Compositional Prompts and Phased Decoupling 
+
+## Zhiyu Li 1,2 , Dianmo Sheng 1,2 , Qi Chu 1,2 , Shilong Chen 1,2 , Tao Gong 1,2 †, Zhou Wei 3, Nenghai Yu 1,2 1University of Science and Technology of China 2Anhui Province Key Laboratory of Digital Security 
+
+> 3
+
+## Lingyang Industrial Internet Co.,Ltd. 
+
+linzeyin@mail.ustc.edu.cn , tgong@ustc.edu.cn , ynh@ustc.edu.cn 
+
+## Abstract 
+
+In-Context Learning (ICL) has shown great effectiveness in developing generalist image segmentation models. Its sig-nificant advantage over text-based descriptions is the ability to convey intricate visual appearance details through sim-ple reference images. However, finding a perfectly matching single example for real-world rare and complex concepts is difficult. Moreover, existing methods are largely confined to semantic or instance-level understanding of the refer-ence image, struggling to express more precise segmenta-tion needs through the input. To address this, we propose 
+
+CDICS , a novel framework that leverages Compositional prompts and phased task Decoupling to achieve compo-sitional prompt-controlled In-Context Segmentation. Our method introduces compositional prompts derived from ref-erence prompts, combining semantic, part and color im-ages to dynamically define segmentation targets. To effec-tively fuse this control information, ensure synergy while suppressing interference, and mitigate feature coupling risks, our decoupled two-stage architecture firstly performs coarse-grained semantic localization, then refines the result using compositional appearance prompts to precisely match the specified attributes. This design extends traditional in-context segmentation, enabling it to support compositional prompts. Additionally, we reconstructed two datasets and their benchmarks to acquire data with part-color-specific attributes. Our method demonstrates superior performance on the compositional prompt-controlled in-context segmen-tation task. It also extends the capabilities of existing in-context segmentation, and makes an attempt toward real-world fine-grained segmentation. 
+
+## 1. Introduction 
+
+In recent years, In-Context Learning (ICL) has emerged as a prominent paradigm in image segmentation, enabling mod-        
+
+> †Corresponding author. Ref Image
+> semantic CDICS (Ours)
+> Our
+> Stage1
+> Our
+> Stage2
+> Previous
+> Methods
+> Target Image
+> Target Image
+> Ref Image
+> Color
+> Ref Image
+> Part
+> Semantic&Instance -level
+> Appearance Constraint
+> Semantic&Instance
+> Input Output
+> Semantic&Instance -level
+> Ref Image
+> semantic
+
+Figure 1. Comparison of our two-stage CDICS framework with previous methods. The blue-highlighted area in Ref Image serves as a mask prompt. Previous methods perform standard semantic and instance-level segmentation based on “RefImage semantic”. Stage 1 of our method is similar to previous methods, while Stage 2 builds upon this foundation by applying additional appearance prompts (“RefImage Color” and “RefImage Part”) to achieve fine-grained, compositional prompt-controlled segmentation. 
+
+els to segment novel targets by referencing just one or more exemplar images. Despite its efficacy, this paradigm faces a limitation: extant methods excel at understanding the se-mantic information of the target but struggle to flexibly ad-just the granularity of segmentation based on the input. In many real-world scenarios, user’s needs are diverse. Users may sometimes require coarse-grained semantic seg-mentation, and at other times, fine-grained segmentation with precise appearance conditions such as “a person wear-ing a necklace of a specific style and color.” Furthermore, it is often impractical and burdensome for users to find exem-plar images that perfectly match the desired attribute com-bination, highlighting the need for a more flexible, compo-sitional approach. This CVPR paper is the Open Access version, provided by the Computer Vision Foundation. Except for this watermark, it is identical to the accepted version; the final published version of the proceedings is available on IEEE Xplore. 13179 To this end, in this paper, we make an attempt towards more fine-grained and controllable segmentation by consid-ering both the part and color of the object of interest. Specif-ically, we propose a strategy focusing on Compositional Prompts and phased task Decoupling. As illustrated in Fig-ure 1, our approach is distinct from previous methods. It ex-tends the standard segmentation pipeline with a coarse-to-fine refinement path. This design allows our model to utilize compositional prompts, which combine high-level “seman-tic” prompts (object) with fine-grained “part” and “color” prompts. Our model can flexibly process these prompts to support diverse instructions. For example, it supports high-level semantics (“segment the chair”), part-level specifics (“segment the chair with back”), and fully combined instructions (“segment the chair with a back of that color”). This flexibility enables our framework to perform both standard category-level segmen-tation and the proposed compositional fine-grained segmen-tation tasks. Concretely, our model follows an encoder-decoder ar-chitecture: (1) Encoding Stage : We use a pretrained im-age encoder to extract target features from the target im-age. Simultaneously, we process the reference prompts by extracting semantic and part features, and mapping the ref-erence color information into a similarity map aligned with the target image. (2) First-stage Decoding : Based on the semantic prompt, we generate and aggregate instance-level masks to derive a coarse semantic map that bootstraps the second-stage decoding. (3) Second-stage Decoding : We input the color-similarity-map-enhanced target image fea-tures and the part features into an Appearance Fusion Mod-ule. This module learns target object appearance attributes and fuses this information to create a final, composed fea-ture. This feature is then processed by a decoder to generate the final, fine-grained segmentation masks, which are pre-cisely constrained by the part and color prompts. In our architecture, the first stage learns generic object 
+
+concepts, while the second stage employs the Appearance Fusion Module to integrate part and color prompts. The de-coupled representations are then recomposed through itera-tive fusion, achieving the fine-grained segmentation. This coarse-to-fine strategy not only preserves the global local-ization ability provided by semantic guidance, but also con-siders part and color cues at a detailed level, enabling pre-cise prompt-based segmentation. Our main contributions are summarized as follows: • Compositional Prompt Mechanism : We introduce, for the first time, a compositional prompt scheme that inte-grates object semantics, part morphology, and color at-tributes into a segmentation network, offering flexible and fine-grained target descriptions. We also design a unified Appearance Fusion Module to enhance sensitivity to fine-grained appearance attributes. • Two-stage Fusion Architecture : We propose a “coarse semantic → fine refinement” pipeline, first filtering target categories via semantic prompts, and then refining seg-mentation by combining user-specified part and color at-tributes to get the user-required segmentation results. • Leading Performance in Precision : Our model demon-strates leading performance on compositional segmen-tation tasks. Extensive experiments show that it sub-stantially reduces the false positive rate for fine-grained attribute queries, while maintaining highly competitive performance on conventional in-context segmentation benchmarks. 
+
+## 2. Related Work 
+
+2.1. Image Segmentation 
+
+Image segmentation is a fundamental problem in com-puter vision, aiming to assign a semantic label to ev-ery pixel in an input image. Early image segmenta-tion predominantly relied on convolutional neural net-works (CNNs), with milestones like FCN [21], U-Net [29], and Mask R-CNN [8] establishing foundational encoder-decoder and region-proposal architectures. Subsequently, Transformer-based architectures such as SegFormer [41] and Mask2Former [2] advanced the field by unifying de-tection and segmentation frameworks with superior perfor-mance. Recently, the paradigm has shifted from closed-set recognition towards open-world perception. Contemporary methods increasingly leverage large-scale foundation mod-els [4, 14, 42, 45] to extract highly generalizable features for complex, real-world segmentation tasks. 
+
+2.2. Vision In-Context Learning 
+
+In-Context Learning (ICL), originating from natural lan-guage processing [1, 5, 38], enables models to perform new tasks without updating weights, relying solely on inference-time example pairs (“contexts” or “prompts”). Vision ICL extends this paradigm to computer vision tasks, often using reference image-mask pairs as prompts to guide the model in segmenting a query image [23, 31, 32, 34, 35]. Early methods like Painter [34] and SegGPT [35] cast segmenta-tion as mask painting or coloring. Recent approaches lever-age foundation models: Matcher [19] computes semantic correspondences for SAM [28] using DINOv2 [24], while SINE [20] enhances contextual usage via prompt fusion and feature alignment. Despite progress in conventional seg-mentation, existing ICL methods underutilize the interac-tive potential of visual sample prompts and continue to face challenges in handling segmentation with more fine-grained appearance requirements. Our work introduces a novel compositional in-context segmentation framework that inte-grates semantic, part, and color cues to achieve fine-grained control over object appearance. 13180 2.3. Reference-Based Segmentation 
+
+Reference Expression Segmentation (RES) aims to seg-ment objects in images based on natural language descrip-tions [17, 18, 36, 40]. Unlike vision ICL, RES methods rely on language models to parse free-form text for ob-ject segmentation. While early works include CMPC [10] and ReSTR [12], recent advancements have increasingly utilized Multimodal Large Language Models (MLLMs) to push the boundaries of referring segmentation by leverag-ing cross-modal reasoning to interpret complex user instruc-tions [13, 27]. However, linguistic vocabulary for color is limited and discrete, leading to ambiguity in color-based scenarios such as e-commerce product matching or indus-trial quality inspection. Users often cannot precisely de-scribe colors verbally, and interpretations of the same color term may vary, lacking a unified standard for mapping color-language semantics. Compared to a pure text or an example-image prompt, our method uses a color image as a visual cue, offering a more user-friendly and consistent ap-proach to representing color semantics across different lin-guistic expressions. 
+
+2.4. Compositional Paradigms in Visual Tasks 
+
+The concept of decomposing images into a combination of elements has been actively explored in other visual do-mains. Compositional Zero-Shot Learning (CZSL) explic-itly disentangles visual primitives to recognize and general-ize to unseen compositions [11, 15]. Recent CZSL methods leverage cross-modal disentanglement and logic rules for precise semantic alignment [6, 39]. Additionally, Attribute-Based Retrieval and Composed Image Retrieval (CIR) use multimodal queries for fine-grained visual control, effec-tively bypassing unimodal constraints [16, 30]. We intro-duce this compositional paradigm into the domain of in-context segmentation. By fully exploiting visual samples as compositional inputs, our framework enhances fine-grained control over segmentation targets and effectively eliminates the reliance on “perfect reference samples”. 
+
+## 3. Method 
+
+3.1. Overview 
+
+To enable precise responses to compositional prompts like “semantic-part-color” and thereby address segmentation tasks that demand fine-grained attribute control at the task-definition level, we propose a decoupled in-context seg-mentation framework (CDICS) . Our core design is to or-thogonally decompose such complex tasks into two inde-pendent sub-problems: semantic identification and appear-ance constraint matching, which are handled by two spe-cialized decoder stages, respectively (as shown in Figure 2). 
+
+Stage 1: Rough Semantic Localization answers the high-level question, “What is the target ? ” by performing a rough spatial localization of all object instances belonging to the specified semantic category. 
+
+Stage 2: Appearance Constraint Refinement operates on the objects identified in Stage 1, answers the fine-grained question, “What does this specific target look like ? ” by applying compositional appearance constraints to precisely match its color and part attributes. This design, by separating high-level semantic iden-tification from fine-grained appearance matching, effec-tively circumvents the challenging issue of feature coupling among different constraints. This allows the model to fo-cus more effectively on learning and applying fine-grained appearance features, thus achieving a precise understanding and segmentation of compositional prompts. 
+
+3.2. Encoder stage 
+
+The model’s input consists of a target image Itar ∈
+
+R3×H×W and a set of compositional prompts acting upon it, specifically: the semantic reference (Isem ∈
+
+R3×H×W , M sem ∈ R1×H×W ), the part reference 
+
+(Ipart ∈ R3×H×W , M part ∈ R1×H×W ), and the color reference Icol ∈ R3×1×1. The goal of the encoding stage is to transform these various types of input information into high-dimensional features usable by the subsequent de-coders. For semantic and part prototype extraction, we employ DINOv2 as the backbone encoder. Through a MaskPooling operation, we extract semantic prototypes Fsem ∈ R1×C
+
+and part prototypes Fpart ∈ R1×C from their respective reference images and masks. The target image Itar is also encoded into a feature map Ftar ∈ Rn×m×C .To apply the color prompt to specific image regions, we designed the Color Fusion Module, which transforms coarse color information into a concrete and quantifiable appearance cue. Our core idea is to generate a location-indicating intensity map, where pixels in the target image that are more similar to the reference color receive a higher intensity value. To this end, the module first converts the target image 
+
+Itar and the reference color Icol into the CIELAB color space. Then, it computes the pixel-wise CIEDE2000 color difference function ∆E00 [22] between the target image and the reference color, yielding a color difference map. Since a smaller color difference indicates greater similarity, these raw difference values are transformed to produce the final similarity map Msim ∈ Rn×m, which is formulated as: 
+
+Msim (Itar , I col ) = 1 − Norm( ∆E 00 (Itar , Icol )) , (1) where Norm( ·) represents the normalization function. Sub-sequently, this map is injected into the target feature map Ftar via a FiLM (Feature-wise Linear Modulation) layer [25]. The FiLM layer generates channel-wise affine 13181 Encoder  Decoder Stage 1  Decoder Stage 2  
+
+> Transformer
+> Block
+> Color
+> Fusion
+> Feature Map
+> Weighting
+> 𝐹 𝑠𝑒𝑚
+> 𝐹 𝑡𝑎𝑟
+> 𝑄 𝑖𝑛𝑠
+> 𝑆𝑐𝑜𝑟𝑒𝑠 𝑖𝑛𝑠
+> 𝐹 𝑡𝑎𝑟 𝑐𝑜𝑙
+> 𝐹 𝑠𝑒𝑚
+> 𝑠2
+> Mask
+> Pooling
+> DinoV2
+> 𝑅𝑒𝑓 𝐼𝑚𝑎𝑔𝑒 𝑠𝑒𝑚
+> 𝑇𝑎𝑟𝑔𝑒𝑡 𝐼𝑚𝑎𝑔𝑒
+> 𝑅𝑒𝑓𝐶𝑜𝑙𝑜𝑟
+> DinoV2
+> 𝑅𝑒𝑓 𝐼𝑚𝑎𝑔𝑒 𝑝𝑎𝑟𝑡
+> Mask
+> Pooling
+> 𝐹 𝑝𝑎𝑟𝑡
+> DinoV2
+> 𝑄 𝑖𝑛𝑠 𝑠2
+> Appearance
+> Fusion
+> 𝐹 𝑠𝑒𝑚 𝐹 𝑠𝑒𝑚
+> 𝑠1
+> 𝐹 𝑝𝑎𝑟𝑡
+> 𝑀 𝑠1
+> 𝐹 𝑡𝑎𝑟 𝑠1
+> 𝐹 𝑡𝑎𝑟 𝑠2
+> 𝑄 𝑖𝑛𝑠
+> 𝑠1
+> Transformer
+> Block
+> Stage 1
+> Decoder
+> Stage 2
+> Decoder
+> 𝐹 𝑡ar 𝑐𝑜𝑙
+> 𝑀 𝑠2
+
+Figure 2. Overview of our proposed CDICS framework. The model takes a target image and a set of compositional prompts (semantic, part, color) as input. All inputs are first processed by the Encoder stage to extract high-dimensional features. These features are then fed into a decoupled two-stage decoder: (1) Stage 1 performs rough semantic localization to output base instance masks; (2) Stage 2 then utilizes the appearance constraints from the compositional prompts to refine the feature from Stage 1, ultimately generating precise segmentation results that adhere to the fine-grained attributes. 
+
+transformation parameters, gamma ( γ ∈ Rn×m×C ) and beta ( β ∈ Rn×m×C ), from the similarity map Msim to modulate the target feature map: 
+
+γ, β = F iLM (Msim ), (2) 
+
+F col tar = Ftar · (1 + γ) + β, (3) where F col tar ∈ Rn×m×C is the final color-enhanced feature and · denotes element-wise multiplication. The primary purpose of this is to apply corresponding enhancement to the feature map regions that match the reference color, ul-timately yielding a color-sensitized color-enhanced feature 
+
+F col tar .
+
+3.3. Decoder Stage 1 
+
+The objective of the first-stage decoder is to perform rough semantic localization. At this stage, the model completely disregards fine-grained details such as part and color, lever-aging only the semantic prototype Fsem ∈ R1×C to locate all potential object instances within the target feature map 
+
+Ftar ∈ Rn×m×C . We implement this process using a trans-former decoder, where a set of learnable instance queries (Qins ∈ RN ×C , with N being the number of instances) interact with the image features to progressively learn the position and shape of each instance. Finally, this stage out-puts a set of rough instance masks and their corresponding semantic labels, which collectively form a solid foundation for the fine-grained analysis in the second stage. 
+
+3.4. Decoder Stage 2 
+
+After the semantic identity of the targets has been estab-lished, the core task of the second-stage decoder is to ap-ply appearance constraints. Within the regions provided by Stage 1, it refines the segmentation result by interpreting the “color-part” compositional prompt. 
+
+Feature Map Weighting To improve efficiency and pre-cision, we merge the instance masks (Scores ins ∈
+
+RN ×n×m) from the Stage 1 into a single comprehensive semantic region score map ( Score sem ∈ R1×n×m). This map is used to weight F S1 
+
+> tar
+
+, yielding the Stage 2 input fea-ture F S2 
+
+> tar
+
+, where F S1 
+
+> tar
+
+is obtained from the original Ftar 
+
+after being modified by the semantic feature Fsem :
+
+F S2 
+
+> tar
+
+= ( Score sem + 1) · F S1 
+
+> tar
+
+. (4) By performing a dot product between this score and the target feature, the model can pay more attention to the fore-ground objects, effectively filtering out background noise. 
+
+Appearance Fusion To accurately interpret the compos-ite concept of “a specific color for a specific part,” we de-13182 Appearance  Fusion  
+
+> Transformer
+> Block
+> Transformer
+> Block
+> Similarity
+> Color Fusion
+> 𝑇𝑎𝑟𝑔𝑒𝑡 𝐼𝑚𝑎𝑔𝑒
+> 𝑅𝑒𝑓𝐶𝑜𝑙𝑜𝑟
+> 𝐹 𝑡𝑎𝑟 FiLM
+> Color
+> Similarity
+> 𝑀 𝑠𝑖𝑚
+
+(𝒂)  (𝒃) 
+
+> 𝐹 𝑡𝑎𝑟 𝑐𝑜𝑙
+> 𝐹 𝑠𝑒𝑚 𝑠1
+> 𝐹 𝑠𝑒𝑚 𝑠2
+> 𝐹 𝑝𝑎𝑟𝑡
+> 𝐹 𝑡𝑎𝑟 𝑐𝑝 𝐹 𝑡𝑎𝑟 𝑐𝑜𝑙
+> 𝐹 𝑐𝑝
+> C
+
+Figure 3. (a) Color Fusion: Generates color-enhanced target features F col tar based on reference color similarity Msim . (b) Appearance Fusion: Back-feeds the F cp tar feature to the part feature, then fuses the result with the semantic feature to produce the fusion feature (Fscp ∈ R1×C ). This enhanced semantic feature is then concatenated with the original semantic feature to obtain the final compositional feature F s2 
+
+> sem
+
+∈ R2×C
+
+signed an elegant semantic guidance pipeline. The color-enhanced feature F col tar alone, while highlighting color-matched regions, lacks semantic selectivity. It cannot dis-tinguish the semantic identity of these regions (it would equally enhance a “red car door” and a “red postbox” in the background). We leverage the semantic information carried by the part prototype Fpart to guide and modulate the color-enhanced feature F col tar . Specifically, we compute the cosine similarity between Fpart and the feature vector at each spatial loca-tion on the feature map F col tar , generating a part attention map F cp tar . The value at each position of this map reflects its correspondence to the target part. Subsequently, we per-form spatially selective modulation on the feature map via the following formula to obtain the part prototype guided feature F cp tar ∈ Rn×m×C :
+
+F cp tar = ( sim (Fpart , F col tar ) + 1) · F col tar , (5) where sim (·) denotes the spatially-wise cosine similarity computation. This operation maximally enhances the re-gions in F col tar that match both in part and in color, thus re-solving the ambiguity caused by relying on color alone. Subsequently, this semantically-guided and more pre-cise feature F cp tar is used in reverse to enhance the origi-nal part prototype Fpart to produce the “appearance-aware” part feature Fcp , allowing it to learn the specific appearance of the target part within the image. Finally, this feature Fcp is fused with the semantic pro-totype F s1 
+
+> sem
+
+to generate the final compositional prototype feature Fscp ∈ R1×C , which encapsulates the complete information about the appearance constraint. This Fscp is concatenated with the original F s1 
+
+> sem
+
+to form the final com-positional feature F s2 
+
+> sem
+
+∈ R2×C .
+
+3.5. Fine-grained Classification and Segmentation 
+
+The final classification compares instance features against the unified F s2 
+
+> sem
+
+prototype. Matching against this con-catenated feature (containing both F s1 
+
+> sem
+
+and Fscp ) en-ables the model to resolve attribute-level distinctions among instances. This approach enables the model to resolve attribute-level distinctions among instances within the same semantic class, which is crucial for generating final fine-grained segmentation masks. We supervise the instance segmentation outputs at each stage of our model using an identical loss function. As our model generates a set of instance predictions for a variable number of ground truth objects, we employ the Hungarian algorithm to estab-lish an optimal one-to-one assignment between the predic-tions and the ground truths. For each successfully matched prediction-ground-truth pair in stage i ∈ { 1, 2}, the loss 
+
+LiH comprises a classification term and a mask segmenta-tion term: 
+
+LiH =
+
+> Ni
+
+X
+
+> j=1
+
+− log pσ(j)(cj ) + 1cj̸ =∅Lmask 
+
+ , (6) where σ denotes the optimal assignment found by the Hun-garian algorithm. Ni is the number of matched instance pairs in the ith stage.The total training loss for the model is the sum of the Hungarian losses computed at each stage. The classification term, − log pσ(j)(cj ), is the negative log-likelihood loss for the predicted class. The mask loss, Lmask ,evaluates the discrepancy between the predicted mask ˆM
+
+and the ground truth mask M . It is a sum of a Sigmoid-based Binary Cross-Entropy (BCE) loss and the Dice loss: 
+
+Lmask ( ˆM , M ) = LBCE ( ˆM , M ) + LDice ( ˆM , M ). (7) 13183 Ref Image       
+
+> semantic
+> Ref Image
+> Part
+> Ref Image
+> Color Target Image Stage1 Pred Stage2 Pred Stage1 GT Stage2 GT
+
+Figure 4. Visual results of our compositional segmentation. The first two rows show our predictions vs. ground truth (GT) using ’semantic-part-color’ compositional prompts. The following two rows show predictions using ’semantic-part’ compositional prompts. 
+
+The total training loss for the model, Ltotal is the sum of the Hungarian losses from each stage: 
+
+Ltotal =
+
+> 2
+
+X
+
+> i=1
+
+LiH . (8) 
+
+## 4. Experiment 
+
+4.1. Experimental Setup 
+
+4.1.1. Datasets 
+
+To comprehensively evaluate our model’s capabilities, we utilize four datasets, which are uniformly formatted into prompt-target pairs. We specifically annotated and recon-structed two datasets for our compositional task, and also use the standard benchmark for general in-context segmen-tation capabilities. We reconstructed two datasets with fine-grained color annotations to directly supervise and evaluate our model’s ability to handle compositional prompts. 
+
+ColorPACO : We reconstructed ColorPACO by per-forming fine-grained color annotations on the PACO dataset [26]. The original PACO dataset contains 75 ob-ject and 456 object-part categories. For each part instance, we annotated its precise RGB value based on its visual ap-pearance, rather than a discrete color label. 
+
+ColorPartImageNet : To assess the model’s out-of-domain generalization ability, we applied similar color an-notations to the PartImageNet dataset [7]. PartImageNet consists of 158 classes from ImageNet, with several part annotations per class (e.g., Head, Body, Foot, Tail). Images in this dataset typically contain only a single primary object. A key feature of our annotated datasets is the partitioning into positive and negative samples. 1) Positive Samples :The object, part, and color described in the prompt are all present in the target image. 2) Negative Samples : The tar-get image contains an object of the prompted category, but its part or color attributes do not match. For negative sam-ples, the ground-truth mask is all-zero. Positive and nega-tive samples are not generated in pairs but are independently sampled from the dataset at an approximate 3:1 ratio to pro-vide a more holistic and unbiased evaluation of the model’s performance. To ensure fair comparison and evaluate general in-context segmentation abilities under previous settings, we also employ the following standard datasets. 
+
+COCO-Ins : The COCO dataset, comprising 80 “thing” and 53 “stuff” categories, is widely used for various seg-mentation tasks. We utilize its instance segmentation anno-tations (COCO-Ins) to bolster the model’s capacity for fine-grained, instruction-based segmentation in a single stage. 
+
+COCO-20 i: We evaluate the model’s fundamental in-context segmentation performance on the COCO-20 i few-shot segmentation benchmark to ensure a fair comparison with contemporary works. 13184 Method Venue COCO-20 i ColorPACO ColorPartImagenet IoU ↑ IoU ↑ FPR ↓ IoU ↑ FPR ↓
+
+Semantic + Part segmentation 
+
+SINE[20]+OIParts[3] ACMM2024 / 27.5 4.2 / /
+
+In-context segmentation 
+
+SegGPT[35] ICCV2023 56.1 23.9 4.9 85.2 23.8 Matcher[19] ICLR2024 52.7 42.6 8.3 81.9 20.9 SINE [20] NeurIPS2024 64.5 44.1 17.1 84.1 23.4 LDIS [33] AAAI2025 60.3 31.0 12.4 71.3 26.4 
+
+Referring segmentation 
+
+OMG-LLaVA [43] NeurIPS2024 / 23.1 8.3 / /PSALM [44] ECCV2024 / 40.8 12.5 / /HyperSeg [37] CVPR2025 / 42.9 8.3 / /DETRIS [9] AAAI2025 / 31.5 8.9 / /
+
+CDICS(Ours) / 65.2 57.6 3.9 84.4 12.5 
+
+> Table 1. Performance comparison with state-of-the-art in-context and referring segmentation methods on the COCO-20 i, ColorPACO, and ColorPartImageNet datasets. We additionally include a post-processing baseline (SINE + OIParts) that combines in-context segmentation outputs with part segmentation and color filtering.
+
+Method ColorPACO AP ↑ AP 50 ↑
+
+HyperSeg 12.9 16.3 PSALM 10.7 13.9 SINE 14.3 27.3 
+
+CDICS(Ours) 20.8 34.9 
+
+> Table 2. Performance comparison of instance segmentation.
+
+Our training and evaluation pipeline is designed to as-sess both specialized compositional understanding and gen-eral segmentation robustness. For training , we use a mix-ture of ColorPACO and COCO-Ins . ColorPACO pro-vides direct supervision for our primary “semantic-part-color” compositional prompt-controlled in-context segmen-tation task, while the diverse instances in COCO-Ins en-hance the model’s fundamental instance recognition capa-bilities and prevent overfitting to our specific compositional structure. For evaluation , the model is tested on two held-out datasets: ColorPartImageNet and COCO-20 i. Col-orPartImageNet is used to measure out-of-domain general-ization on the compositional task, while COCO-20 i bench-marks the model’s performance on the standard FSS task against prior art. The detailed dataset setup can be found in the Appendix. 
+
+4.1.2. Evaluation Metrics Segmentation Accuracy : For positive samples, we employ the standard Intersection-over-Union (IoU) to measure the overlap between the predicted and ground-truth masks. For instance segmentation, we also report the standard Average Precision (AP) and AP at an IoU threshold of 0.5 (AP 50 ). 
+
+Instruction Discrimination Ability : For negative sam-ples, we use the False Positive Rate (FPR) for evaluation. FPR = FP FP + TN (9) where FP (False Positives) is the number of background pix-els incorrectly predicted as foreground, and TN (True Neg-atives) is the number of background pixels correctly pre-dicted as background. FPR represents the fraction of background pixels that are falsely activated by the model when it is expected to output an empty mask. A lower FPR signifies a superior ability to accurately interpret and reject invalid instructions, rather than segmenting indiscriminately. 
+
+4.2. Main Results and Analysis 
+
+4.2.1. Implementation Details 
+
+Our model is constructed upon the SINE architecture and initialized with its pre-trained weights. The model is jointly trained on the ColorPACO and COCO-Ins datasets with a data sampling ratio of 1:1. We use the AdamW optimizer with an initial learning rate of 1 × 10 −4. The model is trained on 8 NVIDIA A6000 GPUs with a batch size of 160 for 60 epochs. 
+
+4.2.2. Quantitative Comparison with Other Methods 
+
+We compare our method against two categories of main-stream models. To ensure a fair comparison, we prior-itized the use of the officially released source code and pre-trained weights for each method, thereby ensuring the 13185 Baseline Appearance Fusion Two Stage IoU ↑ FPR ↓ AP ↑ AP 50 ↑
+
+✓ 50.3 12.0 16.9 27.7 
+
+✓ ✓ 51.4 9.3 18.9 30.8 
+
+✓ ✓ ✓ 58.9 5.7 23.8 42.4 
+
+> Table 3. Ablation study of different module combinations. “ ✓” indicates that the module is included in the experiment.
+
+validity of all experimental results. The first category is In-context segmentation, which relies on visual exemplars. We select SegGPT [35], Matcher [19], SINE [20], and LDIS [33] as representative methods, providing them with a single image patch that perfectly matches the “ [color]-[part]-[category] ” description as the visual prompt. The second category comprises Referring Segmentation models that directly interpret textual instructions. For these models, including OMG-LLaVA [43], PSALM [44], HyperSeg [37], and DETRIS [9], we follow their standard usage with text inputs formatted as “a [obj] with a [color] [part] or a [obj] with a [part]”. Furthermore, we include a combined base-line that directly integrates semantic and part segmentation models (SINE + OIParts). This baseline involves match-ing masks from the semantic segmentation model with the part segmentation model’s output, followed by color post-processing to generate the required mask. As shown in Ta-ble 1, our model demonstrates superior performance across all tasks. 
+
+On ColorPACO : Our method achieves an IoU of 57.6% 
+
+and an FPR of 3.9% . Compared to the strongest referring segmentation model, HyperSeg (IoU 42.9%, FPR 8.3%), our IoU shows an improvement of 14.7 points, while the FPR is reduced by more than half. This result indicates that our model not only locates the target region more pre-cisely but also possesses a strong instruction discrimination ability, effectively avoiding spurious segmentations for non-matching prompts. 
+
+On ColorPartImageNet : Our model exhibits strong out-of-domain generalization, achieving an IoU of 84.4 % and an FPR of 12.5% . Notably, while SegGPT attains the highest IoU ( 85.2% ), it also suffers from a very high FPR (23.8%), suggesting a tendency to “over-segment.” In con-trast, our model maintains a competitive IoU while achiev-ing a significantly lower FPR, demonstrating a better bal-ance between accuracy and fidelity. 
+
+On COCO-20 i: Our model’s IoU of 65.2% confirms that the introduced modules for enhancing compositional understanding do not compromise the model’s fundamental segmentation capabilities. As reported in Table 2, our method also excels in the instance segmentation task on ColorPACO. Our model achieves an AP of 20.8% and an AP 50 of 34.9% , signifi-cantly surpassing the other models. This demonstrates that our method yields improvements in both pixel-level classi-fication and instance-level differentiation. 
+
+4.2.3. Ablation Studies 
+
+To validate the effectiveness of the key components in our method, we conducted a series of ablation studies on the ColorPACO dataset (results in Table 3). We first estab-lished a baseline model (Baseline), which only uses the basic encoder when fusing color, part, and semantic fea-tures (achieving 50.3% IoU and 12.0% FPR). Subsequently, we incrementally integrated our two core proposed modules atop this baseline: the Appearance Fusion module and the Two-Stage training strategy. The experimental results unequivocally demonstrate the contribution of each component. After introducing the Ap-pearance Fusion module to the baseline, the model’s per-formance showed a comprehensive improvement (IoU in-creased from 50.3% to 51.4%, and AP 50 rose from 27.7% to 30.8%), while the FPR was also significantly reduced by 2.7% (from 12.0% to 9.3%) Our designed Appearance Fusion module can effectively fuse features that align with the color and part prompts into the coarse-grained semantic features, thereby providing effective fused features for the subsequent precise segmentation. Moreover, adopting the Two-Stage training strategy fur-ther advanced the model’s performance. We attribute this gain to the decoupling of the task, which facilitates a more focused learning process for distinct objectives. This strat-egy enables the model to effectively utilize the features learned in the first stage, providing a strong foundation for the second stage to achieve more precise segmentation. 
+
+## 5. Conclusion 
+
+Addressing the limitations of current in-context segmenta-tion models in understanding fine-grained visual attributes, this paper proposes a novel framework named CDICS. By introducing innovative “Compositional Prompts”, CDICS is the first attempt to integrate object semantics, part morphol-ogy, and color attributes into a unified pipeline, thus achiev-ing a level of flexibility and precision in target description that surpasses previous paradigms. Experimental results demonstrate that our CDICS framework achieves state-of-the-art performance on compositional prompt-driven seg-mentation tasks, significantly outperforming existing meth-ods in both segmentation accuracy and fidelity to instruc-tions. This work extends the paradigm of traditional in-context segmentation and represents a new step toward real-izing more fine-grained, controllable, and interactive visual understanding for real-world applications. 13186 6. Acknowledgment 
+
+This work was supported by the Anhui Provincial Science and Technology Major Project (No. 2023z020006), the Anhui Provincial Natural Science Foundation (2508085QF212), and the advanced computing re-sources provided by the Supercomputing Center of the USTC. 
+
+## References 
+
+[1] Tom Brown, Benjamin Mann, Nick Ryder, Melanie Sub-biah, Jared D Kaplan, Prafulla Dhariwal, Arvind Neelakan-tan, Pranav Shyam, Girish Sastry, Amanda Askell, et al. Lan-guage models are few-shot learners. Advances in neural in-formation processing systems , 33:1877–1901, 2020. 2 [2] Bowen Cheng, Ishan Misra, Alexander G. Schwing, Alexan-der Kirillov, and Rohit Girdhar. Masked-Attention Mask Transformer for Universal Image Segmentation. pages 1290–1299, 2022. 2 [3] Zhenqi Dai, Ting Liu, Xingxing Zhang, Yunchao Wei, and Yanning Zhang. One-shot in-context part segmentation. In 
+
+ACM Multimedia , 2024. 7 [4] Zheng Ding, Jieke Wang, and Zhuowen Tu. Open-vocabulary universal image segmentation with MaskCLIP. In Proceedings of the 40th International Conference on Ma-chine Learning , pages 8090–8102. PMLR, 2023. 2 [5] Qingxiu Dong, Lei Li, Damai Dai, Ce Zheng, Jingyuan Ma, Rui Li, Heming Xia, Jingjing Xu, Zhiyong Wu, Baobao Chang, Xu Sun, Lei Li, and Zhifang Sui. A survey on in-context learning. In Proceedings of the 2024 Conference on Empirical Methods in Natural Language Processing , pages 1107–1128, Miami, Florida, USA, 2024. Association for Computational Linguistics. 2 [6] Shaozhe Hao, Kai Han, and Kwan-Yee K Wong. Learning at-tention as disentangler for compositional zero-shot learning. In Proceedings of the IEEE/CVF conference on computer vi-sion and pattern recognition , pages 15315–15324, 2023. 3 [7] Ju He, Shuo Yang, Shaokang Yang, Adam Kortylewski, Xi-aoding Yuan, Jie-Neng Chen, Shuai Liu, Cheng Yang, Qi-hang Yu, and Alan Yuille. Partimagenet: A large, high-quality dataset of parts. In European Conference on Com-puter Vision , pages 128–145. Springer, 2022. 6 [8] Kaiming He, Georgia Gkioxari, Piotr Dollar, and Ross Gir-shick. Mask R-CNN. pages 2961–2969, 2017. 2 [9] Jiaqi Huang, Zunnan Xu, Ting Liu, Yong Liu, Haonan Han, Kehong Yuan, and Xiu Li. Densely Connected Parameter-Efficient Tuning for Referring Image Segmentation, 2025. arXiv:2501.08580 [cs]. 7, 8 [10] Shaofei Huang, Tianrui Hui, Si Liu, Guanbin Li, Yunchao Wei, Jizhong Han, Luoqi Liu, and Bo Li. Referring Image Segmentation via Cross-Modal Progressive Comprehension. pages 10488–10497, 2020. 3 [11] Hirunima Jayasekara, Khoi Pham, Nirat Saini, and Abhinav Shrivastava. Unified framework for open-world composi-tional zero-shot learning. In 2025 IEEE/CVF Winter Con-ference on Applications of Computer Vision (WACV) , pages 2706–2714. IEEE, 2025. 3 [12] Namyup Kim, Dongwon Kim, Cuiling Lan, Wenjun Zeng, and Suha Kwak. Restr: Convolution-free referring im-age segmentation using transformers. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , pages 18145–18154, 2022. 3 [13] Xin Lai, Zhuotao Tian, Yukang Chen, Yanwei Li, Yuhui Yuan, Shu Liu, and Jiaya Jia. Lisa: Reasoning segmentation via large language model. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , pages 9579–9589, 2024. 3 [14] Mengcheng Lan, Chaofeng Chen, Yiping Ke, Xinjiang Wang, Litong Feng, and Wayne Zhang. Clearclip: Decom-posing clip representations for dense vision-language infer-ence. In European Conference on Computer Vision , pages 143–160. Springer, 2024. 2 [15] Yun Li, Zhe Liu, Hang Chen, and Lina Yao. Context-based and diversity-driven specificity in compositional zero-shot learning. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 17037– 17046, 2024. 3 [16] Zixu Li, Zhiwei Chen, Haokun Wen, Zhiheng Fu, Yupeng Hu, and Weili Guan. Encoder: Entity mining and modifica-tion relation binding for composed image retrieval. Proceed-ings of the AAAI Conference on Artificial Intelligence , 39(5): 5101–5109, 2025. 3 [17] Chang Liu, Henghui Ding, and Xudong Jiang. Gres: Gen-eralized referring expression segmentation. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , pages 23592–23601, 2023. 3 [18] Jiang Liu, Hui Ding, Zhaowei Cai, Yuting Zhang, Ravi Ku-mar Satzoda, Vijay Mahadevan, and R. Manmatha. Poly-former: Referring image segmentation as sequential poly-gon generation. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , pages 18653–18663, 2023. 3 [19] Yang Liu, Muzhi Zhu, Hengtao Li, Hao Chen, Xinlong Wang, and Chunhua Shen. Matcher: Segment anything with one shot using all-purpose feature matching. arXiv preprint arXiv:2305.13310 , 2023. 2, 7, 8 [20] Yang Liu, Chenchen Jing, Hengtao Li, Muzhi Zhu, Hao Chen, Xinlong Wang, and Chunhua Shen. A simple image segmentation framework via in-context examples. Advances in Neural Information Processing Systems , 37:25095–25119, 2024. 2, 7, 8 [21] Jonathan Long, Evan Shelhamer, and Trevor Darrell. Fully Convolutional Networks for Semantic Segmentation. pages 3431–3440, 2015. 2 [22] M Ronnier Luo, Guihua Cui, and Bryan Rigg. The develop-ment of the cie 2000 colour-difference formula: Ciede2000. 
+
+Color Research & Application: Endorsed by Inter-Society Color Council, The Colour Group (Great Britain), Canadian Society for Color, Color Science Association of Japan, Dutch Society for the Study of Color, The Swedish Colour Centre Foundation, Colour Society of Australia, Centre Franc ¸ais de la Couleur , 26(5):340–350, 2001. 3 [23] Lingchen Meng, Shiyi Lan, Hengduo Li, Jose M Alvarez, Zuxuan Wu, and Yu-Gang Jiang. Segic: Unleashing the 13187 emergent correspondence for in-context segmentation. In 
+
+European Conference on Computer Vision , pages 203–220. Springer, 2024. 2 [24] Maxime Oquab, Timoth´ ee Darcet, Th´ eo Moutakanni, Huy Vo, Marc Szafraniec, Vasil Khalidov, Pierre Fernandez, Daniel Haziza, Francisco Massa, Alaaeldin El-Nouby, et al. Dinov2: Learning robust visual features without supervision. 
+
+arXiv preprint arXiv:2304.07193 , 2023. 2 [25] Ethan Perez, Florian Strub, Harm De Vries, Vincent Du-moulin, and Aaron Courville. Film: Visual reasoning with a general conditioning layer. In Proceedings of the AAAI con-ference on artificial intelligence , 2018. 3 [26] Vignesh Ramanathan, Anmol Kalia, Vladan Petrovic, Yi Wen, Baixue Zheng, Baishan Guo, Rui Wang, Aaron Mar-quez, Rama Kovvuri, Abhishek Kadian, et al. Paco: Parts and attributes of common objects. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 7141–7151, 2023. 6 [27] Hanoona Rasheed, Muhammad Maaz, Sahal Shaji, Abdel-rahman Shaker, Salman Khan, Hisham Cholakkal, Rao M. Anwer, Eric Xing, Ming-Hsuan Yang, and Fahad S. Khan. Glamm: Pixel grounding large multimodal model. In Pro-ceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , pages 13009–13018, 2024. 3[28] Nikhila Ravi, Valentin Gabeur, Yuan-Ting Hu, Ronghang Hu, Chaitanya Ryali, Tengyu Ma, Haitham Khedr, Roman R¨ adle, Chloe Rolland, Laura Gustafson, et al. Sam 2: Segment anything in images and videos. arXiv preprint arXiv:2408.00714 , 2024. 2 [29] Olaf Ronneberger, Philipp Fischer, and Thomas Brox. U-Net: Convolutional Networks for Biomedical Image Seg-mentation. In Medical Image Computing and Computer-Assisted Intervention – MICCAI 2015 , pages 234–241, Cham, 2015. Springer International Publishing. 2 [30] Kuniaki Saito, Kihyuk Sohn, Xiang Zhang, Chun-Liang Li, Chen-Yu Lee, Kate Saenko, and Tomas Pfister. Pic2word: Mapping pictures to words for zero-shot composed image re-trieval. In Proceedings of the IEEE/CVF conference on com-puter vision and pattern recognition , pages 19305–19314, 2023. 3 [31] Dianmo Sheng, Dongdong Chen, Zhentao Tan, Qiankun Liu, Qi Chu, Jianmin Bao, Tao Gong, Bin Liu, Shengwei Xu, and Nenghai Yu. Towards more unified in-context visual un-derstanding. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , pages 13362–13372, 2024. 2 [32] Dianmo Sheng, Dongdong Chen, Zhentao Tan, Qiankun Liu, Qi Chu, Tao Gong, Bin Liu, Jing Han, Wenbin Tu, Shengwei Xu, et al. Unicl-sam: Uncertainty-driven in-context segmen-tation with part prototype discovery. In Proceedings of the Computer Vision and Pattern Recognition Conference , pages 20201–20211, 2025. 2 [33] Chaoyang Wang, Xiangtai Li, Henghui Ding, Lu Qi, Jiangn-ing Zhang, Yunhai Tong, Chen Change Loy, and Shuicheng Yan. Explore In-Context Segmentation via Latent Diffusion Models. Proceedings of the AAAI Conference on Artificial Intelligence , 39(7):7545–7553, 2025. Number: 7. 7, 8 [34] Xinlong Wang, Wen Wang, Yue Cao, Chunhua Shen, and Tiejun Huang. Images speak in images: A generalist painter for in-context visual learning. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 6830–6839, 2023. 2 [35] Xinlong Wang, Xiaosong Zhang, Yue Cao, Wen Wang, Chunhua Shen, and Tiejun Huang. Seggpt: Segmenting ev-erything in context. arXiv preprint arXiv:2304.03284 , 2023. 2, 7, 8 [36] Zhaoqing Wang, Yu Lu, Qiang Li, Xunqiang Tao, Yandong Guo, Mingming Gong, and Tongliang Liu. Cris: Clip-driven referring image segmentation. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , pages 11686–11695, 2022. 3 [37] Cong Wei, Yujie Zhong, Haoxian Tan, Yong Liu, Jie Hu, Dengjie Li, Zheng Zhao, and Yujiu Yang. Hyperseg: Hybrid segmentation assistant with fine-grained visual perceiver. In 
+
+Proceedings of the IEEE/CVF Conference on Computer Vi-sion and Pattern Recognition (CVPR) , pages 8931–8941, 2025. 7, 8 [38] Noam Wies, Yoav Levine, and Amnon Shashua. The learn-ability of in-context learning. Advances in Neural Informa-tion Processing Systems , 36:36637–36651, 2023. 2 [39] Peng Wu, Xiankai Lu, Hao Hu, Yongqin Xian, Jianbing Shen, and Wenguan Wang. Logiczsl: Exploring logic-induced representation for compositional zero-shot learning. In Proceedings of the Computer Vision and Pattern Recogni-tion Conference , pages 30301–30311, 2025. 3 [40] Zhuofan Xia, Dongchen Han, Yizeng Han, Xuran Pan, Shiji Song, and Gao Huang. Gsva: Generalized segmentation via multimodal large language models. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 3858–3869, 2024. 3 [41] Enze Xie, Wenhai Wang, Zhiding Yu, Anima Anandkumar, Jose M. Alvarez, and Ping Luo. SegFormer: Simple and Ef-ficient Design for Semantic Segmentation with Transform-ers. In Advances in Neural Information Processing Systems ,pages 12077–12090. Curran Associates, Inc., 2021. 2 [42] Qihang Yu, Ju He, Xueqing Deng, Xiaohui Shen, and Liang-Chieh Chen. Convolutions die hard: Open-vocabulary seg-mentation with single frozen convolutional clip. In Advances in Neural Information Processing Systems , pages 32215– 32234. Curran Associates, Inc., 2023. 2 [43] Tao Zhang, Xiangtai Li, Hao Fei, Haobo Yuan, Shengqiong Wu, Shunping Ji, Chen Change Loy, and Shuicheng Yan. Omg-llava: Bridging image-level, object-level, pixel-level reasoning and understanding. Advances in neural informa-tion processing systems , 37:71737–71767, 2024. 7, 8 [44] Zheng Zhang, Yeyao Ma, Enming Zhang, and Xiang Bai. Psalm: Pixelwise segmentation with large multi-modal model. In Computer Vision – ECCV 2024 , pages 74–91, Cham, 2025. Springer Nature Switzerland. 7, 8 [45] Xuanpu Zhao, Dianmo Sheng, Zhentao Tan, Zhiwei Zhao, Tao Gong, Qi Chu, Bin Liu, and Nenghai Yu. Training-free open-vocabulary semantic segmentation via diverse pro-totype construction and sub-region matching. Proceedings of the AAAI Conference on Artificial Intelligence , 39(10): 10474–10482, 2025. 2 13188

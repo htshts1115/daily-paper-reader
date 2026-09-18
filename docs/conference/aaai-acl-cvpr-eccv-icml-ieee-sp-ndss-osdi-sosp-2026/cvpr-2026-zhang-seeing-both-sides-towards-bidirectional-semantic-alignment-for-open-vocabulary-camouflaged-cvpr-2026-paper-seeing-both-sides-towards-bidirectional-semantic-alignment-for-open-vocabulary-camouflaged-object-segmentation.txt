@@ -1,0 +1,453 @@
+Title: Seeing Both Sides: Towards Bidirectional Semantic Alignment for Open-Vocabulary Camouflaged Object Segmentation
+
+URL Source: https://openaccess.thecvf.com/content/CVPR2026/papers/Zhang_Seeing_Both_Sides_Towards_Bidirectional_Semantic_Alignment_for_Open-Vocabulary_Camouflaged_CVPR_2026_paper.pdf
+
+Published Time: Sat, 16 May 2026 16:51:08 GMT
+
+Number of Pages: 10
+
+Markdown Content:
+# Seeing Both Sides: Towards Bidirectional Semantic Alignment for Open-Vocabulary Camouflaged Object Segmentation 
+
+## Guohui Zhang Fuming Sun * Yu Zhao Yuqiu Kong Jing Sun Fasheng Wang Dalian Minzu University 
+
+## Abstract 
+
+Open-Vocabulary Camouflaged Object Segmentation (OV-COS) aims to segment camouflaged objects from unseen categories under textual guidance precisely. However, ex-isting methods often employ a unidirectional interaction strategy, where textual prompts guide the matching of vi-sual features. Such a design neglects the bidirectional in-teraction between visual and language modalities, making the model vulnerable to the semantic gap between image-level textual semantics and pixel-level segmentation cues, which in turn leads to severe semantic confusion in com-plex camouflaged scenarios. To address this challenge, we propose BaCLIP, a novel bidirectional semantic align-ment framework for OVCOS. At its core lies the Mutual Refinement and Enhancement Module (MREM), which es-tablishes bidirectional cross-attention between visual and textual features, enabling mutual semantic calibration to resolve ambiguity and strengthen cross-modal alignment. Moreover, we introduce an Adaptive Prompt that transforms refined textual embeddings into semantic-aware prompts for Segment Anything Model (SAM), enabling direct tex-tual guidance and improving mask precision. Experimen-tal results on the OVCamo benchmark demonstrate that BaCLIP consistently achieves state-of-the-art performance with a compact architecture, effectively mitigating seman-tic confusion and advancing the understanding of cross-modal camouflage perception. Our code is released at https://github.com/okmaybach/BaCLIP-CVPR2026. 
+
+## 1. Introduction 
+
+Camouflaged object segmentation (COS) aims to detect and segment objects that are visually blended with their sur-roundings [3, 13]. Despite notable progress achieved by CNN- and Transformer-based architectures [21], existing COS models remain confined to a closed-set paradigm, lim-iting their capacity to generalize to unseen or ambiguous    
+
+> *Corresponding authors. Input Image GT OVCoser Ours
+
+Figure 1. A visualization of semantic confusion exhibiting incom-plete segmentation and category misclassification. In the first row, OVCoser produces fragmented worm segmentation with false-positive background activation; in the second row, it fails to com-pletely segment the “bee” while misclassifying it as “ant”. In con-trast, our method achieves precise segmentation with high accu-racy. 
+
+categories encountered in real-world scenarios. The emergence of large-scale vision-language pretrain-ing, such as CLIP [17], has opened new opportunities for Open-Vocabulary Semantic Segmentation (OVSS) [22], where visual recognition is guided by natural language rather than fixed class labels [12, 23]. Recently, Pang et al. [16] formally introduced the Open-Vocabulary COS (OVCOS) task, along with the OVCamo benchmark and the CLIP-based baseline OVCoser, which incorporates hand-crafted structure cues (e.g., edges and depth) to enhance category-agnostic segmentation. SuCLIP [19] introduced a semantic consistency loss to mitigate that different parts of the same camouflaged object may be assigned to undefined categories. Although OVCoser and SuCLIP demonstrate promising performance, they share a fundamental drawback with other CLIP-based approaches: they rely solely on text-to-vision guidance, where textual features unilaterally en-hance visual representations. This design neglects the in-herent semantic gap between CLIP’s image-level textual de-scriptions and the pixel-level precision required for segmen-tation. Consequently, such unidirectional interaction easily triggers semantic confusion, where semantically correlated yet visually distinct regions (e.g., object vs. background) are misinterpreted. To address this limitation, we argue that establishing a This CVPR paper is the Open Access version, provided by the Computer Vision Foundation. Except for this watermark, it is identical to the accepted version; the final published version of the proceedings is available on IEEE Xplore. 27655 20 10 0 10 20 30 30        
+
+> 20
+> 10
+> 010 20
+> arctic fox bat bee bittern cat cheetah crocodile deer dog dragonfly duck frogmouth giraffe grouse heron kangaroo leopard mockingbird monkey non-succulent plant rabbit raccoon squirrel tiger
+> (a)
+> Results from CLIP (24 classes)
+> 50 40 30 20 10 010 20 20
+> 10
+> 010 20 30
+> arctic fox bat bee bittern cat cheetah crocodile deer dog dragonfly duck frogmouth giraffe grouse heron kangaroo leopard mockingbird monkey non-succulent plant rabbit raccoon squirrel tiger
+> (b)
+> Results after MREM (24 classes)
+
+Figure 2. Comparative t-SNE feature distribution results of 24 camouflaged object categories. (a) With frozen CLIP encoders, inter-class feature boundaries appear blurred; (b) After incorporat-ing MREM-based bidirectional alignment, visual features enhance textual representations, forming compact clusters with sharper de-cision boundaries. 
+
+bidirectional guidance mechanism between vision and lan-guage modalities is essential for mitigating semantic con-fusion. As illustrated in Fig. 1, given a text query such as “a green worm lying on a leaf,” conventional unidirec-tional methods often misclassify visually similar “green” regions (e.g., the leaf) as the target object, overlooking cru-cial structural cues—such as shape, texture, and boundary continuity—that define the actual worm. In contrast, the proposed BaCLIP enables visual cues to reciprocally refine textual semantics, dynamically adjusting the model’s atten-tion toward relevant morphological and textural character-istics. This mutual refinement results in more precise object localization and sharper segmentation boundaries, even un-der challenging camouflage conditions. Building upon this motivation, we propose BaCLIP ,a bidirectional semantic alignment framework designed for OVCOS. Its core component, the Mutual Refinement and Enhancement Module (MREM), performs bidirectional cross-attention between textual and visual features, allow-ing visual context to calibrate textual ambiguity while tex-tual cues enhance visual discrimination. Furthermore, self-attention and projection layers are integrated to transform CLIP textual embeddings into adaptive prompts tailored for SAM’s prompt encoder [10], thereby equipping SAM with the capability to exploit textual cues effectively. This de-sign not only enables bidirectional semantic Refinement be-tween textual and visual representations but also bridges the gap between image-level semantics and pixel-level mask prediction, ultimately enhancing segmentation performance in challenging camouflaged scenarios. Subsequently, we further evaluate the effectiveness of the bidirectional mechanism through feature alignment analysis. As illustrated in Fig. 2, we visualize the text–visual feature distributions of 24 unseen categories be-fore and after applying MREM (all test category distribution maps are provided in the supplementary material). Features extracted from the frozen CLIP model exhibit sparse intra-class clustering and significant inter-class overlap, indicat-ing limited semantic separability. In contrast, after MREM, the distributions become more compact and clearly delin-eated, demonstrating that bidirectional semantic refinement effectively enhances cross-modal consistency and discrim-inability. Experimental results on the OVCamo benchmark demonstrate that BaCLIP achieves state-of-the-art perfor-mance with a compact architecture. More importantly, it substantially alleviates semantic confusion, establishing a new paradigm for bidirectional cross-modal alignment in open-vocabulary camouflage perception. Our main contributions are summarized as follows: • We rethink the OVCOS task from a bidirectional modal-ity guidance perspective, and propose a novel framework, termed BaCLIP. It effectively mitigates semantic confu-sion between visual features and textual descriptions. • We design the Mutual Refinement and Enhancement Module, which employs bidirectional cross-attention to suppress semantic confusion and enhance cross-modal consistency. • We introduce adaptive textual prompts, tailored for SAM’s prompt encoder, to bridge the gap between image-level semantics and pixel-level segmentation precision. 
+
+## 2. Related Work 
+
+2.1. OVCOS 
+
+COS [3, 7, 30] aims to detect and segment objects that are visually embedded in their surroundings. Early ad-vances were driven by convolutional networks (CNNs) [9, 15] and, more recently, by Transformer-based models [6, 8, 25], which progressively improved feature discrimina-tion, boundary refinement, and context modeling. How-ever, these methods operate at a fundamental level under a closed-set assumption—they are both trained and evalu-ated on a fixed set of object categories. This severely lim-its their applicability in real-world scenarios, where cam-ouflaged objects can belong to a virtually unlimited num-ber of unseen categories. Indeed, recent work has begun to push COS towards open-vocabulary / VLM-guided dense prediction (e.g., OVCOS) to handle unseen categories and language supervision [16, 29]. To address this limitation, the field has begun to embrace Open-Vocabulary Semantic Segmentation (OVSS) [4, 12], which leverages natural language supervision instead of a fixed label set to recognize and segment objects from arbi-trary categories. Inspired by vision–language pre-training models such as CLIP [17], methods like DenseCLIP and OVSeg have demonstrated promising transfer capabilities by aligning visual and textual embeddings in a shared se-mantic space [11, 18]. However, a significant gap remains between general OVSS techniques and the specific chal-lenges of camouflage [16]. Most existing OVSS approaches 27656 follow a unidirectional text-to-vision paradigm [12], where language guides visual decoding without feedback. This often leads to semantic confusion in camouflage scenarios, where visual boundaries are subtle and categories are easily confused. The recent establishment of the OVCOS task [16] for-malizes this emerging direction. Pioneering methods such as OVCoser [16] adapt CLIP for camouflaged object seg-mentation by incorporating handcrafted visual cues. Su-CLIP [19] proposes Context-Aware Prompt and a seman-tic consistency loss to mitigate semantic confusion. How-ever, they still rely on unidirectional semantic propaga-tion [11, 23], which fails to fully resolve the inherent am-biguity among visually similar concepts [1]. In response, we propose a bidirectional guidance paradigm that not only uses language to direct visual segmentation [12] but also employs visual features to refine and disambiguate semantic representations. This dual interaction enables a more robust and precise understanding in open-vocabulary camouflage scenarios. 
+
+2.2. Prompt-driven Segmentation Frameworks 
+
+Since the advent of the SAM [10], prompt-driven segmen-tation frameworks have attracted significant research in-terest. SAM demonstrates strong generalization through its prompt-based interface, where segmentation masks are predicted from diverse inputs, such as points, boxes, or coarse masks. However, SAM remains inherently category-agnostic and lacks high-level semantic awareness. To en-hance its understanding of open-world semantics, several studies integrate SAM with vision–language models. For instance, SEEM [32] augments SAM with unified visual and textual prompts, enabling interactive segmentation and referring expression understanding. OpenSeg-SAM [4] and OVSAM [28] further incorporate CLIP-derived embed-dings to bridge category-level semantics with SAM’s mask generation pipeline. Despite these advancements, existing prompt-guided methods still follow a unidirectional design in which textual features influence visual decoding, but not vice versa, lead-ing to inconsistent feature alignment and degraded localiza-tion under complex conditions. In contrast, our method in-troduces a bidirectional semantic alignment mechanism ,enabling visual context to dynamically refine textual se-mantics and textual cues to reinforce visual discriminabil-ity. Consequently, this leads to a significant reduction in semantic confusion. 
+
+## 3. Proposed Method 
+
+3.1. Overview 
+
+The overall framework of BaCLIP is illustrated in Fig. 3. The visual pathway leverages CLIP’s visual encoder to cap-ture multi-scale representations fv from the input image, whereas the corresponding class descriptions are fed into CamoPrompts followed by CLIP’s text encoder to produce textual embeddings ft. The visual and textual streams inter-act within the Mutual Refinement and Enhancement Mod-ule (MREM), where bidirectional cross-attention enables visual context to refine textual ambiguity and textual cues to guide visual focus. The refined visual representations Ev
+
+are further processed by the Camo Clue Extractor (CCE) equipped with cascaded Multi-Frequency Multi-Scale At-tention (MFMSA), producing camouflage-sensitive features 
+
+E∗ 
+
+> v
+
+. Enhanced textual features from the MREM are pro-jected into a prompt-compatible embedding space to form adaptive prompt embeddings E∗ 
+
+> t
+
+. These embeddings, to-gether with the enhanced visual features E∗ 
+
+> v
+
+, are fed into the Mask Decoder to generate high-resolution binary masks. Finally, the zero-shot capability of CLIP is employed to pre-dict the class of the segmentation mask. 
+
+3.2. MREM 
+
+The MREM aims to bridge the semantic granularity gap between CLIP’s image-level understanding and the pixel-level requirements of image segmentation. As illustrated in Fig. 4, MREM enables bidirectional semantic alignment between the visual and textual modalities through a cross-attention operation. 
+
+Bidirectional Cross-Attention. Given the visual fea-tures fv ∈ RH×W ×C (processed by Conv 1) and textual embeddings ft ∈ RN ×C (processed by Linear ), MREM projects them into h separate query-key-value (QKV) triplets (i.e., heads). For the i-th head, the QKV projections are defined as: 
+
+Qv,i , K v,i , V v,i = W Qv,i fv , W Kv,i fv , W Vv,i fv , (1) 
+
+qt,i , k t,i , v t,i = W Qt,i ft, W Kt,i ft, W Vt,i ft, (2) where {W ξv,i , W ξt,i }hi=1 , for ξ ∈ { Q, K, V }, are the inde-pendent, learnable projection parameters for each head. Then, visual and textual features interact through a multi-head bidirectional cross-attention mechanism, as in-dicated by the crossed arrows in Fig. 4. For a single head i, the operations are defined as: 
+
+F head v,i = Softmax Qv,i kTt,i 
+
+√dk
+
+!
+
+vt,i , (3) 
+
+F head t,i = Softmax qt,i KTv,i 
+
+√dk
+
+!
+
+Vv,i , (4) where F head v,i (visual features refined by text) and F head t,i 
+
+(textual features refined by visual) are updated by cues from the opposing modality for the i-th head, and dk is the dimen-sion of the keys. 27657 Visual Encoder 
+
+Class Set 
+
+grouse frogmouth ··· Camo Prompts 
+
+Text Encoder 
+
+> ···
+
+MREM 
+
+Mask Decoder 
+
+Similarity 
+
+√
+
+Class Score 
+
+> ···
+
+𝐀 𝐀 
+
+𝐀 𝐀 
+
+𝐀 𝐀 
+
+𝐀 𝐀 
+
+𝐀 𝐀 ∗
+
+𝐀 𝐀𵀀𝐀 
+
+𝐀 𝐀 
+
+Multi-Frequency Multi-Scale Attention MFMSA Camo Clue Extractor MFMSA MFMSA MFMSA 
+
+Mutual Refinement and Enhancement Module MREM 
+
+RGB Pre 
+
+𝐀 𝐀 ∗
+
+Prompt Encoder 
+
+> SelfAttention
+> Projection
+
+𝐀 𝐀 Figure 3. Overview of BaCLIP, which integrates MREM, Camo Clue Extractor, SAM’s Prompt Encoder, and Mask Decoder. Leveraging the aforementioned components, BaCLIP achieves precise segmentation of camouflaged objects in unseen categories while simultaneously predicting their class labels. KV QScaled Dot-Product Attention KV QScaled Dot-Product Attention 
+
+> 𝐀 𝐀
+> 𝐀 𝐀
+
+··· 
+
+> Conv 1
+> Linear
+> KV KV QScaled Dot-Product Attention KV QScaled Dot-Product Attention
+
+kv 
+
+q Scaled Dot-Product Attention 
+
+> Concat Projection Concat
+> QScaled Dot-Product Attention
+> 𝐀 𝐀
+> 𝐀 𝐀
+
+···  
+
+> Mismatch! Match!
+> Mutual Refinement and Enhancement Module MREM
+> 𝐀 𝐀
+> ℎ𝐀𝐀𝐀
+> 𝐀 𝐀
+> ℎ𝐀𝐀𝐀
+
+Figure 4. Framework of the MREM. It employs double cross-modal attention to achieve bidirectional alignment between text and visual features, narrowing the semantic gap and thereby gen-erating enhanced text and visual embeddings. 
+
+The final module outputs, Ev and Et, are produced by concatenating the outputs from all h heads, followed by a final linear projection (with parameters W Ov and W Ot ): 
+
+Ev = Proj (Concat (F head v, 1 , . . . , F head v,h )W Ov ), (5) 
+
+Et = Concat (F head t, 1 , . . . , F head t,h )W Ot . (6) This mutual cross-attention enables textual tokens to in-ject category semantics into visual features, while visual cues refine the textual focus, thereby reducing ambiguity from correlated background concepts. Unlike conventional unidirectional CLIP-based match-ing, MREM enables a bidirectional exchange of semantic information, guiding both modalities to co-evolve toward a consistent semantic space. Empirically, it effectively mit-igates the “semantic confusion” problem, where visually similar background regions (e.g., foliage or sand) are in-correctly matched to camouflaged objects, thus improving both boundary precision and class discrimination. Conv 1 MFCA MFCA MFCA MSDA ⊕
+
+⨂ ⨂ ⨂  
+
+> DCT Bias
+> FC FC
+> ѳ
+> Conv 1
+
+# ѳ Conv 3⊖
+
+# ѳ ⊖
+
+# ѳ ⊖
+
+⊕𝐀𢀀 2  
+
+> 𝐀𢀀 4
+> 𝐀𝰀𝐀𧀀 4
+> 𝐀𝰀𝐀𧀀 2
+> 𝐀 𝐀 𝐀 𝐀 ∗
+> MFCA
+
+Multi-Frequency Channel Attention  
+
+> MSDA
+
+Multi-Scale Differential Attention MFCA MFMSA MSDA   
+
+> Conv 1
+> Conv 1
+> Conv 3
+> Conv 3
+> Conv 1
+> Conv 1𝐀 1
+> 𝐀 2
+> 𝐀 3
+> 𝐀 1
+> 𝐀 3
+> 𝐀 2
+> 𝐀 1
+> 𝐀 3
+> 𝐀 2
+> 𝐀 𝐀
+> 𝐀 𝐀
+> 𝐀 1
+> 𝐀 3
+> 𝐀 2
+> 𝐀 1
+> 𝐀 2
+> 𝐀 3
+> 𝐀 3
+> 𝐀 2
+> 𝐀 1
+> 𝐀 3
+> 𝐀 2
+> 𝐀 1
+> 𝐀 3
+> 𝐀 2
+> 𝐀 1
+> 𝐀 𝐀
+> FC
+
+Fully-Connected layer ѳ Sigmoid 
+
+Figure 5. Framework of the MFMSA. It is composed of MFCA and MSDA, which jointly exploit camouflage cues across multiple frequency domains and multiple scales. 
+
+3.3. CCE 
+
+While MREM focuses on semantic alignment, CCE en-hances fine-grained visual perception. As illustrated in Fig. 5, CCE refines the visual features Ev using a Multi-Frequency Multi-Scale Attention (MFMSA) module. This module is composed of the following stages: 
+
+Multi-Scale Feature Extraction. The input visual fea-tures Ev are processed by three parallel branches to cap-ture multi-scale information. Features are downsampled at different rates ( Down 2, Down 4) and respectively passed through a convolution layer to produce multi-scale feature maps E1, E 2, and E3.
+
+Multi-Frequency Channel Attention (MFCA). As 27658 shown in Fig. 5 (bottom left), each multi-scale feature Ei
+
+(where i ∈ { 1, 2, 3}) is fed into the MFCA module. This module uses a DCT Bias to decompose Ei into multiple frequency components. These components are individually processed by parallel Fully-Connected (FC) layers. The re-sults are aggregated and used to create a channel attention map, which is multiplied by the original feature Ei to pro-duce the frequency-refined feature χi (i ∈ { 1, 2, 3}). 
+
+Multi-Scale Differential Attention (MSDA). The re-fined features {χ1, χ 2, χ 3} are fed into the MSDA module (Fig. 5, bottom right) to enhance inter-scale boundary cues. The channel-recalibrated feature map χi is used to extract discriminative boundary cues at multiple scales in the spa-tial domain. Here, we introduce two learnable parameters (αi and βi) to control the information flow between the fore-ground and background, respectively, as follows: 
+
+λi = Conv 3 (αi(χi ⊗ Fi) ⊕ βi(χi ⊗ Bi)) , (7) where Fi = Sigmoid (Conv 1(χi)) is a foreground atten-tion map, ⊗ denotes element-wise multiplication, ⊕ means element-wise addition. Consequently, the background at-tention map Bi can be derived by element-wise subtraction of Fi from a matrix of ones, that is, Bi = 1 − Fi. Fi-nally, to aggregate each refined feature from different scale branches, we apply upsampling to match the resolutions. For more stable training, we apply a residual connection af-ter the spatially refined feature map as follows: 
+
+χ = λ1 ⊕ U p 2(λ2) ⊕ U p 4(λ3). (8) Finally, as shown in the top-level diagram of MFMSA, the output χ is fused with the original input Ev via a resid-ual connection to produce the enhanced features E∗ 
+
+> v
+
+:
+
+E∗ 
+
+> v
+
+= Ev ⊕ χ. 
+
+This hierarchical refinement progressively extracts frequency-, texture-, and boundary-level camouflage cues, yielding the final enhanced visual feature E∗ 
+
+> v
+
+for precise segmentation. 
+
+3.4. Text Prompts for SAM 
+
+To integrate the cross-modal semantic alignment into spa-tial segmentation, we extend the prompt mechanism of the SAM [10] to support textual prompts . Unlike the original SAM, which relies on spatial cues such as points, boxes, or masks, our framework further enhances the textual outputs of MREM, enabling them to function as semantic-aware prompts for the prompt encoder. 
+
+Adaptive Prompt Generation. As illustrated in Fig. 3, the refined textual embeddings Et ∈ RN ×C (output from MREM) are transformed into adaptive prompts. First, Et
+
+is processed by a SelfAttention layer to capture inter-token dependencies: 
+
+Pt = SelfAttention (Et). (9) Then, a Projection layer and SAM’s Prompt Encoder (whose parameters are frozen) map these features into the final semantic-aware prompt embeddings E∗ 
+
+> t
+
+:
+
+E∗ 
+
+> t
+
+= PromptEncoder (Proj (Pt)) . (10) This resulting E∗ 
+
+> t
+
+serves as the textual prompt injected into the mask decoder. 
+
+Prompt-Visual Fusion. During the decoding stage, the enhanced visual features E∗ 
+
+> v
+
+from the CCE and the gen-erated textual prompt embeddings E∗ 
+
+> t
+
+are fed into SAM’s Mask Decoder to generate the final segmentation mask. This process grounds the semantic meaning of the text in spatial context, allowing the model to delineate object re-gions that match the described category or attributes. By replacing manual spatial prompts with adaptive tex-tual prompts, SAM becomes open-vocabulary and semanti-cally guided. This design not only enhances its generaliza-tion to unseen categories but also improves segmentation consistency when handling camouflaged objects that lack distinct spatial priors. 
+
+3.5. Loss Function 
+
+We use weighted segmentation loss [20] and Dice loss [14], respectively, for supervising segmentation results and mitigating class imbalance between positive and negative samples. The total loss Lseg is formulated as follows: 
+
+Lseg = LBCE + LDice , (11) where LBCE is the BCE loss and LDice is the Dice loss. 
+
+## 4. Experiments 
+
+4.1. Implementation Details 
+
+The proposed model is implemented using the PyTorch framework and is trained on a single NVIDIA GeForce RTX 4090 GPU (24 GB memory). During training, each input image is resized to 384 × 384 , with the CLIP parameters remaining frozen. We employ the AdamW optimizer with hyperparameters: batch size = 4 , learning rate = 3 × 10 −5,epochs = 30 . A cosine annealing scheduler adjusts the learning rate. Basic data augmentations, including random flipping, rotating, and color jittering, are introduced to pre-process training data. 
+
+4.2. Dataset, Baseline, and Metrics 
+
+Dataset. Consistent with OVCoser, we use the OVCamo dataset [16], which consists of two parts: base categories and novel categories. The base categories include 14 train-ing classes, while the novel categories comprise 61 test-ing classes. Baseline. We select OVCoser [16] as the baseline method for OVCOS. We also benchmark several open-vocabulary semantic segmentation methods on the 27659 Table 1. Comparison with state-of-the-art open-vocabulary semantic image segmentation methods with different training settings on the OVCamo. Red and Blue denote the best and the second-best results, respectively. Notably, ‘None’ indicates that the model does not leverage an additional backbone ( e.g. , ResNet, Swin). A dagger † denotes the results we obtained by replicating the original algorithm. 
+
+Model VLM Feature Backbone Text Prompt cS m ↑ cF ωβ ↑ cM AE ↓ cF β ↑ cE m ↑ cIoU ↑
+
+Test on OVCamo with the weight trained on COCO 
+
+SimSeg [26] CLIP-ViT-B/16 ResNet-101 Learnable [31] 0.128 0.105 0.838 0.112 0.143 0.094 OVSeg [12] CLIP-ViT-L/14 Swin-B [5] 0.341 0.306 0.584 0.325 0.384 0.273 ODISE [23] CLIP-ViT-L/14 StableDiffusionv1.3 [4] 0.409 0.339 0.500 0.341 0.421 0.302 SAN [24] CLIP-ViT-L/14 ViT Adapter [5] 0.414 0.343 0.489 0.357 0.456 0.319 CAT-Seg [2] CLIP-ViT-L/14 Swin-B [17] 0.430 0.344 0.448 0.366 0.459 0.310 FC-CLIP [27] CLIP-ConvNeXt-L None [5] 0.374 0.306 0.539 0.320 0.409 0.285 
+
+Finetune on OVCamo with the weight trained on COCO 
+
+SimSeg [26] CLIP-ViT-B/16 ResNet-101 Learnable [31] 0.098 0.071 0.852 0.081 0.128 0.066 OVSeg [12] CLIP-ViT-L/14 Swin-B [5] 0.164 0.131 0.763 0.147 0.208 0.123 ODISE [23] CLIP-ViT-L/14 StableDiffusionv1.3 [4] 0.182 0.125 0.691 0.219 0.309 0.189 SAN [24] CLIP-ViT-L/14 ViT Adapter [5] 0.321 0.216 0.550 0.236 0.331 0.204 CAT-Seg [2] CLIP-ViT-L/14 Swin-B [17] 0.185 0.094 0.702 0.110 0.185 0.088 FC-CLIP [27] CLIP-ConvNeXt-L None [5] 0.124 0.074 0.798 0.088 0.162 0.072 
+
+Train on OVCamo 
+
+SimSeg [26] CLIP-ViT-B/16 ResNet-101 Learnable [31] 0.053 0.049 0.921 0.056 0.098 0.047 OVSeg [12] CLIP-ViT-L/14 Swin-B [5] 0.024 0.046 0.954 0.056 0.130 0.046 ODISE [23] CLIP-ViT-L/14 StableDiffusionv1.3 [4] 0.187 0.119 0.700 0.211 0.298 0.167 SAN [24] CLIP-ViT-L/14 ViT Adapter [5] 0.275 0.202 0.612 0.220 0.318 0.189 CAT-Seg [2] CLIP-ViT-L/14 Swin-B [17] 0.181 0.106 0.719 0.123 0.196 0.094 FC-CLIP [27] CLIP-ConvNeXt-L None [5] 0.080 0.076 0.872 0.090 0.191 0.072 SuCLIP † [19] CLIP-ConvNeXt-L None CAP [19] 0.533 0.449 0.368 0.482 0.570 0.395 OVCoser [16] CLIP-ConvNeXt-L None CamoPrompts [16] 0.579 0.490 0.336 0.520 0.616 0.443 
+
+Ours CLIP-ConvNeXt-L None CamoPrompts [16] 0.589 0.540 0.327 0.559 0.640 0.488 Improvement - - - 1.0% 5.0% 0.9% 3.9% 2.4% 4.5%
+
+OVCamo dataset to provide a broader comparative base-line. Metrics. Following [16], we employ six evaluation metrics to assess model performance: cS m , cF ωβ , cMAE ,
+
+cF β , cE m , and cIoU , which simultaneously consider both segmentation and classification. 
+
+4.3. Quantitative Results 
+
+As shown in Tab. 1, we comprehensively compare our method with several OVSS techniques and an advanced OV-COS approach, OVCoser. Our method establishes a new state-of-the-art, exceeding OVCoser by 1.0% on cS m, 5.0% on cF ωβ , 0.9% on cM AE , 3.9% on cF β , 2.4% on cE m, and 4.5% on cIoU .Furthermore, the evaluation includes multiple OVSS methods tested on OVCamo under both zero-shot and fine-tuned settings. The pronounced performance degradation after fine-tuning suggests that these models experience se-vere knowledge forgetting when adapted to camouflage-specific data. It is also worth noting that, unlike SimSeg [26], OVSeg [12], ODISE [23], and SAN [24], our model does not rely on any additional visual backbone (e.g., ResNet, Swin). Furthermore, benefiting from the elegant integra-tion of SAM through the MREM, we replace SAM’s orig-inal backbone with the CLIP visual encoder, which signifi-cantly reduces the number of parameters and improves over-image GT OVCoser Ours 
+
+Figure 6. Qualitative comparison results with the SOTA method OVCoser [16] on the OVCamo dataset. The first two columns represent correctly segmented and classified results; the middle two columns correspond to misclassifications; and the last two columns depict segmentation errors. The red text denotes an in-correctly classified prediction. 
+
+all model efficiency. 
+
+4.4. Qualitative Results 
+
+Fig. 6 presents a qualitative comparison with the SOTA method, OVCoser [16]. The visual results highlight OV-Coser’s limitations in two key areas. First, it suffers from 
+
+semantic confusion , frequently misclassifying categories 27660 Table 2. Performance analysis on Hard Categories (Bottom 25%, N=15) vs. All Categories (N=61). Our model’s relative improve-ment is substantially larger on hard categories, validating its effec-tiveness in mitigating semantic confusion.                              
+
+> Metric OVCoser Ours Improvement
+> All Categories (N=61)
+> cIoU ↑0.443 0.488 +4 .5%
+> cF ωβ↑0.490 0.540 +5 .0%
+> cM AE ↓0.336 0.327 +0 .9%
+> Hard Categories (N=15, Bottom 25%)
+> cIoU ↑0.382 0.445 +6 .3%
+> cF ωβ↑0.446 0.517 +7 .1%
+> cM AE ↓0.466 0.437 +2 .9%
+
+(e.g., predicting ‘rabbit’ as ‘dog’ and ‘worm’ as ‘owlfly larva’). Second, its segmentation quality is limited, pro-ducing incomplete masks that fail to capture critical object parts (e.g., the cicada’s head) or noisy boundaries in low-contrast scenes (e.g., ‘moth’ and ‘squirrel’). In direct contrast, our method demonstrates superior per-formance and robustness. It correctly classifies all challeng-ing categories, indicating a stronger semantic alignment. Our segmentation masks are more complete and coherent ,capturing the entire entity even under strong background in-terference (e.g., ‘cicada’ and ‘squirrel’). Furthermore, our predictions yield cleaner, more precise boundaries that closely follow object contours. Notably, in the highly am-biguous ‘cat’ scene, OVCoser generates a clear false pos-itive segmentation, whereas our model successfully avoids this false prediction. Overall, our framework consistently delivers finer, more accurate, and more reliable segmenta-tion. 
+
+4.5. Targeted Analysis on Hard Categories 
+
+Our qualitative analysis in Section 4.4 (e.g., Fig. 6) high-lights specific instances where the baseline OVCoser suffers from severe semantic confusion, leading to category mis-classification or incomplete segmentation. To quantitatively validate this observation and demonstrate the targeted effec-tiveness of our proposed BaCLIP, we conduct a specialized analysis focused on these most challenging scenarios. We define “Hard Categories” as the bottom 25% (N=15) 
+
+of the 61 novel categories, ranked by the baseline OV-Coser’s cIoU performance. These 15 categories (‘mon-goose’, ‘non-succulent plant’, ‘stick insect’, ‘bee’, ‘goat’, ‘clownfish’, ‘scorpion’, ‘ant’, ‘tiger’, ‘seadragon’, ‘giraffe’, ‘lion’, ‘raccoon’, ‘arctic fox’, ‘moth’) represent the scenar-ios where semantic confusion between the camouflaged ob-ject and its background is highest, and thus the baseline model is most prone to failure. The results of this analysis are presented in Tab. 2 . The data reveals a clear and compelling trend. While our model 
+
+Table 3. Ablation comparison of proposed components.                                           
+
+> No. Model cS m↑cF ωβ↑cM AE ↓cF β↑cE m↑cIoU ↑
+> #1 baseline 0.528 0.355 0.353 0.410 0.538 0.311 #2 +SAM 0.531 0.360 0.348 0.434 0.547 0.332 #3 +CCE 0.555 0.483 0.338 0.511 0.607 0.428 #4 +CCE+MREM 0.589 0.540 0.327 0.559 0.640 0.488
+
+Table 4. Ablation comparison of backbone.                                           
+
+> No. Backbone cS m↑cF ωβ↑cM AE ↓cF β↑cE m↑cIoU ↑
+> #1 CLIP-ViT-B/16 0.530 0.466 0.341 0.509 0.613 0.437 #2 CLIP-ViT-L/14 0.559 0.497 0.338 0.522 0.620 0.458 #3 CLIP-ConvNeXt-L 0.589 0.540 0.327 0.559 0.640 0.488 #4 CLIP-ConvNeXt-XXL 0.647 0.585 0.258 0.605 0.704 0.530
+
+(Ours) achieves a solid improvement across All Categories 
+
+(e.g., +4.5% gain in cIoU and +5.0% in cF ωβ ), its per-formance advantage is dramatically amplified on the Hard Categories subset. As summarized in Tab. 2, our model demonstrates supe-rior performance for the 15 most difficult categories, achiev-ing a +6.3% relative cIoU improvement and a +7.1% gain in cF ωβ —significantly outperforming the dataset-wide aver-age. Notably, the most substantial evidence comes from the 
+
+cM AE metric, where our model achieves a +2.9% error reduction in these challenging cases, compared to a modest 
+
++0.9% overall. The observed performance gain stems pri-marily from our proposed Mutual Refinement and Enhance-ment Module. Its integrated bidirectional semantic align-ment mechanism between text and visual features enables it to address semantic confusion, which baseline methods often neglect. 
+
+4.6. Ablation Studies 
+
+Tab. 3 demonstrates the step-by-step impact of integrating our proposed components. The baseline (No.#1), consist-ing of CLIP (ConvNext-L) and a convolutional decoder, is relatively weak ( cS m: 0.528, cIoU : 0.311). Integrating SAM’s prompt encoder and mask decoder (No.#2) estab-lishes a stronger foundation, improving the cIoU to 0.332. The addition of the CCE module (No.#3) yields a substan-tial performance leap, boosting cS m to 0.555 and cIoU to 0.428. This represents a 9.6% relative gain in cIoU over the SAM baseline (No.#2), confirming that exploiting camou-flaged features is critical. Finally, adding our core MREM module (No.#4) delivers the best results, providing an addi-tional 6.0% relative gain in cIoU (from 0.428 to 0.488) and a 3.4% gain in cS m (from 0.555 to 0.589). This incremental analysis validates that both CCE and MREM are essential for achieving the final state-of-the-art performance. 
+
+On Backbone. We validate the choice of visual backbone in Tab. 4. The results reveal a clear superiority of ConvNeXt architectures over ViT models for this task. Specifically, our chosen backbone, CLIP-ConvNeXt-L (No.#3) , achieves a 
+
+cIoU of 0.488, significantly outperforming both ViT-L/14 (No.#2) at 0.458 and ViT-B/16 (No.#1) at 0.437. We at-tribute this performance gap to architectural design: the ViT 27661 Table 5. Ablation comparison of proposed MREM.                                                  
+
+> No. Model cS m↑cF ωβ↑cM AE ↓cF β↑cE m↑cIoU ↑
+> #1 w/o MREM 0.555 0.483 0.338 0.511 0.607 0.428 #2 w/o visual 0.559 0.486 0.333 0.513 0.613 0.432 #3 w/o text 0.574 0.520 0.335 0.544 0.625 0.462 #4 w/o SA 0.580 0.523 0.331 0.543 0.631 0.470 #5 Ours 0.589 0.540 0.327 0.559 0.640 0.488
+
+Table 6. Ablation comparison of proposed CCE.                                                                       
+
+> No. Model cS m↑cF ωβ↑cM AE ↓cF β↑cE m↑cIoU ↑
+> #1 w/o CCE 0.545 0.383 0.343 0.455 0.561 0.355 #2 w/ MFMSA-2 0.579 0.519 0.333 0.538 0.627 0.463 #3 w/ MFMSA-3 0.589 0.540 0.327 0.559 0.640 0.488
+> #4 w/ MFMSA-4 0.579 0.525 0.332 0.543 0.632 0.470 #5 w/ MFMSA-5 0.578 0.521 0.333 0.541 0.629 0.466 #6 w MSDA 0.577 0.505 0.333 0.525 0.612 0.437 #7 w MFCA 0.569 0.466 0.337 0.503 0.597 0.412 #8 Ours 0.589 0.540 0.327 0.559 0.640 0.488
+
+series produces single-scale features, which are suboptimal for dense segmentation. In contrast, ConvNeXt’s convolu-tional nature naturally provides the multi-scale feature maps essential for segmentation. Within the ConvNeXt family, the larger ConvNeXt-XXL (No.#4) achieves the absolute best performance ( cIoU :0.530) by a notable margin. However, this comes with a substantial increase in parameters. Therefore, we select 
+
+ConvNeXt-L as our primary backbone. 
+
+On MREM. We validate the components of MREM in Tab. 5. The baseline (No.#1, w/o MREM) suffers from poor performance ( cS m: 0.555). While unidirectional enhance-ments (No.#2, w/o visual; No.#3, w/o text) provide slight gains, they are insufficient. Our full model (No.#5), featur-ing bidirectional interaction, achieves the best results across all metrics. This proves that mutual refinement is critical for resolving ambiguity, far exceeding the benefits of single-path enhancement. The final gain from No.#4 to No.#5 also confirms the value of using self-attention (SA) to refine fea-tures for SAM’s prompt encoder. The quantitative improvements are directly explained by the visual evidence in Fig. 7. The baseline (w/o MREM) heatmap shows scattered attention and severe background noise (e.g., ‘cat’, ‘crab’), correlating with the poor metrics of No.#1. Conversely, our full MREM (w/ MREM) utilizes 
+
+bidirectional calibration to suppress this noise, focusing activation tightly on the target in alignment with the GT (e.g., ‘octopus’, ‘moth’). This visualization confirms that MREM’s superior quantitative performance stems from its ability to mitigate semantic confusion and enhance cross-modal alignment. 
+
+On CCE. Tab. 6 presents the ablation study results of the CCE module. First, we conduct an ablation on the num-ber of MFMSA modules, showing the results of cascad-ing 2, 3, 4, and 5 MFMSA modules, respectively (No.#2-No.#5). In addition, we compare the effects of using only MSDA (No.#6) and only MFSA (No.#7). Quantitative ex-RGB GT w/o MREM w/ MREM 
+
+cat dog crab octopus moth 
+
+Figure 7. Visualization of the MREM module’s effectiveness. Fea-ture maps without MREM exhibit scattered attention and back-ground noise, leading to semantic confusion. In contrast, MREM utilizes bidirectional semantic calibration to suppress noise and precisely focus activation on the target. The resulting heatmaps align closely with the GT, demonstrating MREM’s ability to re-solve ambiguity. 
+
+perimental results demonstrate that using three MFMSA modules is a reasonable choice, and both MFCA and MSDA contribute to performance improvement. Moreover, the best performance is achieved when both are used together. This indicates that objects that are visually difficult to detect be-come much simpler when transformed into the frequency domain, and the multi-scale strategy can effectively address the problem of large variations in object size. 
+
+## 5. Conclusion 
+
+In this paper, we propose the BaCLIP framework to tackle the semantic confusion in Open-Vocabulary Camouflaged Object Segmentation. The framework employs a bidirec-tional feature interaction mechanism, with the Mutual Re-finement and Enhancement Module at its core, using bidi-rectional cross-modal attention to alleviate semantic confu-sion and improve the model’s ability to differentiate camou-flaged categories. Additionally, the Camo Context Extrac-tor module, utilizing multi-frequency and multi-scale atten-tion, enhances feature extraction in complex backgrounds. To improve flexibility and prevent overfitting, we integrate SAM’s prompt encoder and mask decoder, keeping their parameters frozen, and adapt MREM-enhanced textual fea-tures to SAM’s prompt input dimensions. Experimental re-sults show significant improvement in mitigating semantic confusion, achieving state-of-the-art performance on OV-Camo. 27662 Acknowledgments 
+
+This work was partly supported by the National Natural Science Foundation of China under Grant 62472067, and by the Joint Funds of Liaoning Science and Tech-nology Program under Grant 2024JH2/102600091. 
+
+## References 
+
+[1] Bowen Cheng, Ishan Misra, Alexander G. Schwing, Alexan-der Kirillov, and Rohit Girdhar. Masked-attention mask transformer for universal image segmentation. In CVPR ,pages 1280–1289, 2022. 3 [2] Seokju Cho, Heeseong Shin, Sunghwan Hong, Anurag Arnab, Paul Hongsuck Seo, and Seungryong Kim. CAT-Seg: Cost aggregation for open-vocabulary semantic segmenta-tion. In CVPR , pages 4113–4123, 2024. 6 [3] Deng-Ping Fan, Ge-Peng Ji, Guolei Sun, Ming-Ming Cheng, Jianbing Shen, and Ling Shao. Camouflaged object detec-tion. In CVPR , pages 2774–2784, 2020. 1, 2 [4] Golnaz Ghiasi, Xiuye Gu, Yin Cui, and Tsung-Yi Lin. Scal-ing open-vocabulary image segmentation with image-level labels. In ECCV , pages 540–557, 2022. 2, 3, 6 [5] Xiuye Gu, Tsung-Yi Lin, Weicheng Kuo, and Yin Cui. Open-vocabulary object detection via vision and language knowledge distillation. In ICLR , 2022. 6 [6] Chunming He, Kai Li, Yachao Zhang, Longxiang Tang, Yu-lun Zhang, Zhenhua Guo, and Xiu Li. Camouflaged object detection with feature decomposition and edge reconstruc-tion. In CVPR , pages 22046–22055, 2023. 2 [7] Xihang Hu, Xiaoli Zhang, Fasheng Wang, Jing Sun, and Fuming Sun. Efficient camouflaged object detection network based on global localization perception and local guidance refinement. IEEE TCSVT , 34(7):5452–5465, 2024. 2 [8] Zhou Huang, Hang Dai, Tian-Zhu Xiang, Shuo Wang, Huai-Xin Chen, Jie Qin, and Huan Xiong. Feature shrinkage pyra-mid for camouflaged object detection with transformers. In 
+
+CVPR , pages 5557–5566, 2023. 2 [9] Ge-Peng Ji, Lei Zhu, Mingchen Zhuge, and Keren Fu. Fast camouflaged object detection via edge-based reversible re-calibration network. PR , 123:108414, 2022. 2 [10] Alexander Kirillov, Eric Mintun, Nikhila Ravi, Hanzi Mao, Chloe Rolland, Laura Gustafson, Tete Xiao, Spencer White-head, Alexander C. Berg, Wan-Yen Lo, Piotr Doll´ ar, and Ross Girshick. Segment anything. In ICCV , pages 4015– 4026, 2023. 2, 3, 5 [11] Boyi Li, Kilian Q. Weinberger, Serge J. Belongie, Vladlen Koltun, and Ren´ e Ranftl. Language-driven semantic seg-mentation. In ICLR , 2022. 2, 3 [12] Feng Liang, Bichen Wu, Xiaoliang Dai, Kunpeng Li, Yinan Zhao, Hang Zhang, Peizhao Zhang, Peter Vajda, and Diana Marculescu. Open-vocabulary semantic segmentation with mask-adapted CLIP. In CVPR , pages 7061–7070, 2023. 1, 2, 3, 6 [13] Haiyang Mei, Ge-Peng Ji, Ziqi Wei, Xin Yang, Xiaopeng Wei, and Deng-Ping Fan. Camouflaged object segmentation with distraction mining. In CVPR , pages 8772–8781, 2021. 1[14] Fausto Milletari, Nassir Navab, and Seyed-Ahmad Ahmadi. V-Net: Fully convolutional neural networks for volumetric medical image segmentation. In 3DV , pages 565–571, 2016. 5[15] Youwei Pang, Xiaoqi Zhao, Tian-Zhu Xiang, Lihe Zhang, and Huchuan Lu. Zoom in and out: A mixed-scale triplet network for camouflaged object detection. In CVPR , pages 2150–2160, 2022. 2 [16] Youwei Pang, Xiaoqi Zhao, Jiaming Zuo, Lihe Zhang, and Huchuan Lu. Open-vocabulary camouflaged object segmen-tation. In ECCV , pages 476–495, 2024. 1, 2, 3, 5, 6 [17] Alec Radford, Jong Wook Kim, Chris Hallacy, Aditya Ramesh, Gabriel Goh, Sandhini Agarwal, Girish Sastry, Amanda Askell, Pamela Mishkin, Jack Clark, Gretchen Krueger, and Ilya Sutskever. Learning transferable visual models from natural language supervision. In ICML , pages 8748–8763, 2021. 1, 2, 6 [18] Yongming Rao, Wenliang Zhao, Guangyi Chen, Yansong Tang, Zheng Zhu, Guan Huang, Jie Zhou, and Jiwen Lu. DenseCLIP: Language-guided dense prediction with context-aware prompting. In CVPR , pages 18061–18070, 2022. 2 [19] Peng Ren, Tian Bai, Jing Sun, and Fuming Sun. Seeing the unseen: A semantic alignment and context-aware prompt framework for open-vocabulary camouflaged object segmen-tation. In ICCV , pages 23657–23666, 2025. 1, 3, 6 [20] Yujia Sun, Shuo Wang, Chenglizhao Chen, and Tian-Zhu Xi-ang. Boundary-guided camouflaged object detection. In IJ-CAI , pages 1335–1341, 2022. 5 [21] Haiwen Wang, Xinzhou Wang, Fuchun Sun, and Yixu Song. Camouflaged object segmentation with transformer. In ICC-SIP , pages 225–237, 2021. 1 [22] Jianzong Wu, Xiangtai Li, Shilin Xu, Haobo Yuan, Henghui Ding, Yibo Yang, Xia Li, Jiangning Zhang, Yunhai Tong, Xudong Jiang, et al. Towards open vocabulary learning: A survey. IEEE TPAMI , 46(7):5092–5113, 2024. 1 [23] Jiarui Xu, Sifei Liu, Arash Vahdat, Wonmin Byeon, Xiao-long Wang, and Shalini De Mello. Open-vocabulary panop-tic segmentation with text-to-image diffusion models. In 
+
+CVPR , pages 2955–2966, 2023. 1, 3, 6 [24] Mengde Xu, Zheng Zhang, Fangyun Wei, Han Hu, and Xi-ang Bai. Side adapter network for open-vocabulary semantic segmentation. In CVPR , pages 2945–2954, 2023. 6 [25] Fan Yang, Qiang Zhai, Xin Li, Rui Huang, Ao Luo, Hong Cheng, and Deng-Ping Fan. Uncertainty-guided transformer reasoning for camouflaged object detection. In ICCV , pages 4146–4155, 2021. 2 [26] Muyang Yi, Quan Cui, Hao Wu, Cheng Yang, Osamu Yoshie, and Hongtao Lu. A simple framework for text-supervised semantic segmentation. In CVPR , pages 7071– 7080, 2023. 6 [27] Qihang Yu, Ju He, Xueqing Deng, Xiaohui Shen, and Liang-Chieh Chen. Convolutions die hard: Open-vocabulary segmentation with single frozen convolutional CLIP. In 
+
+NeurIPS , 2023. 6 27663 [28] Haobo Yuan, Xiangtai Li, Chong Zhou, Yining Li, Kai Chen, and Chen Change Loy. Open-vocabulary SAM: segment and recognize twenty-thousand classes interactively. In ECCV ,pages 419–437, 2024. 3 [29] Hao Zhang, Feng Li, Xueyan Zou, Shilong Liu, Chunyuan Li, Jianwei Yang, and Lei Zhang. A simple framework for open-vocabulary segmentation and detection. In ICCV ,pages 1020–1031, 2023. 2 [30] Junmin Zhong, Anzhi Wang, Chunhong Ren, and Jintao Wu. A survey on deep learning-based camouflaged object detec-tion. Multim. Syst. , 30(5):268, 2024. 2 [31] Kaiyang Zhou, Jingkang Yang, Chen Change Loy, and Ziwei Liu. Learning to prompt for vision-language models. IJCV ,130(9):2337–2348, 2022. 6 [32] Xueyan Zou, Jianwei Yang, Hao Zhang, Feng Li, Linjie Li, Jianfeng Wang, Lijuan Wang, Jianfeng Gao, and Yong Jae Lee. Segment everything everywhere all at once. In NeurIPS ,2023. 3 27664

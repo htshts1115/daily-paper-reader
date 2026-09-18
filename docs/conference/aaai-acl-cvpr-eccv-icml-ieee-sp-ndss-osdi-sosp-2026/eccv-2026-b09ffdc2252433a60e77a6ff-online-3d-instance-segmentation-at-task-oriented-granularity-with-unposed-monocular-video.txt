@@ -1,0 +1,361 @@
+Title: 9032.pdf
+
+URL Source: https://media.eventhosts.cc/Conferences/ECCV2026/pdfs/9032.pdf
+
+Published Time: Tue, 08 Sep 2026 20:06:46 GMT
+
+Number of Pages: 18
+
+Markdown Content:
+# Online 3D Instance Segmentation at task-oriented granularity with Unposed Monocular Video 
+
+Dong Wu 1, Baicheng Li 1, Yingdian Cao 1, Shunkai Zhou 1, Yiwen Lu 1, and Hongbin Zha 1,2 
+
+> 1
+
+State Key Laboratory of GAI, School of IST, Peking University  
+
+> 2
+
+School of Artificial Intelligence and Computer Science, Anqing Normal University 
+
+{riserwu,skzhou25}@stu.pku.edu.cn {libc,yingdianc,luyw}@pku.edu.cn, zha@cis.pku.edu.cn Superpoint 
+
+> Segmentation
+> SAM
+
+…
+
+> Mask3D
+> CropFormer
+
+…     
+
+> YOLO-World
+> SAM
+> MASt3R-SLAM
+> 3D Point Cloud
+> Posed
+> RGB-D Images
+> 3D Point Cloud
+> Posed
+> RGB-D Images
+> Unposed
+> RGB Videos
+> Task
+> All visually decomposable instances
+> All pretrained category
+> instances
+> Task-relevant instances
+> Assign
+> semantic
+> label
+> Assign
+> semantic
+> label
+> …
+> Input Output
+> “Find the towel on the bathtub .”
+> Not found!
+> Ours:
+> “towel”, “bathtub”
+> Existing approaches:
+> Found!
+> Type I:
+> Type II:
+> Ours :
+
+Fig. 1: We propose a task-oriented 3D instance segmentation method with online unposed images, without requiring offline-collected point clouds or additional sensor data. Unlike existing bottom-up approaches that segment before recognition, our method determines segmentation granularity based on the task. For example, in the task “Find the towel on the bathtub,” conventional methods may falsely merge the towel and bathtub, while ours correctly separates the towel as an individual instance. 
+
+Abstract. We present a real-time, task-oriented 3D instance segmenta-tion framework for unposed monocular video, enabling embodied agents to task-adaptively perceive and interact with objects in open-world scenes. Unlike most previous bottom-up segmentation paradigms that segment before recognition, we adopt a task-oriented segmentation approach. Specifically, objects are decoupled within each frame using an open-vocabulary detector combined with a prompt-based 2D segmentation model, while the 3D underlying geometry of the scene is simultane-ously being reconstructed using a modern dense SLAM system, whose continuously re-optimized camera poses and depth are unsuitable for incremental mask association. Guided by the SLAM-derived pose graph, 2 D. Wu et al. we selectively associate multi-view masks and reuse the dense correspon-dences provided by the SLAM system, incrementally converting them into geometric association scores with minimal additional computation. By incorporating semantic similarity and mutual exclusivity metrics, we design a priority-ordered mask clustering algorithm for efficient online multi-view mask matching and merging. Evaluations on open-vocabulary 3D instance segmentation benchmarks show that our method effectively mitigates the performance degradation of existing approaches when using dense SLAM reconstructions instead of depth-sensor point clouds. On the Replica dataset, using only unposed images, it even achieves results comparable to methods leveraging ground-truth depth and poses. More importantly, qualitative results show that our method achieves more reli-able task-oriented 3D object disentanglement than previous bottom-up segmentation paradigms.  
+
+> Keywords: 3D instance segmentation · Task-oriented · Unposed monoc-ular video
+
+## 1 Introduction 
+
+3D instance segmentation is a fundamental task in embodied intelligence, which typically aims to decouple and semantically recognize object instances in a scene using offline-collected sensor data from RGB-D cameras or LiDAR. However, the assumption of having complete offline-collected sensor data rarely holds in embodied intelligence applications, where agents must incrementally perceive, reconstruct, and parse their surroundings under real-time constraints without access to full observations in advance. Moreover, the reliance on depth sensors inherently limits the applicability of these approaches. By contrast, monocular cameras are more cost-effective, easier to deploy, and provide richer semantic information, making them particularly advantageous for a broader range of embodied intelligence applications. Furthermore, unlike traditional settings where instance segmentation is restricted to categorization within predefined taxonomies (e.g., ScanNet [5]), embodied intelligence requires open-world generalization, where an agent must flexibly adapt its perception to novel tasks and semantic concepts encountered during interaction. Recently, with the advancement of deep learning, 2D image segmentation and open-vocabulary recognition models such as SAM [13, 26], CLIP [25], and YOLO-World [4] have been proposed and widely applied in open-vocabulary 3D instance segmentation tasks. As shown in Fig. 1, existing approaches generally fall into two categories: (1) the first [41, 42] leverages models like SAM [13] or superpoint segmentation [8] to segment all visually decomposable entities in the scene, but often suffers from fragmented and redundant segmentation, and relies heavily on time-consuming post-processing; (2) the second [29, 30] depends on pre-trained 2D segmentation [24] or 3D segmentation models [10] with closed-set categories to determine segmentation granularity, which cannot continuously adapt segmentation granularity to task requirements. We observe Online 3D Instance Segmentation with Unposed Monocular Video 3
+
+that for each specific embodied intelligence task, the set of object categories that need to be recognized is usually task-dependent and clearly defined. 
+
+Consequently, we can move away from the traditional bottom-up segmentation paradigm—where segmentation is performed prior to recognition—toward a task-oriented segmentation paradigm. To reduce reliance on offline-collected sensor data and pre-known poses, integrating modern monocular SLAM systems can provide real-time 3D scene reconstruction as a basis for instance segmentation. The latest dense SLAM systems, such as MASt3R-SLAM [20] and VGGT-SLAM [18], are capable of performing real-time online reconstruction from unposed monocular video. During online perception, camera poses and per-pixel depths are continuously optimized in the SLAM backend, making them unstable references for incremental mask association, as prior associations cannot be directly revised to follow every online update of these variables. Moreover, directly replacing sensor depth and ground-truth poses with the noisy outputs of feed-forward SLAM methods often leads to significant degradation in existing 3D instance segmentation approaches. Hence, effectively combining modern 3D dense SLAM methods with 3D scene instance segmentation remains a non-trivial problem. In this paper, we propose a novel online framework for task-oriented 3D instance segmentation from unposed monocular video. Our approach builds upon MASt3R-SLAM, a dense SLAM system, to perform online scene reconstruction directly from the live image stream. For each incoming keyframe, we leverage an open-vocabulary object detector together with a prompt-based 2D segmentation model to decouple and recognize task-relevant objects in 2D images. Guided by the pose graph of MASt3R-SLAM, we avoid redundant pairwise computa-tions between all frames by performing mask association only with the most spatio-temporally relevant keyframes. Moreover, we fully reuse the point-level correspondences computed by the SLAM system, which are long-term valid and 
+
+independent of the optimized state variables , enabling efficient incremental computation with minimal additional overhead. We introduce semantic cues and mutual-exclusivity constraints with an online priority-ordered clustering strategy for efficient multi-view mask association and decoupling. In addition, due to the high efficiency of our mask clustering algorithm, we perform optimal clustering at each step using all current mask association metrics, thereby effec-tively preventing error accumulation from early segmentation errors in online segmentation tasks [37, 38]. Our method does not rely on any 3D dataset for fine-tuning or post-training, and achieves online, zero-shot, task-oriented 3D instance segmentation. Our contributions are summarized as follows: 
+
+– We propose a novel real-time system capable of task-oriented, specified-granularity, online 3D object segmentation from monocular video without requiring pose information. 
+
+– We design a task-relevant 2D instance mask decoupling strategy that asso-ciates masks using SLAM correspondence information rather than dynami-4 D. Wu et al. 
+
+cally optimized variables, together with a priority-ordered mask clustering algorithm for online cross-view mask merging. 
+
+– We evaluate our method on open-vocabulary 3D instance segmentation bench-marks and show that existing methods struggle to adapt to modern dense SLAM systems. Using only unposed monocular video, our approach outper-forms baselines on ScanNet200 [5] and remains competitive with methods using ground-truth depth and poses on Replica [27], while qualitative results demonstrate superior task-relevant segmentation granularity compared with other methods. 
+
+## 2 Related Work 
+
+2.1 Feed-forward Scene Reconstruction 
+
+The pioneering work DUSt3R [35] introduced a feed-forward framework that directly predicts dense point clouds and recovers camera parameters from image pairs. MASt3R [3] incorporated feature descriptors for cross-image correspon-dences, and MASt3R-SFM [6] extended this approach to multi-view global optimization, although with high computational cost. VGGT [33] overcame the two-view limitation via alternating frame-wise and global attention, enabling end-to-end reconstruction from an arbitrary number of views. Spann3R [32] and CUT3R [34] further advanced online incremental multi-frame reconstruction, the former leveraging memory mechanisms and the latter employing recurrent temporal networks. MASt3R-SLAM [20] extended MASt3R [3] into a real-time dense SLAM system with globally consistent poses and geometry. In contrast, VGGT-SLAM [18] addressed the ambiguity of uncalibrated reconstruction by opti-mizing 15-DoF homographies across submaps on the SL(4) manifold. Collectively, these works illustrate how feed-forward architectures can evolve into dense SLAM systems; however, they primarily focus on geometric reconstruction, neglecting semantic understanding. PanSt3R [46] and IGGT [14] enable instance-level re-construction on top of feed-forward architectures. More recently, LSM [7] and Uni3R [28] reconstruct semantic 3D Gaussians from a few unposed images, and SIU3R [36] further adds instance-level understanding. However, all of these meth-ods run offline and do not support online perception or interactive-granularity instance segmentation. 
+
+2.2 VFM for Offline 3D Instance Segmentation 
+
+Benefiting from large-scale 2D annotated data, many vision foundation models (VFMs) have rapidly advanced, showing strong performance and generalization in 2D segmentation and recognition. However, high-quality 3D annotated data remains scarce, motivating researchers to leverage 2D VFMs to assist 3D seg-mentation and bridge the gap between 2D and 3D understanding. With VFM assistance, many methods achieve strong results in open-vocabulary 3D instance segmentation. Current approaches mainly fall into two categories: (1) SAM3D [41] Online 3D Instance Segmentation with Unposed Monocular Video 5
+
+and Sai3D [42] use SAM [13] and superpoint segmentation [8] to split all entities in 2D images or 3D point clouds, often suffering from over-segmentation and re-quiring complex post-processing, while leveraging mask-pooled CLIP embeddings to assign semantic labels to objects; (2) OpenMask3D [29] and Open3DIS [23] use 3D pretrained segmentation [10, 22] models to decide segmentation granularity, assigning semantics via mask-pooled CLIP [25] embeddings, while OpenIns3D [12] and OpenYOLO 3D [2] leverage open-vocabulary detection results [4, 16] for semantic labeling. However, all of these methods are limited to closed-set granular-ity. Different from the above bottom-up or closed-set segmentation strategies, we adopt a top-down segmentation approach with specified task-relevant granularity to better meet the diverse requirements of embodied applications. OVIR-3D [17] follows a similar paradigm, but it fully relies on sensor depth and poses to establish correspondences [44]. Moreover, all of these methods are based on offline-collected data, making it difficult to meet the requirements of online embodied applications. 
+
+2.3 Online 3D Instance Segmentation 
+
+With the rise of embodied AI and the growing demand for diverse robotic applications, online 3D instance segmentation has attracted increasing attention. Early methods [19, 21] processed 2D images independently, projected predictions onto 3D point clouds, and fused results across frames, but the lack of geometric and temporal information made fusion challenging. Fusion-aware 3D-Conv [43] and SVCNN [11] preserved prior frame information and aggregated 3D features for semantic segmentation. INS-CONV [15] extended sparse convolutions for efficient global 3D feature extraction, while MemAda [39] employed multimodal memory adapters for online perception. EmbodiedSAM [38] lifted SAM-generated 2D masks to precise 3D masks for high-accuracy per-frame fusion. OnlineAnySeg [30] similarly models the 3D instance segmentation problem as the association and matching of VFM-generated masks. However, it relies on sensor-provided depth signals and offline-computed fixed camera poses to calculate spatial overlap ratios. PanoRecon [37] and EPRecon [45] perform reconstruction and segmentation simultaneously from monocular video but still rely on known poses and models with only closed-set recognition capabilities. Most prior methods still rely on offline poses or depth. Although modern SLAM methods [18,20] can provide pose and geometry estimates, these optimization variables are continuously updated online. These methods cannot revise past segmentations accordingly and are sensitive to noise or adjustment of these variables. To tackle this limitation, we introduce a mask association metric leveraging the prior of the feed-forward reconstruction model. In contrast to OnlineAnySeg [30], our association metrics are agnostic to the optimization variables such as camera poses and depth, making our method suitable for online segmentation in streaming unposed monocular video setting. 6 D. Wu et al. 
+
+## 3 Method 
+
+We provide an overview of our method in Fig. 2, which shows our main compo-nents: the MASt3R-SLAM [20] system (Sec. 3.1), task-oriented mask segmentation (Sec. 3.2), mask association criteria (Sec. 3.3), and online mask merging (Sec. 3.4). 
+
+3.1 Preliminaries 
+
+Our method builds upon MASt3R-SLAM. Given a stream of RGB images {It ∈
+
+RH×W ×3} as input, MASt3R-SLAM outputs per-pixel 3D pointmaps {Xi ∈
+
+RH×W ×3} along with their confidences {Ci ∈ RH×W ×1} of keyframes {K i} and camera poses {T t ∈ Sim (3) } of all frames. A key component of MASt3R-SLAM is pointmap matching, which establishes dense pixel correspondences: πij : pi → pj as well as the valid mask Vij ∈ BH×W ×2
+
+between frames, where pi ∈ RH×W represents the pixel coordinates of image i and the valid mask Vij = F alse denotes the invalidate matches with large distances in 3D space or low predicted confidence scores. By formulating correspondence search as a local non-linear optimization and leveraging GPU parallelization, MASt3R-SLAM achieves highly efficient pointmap matching. Importantly, the matching is completely independent of pose estimates , relying solely on MASt3R outputs. This ensures that correspondences remain valid even as back-end optimization and loop closure continuously refine keyframe poses. To maintain consistency over long sequences, MASt3R-SLAM constructs an incremental pose graph E. Each incoming frame is compared against the latest keyframe Ki−1, and a new keyframe Ki is added when geometric matches fall below a threshold. Graph edges are formed either sequentially or through loop closure detection. In summary, MASt3R-SLAM provides (1) dense and reliable point-level correspondences across frames and (2) keyframe mechanism and factor graph that captures spatiotemporal associations between keyframes. These two properties are particularly important for our extension: we leverage the point-level matching to associate instance masks across frames, and we exploit the incremental and sparse nature of the factor graph to selectively and efficiently compute associations of instance masks between different frames. 
+
+3.2 Task-oriented Mask Representation 
+
+For each new added keyframe Ki, we adopt a task-oriented instance mask gen-eration strategy. Specifically, given a task-relevant open-category set C(e.g., set {towel, bathtub} for “Find the towel on the bathtub.”), which can be inferred automatically by an LLM [1, 31, 40], YOLO-World [4] first generates coarse, category-aware 2D proposals. These proposals are then refined by SAM2 [26] to yield high-quality instance masks. In accordance with the small-mask retention priority principle(See supplementary material for details.), we can process the instance masks of each keyframe to be non-overlapping. Therefore, the instance masks of each keyframe can be parameterized as Mi ∈ ZH×W , where M iid =n refer Online 3D Instance Segmentation with Unposed Monocular Video 7Instance Segmentation Map      
+
+> Semantics Segmentation Map
+> Back-project
+> Back-project
+> Task-oriented
+> Segmentation
+> RGB Sequence
+> Online Clustering
+> Cluster_j, “pillow” Cluster_k, “picture”
+> Cluster_i, “bed”
+> ⋯⋯
+> Newly Segmented Instances
+> Pointmap Matching based SLAM
+> Pointmap Matching
+> Pose Graph
+> Task words
+> ⋮
+> ⋮
+> Instance masks
+> keyframe
+> correspondence
+> Mask Association Criteria
+> GAM Matrix
+> SSM Matrix
+> MEM Matrix
+> ⋮
+
+Fig. 2: System diagram of ours . Upon arrival of a new frame, keyframes are selected and the pose graph is dynamically updated via MASt3R-SLAM, with point correspondences established. Task-oriented instance masks are extracted for newly added keyframes. Guided by the pose graph and inter-frame correspondences, mask association criteria are incrementally computed. Followed by online clustering that establishes cross-frame instance identities, the cross-frame instance masks as well as corresponding semantic labels are back-projected onto the reconstructed point cloud to obtain 3D instance and semantic maps. 
+
+to the n-th detected instance mask in the current scene, cin ∈ C is its associated category label, and M iid =−1 represents the background region. Since the pointmap Xi and instance mask representation M i of keyframes are pixel-wise aligned, we can equivalently formulate the 3D instance segmentation problem of pointmap as an instance masks association problem across multiple keyframes. Once multi-view association is finished, the instance IDs of the pointmap across views are updated via a single-level hash mapping rule. 
+
+3.3 Mask Association Criteria 
+
+To efficiently establish correspondences among instance masks across frames, we leverage the incremental and sparse nature of the pose graph E to guide online masks association computation, avoiding redundant and irrelevant frame-to-frame association. Specifically, whenever a new edge eij =  Ki, Kj  is added to the pose graph, we compute pairwise mask associations between the mask sets M iid =n and 
+
+n
+
+M jid =m
+
+o
+
+of the two endpoint keyframes. For each mask pair 
+
+(M iid =n, M jid =m), we compute and record the geometric association metric and semantic similarity metric. In addition, for the newly added keyframe Ki, we impose mutual exclusivity constraints among masks within its set Mi.
+
+Geometric association metric. For each new edge eij =  Ki, Kj , we establish bidirectional dense pixel correspondences between them: πij : pi → pj and 
+
+πji : pj → pi. For each mask pair (M iid =n, M jid =m) from keyframe Ki and Kj ,we use correspondence πij to project the mask M iid =n to the image coordinate frame of keyframe Kj , denoted as πij (M iid =n). We can then compute the overlap between πij (M iid =n) and M jid =m, yielding the intersection πij (M iid =n) ∩ M jid =m.With this, the valid overlap ratio of M iid =n to M jid =m is defined as follows: 8 D. Wu et al. 
+
+or (n,m ) =
+
+(πij (M iid =n) ∩ M jid =m, V ij )
+
+(M iid =n, V ij ) (1) where |(M, V )| counts the number of pixel correspondences whose source pixels lie inside mask M and are marked valid by V (i.e., Vij = True). Object observations during online mapping are often incomplete. If M iid =n and M jid =m
+
+correspond to the same object but M iid =n ≫ M jid =m , the overlap ratio or (n, m )
+
+may be underestimated due to inevitable matching noise. Therefore, we also compute or (m, n ), which represents the valid overlap ratio of M jid =m to M iid =n.The final geometric association metric between these two masks is defined as the maximum of these two overlap ratios: 
+
+GAM (n,m ) = GAM (m,n ) = max (or (n,m ), or (m,n )) ∈ [0 , 1]  (2) 
+
+Semantic similarity metric. Similar to the geometric association metric, the semantic similarity metric is computed only between mask sets of two keyframes connected by a pose graph edge. We pre-compute text features for each category in the task-relevant open-category set C using CLIP only once, denoted as: 
+
+F = fc |c ∈ C , f c ∈ Rd , where fc is the text embedding of category c. Each instance mask (M in, c in) directly takes its semantic feature from the corresponding category embedding: sin = fcin . Compared with methods that crop instances and extract image features via CLIP, this approach significantly reduces computation. For a mask pair (M iid =n, M jid =m), the semantic similarity metric is defined as the cosine similarity of their semantic features: 
+
+SSM (n,m ) = SSM (m,n ) = sin, s jm
+
+sin sjm
+
+∈ [−1, 1]  (3) where ⟨., . ⟩ denotes the inner product and ∥.∥ the Euclidean norm. 
+
+Mutual exclusivity metric. While geometric and semantic cues promote mask merging, they may also incorrectly associate mismatched masks—for instance, due to under-segmentation where a bounding box intended for one object may inherently include parts of others, or due to noisy correspondences. To prevent incorrect associations, we propose a mutual exclusivity score for intra-frame masks, based on the premise that different instance masks within a keyframe should not be merged. When a new keyframe Ki is added, before the explicit non-overlapping constraint is enforced (see Sec. 3.2), some instance masks within the keyframe Ki may still partially overlap. For mask pairs with negligible overlap, we define the mutual exclusivity score as following: 
+
+M EM (n,m ) = M EM (m,n ) =
+
+(1 iou 
+
+ ˆM in, ˆM im
+
+
+
+< ϵ 
+
+0 otherwise  (4) Online 3D Instance Segmentation with Unposed Monocular Video 9
+
+where ϵ is a threshold, ˆM denotes the instance masks before applying the explicit non-overlapping constraint. As shown in Fig. 2, these pairwise mask metrics are stored in a dense array, where the entry at row i and column j encodes the association score between the i-th and j-th masks. Since random access in a dense array has O(1) time complexity, both lookups and updates can be performed in constant time, enabling efficient access during online processing. 
+
+3.4 Mask Merging Based on the Priority-ordered Principle 
+
+Mask merging based on association criteria. We model multi-view mask matching as an online clustering problem over masks. A cluster γ is a set of masks that represent the same object. Whenever a new set of edges {eij } is added to the pose graph and the mask association criteria is computed, the new mask edges 
+
+{(M iid =n, M jid =m, GAM (n,m ), SSM (n,m ))} will be added to the mask edge set E.Then we need to update assignment state of instance masks based on all available association information. The detailed procedure is provided in Alg. 1. Briefly, for all newly added mask pairs, we first select plausible candidate matches by applying thresholds to the geometric and semantic similarity metrics. These candidate pairs are then processed in descending order of their geometric matching scores, giving priority to pairs with higher matching confidence. During mask assignment and cluster merging, we refer to the mutual exclusivity matrix to ensure that no mutually exclusive mask pairs coexist within the same cluster. 
+
+Clusters merging based on IoU criteria. Since the computation of association metrics relies on the pose graph, keyframes that are temporally distant but spatially close may lack connecting edges, making it hard to associate masks of the same instance. To address this, we use the first-stage clustering results (num clusters ≫ num masks ) to compute 3D bounding boxes for each cluster and their pairwise IoUs. Following a principle similar to that in Algorithm 1, clusters are then merged in descending IoU order, while consulting the mutual exclusivity matrix to ensure no conflicting masks are merged. 
+
+3.5 Implementation Details 
+
+During the task-oriented mask detection stage, we discard segmentation results where the bounding box of YOLO-World and the corresponding instance mask from SAM2 have low overlap. All experimental scenes share the same set of hyperparameters: the threshold ϵ for determining mutual exclusivity is set to 0.2, while the thresholds for the Geometric association metric( τGAM ), Semantic similarity metric( τSSM ), and inter-cluster IoU( τIoU ) filtering are 0.25, 0.85, and 0.1, respectively. These hyperparameter values were selected based on experimen-tal results and the system’s performance is not sensitive to their exact values. The overall metrics vary only slightly across different settings, indicating the robustness of our method. We provide a detailed report on the ablation studies of these hyperparameters in the supplementary material. 10 D. Wu et al. 
+
+Algorithm 1 Online Mask merging based on the priority-ordered principle. 
+
+Input: E = {(M iid =n, M jid =m, GAM (n,m ), SSM (n,m ))}, M = {M EM (n,m )}, clusters 
+
+Γ = {γk }
+
+Output: processed mask edges E∗, clusters Γ ∗
+
+1: Γ ∗ ← Γ, E∗ ← filter_mask_edges (E, S)
+
+2: E∗ ← sort (E∗, keyword= {GAM (n,m )}, descend )
+
+3: for (M iid =n, M jid =m, GAM (n,m ), SSM (n,m )) ∈ E∗ do 
+
+4: γn ← get_cluster (M iid =n), γ m ← get_cluster (M jid =m)
+
+5: if γn = ∅ and γm = ∅ then 
+
+6: γnew ← { M iid =n, M jid =m} ▷ create a new cluster with the masks 
+
+7: Γ ∗ ← { γnew }
+
+8: else if γn̸ = ∅ and γm̸ = ∅ then 
+
+9: if γn̸ = γm then 
+
+10: if is_violate (γn, γ m, M) then 
+
+11: E∗ ← E∗ \ { (M iid =n, M jid =m, GAM (n,m ), SSM (n,m ))} ▷ discard the edge 
+
+12: else 
+
+13: Γ ∗ ← Γ ∗ \ { γn, γ m} ▷ delete the two clusters 
+
+14: Γ ∗ ← Γ ∗ ∪ { γn ∪ γm} ▷ merge the two clusters 
+
+15: end if 
+
+16: end if 
+
+17: else 
+
+18: # assuming γn̸ = ∅, γ m = ∅, vice versa. 
+
+19: if is_violate (γn, M jid =m) then 
+
+20: E∗ ← E∗ \ { (M iid =n, M jid =m, GAM (n,m ), SSM (n,m ))} ▷ discard the edge 
+
+21: else 
+
+22: γ∗ 
+
+> n
+
+← γn ∪ { M jid =m} ▷ add the unassigned mask to the cluster 
+
+23: Γ ∗ ← Γ ∗ \ { γn} ▷ remove the older cluster 
+
+24: Γ ∗ ← Γ ∗ ∪ { γ∗
+
+> n
+
+} ▷ add the updated cluster 
+
+25: end if 
+
+26: end if 
+
+27: end for 
+
+## 4 Experiments 
+
+In this section, we conduct extensive experiments to evaluate our method against state-of-the-art approaches on publicly available 3D instance segmenta-tion datasets. We begin by describing the experimental setup (Sec. 4.1), followed by quantitative results and qualitative analyses (Sec. 4.2), and an ablation study (Sec. 4.3) that demonstrates the effectiveness of our key designs. Finally, we provide a detailed report on the runtime analysis. 
+
+4.1 Experimental Setup 
+
+We conduct our experiments using the ScanNet200 and Replica datasets. Our analysis on ScanNet200 is based on its validation set, comprising 312 scenes. Online 3D Instance Segmentation with Unposed Monocular Video 11 
+
+For the 3D instance segmentation task, we utilize the 198 predefined categories from the ScanNet200 annotations. Additionally, we conduct experiments on the Replica dataset, which contains 48 categories. Since our method takes only monocular videos without poses as input, we use evo [9] to align the estimated trajectory with the ground truth via a Sim(3) transformation, which is then applied to the reconstructed point cloud to align it with the ground-truth mesh. We then transfer semantic and instance labels of the reconstructed point cloud to the ground-truth mesh through nearest-neighbor vertex lookup. For evaluation metrics, we follow the ScanNet methodology and report average precision (AP) at two mask overlap thresholds: 50% and 25%. In the open-vocabulary setting, AP evaluates both instance segmentation quality and correct category assignment, whereas in the class-agnostic setting, it evaluates instance segmentation only. 
+
+4.2 Results Analysis 
+
+We conduct comparisons against other methods on the ScanNet200 [5] and Replica datasets [27]. The evaluation results on ScanNet200 are presented in Tab. 1, where we indicate for each method whether it operates in an online setting and under zero-shot conditions, the priors it uses for segmentation granularity and open-vocabulary recognition, its dependence on ground-truth poses or sensor depth, and the FPS rate of the online system. Under the open-vocabulary setting, our method still lags behind approaches using privileged ground-truth poses and depth, mainly because MASt3R-SLAM reconstructions deviate from ground-truth point clouds, producing mismatched regions and artifacts. This leads to degraded performance on small objects, especially for long-tail categories. At the same time, we observe that when using MASt3R-SLAM reconstructed point clouds and estimated poses as inputs, Open-YOLO 3D performs poorly due to the limited generalization ability of its 3D segmentation network on noisy SLAM point clouds, where even tuning its score and NMS thresholds brings little improvement. OnlineAnySeg heavily relies on high-quality point clouds for mask association and is sensitive to artifacts. Its low open-vocabulary accuracy mainly comes from naively averaging multi-view CLIP embeddings, which is ill-suited to open-set recognition; its class-agnostic results are better but still fall short of ours. In contrast, our mask association strategy demonstrates stronger robustness and reliability, achieving results that substantially surpass these methods. Moreover, under the ScanNet200 class-agnostic setting, our method remains competitive without relying on ground-truth poses or depth. Our system achieves a runtime of approximately 7 FPS, where the main time consumption comes from the SLAM system. We report the detailed time cost of each module of our algorithm in Sec. 4.4. In contrast, other online segmentation methods directly take ground-truth poses and depth as input, and therefore do not account for the time overhead of the SLAM system. Furthermore, we conduct open-vocabulary instance segmentation experiments on the Replica dataset. As shown in Tab. 2, even without ground-truth camera poses or depth information, our method ranks first on the AP25 metric and achieves highly competitive results on the AP50 metric. As a closer-paradigm reference, 12 D. Wu et al. 
+
+we further compare with the offline feed-forward method PanSt3R on Replica (Tab. 2): although PanSt3R processes all frames offline, our online method still achieves higher AP50 (23.4 vs. 20.9) and AP25 (37.3 vs. 34.3). 
+
+Table 1: Open-vocabulary and class-agnostic 3D instance segmentation quantitative result on the ScanNet200 validation set. Methods marked with GT pose/depth operate in an easier setting that assumes privileged geometry and poses. We also attempted to replace the inputs of some baseline methods with point clouds and camera poses estimated by MASt3R-SLAM. Under this setting, our method significantly outperforms these baselines.                                                                                                                                              
+
+> Method Online Zero-shot Segment Granularity Open-Vocabulary Pose&Depth AP50 ↑AP25 ↑FPS ↑
+> SAM3D ×✓SAM CLIP GT 14.2 21.3 -SAM3D ✓✓SAM CLIP GT 14.7 19.0 8OVIR-3D ×✓Detic Detic GT 24.9 32.3 -Open3DIS ××ISBNet CLIP GT 29.4 32.8 -OpenIns3D ××Mask3D Grounding Dino GT 10.3 14.4 -OpenMask3D ××Mask3D CLIP GT 19.9 23.1 -Open-YOLO 3D ××Mask3D YOLO-World GT 31.7 36.2 -EmbodiedSAM ✓×ScanNet200 CLIP GT 19.2 23.9 10 Open-YOLO 3D ××Mask3D YOLO-World MASt3R-SLAM 0.8 2.0 -OnlineAnySeg ✓✓CropFormer CLIP MASt3R-SLAM 0.1 0.5 15
+> Ours ✓✓YOLO-World + SAM YOLO-World MASt3R-SLAM 7.4 19.3 7OVIR-3D ×✓Detic Class-Agnostic GT 27.5 38.8 -SAM3D ✓✓SAM Class-Agnostic GT 24.8 49.6 8EmbodiedSAM ✓×ScanNet200 Class-Agnostic GT 65.4 80.9 10 OnlineAnySeg ✓✓CropFormer Class-Agnostic GT 36.1 53.5 15
+> OnlineAnySeg ✓✓CropFormer Class-Agnostic MASt3R-SLAM 4.7 19.5 15
+> Ours ✓✓YOLO-World + SAM Class-Agnostic MASt3R-SLAM 16.4 44.7 7
+
+Table 2: Open-vocabulary 3D instance segmentation quantitative result on the Replica dataset.                                                        
+
+> Method Online Zero-shot Segment Granularity Open-Vocabulary Pose&Depth AP50 ↑AP25 ↑
+> OVIR-3D ×✓Detic Detic GT 20.5 27.5 Open3DIS ××ISBNet CLIP GT 24.5 28.2 OpenMask3D ××Mask3D CLIP GT 18.4 24.2 OpenScene ××Mask3D LSeg GT 15.6 17.3 Open-YOLO 3D ××Mask3D YOLO-World GT 28.6 34.8 PanSt3R ××PanSt3R CLIP MUSt3R 20.9 34.3 Ours ✓✓YOLO-World + SAM YOLO-World MASt3R-SLAM 23.4 37.3
+
+In addition, Fig. 3 presents qualitative results on the ScanNet200 dataset, in-cluding class-agnostic instance segmentation results produced by three bottom-up segmentation paradigms: Mask3D [10], OnlineAnySeg [30], and SAM3D [41]. Due to ambiguity in segmentation granularity, bottom-up paradigms tend to merge small objects with adjacent larger ones, failing to satisfy task-specific decoupling requirements. In contrast, our task-oriented instance segmentation paradigm adapts effectively to diverse task demands. In instruction-driven applications, the correctness of task-relevant granularity matters more than the AP metric on common benchmarks. Online 3D Instance Segmentation with Unposed Monocular Video 13 OnlineAnySeg Mask3d Scene  Ours SAM3D          
+
+> Find the paper on the desk 01
+> Find the book on the table 02
+> Look for the cushion by the sofa 03
+> 04 Look for the towel on the side of the bathtub
+
+Fig. 3: Qualitative results on the ScanNet dataset. We show class-agnostic masks from three other bottom-up methods. Unlike them, which often merge small objects into larger neighbors, our approach reliably achieves task-oriented 3D object disentanglement from monocular video. 
+
+4.3 Ablation Study 
+
+Since mask association and merging are the key components of our method, we conducted experiments to evaluate the effectiveness of different designs. As shown in Tab. 3, we first validate three mask association criteria: the Geometric Association Metric (GAM), Semantic Similarity Metric (SSM), and Mutual Exclusivity Metric (MEM). Removing any of these criteria results in a noticeable performance drop, with the most severe degradation occurring when MEM is omitted. This is driven by two independent, module-intrinsic factors: (1) inevitable point-matching noise in the SLAM system, and (2) a few under-segmented masks. Without MEM, either factor can cause multiple distinct instances to be erroneously merged into a single instance. Furthermore, removing the IoU-based mask cluster merging impairs the association of masks belonging to the same instance across different time spans. The qualitative analysis of MEM and IoU-based cluster merging is presented in the supplementary material. Finally, we evaluate the impact of discarding the priority-ordered algorithm principle during mask merging, i.e., processing mask pairs in random order rather than by descending confidence. The results show a significant drop in segmentation performance, primarily because prioritizing high-confidence mask pairs, in combination with the exclusivity metric, helps mitigate noisy matches and segmentation errors. 14 D. Wu et al.                      
+
+> Table 3: Ablation study with different design in mask association and merging on the Replica dataset. Method AP50 ↑AP25 ↑
+> w/o GAM 17.3 31.5 w/o SSM 21.7 33.1 w/o MEM 8.2 12.0 w/o IoU 13.8 31.4 w/o priority-ordered 20.3 33.8 Our final system 23.4 37.3 Table 4: Runtime analysis of differ-ent components. YOLO-World and SAM2 are measured per keyframe, and GAM per keyframe pair. Component Runtime (ms) YOLO-World 30.1 SAM2 132.4 GAM Cal. 9.0 Masks merging 32
+
+4.4 Runtime Analyses 
+
+We conduct runtime evaluation on a desktop computer equipped with an Intel i9-12900KS CPU and an NVIDIA RTX 3090 GPU. Our algorithm achieves 10.87 FPS on the scene of f ice 0 of the Replica dataset and 7.32 FPS on the 
+
+scene 0011 _00 of the ScanNet dataset. For reference, Mast3r-SLAM runs at 11.23 FPS on Replica of f ice 0 and 7.58 FPS on ScanNet scene 0011 _00 . Since our mask association module largely reuses the corresponding computation results from Mast3r-SLAM, both the association step and the system integration incur almost no extra computational overhead. Taking the scene of f ice 0 of the Replica dataset as an example, we report the runtime breakdown of all major components, as shown in Tab. 4. Specifically, the average processing time per keyframe is 30.1 ms for YOLO-World [4] and 132.4 ms for SAM2 [26], while the geometric association metric requires only 9 ms per keyframe pair, and the mask merging step takes 32 ms. 
+
+## 5 Limitation and Future Work 
+
+Our current approach is limited to static 3D scenes, and extending it to dynamic scenes by integrating monocular 4D reconstruction methods would be valuable. Moreover, errors from the front-end 2D detector and the SLAM system inevitably affect our final accuracy, although our multiple association metrics can offset part of these errors. In addition, the SLAM module in our framework could better leverage the richer semantic and instance information provided by the recognition module, and we view this as a promising extension. Possible directions include (but are not limited to): semantics-guided dynamic suppression, semantic loop-closure proposal generation, and object-level local reconstruction optimization, and we leave these for future work. 
+
+## 6 Conclusion 
+
+We present a real-time, task-oriented 3D instance segmentation framework for unposed monocular video, enabling embodied agents to task-adaptively perceive Online 3D Instance Segmentation with Unposed Monocular Video 15 
+
+and interact with objects in open-world scenes. By combining task-oriented 2D instance segmentation with modern dense SLAM-based 3D reconstruction and an efficient online multi-view mask clustering algorithm, our method supports flexible task-oriented 3D instance segmentation. Evaluations demonstrate that our approach overcomes the challenges faced by existing methods when using point clouds reconstructed by dense SLAM, outperforming baseline methods on the ScanNet200 dataset and achieving performance comparable to methods that rely on ground-truth depth and poses on the Replica dataset. Our framework provides a robust solution for online, task-adaptive 3D perception, empowering embodied agents with flexible and adaptive scene understanding. 
+
+## Acknowledgements 
+
+We gratefully acknowledge the anonymous reviewers and area chairs for their valuable comments and suggestions. This work is supported by the NSFC, China (U22A2061), and 230601GP0004. 
+
+## References 
+
+1. Achiam, J., Adler, S., Agarwal, S., Ahmad, L., Akkaya, I., Aleman, F.L., Almeida, D., Altenschmidt, J., Altman, S., Anadkat, S., et al.: Gpt-4 technical report. arXiv preprint arXiv:2303.08774 (2023) 2. Boudjoghra, M.E.A., Dai, A., Lahoud, J., Cholakkal, H., Anwer, R.M., Khan, S., Khan, F.S.: Open-yolo 3d: Towards fast and accurate open-vocabulary 3d instance segmentation. arXiv preprint arXiv:2406.02548 (2024) 3. Cabon, Y., Stoffl, L., Antsfeld, L., Csurka, G., Chidlovskii, B., Revaud, J., Leroy, V.: Must3r: Multi-view network for stereo 3d reconstruction. In: CVPR (2025) 4. Cheng, T., Song, L., Ge, Y., Liu, W., Wang, X., Shan, Y.: Yolo-world: Real-time open-vocabulary object detection. In: Proceedings of the IEEE/CVF conference on computer vision and pattern recognition. pp. 16901–16911 (2024) 5. Dai, A., Chang, A.X., Savva, M., Halber, M., Funkhouser, T., Nießner, M.: Scannet: Richly-annotated 3d reconstructions of indoor scenes. In: Proceedings of the IEEE conference on computer vision and pattern recognition. pp. 5828–5839 (2017) 6. Duisterhof, B.P., Zust, L., Weinzaepfel, P., Leroy, V., Cabon, Y., Revaud, J.: Mast3r-sfm: A fully-integrated solution for unconstrained structure-from-motion. In: 3DV (2025) 7. Fan, Z., Zhang, J., Cong, W., Wang, P., Li, R., Wen, K., Zhou, S., Kadambi, A., Wang, Z., Xu, D., et al.: Large spatial model: End-to-end unposed images to semantic 3d. Advances in neural information processing systems 37 , 40212–40229 (2024) 8. Felzenszwalb, P.F., Huttenlocher, D.P.: Efficient graph-based image segmentation. International journal of computer vision 59 (2), 167–181 (2004) 9. Grupp, M.: evo: Python package for the evaluation of odometry and slam (2017) 10. Hou, J., Dai, X., He, Z., Dai, A., Nießner, M.: Mask3d: Pre-training 2d vision transformers by learning masked 3d priors. In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition. pp. 13510–13519 (2023) 16 D. Wu et al. 11. Huang, S.S., Ma, Z.Y., Mu, T.J., Fu, H., Hu, S.M.: Supervoxel convolution for online 3d semantic segmentation. ACM Transactions on Graphics (TOG) 40 (3), 1–15 (2021) 12. Huang, Z., Wu, X., Chen, X., Zhao, H., Zhu, L., Lasenby, J.: Openins3d: Snap and lookup for 3d open-vocabulary instance segmentation. In: European Conference on Computer Vision. pp. 169–185. Springer (2024) 13. Kirillov, A., Mintun, E., Ravi, N., Mao, H., Rolland, C., Gustafson, L., Xiao, T., Whitehead, S., Berg, A.C., Lo, W.Y., et al.: Segment anything. In: ICCV (2023) 14. Li, H., Zou, Z., Liu, F., Zhang, X., Hong, F., Cao, Y., Lan, Y., Zhang, M., Yu, G., Zhang, D., et al.: Iggt: Instance-grounded geometry transformer for semantic 3d reconstruction. arXiv preprint arXiv:2510.22706 (2025) 15. Liu, L., Zheng, T., Lin, Y.J., Ni, K., Fang, L.: Ins-conv: Incremental sparse convo-lution for online 3d segmentation. In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition. pp. 18975–18984 (2022) 16. Liu, S., Zeng, Z., Ren, T., Li, F., Zhang, H., Yang, J., Jiang, Q., Li, C., Yang, J., Su, H., et al.: Grounding dino: Marrying dino with grounded pre-training for open-set object detection. In: European conference on computer vision. pp. 38–55. Springer (2024) 17. Lu, S., Chang, H., Jing, E.P., Boularias, A., Bekris, K.: Ovir-3d: Open-vocabulary 3d instance retrieval without training on 3d data. In: Conference on Robot Learning. pp. 1610–1620. PMLR (2023) 18. Maggio, D., Lim, H., Carlone, L.: Vggt-slam: Dense rgb slam optimized on the sl (4) manifold. arXiv preprint arXiv:2505.12549 (2025) 19. McCormac, J., Handa, A., Davison, A., Leutenegger, S.: Semanticfusion: Dense 3d semantic mapping with convolutional neural networks. In: 2017 IEEE International Conference on Robotics and automation (ICRA). pp. 4628–4635. IEEE (2017) 20. Murai, R., Dexheimer, E., Davison, A.J.: Mast3r-slam: Real-time dense slam with 3d reconstruction priors. In: CVPR (2025) 21. Narita, G., Seno, T., Ishikawa, T., Kaji, Y.: Panopticfusion: Online volumetric semantic mapping at the level of stuff and things. In: 2019 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS). pp. 4205–4212. IEEE (2019) 22. Ngo, T.D., Hua, B.S., Nguyen, K.: Isbnet: a 3d point cloud instance segmenta-tion network with instance-aware sampling and box-aware dynamic convolution. In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition. pp. 13550–13559 (2023) 23. Nguyen, P., Ngo, T.D., Kalogerakis, E., Gan, C., Tran, A., Pham, C., Nguyen, K.: Open3dis: Open-vocabulary 3d instance segmentation with 2d mask guidance. In: Proceedings of the IEEE/CVF conference on computer vision and pattern recognition. pp. 4018–4028 (2024) 24. Qi, L., Kuen, J., Guo, W., Shen, T., Gu, J., Jia, J., Lin, Z., Yang, M.H.: High-quality entity segmentation. arXiv preprint arXiv:2211.05776 (2022) 25. Radford, A., Kim, J.W., Hallacy, C., Ramesh, A., Goh, G., Agarwal, S., Sastry, G., Askell, A., Mishkin, P., Clark, J., et al.: Learning transferable visual models from natural language supervision. In: ICML (2021) 26. Ravi, N., Gabeur, V., Hu, Y.T., Hu, R., Ryali, C., Ma, T., Khedr, H., Rädle, R., Rolland, C., Gustafson, L., et al.: Sam 2: Segment anything in images and videos. arXiv preprint arXiv:2408.00714 (2024) 27. Straub, J., Whelan, T., Ma, L., Chen, Y., Wijmans, E., Green, S., Engel, J.J., Mur-Artal, R., Ren, C., Verma, S., et al.: The replica dataset: A digital replica of indoor spaces. arXiv preprint arXiv:1906.05797 (2019) Online 3D Instance Segmentation with Unposed Monocular Video 17 28. Sun, X., Jiang, H., Liu, L., Nam, S., Kang, G., Wang, X., Sui, W., Su, Z., Liu, W., Wang, X., et al.: Uni3r: Unified 3d reconstruction and semantic understanding via generalizable gaussian splatting from unposed multi-view images. In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition. pp. 33280–33290 (2026) 29. Takmaz, A., Fedele, E., Sumner, R.W., Pollefeys, M., Tombari, F., Engelmann, F.: Openmask3d: Open-vocabulary 3d instance segmentation. arXiv preprint arXiv:2306.13631 (2023) 30. Tang, Y., Zhang, J., Lan, Y., Guo, Y., Dong, D., Zhu, C., Xu, K.: Onlineanyseg: Online zero-shot 3d segmentation by visual foundation model guided 2d mask merging. In: CVPR (2025) 31. Touvron, H., Lavril, T., Izacard, G., Martinet, X., Lachaux, M.A., Lacroix, T., Rozière, B., Goyal, N., Hambro, E., Azhar, F., et al.: Llama: Open and efficient foundation language models. arXiv preprint arXiv:2302.13971 (2023) 32. Wang, H., Agapito, L.: 3d reconstruction with spatial memory. 3DV (2024) 33. Wang, J., Chen, M., Karaev, N., Vedaldi, A., Rupprecht, C., Novotny, D.: Vggt: Visual geometry grounded transformer. In: CVPR (2025) 34. Wang, Q., Zhang, Y., Holynski, A., Efros, A.A., Kanazawa, A.: Continuous 3d perception model with persistent state. In: CVPR (2025) 35. Wang, S., Leroy, V., Cabon, Y., Chidlovskii, B., Revaud, J.: Dust3r: Geometric 3d vision made easy. In: CVPR (2024) 36. Wei, D., Zhao, L., Li, W., Huang, Z., Ji, S., Liu, P.: Siu3r: Simultaneous scene understanding and 3d reconstruction beyond feature alignment. Advances in Neural Information Processing Systems 38 , 110800–110830 (2026) 37. Wu, D., Yan, Z., Zha, H.: Panorecon: Real-time panoptic 3d reconstruction from monocular video. In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition. pp. 21507–21518 (2024) 38. Xu, X., Chen, H., Zhao, L., Wang, Z., Zhou, J., Lu, J.: Embodiedsam: Online segment any 3d thing in real time. arXiv preprint arXiv:2408.11811 (2024) 39. Xu, X., Xia, C., Wang, Z., Zhao, L., Duan, Y., Zhou, J., Lu, J.: Memory-based adapters for online 3d scene perception. In: Proceedings of the IEEE/CVF Confer-ence on Computer Vision and Pattern Recognition. pp. 21604–21613 (2024) 40. Yang, A., Li, A., Yang, B., Zhang, B., Hui, B., Zheng, B., Yu, B., Gao, C., Huang, C., Lv, C., et al.: Qwen3 technical report. arXiv preprint arXiv:2505.09388 (2025) 41. Yang, Y., Wu, X., He, T., Zhao, H., Liu, X.: Sam3d: Segment anything in 3d scenes. arXiv preprint arXiv:2306.03908 (2023) 42. Yin, Y., Liu, Y., Xiao, Y., Cohen-Or, D., Huang, J., Chen, B.: Sai3d: Segment any instance in 3d scenes. In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR). pp. 3292–3302 (June 2024) 43. Zhang, J., Zhu, C., Zheng, L., Xu, K.: Fusion-aware point convolution for online semantic 3d scene segmentation. In: Proceedings of the IEEE/CVF conference on computer vision and pattern recognition. pp. 4534–4543 (2020) 44. Zhou, X., Girdhar, R., Joulin, A., Krähenbühl, P., Misra, I.: Detecting twenty-thousand classes using image-level supervision. In: European conference on computer vision. pp. 350–368. Springer (2022) 45. Zhou, Z., Ma, Y., Fan, J., Zhang, S., Jing, F., Tan, M.: Eprecon: An efficient framework for real-time panoptic 3d reconstruction from monocular video. In: 2025 IEEE International Conference on Robotics and Automation (ICRA). pp. 2026–2033. IEEE (2025) 18 D. Wu et al. 46. Zust, L., Cabon, Y., Marrie, J., Antsfeld, L., Chidlovskii, B., Revaud, J., Csurka, G.: Panst3r: Multi-view consistent panoptic segmentation. In: Proceedings of the IEEE/CVF International Conference on Computer Vision. pp. 5856–5866 (2025)

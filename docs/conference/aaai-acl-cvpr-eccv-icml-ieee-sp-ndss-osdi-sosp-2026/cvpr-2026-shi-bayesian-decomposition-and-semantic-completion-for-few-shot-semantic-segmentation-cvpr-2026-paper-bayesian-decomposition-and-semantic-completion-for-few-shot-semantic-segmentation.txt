@@ -1,0 +1,393 @@
+Title: Bayesian Decomposition and Semantic Completion for Few-shot Semantic Segmentation
+
+URL Source: https://openaccess.thecvf.com/content/CVPR2026/papers/Shi_Bayesian_Decomposition_and_Semantic_Completion_for_Few-shot_Semantic_Segmentation_CVPR_2026_paper.pdf
+
+Published Time: Sat, 16 May 2026 16:47:47 GMT
+
+Number of Pages: 10
+
+Markdown Content:
+# Bayesian Decomposition and Semantic Completion for Few-shot Semantic Segmentation 
+
+# Guangchen Shi 1 Yirui Wu 2 Wei Zhu 3 Tao Wang 4* Hao Zhang 4 Bo Li 4 Tong Lu 1* 
+
+> 1
+
+# State Key Lab for Novel Software Technology, Nanjing University  
+
+> 2
+
+# College of Computer Science and Software Engineering, Hohai University 
+
+> 3
+
+# China Mobile Zijin Innovation Insititute 
+
+> 4
+
+# vivo BlueImage Lab, vivo Mobile Communication Co., Ltd. 
+
+guangchenshi@smail.nju.edu.cn, wuyirui@hhu.edu.cn, zhuweisgs2@js.chinamobile.com, 
+
+{taowangzj, haozhang, libra }@vivo.com, lutong@nju.edu.cn 
+
+# Abstract 
+
+Few-shot Semantic Segmentation (FSS) aims to segment objects of novel categories given only a handful of labeled examples. However, existing methods often rely on complex category-specific modeling, resulting in high computational cost and limited generalization under low-data regimes. To address these challenges, we propose a Bayesian Proba-bilistic Network (BPNet) that reformulates FSS as a com-position of three interpretable components: a prior, a likeli-hood, and a class-consistency term. Specifically, an efficient Segment Anything Model (SAM) is employed to generate fragmented prior regions for the query image, while both the likelihood and the consistency terms are estimated by a lightweight Class-Agnostic Localization Model (CALM). CALM simultaneously predicts the class consistency be-tween support-query pairs through a binary classification head and estimates the likelihood by localizing the target region in the support image. By evaluating SAM-generated regions in parallel, CALM can efficiently identify the core region, thereby transforming the segmentation problem into a simple binary classification task. Furthermore, to mit-igate the semantic incompleteness of SAM proposals, we introduce an attention-based Semantic Completion Mod-ule (SCM), which leverages local and global context cues to integrate fragmented regions into semantically complete masks. Experiments show that BPNet achieves state-of-the-art performance while maintaining high efficiency. 
+
+# 1. Introduction 
+
+Semantic segmentation [1, 2, 33] has achieved remark-able progress with the rapid advancement of deep learn-  
+
+> *Corresponding authors. Query image
+> Support set
+> Class-Agnostic Localization Model
+> CAM
+> Likehood probability
+> p(m|x,y,s)
+> Yes p(y|x) Yes
+> No
+> Prototype
+> or
+> Feature
+> Decoder
+> ···
+> Prior
+> Prediction
+> Query image
+> Support set
+> Prediction
+> (a) Metric-based Methods (b) MLLM-based Methods
+> Support set
+> Query image
+> Prediction
+> Multimodal LLM
+> Extract
+> Similarity metric
+> (c) Bayesian Decomposition
+> Class consistency
+> probability  p(s|x,y)
+> (d) Semantic Completion
+
+## ···  
+
+> No
+> No Complete
+
+Figure 1. Comparison among different methods. (a) Metric-based methods rely on class prototypes for segmentation. (b) MLLM-based methods utilize pretrained large models to extract class-aware features. (c) Our BPNet decomposes FSS into three se-mantically lightweight probabilistic components, avoiding direct modeling of class prototypes. (d) The Semantic Completion Mod-ule refines fragmented proposals into complete masks using local and global semantic similarities. 
+
+ing. Nevertheless, training such models typically requires large-scale datasets with pixel-level annotations, which are costly and labor-intensive to collect. In contrast, humans can efficiently recognize and segment novel object cat-egories from only a few examples, motivating the few-shot learning paradigm. By transferring knowledge from seen to unseen classes, Few-shot Semantic Segmentation (FSS) [19, 37, 43] significantly reduces annotation costs while extending the applicability of segmentation models to real-world scenarios. In this paper, we address the problem of FSS tasks, This CVPR paper is the Open Access version, provided by the Computer Vision Foundation. Except for this watermark, it is identical to the accepted version; the final published version of the proceedings is available on IEEE Xplore. 12354 which aims to accurately segment novel classes using only a limited number of annotated samples. Most metric-based FSS methods [12, 35, 40] extract features or class pro-totypes from support images and compute similarity with query images to segment new classes, as illustrated in Fig.1 (a). However, these methods heavily rely on the accurately modeling of class prototypes, which is diffi-cult to ensure under few-shot settings. Recently, some methods [14, 30, 42] leverage the rich semantic and visual prior knowledge embedded in pretrained Multimodal Large Language Models (MLLMs) to guide few-shot segmenta-tion, typically by generating class-aware prompts or adapt-ing features from the support set, as shown in Fig.1 (b). While these approaches improve the utilization of rich prior knowledge, they impose substantial computational over-head and are still constrained by the quality of the under-lying class representations. To tackle these challenges, we propose BPNet , a novel paradigm based on Bayesian probabilistic formulations. It decomposes the challenging FSS task into three seman-tically lightweight components with distinct probabilistic roles, which eliminates the need to model class prototypes directly, as illustrated in Fig.1 (c). Specifically, given a query image x with its mask y, and a support image s
+
+with mask m, we decompose the FSS prediction objective 
+
+p(y|x, s, m ) into three components: a prior term p(y|x), a likelihood term p(m|x, y, s ), and a class-consistency term 
+
+p(s|x, y ). The prior component provides query image re-gions based purely on structural cues, serving as target pro-posals. Practically, an efficient Segment Anything Model (SAM) [36] is employed to generate these proposals, pro-viding structure-based regions without class-specific se-mantics. It naturally aligns with the few-shot constraint that models have no prior knowledge about target classes be-fore training. Benefiting from SAM’s strong capability in structural segmentation, the generated regions exhibit pre-cise and well-defined boundaries. As for the likelihood term p(m|x, y, s ) and the class-consistency term p(s|x, y ), the former models the proba-bility of observing the support mask m given a hypoth-esized query region, while the latter verifies the seman-tic alignment between the proposed query region and the support image. Instead of predicting explicit category la-bels, we only determine whether the support image and query region share consistent semantics. To this end, both components are integrated into a Class-Agnostic Localiza-tion Module (CALM), which is a lightweight binary clas-sification network augmented with Class Activation Maps (CAMs) of support branch. The classification probabil-ity produced by CALM serves as the class-consistency term, whereas the intersection-over-union (IoU) between the CAM-highlighted region and the support mask provides an approximation of the likelihood term. This probabilis-tic reformulation effectively converts the complex FSS task into a simple binary classification task. Moreover, by lever-aging the joint collaboration among the probabilistic com-ponents, BPNet achieves high segmentation accuracy even without precise estimation of each individual term. To address the semantic incompleteness of SAM pro-posals, we design a Semantic Completion Module (SCM) as shown in Fig.1 (d), which refines fragmented priors into complete object masks by evaluating both local and global semantic similarities between each proposal and the core region (the proposal with the highest confidence obtained from the Bayesian decomposition). The local similarity di-rectly measures the semantic correspondence between each proposal and the core region, providing a straightforward estimate of their feature alignment. However, proposals that appear locally dissimilar to the core region may still belong to the same semantic object in a broader context. For ex-ample, the glass and tire of a car exhibit distinct textures but share the same object semantics. To capture such long-range semantic dependencies, the global similarity is intro-duced. Specifically, SCM first computes the semantic as-sociations between all regions and the core region through a semantic association attention mechanism, and then com-pares these associations with the candidate proposals. This enables SCM to recognize globally consistent semantics, al-lowing fragmented regions to be effectively integrated into semantically complete masks. Our main contributions are summarized as follows: • We propose a novel Bayesian Probability-based paradigm for FSS, which decomposes the complex task into three semantically lightweight components, avoiding the need to directly model class prototypes. • We introduce a Class-Agnostic Localization Module that simultaneously integrates the likelihood and the class consistency terms using a single binary classification net-work, thus significantly reducing training cost. • We propose a Semantic Completion Module, which not only directly compares the semantic similarity between proposals but also leverages the global context to infer their intrinsic relationships, thereby accurately complet-ing target masks. 
+
+# 2. Related Work 
+
+2.1. Semantic Segmentation 
+
+Semantic segmentation aims to classify each pixel of an im-age into a set of preset categories. According to different network structures, current methods can be roughly divided into three categories, i.e., CNN-based [5, 20, 21], RNN-based [28, 31] and Transformer-based methods [9, 38, 39]. CNN-based methods utilize convolution operations to ex-tract semantic information for pixel-level label prediction. Considering dependence of context information, RNN-12355 based methods use recurrent layers to capture local and global spatial structure information of images. Recently, Transformer-based methods have received more popularity. They regard patches of images as a se-quence, then utilize an encoder-decoder structure with at-tention mechanisms to achieve segmentation. For instance, considering the challenge of achieving unified semantic and instance understanding, OneFormer3D [16] utilizes a transformer-based kernel decoder to jointly predict seman-tic and instance masks, thereby demonstrating strong gen-eralization and efficiency. To alleviate the high computa-tional cost of Vision Transformers, ALGM [22] hierarchi-cally merges similar tokens first within local windows and then across the global feature space, thus reducing token re-dundancy without compromising structural details. 
+
+2.2. Few-shot Semantic Segmentation 
+
+Few-shot semantic segmentation extends the ability of seg-mentation to novel category with a few labeled samples. Many researchers have approached the FSS task using feature-level or prototype-level similarity methods [10, 35], which have been enhanced by various strategies e.g., multi-scale, memory modules, and region-level aggregation, thus addressing appearance variations and background noise. To better exploit large-scale pretrained image en-coders [3], recent studies have proposed approaches cen-tered on visual prompts [14], class-aware dynamic enhance-ment [41, 44], and prior knowledge guidance [17, 24, 30], aiming to customize the generic representations for novel categories with minimal parameters or limited fine-tuning efforts. For instance, to leverage the rich prior knowledge embedded in large-scale diffusion models, Shi et al. [30] propose a prior-guided FSS method that incorporates class-specific prior knowledge to guide the segmentation process, thereby improving accuracy and robustness. Those methods, while surpassing traditional prototype alignment and similarity-based approaches in few-shot tasks, often rely on extensive training data and computa-tional resources, limiting their flexibility and scalability in practical applications. In contrast, our method introduces a Bayesian probabilistic framework that decomposes the seg-mentation task into interpretable lightweight components, thereby enhancing computational efficiency and generaliza-tion capabilities. 
+
+# 3. Method 
+
+3.1. Theoretical Formulation 
+
+Let s and m denote the support image and its corresponding binary mask, while x and y represent the query image and its binary mask. The FSS task can be formulated as learning the conditional probability p(y|x, s, m ) [6, 27]. Under the assumption that the support set (s, m ) and query set (x, y ) are independent, we can derive the fol-lowing reformulation of the target conditional distribution based on Bayes’ theorem: 
+
+p(y|x, s, m ) = p(y, s, m |x)
+
+p(s, m |x) . (1) The numerator term can be further factorized as follows: 
+
+p(y, s, m |x) = p(y|x) · p(s, m |x, y )= p(y|x) · p(m|s, x, y ) · p(s|x, y ). (2) Combining the above equations yields: 
+
+p(y|x, s, m ) = p(y|x) · p(m|s, x, y ) · p(s|x, y )
+
+p(s, m |x) . (3) 
+
+p(y|x) represents the structure-based segmentation of the query image, which partitions the image into coherent regions according to visual structures rather than class se-mantics, as the model has no knowledge of novel classes in the FSS setting. p(m|s, x, y ) represents the likelihood of observing the support mask m given the query hypoth-esis (x, y ) and the support image s. A similar idea has also been explored in [29, 34]. Practically, we estimate this term by segmenting the support conditioned on the query region. Unlike the original FSS objective p(y|x, s, m ), this term does not require precise segmentation, allowing for a more lightweight network design. p(s|x, y ) measures the class-consistency between support and query features, while p(s|x) serves as a normalization constant that is inde-pendent of y.By employing this Bayesian decomposition, we refor-mulate the FSS task into three tractable components: pixel-wise class prediction, support segmentation conditioned on the query, and class-level feature consistency measure-ment. Each component can be optimized without requir-ing explicit class prototypes or precise segmentation masks, thereby alleviating overfitting and improving generalization in few-shot scenarios. 
+
+3.2. Overview 
+
+The key idea of our method is to reformulate the FSS task under a Bayesian probabilistic framework, decomposing it into interpretable and tractable components. Following Eq. 3, and omitting the normalization constant p(s|x), we derive the following formulation: 
+
+p(y|x, s, m ) ∝ p(y|x) · p(m|s, x, y ) · p(s|x, y ). (4) Based on Eq. 4, we propose a Bayesian Probability Net-work (BPNet), as illustrated in Fig. 2. The prior term p(y|x)
+
+represents the structure-based segmentation of the query image, which is produced by a lightweight variant of the Segment Anything Model (SAM), namely EfficientSAM-S [36]. It provides class-agnostic region proposals based 12356 0.92 
+
+> 
+> 0.74
+
+(a) Bayesian decomposition 
+
+> Efficient
+> SAM
+> BackBone
+> IoU is 0.74
+> p(m|s, x, y)
+
+p(y|x) 
+
+(b) Semantic completion 
+
+> Class-Agnostic Localization Module
+> Query image
+> Support set
+> Query region
+> BackBone
+> MLP+
+> Sigmoid
+> CAM
+> Feedback
+> For each
+> Concatenation
+> Element-wise multiplication
+> Prob(same class) is 0.92
+> p(s|x, y)
+> Prediction
+> ···
+> For each
+> region
+> Core region
+> Local
+> similarity
+> Cross attention with the query image
+> Global
+> similarity
+> Semantic context
+> Similarity
+
+# *
+
+# *
+
+# *
+
+> Region selection
+> 0.85
+> 
+> 0.70
+> 0.72
+> 
+> 0.61
+> 0.39
+> 
+> 0.14
+> 0.12
+> 
+> 0.17
+> 0.24
+> 
+> 0.11
+> Confidence
+
+Figure 2. The framework of BPNet, where * means freezing parameters in training phase. (a) Firstly, we use a lightweight EfficientSAM to segment the query image into multiple region proposals. Then, each proposal along with the support image is input into the class-agnostic localization module to compute the class-consistency and likelihood probabilities. The proposal with the highest joint probability is selected as the core region. (b) Finally, the semantic completion module refines and expands the core region into a complete semantic mask by leveraging both local and global semantic relationships. 
+
+purely on visual structures without semantic information, thereby meeting the requirements of FSS where the seman-tic information of novel classes are unknown before train-ing. The process can be formalized as: 
+
+{Ri}Ni=1 = SAM( x), (5) where Ri denotes the i-th region proposal generated by SAM, and N is the total number of proposals. The likelihood term p(m|s, x, y ) segments the support image guided by the query hypothesis y, and the class con-sistency term p(s|x, y ) measures the semantic similarity be-tween a support image and query regions. Instead of pre-dicting explicit class identities, the framework estimates whether their features are semantically aligned. To fur-ther reduce computational overhead, we propose a Class-Agnostic Localization Module (CALM) that jointly mod-els both p(m|s, x, y ) and p(s|x, y ). Essentially, CALM is a binary classification network that determines whether a query region Ri and a support image belong to the same class, thereby estimating the class-consistency probabil-ity. The classification probability serves as the guidance signal, and its gradients are back-propagated to the back-bone extracting features from the support image, generat-ing Class Activation Maps (CAMs) that represent the likeli-hood p(m|s, x, y ). Through this joint modeling, CALM ef-fectively captures both the class-consistency and likelihood relationships, achieving higher accuracy while significantly reducing computational cost. By inputting query regions Ri
+
+into CALM, we can obtain corresponding likelihood P li and class-consistency P ci probabilities: 
+
+{(P li , P ci )}Ni=1 = CALM( {Ri}Ni=1 , s, m ). (6) Then, we select the region with the highest joint proba-bility as the core region Rcore :
+
+Rcore = arg max 
+
+> Ri
+
+(P li · P ci ). (7) Since the regions generated by SAM are often struc-turally accurate but semantically incomplete, we introduce a Semantic Completion Module (SCM) to refine and ex-pand the selected region into a complete semantic object. SCM evaluates both local and global semantic relationships between each proposal and the core region, which effec-tively identifies and merges fragmented regions, producing semantically complete masks P red y . The process can be expressed as: 
+
+P red y = SCM (Rcore , {Ri}Ni=1 
+
+) . (8) This framework can be easily extended to the k-shot set-ting by simply adapting CALM to handle multiple support images. For each query region Ri, CALM independently computes the likelihood and class consistency probabilities with respect to each support image. The final probability of Ri is then obtained by averaging the results across all k
+
+support samples: 
+
+Rcore = arg max 
+
+> Ri
+
+∑kj=1 (P l 
+
+> (i,j )
+
+· P c
+
+> (i,j )
+
+)
+
+k , (9) 12357 where P l 
+
+> (i,j )
+
+and P c 
+
+> (i,j )
+
+denote the likelihood and class-consistency probabilities between query region Ri and the 
+
+j-th support image, respectively. 
+
+3.3. Class-Agnostic Localization Model 
+
+To jointly estimate class-consistency and likelihood prob-abilities, we propose a Class-Agnostic Localization Model (CALM) built upon a binary classification framework with gradient-based activation. CALM predicts whether a query region and a support image belong to the same class, while simultaneously localizing the most relevant regions in the support image by extracting its Class Activation Maps (CAMs). The overlap rate between the CAM and the sup-port mask serves as the likelihood term, whereas the classi-fication probability represents the class-consistency term. Concretely, we first input the query image q and the sup-port image s into a pre-trained lightweight ResNet-18 [8] to extract their feature maps Fq and Fs. For query region Ri,we perform element-wise multiplication between its mask and the query feature map to obtain the region-specific fea-ture maps. Then, we perform global average pooling on the feature maps to obtain their feature vectors. Next, we concatenate the two feature vectors and input them into a Multi-Layer Perceptron (MLP) with a sigmoid activation function to predict whether they belong to the same class. The output same-class probability of this network serves as the class consistency probability. 
+
+P ci = σ(MLP( V ec (Ri ⊗ Fq ) ⊕ V ec (Fs))) , (10) where V ec (·) represents global average pooling, σ(·) is the sigmoid function, ⊗ and ⊕ indicates element-wise multipli-cation and concatenation, respectively. Secondly, we use the class-consistency probability P ci
+
+as a supervision signal to perform backpropagation through the binary classification network. During this process, the gradients with respect to the support feature map Fs are ob-tained. Following the LayerCAM algorithm [13], these gra-dients are utilized to generate a class activation map (CAM) from Fs, which highlights the region in the support image that is most semantically correlated with the current query region Ri. By binarizing the CAM and computing its In-tersection over Union (IoU) with the ground-truth support mask m, we estimate the likelihood probability P li as: 
+
+P li = IoU ( Binarize(CAM( Fs, P ci )) , m ). (11) The training process of CALM only requires binary clas-sification labels, which avoids the dependence on precise segmentation masks, reducing training costs while improv-ing the model’s generalization ability. 
+
+3.4. Semantic Completion Module 
+
+Considering that the regions segmented by the Efficient SAM [36] are often semantically incomplete, we introduce a Semantic Completion Module (SCM) to combine the core region with other related regions based on their semantic re-lationships, thereby completing the target mask guided by prior information. In CALM, we extract the feature map of each proposal region Ri and apply global average pooling to obtain its feature vector Vi. Let Vcore denote the feature vector of the core region. The local similarity between region i and the core region is computed using cosine similarity: sim local  
+
+> i
+
+= cos( Vi, V core ). (12) Local similarity measures only the direct feature-space proximity between neighboring regions, neglecting broader semantic relationships. However, regions that are distant in feature space may still belong to the same semantic object. For example, while the glass and tire of a car exhibit dis-tinct visual appearances, they belong to the same semantic category ( car ). To model long-range semantic dependen-cies, SCM employs a cross-attention mechanism that com-putes global similarity. Specifically, it measures the seman-tic context correlation between the query image’s global feature Vq and each proposal region Vi as follows: 
+
+V context  
+
+> i
+
+= softmax 
+
+( (Wq · Vi) · (Wk · Vq )⊤
+
+√dk
+
+)
+
+(Wv · Vq ),
+
+(13) where dk is the feature dimension, and Wq , Wk, and Wv are learnable projection matrices. We then compute the global similarity between the contextual feature V context  
+
+> i
+
+and the core region Vcore , weighted by its class-consistency P ci and likelihood P li probabilities: sim global  
+
+> i
+
+= cos( V context  
+
+> i
+
+, V core ) · P ci · P li . (14) Finally, to balance the contributions of local and global semantics, we combine both similarities through a learnable parameter α:sim i = α sim global  
+
+> i
+
++ (1 − α) sim local  
+
+> i
+
+. (15) If sim i > 0.5, region Ri is regarded as belonging to the same semantic category as the core region and is included in the final predicted mask. In this way, the integration of global contextual information and local feature cues enables the selection of the most representative and semantically complete target regions as the final prediction results. 
+
+# 4. Experiment 
+
+4.1. Datasets and Evaluation Metrics 
+
+Datasets. We evaluate our method on two widely adopted FSS benchmarks: PASCAL-5 i [27] and COCO-20 i [18]. 
+
+PASCAL-5 i is derived from the PASCAL VOC 2012 12358 Table 1. Comparison results under 1-shot and 5-shot settings. Best in Bold and Second in Underline. 
+
+Dataset Method Backbone 1-shot 5-shot split-1 split-2 split-3 split-4 mean split-1 split-2 split-3 split-4 mean PASCAL-5i
+
+HDMNet [23] ResNet [8] 71.0 75.4 62.1 69.4 69.7 71.3 76.2 71.3 68.5 71.8 SCCAN [37] ResNet [8] 68.3 72.5 66.8 58.9 66.6 72.3 74.1 69.1 65.6 70.3 ABCB [43] ResNet [8] 72.9 76.0 69.5 64.0 70.6 74.4 78.0 73.9 68.3 73.6 DiffSeg [30] Diffusion [25] 70.5 75.8 67.9 63.2 69.3 72.8 77.6 68.7 69.3 72.1 AlignDiff [24] Diffusion [25] 71.0 74.8 66.5 63.6 69.0 72.6 75.5 70.3 68.1 71.6 LLaFS [42] LLM [26] 74.2 78.8 72.3 68.5 73.5 75.9 80.1 75.8 70.7 75.6 PAHNet [45] Plug-in 72.1 76.4 71.0 66.6 71.5 75.8 78.6 76.9 73.2 76.1 VRP-SAM [32] SAM [15] 73.9 78.3 70.6 65.0 71.9 - - - - -BPNet (ours) SAM [15] 75.3 80.6 73.2 73.6 75.7 77.1 81.3 76.0 74.0 77.1 
+
+> COCO-20 i
+
+HDMNet [23] ResNet [8] 43.8 50.8 50.6 49.4 48.6 50.6 61.6 55.7 56.6 56.1 SCCAN [37] ResNet [8] 40.4 49.7 49.6 45.6 46.3 47.2 57.2 59.2 52.1 53.9 ABCB [43] ResNet [8] 44.2 54.0 52.1 49.8 50.0 50.5 59.1 57.0 53.6 55.1 DiffSeg [30] Diffusion [25] 45.2 54.1 47.9 48.3 48.9 50.7 58.9 51.6 52.4 53.4 AlignDiff [24] Diffusion [25] 42.1 52.5 49.0 47.8 47.9 49.3 59.9 59.5 53.0 55.4 LLaFS [42] LLM [26] 47.5 58.8 56.2 53.0 53.9 53.2 63.8 63.1 60. 0 60.0 PAHNet [45] Plug-in 45.2 58.2 54.4 51.2 52.3 53.0 64.1 60.8 58.7 59.2 VRP-SAM [32] SAM [15] 48.1 55.8 60.0 51.6 53.9 - - - - -BPNet (ours) SAM [15] 46.7 59.2 56.8 54.2 54.2 54.8 65.6 64.2 61.7 61.6 
+
+dataset [4] and further augmented with additional SDS an-notations [7]. It consists of 20 object categories, which are evenly divided into four folds for cross-validation. In each fold, five categories are reserved for evaluation, while the remaining fifteen are used for training. COCO-20 i is con-structed from the MS COCO dataset and contains 80 object categories. Following the same protocol as PASCAL-5 i, the classes are partitioned into four folds, each with 60 training classes and 20 test classes. 
+
+Evaluation Metrics. We evaluate our method using the mean Intersection over Union (mIoU) metric, which is com-puted by averaging the IoU scores across all classes in the test set. To reduce the influence of the random selection of support images, we repeat all experiments 10 times with different support images and report the mean results. 
+
+4.2. Implementation Details 
+
+To evaluate the performance of our method, we implement BPNet using the PyTorch library, and train it for 200 epochs on an RTX 3090 GPU. During training process, the seg-mentation results produced by SAM for the query images remain nearly unchanged. Therefore, we precompute the segmentation results of SAM for all query images and store them for use during training, which can significantly save GPU memory and speed up training. To supervise the model training, we determine whether each region predicted by SAM corresponds to the target object. Specifically, a re-gion is considered a positive target if its overlap ratio with the ground-truth mask exceeds 0.7. 
+
+4.3. Comparison with State-of-the-Art 
+
+We compare PBNet with several state-of-the-art methods under both 1-shot and 5-shot settings, as shown in Table 1. Existing approaches adopt diverse feature extractors, in-cluding CNN-based backbones (e.g., ResNet [8]), diffusion models [25], large language models [26], and foundation vision models such as SAM [15]. While CNN-based meth-ods such as HDMNet [23], SCCAN [37], and ABCB [43] achieve competitive performance, their representation capa-bility is limited when dealing with large appearance varia-tions in few-shot scenarios. DiffSeg [30] and AlignDiff [24] benefit from the extensive knowledge of pretrained diffu-sion models, further enhancing their performance on few-shot segmentation tasks. It is worth noting that PAHNet [45] is a plug-in mod-ule that can be integrated with other few-shot segmen-tation methods. For fair comparison, we report its best performance obtained when integrated into SCCAN [37]. LLaFS [42] can achieve notable performance, which bene-fits from the strong representation ability of a pre-trained LLM. The margin between LLaFS and our method indi-cates that our BPNet has the ability to surpass powerful pre-trained large models. Due to the larger number of test categories and the more complex scene layouts in COCO-20 i, existing methods generally exhibit a noticeable per-formance drop on this dataset. Our BPNet consistently achieves the best results on COCO-20 i, highlighting its gen-eralization capability and robustness to challenging scenes. 12359 Support   
+
+> set
+> Query
+> set
+> Prediction
+> Ground
+> truth  Region
+> proposal
+> CAM Figure 3. Qualitative results of BPNet. Each column corresponds to one test sample. Red stars denote the core regions in proposals. The last column illustrates a failure case, where a proposal contains both foreground and background content, leading to incorrect segmentation.
+
+4.4. Qualitative Results 
+
+We present qualitative results of BPNet in Fig. 3. It can be observed that the SCM can effectively expand incomplete regions from SAM’s fragmented proposals into coherent semantic masks. Benefiting from the high-quality region proposals generated by SAM, BPNet focuses on modeling high-level semantic information rather than aligning low-level feature, thus producing masks with compact bound-aries. From the 2nd and 3rd samples, it can be seen that different regions in the query images activate different areas in the support images, indicating the effectiveness of using CAMs to compute the likelihood probability. Furthermore, the 4th and 5th samples demonstrate that different support images can guide the selection of different high-probability regions when the query image remains the same. The last sample illustrates a failure case, where a pro-posal region generated by SAM contains both foreground and background objects. Since SCM can only complete re-gions but cannot separate foreground objects from a mixed region, this leads to incorrect segmentation. Fortunately, such mixed regions are rare in practice due to the suffi-ciently fragmented proposals generated by SAM, thus hav-ing minimal impact on overall performance. 
+
+4.5. Ablation Studies 
+
+4.5.1. Network Design 
+
+To validate the effectiveness of the proposed components, we conduct ablation studies by removing individual mod-ules from BPNet, as shown in Table 2. When the likelihood term Pl or the consistency term Pc in CALM is removed, 
+
+> Table 2. Results of BPNet with different modules in 1-shot and 5-shot segmentation.
+
+Method Pl Pc SCM 1-shot 5-shot Clustering √ √ √ 52.8 55.3 SAM 
+
+× √ √ 61.3 63.8 √ × √ 62.9 64.0 √ √ × 69.0 71.3 √ √ √ 75.7 77.1 
+
+the remaining components are used to compute the final probability. When the SCM module is removed, regions with predicted probability greater than 0.5 are directly se-lected as the final target. In addition, to compare with SAM, we replace it with a simple clustering-based proposal gen-erator and evaluate the resulting performance. It can be observed that each module contributes pos-itively to the final result, with the the class-consistency probability Pc and the SCM playing particularly critical roles in achieving high accuracy. Comparing SAM with the clustering-based proposal generator further shows that SAM provides higher-quality region proposals, leading to superior segmentation accuracy. Specifically, SAM offers proposals with more precise boundaries and better object completeness, whereas the clustering method tends to pro-duce fragmented or noisy regions. Moreover, both the likelihood term Pl and the consis-tency term Pc are indispensable for modeling class consis-tency, as removing either component results in a significant performance drop. These findings validate the effectiveness 12360 Table 3. Results of BPNet when using different task heads and backbones, where backbone networks are abbreviated for space, as well as Cls and Seg represent classification and segmentation tasks, respectively. 
+
+Network Backbone 1-shot 5-shot FPS Cls Seg Res18 Res101 Dense 
+
+× √ √ × × 75.8 76.9 1.2 √ × √ × × 75.7 77.1 5.5 √ × × √ × 75.6 77.1 2.8 √ × × × √ 75.8 77.3 1.6 Query image  Resnet-18 
+
+> Layer2
+> Resnet-18
+> Layer3
+> Resnet-18
+> Layer4
+> Resnet-101
+> Layer4
+> DenseNet-121
+> Layer4
+> Figure 4. The class activation maps extracted from different layers and backbones, where support sets are highlighted with red boxes in the top-left corner of query images.
+
+of the Bayesian decomposition and highlight its ability to leverage limited samples for accurate segmentation. 
+
+4.5.2. Design of CALM 
+
+To evaluate the robustness of our Bayesian probabilistic framework, we extend BPNet by replacing the lightweight ResNet-18 [8] backbone with stronger architectures, includ-ing ResNet-101 [8] and DenseNet-121 [11]. In addition, we upgrade the training paradigm from a binary classification task to a dense prediction task. We report the performance and speed of different configurations in Table 3. Compared to classification, the segmentation task allows the model to capture richer semantic cues. However, our ex-periments show that the classification-based model achieves performance comparable to its segmentation-based counter-part while offering faster inference. This demonstrates that our method maintains strong robustness even under a sim-pler training objective. If the backbone networks differ substantially in capac-ity, one would expect a corresponding performance gap in the final results. Interestingly, our experiments show that changing the backbone leads to only minor perfor-mance fluctuations, which demonstrates the strong robust- 
+
+> Table 4. Results of BPNet when using different similarity and fusion methods in SCM.
+
+Similarity Fusion Method 1-shot 5-shot Local Global Cross Weighted 
+
+√ × - - 69.4 71.9 
+
+× √ × √ 69.8 72.4 √ √ × √ 70.8 72.6 
+
+× √ √ × 72.7 73.5 √ √ √ × 75.7 77.1 
+
+ness of our method. To further ensure that this consistency is not caused by suppressing the representation capacity of stronger backbones during training, we compare the activa-tion maps generated by different backbones, as illustrated in Fig. 4. The results show that DenseNet yields more com-plete and precise activation regions than ResNet-18. This clear distinction verifies that the comparable performance across backbones arises from the robustness of our method. 
+
+4.5.3. Design of SCM 
+
+To validate the SCM design, we analyze the contributions of both local and global similarity measures, as well as exam-ine various context fusion strategies for constructing global vectors. The comparison results are shown in Table 4. Removing either the local vectors or the global vectors results in a noticeable performance drop, demonstrating that both components are essential for effective semantic com-pletion. Local vectors enable the model to capture direct correspondence between the current region and its most relevant neighboring regions, while global vectors provide holistic semantic guidance. Their complementary roles help enrich the semantic representation of the target region, ulti-mately enhancing segmentation accuracy. Furthermore, we evaluate two approaches for generat-ing global vectors: simple weighted averaging and cross-attention. The results indicate that cross-attention yields su-perior performance, likely because it can dynamically em-phasize class-relevant features and better align global se-mantics, thereby improving completion accuracy. 
+
+# 5. Conclusion 
+
+In this paper, we introduce the BPNet, a Bayesian proba-bilistic framework for FSS. By decomposing the complex task into probabilistic models, BPNet reformulates FSS as a composition of three interpretable components: a prior, a likelihood, and a class-consistency term. The CALM uni-fies class-consistency and likelihood estimation through a single binary classification process, while the SCM lever-ages both local and global semantic cues to refine incom-plete regions into coherent object masks. Extensive experi-ments demonstrate that BPNet achieves state-of-the-art per-formance while maintaining high efficiency. 12361 Acknowledgement 
+
+This work is funded by the National Natural Science Foun-dation of China (Grant No. 62372223 and U24A20330), the Key R&D Program of Xinjiang Uygur Autonomous Region (Grant No. 2025B03043), and Nanjing University-China Mobile Communications Group Co., Ltd. Joint Institute. 
+
+# References 
+
+[1] Seun-An Choe, Keon-Hee Park, Jinwoo Choi, and Gyeong-Moon Park. Universal domain adaptation for semantic seg-mentation. In Proceedings of the IEEE Conference on Com-puter Vision and Pattern Recognition , pages 4607–4617, 2025. [2] Zhenhui Ding, Guilian Chen, Qin Zhang, Huisi Wu, and Jing Qin. CSC-PA: cross-image semantic correlation via proto-type attentions for single-network semi-supervised breast tu-mor segmentation. In Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition , pages 15632– 15641, 2025. [3] Alexey Dosovitskiy, Lucas Beyer, Alexander Kolesnikov, Dirk Weissenborn, Xiaohua Zhai, Thomas Unterthiner, Mostafa Dehghani, Matthias Minderer, Georg Heigold, Syl-vain Gelly, Jakob Uszkoreit, and Neil Houlsby. An image is worth 16x16 words: Transformers for image recognition at scale. In 9th International Conference on Learning Repre-sentations, ICLR , 2021. [4] Mark Everingham, Luc Van Gool, Christopher K. I. Williams, John M. Winn, and Andrew Zisserman. The pas-cal visual object classes (VOC) challenge. Int. J. Comput. Vis. , 88(2):303–338, 2010. [5] Yunxiang Fu, Meng Lou, and Yizhou Yu. Segman: Omni-scale context modeling with state space models and local attention for semantic segmentation. In Proceedings of the IEEE Conference on Computer Vision and Pattern Recogni-tion , pages 19077–19087, 2025. [6] Sina Hajimiri, Malik Boudiaf, Ismail Ben Ayed, and Jose Dolz. A strong baseline for generalized few-shot seman-tic segmentation. In Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition , pages 11269– 11278, 2023. [7] Bharath Hariharan, Pablo Andr´ es Arbel´ aez, Ross B. Gir-shick, and Jitendra Malik. Simultaneous detection and seg-mentation. In Proceedings of the European Conference on Computer Vision , pages 297–312, 2014. [8] Kaiming He, Xiangyu Zhang, Shaoqing Ren, and Jian Sun. Deep residual learning for image recognition. In Proceed-ings of the IEEE Conference on Computer Vision and Pattern Recognition , pages 770–778, 2016. [9] Xinting Hu, Li Jiang, and Bernt Schiele. Training vision transformers for semi-supervised semantic segmentation. In 
+
+Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition , pages 4007–4017, 2024. [10] Yutao Hu, Xin Huang, Xiaoyan Luo, Jungong Han, Xianbin Cao, and Jun Zhang. Learning foreground information bot-tleneck for few-shot semantic segmentation. Pattern Recog-nit. , 146:109993, 2024. [11] Gao Huang, Zhuang Liu, Laurens van der Maaten, and Kil-ian Q. Weinberger. Densely connected convolutional net-works. In Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition , pages 2261–2269, 2017. [12] Kai Huang, Feigege Wang, Ye Xi, and Yutao Gao. Proto-typical kernel learning and open-set foreground perception for generalized few-shot semantic segmentation. In Proceed-ings of the IEEE Conference on Computer Vision and Pattern Recognition , pages 19199–19208, 2023. [13] Peng-Tao Jiang, Chang-Bin Zhang, Qibin Hou, Ming-Ming Cheng, and Yunchao Wei. Layercam: Exploring hierarchical class activation maps for localization. IEEE Trans. Image Process. , 30:5875–5888, 2021. [14] Amin Karimi and Charalambos Poullis. DSV-LFS: unifying llm-driven semantic cues with visual features for robust few-shot segmentation. In Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition , pages 4584– 4594, 2025. [15] Alexander Kirillov, Eric Mintun, Nikhila Ravi, Hanzi Mao, Chlo´ e Rolland, Laura Gustafson, Tete Xiao, Spencer White-head, Alexander C. Berg, Wan-Yen Lo, Piotr Doll´ ar, and Ross B. Girshick. Segment anything. In Proceedings of the IEEE/CVF International Conference on Computer Vi-sion , pages 3992–4003, 2023. [16] Maxim Kolodiazhnyi, Anna Vorontsova, Anton Konushin, and Danila Rukhovich. Oneformer3d: One transformer for unified point cloud segmentation. In Proceedings of the IEEE Conference on Computer Vision and Pattern Recog-nition , pages 20943–20953, 2024. [17] Minh-Quan Le, Tam V. Nguyen, Trung-Nghia Le, Thanh-Toan Do, Minh N. Do, and Minh-Triet Tran. Maskd-iff: Modeling mask distribution with diffusion probabilistic model for few-shot instance segmentation. In Proceedings of AAAI Conference on Artificial Intelligence , pages 2874– 2881, 2024. [18] Tsung-Yi Lin, Michael Maire, Serge J. Belongie, James Hays, Pietro Perona, Deva Ramanan, Piotr Doll´ ar, and C. Lawrence Zitnick. Microsoft COCO: common objects in context. In Proceedings of European Conference on Com-puter Vision , pages 740–755, 2014. [19] Seonghyeon Moon, Samuel S. Sohn, Honglu Zhou, Sejong Yoon, Vladimir Pavlovic, Muhammad Haris Khan, and Mub-basir Kapadia. MSI: maximize support-set information for few-shot segmentation. In Proceedings of the IEEE Interna-tional Conference on Computer Vision , pages 19209–19219, 2023. [20] Danish Nazir, Timo Bartels, Jan Piewek, Thorsten Bagdo-nat, and Tim Fingscheidt. Distributed semantic segmentation with efficient joint source and task decoding. In Proceedings of the European Conference on Computer Vision , pages 195– 212, 2024. [21] Zhenliang Ni, Xinghao Chen, Yingjie Zhai, Yehui Tang, and Yunhe Wang. Context-guided spatial feature reconstruction for efficient semantic segmentation. In Proceedings of the European Conference on Computer Vision , pages 239–255, 2024. [22] Narges Norouzi, Svetlana Orlova, Daan de Geus, and Gijs Dubbelman. ALGM: adaptive local-then-global token merg-12362 ing for efficient semantic segmentation with plain vision transformers. In Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition , pages 15773– 15782, 2024. [23] Bohao Peng, Zhuotao Tian, Xiaoyang Wu, Chengyao Wang, Shu Liu, Jingyong Su, and Jiaya Jia. Hierarchical dense cor-relation distillation for few-shot segmentation. In Proceed-ings of the IEEE Conference on Computer Vision and Pattern Recognition , pages 23641–23651, 2023. [24] Ri-Zhao Qiu, Yu-Xiong Wang, and Kris Hauser. Aligndiff: Aligning diffusion models for general few-shot segmenta-tion. In Proceedings of the European Conference on Com-puter Vision , pages 384–400, 2024. [25] Robin Rombach, Andreas Blattmann, Dominik Lorenz, Patrick Esser, and Bj¨ orn Ommer. High-resolution image synthesis with latent diffusion models. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 10674–10685, 2022. [26] Baptiste Rozi` ere, Jonas Gehring, Fabian Gloeckle, Sten Sootla, and Itai Gat. Code llama: Open foundation models for code. CoRR , abs/2308.12950, 2023. [27] Amirreza Shaban, Shray Bansal, Zhen Liu, and Irfan Essa. One-shot learning for semantic segmentation. In Proceed-ings of British Machine Vision Conference , 2017. [28] Xinxin Shan, Yao Li, Fang Chen, Dongchu Wang, and Yifan Deng. A fine-grained recurrent network for image segmen-tation via vector field guided refinement. In Proceedings of the Pattern Recognition and Computer Vision , pages 3–16, 2024. [29] Guangchen Shi, Yirui Wu, Shivakumara Palaiahnakote, Umapada Pal, and Tong Lu. Arnet: Active-reference net-work for few-shot image semantic segmentation. In Pro-ceedings of the IEEE International Conference on Multime-dia and Expo , pages 1–6, 2021. [30] Guangchen Shi, Wei Zhu, Yirui Wu, Danhuai Zhao, Kang Zheng, and Tong Lu. Few-shot semantic segmentation via perceptual attention and spatial control. In Proceedings of the 32nd ACM International Conference on Multimedia ,pages 5374–5383, 2024. [31] Haley M. So, Laurie Bose, Piotr Dudek, and Gordon Wet-zstein. Pixelrnn: In-pixel recurrent neural networks for end-to-end-optimized perception with neural sensors. In Pro-ceedings of the IEEE Conference on Computer Vision and Pattern Recognition , pages 25233–25244, 2024. [32] Yanpeng Sun, Jiahui Chen, Shan Zhang, Xinyu Zhang, Qiang Chen, Gang Zhang, Errui Ding, Jingdong Wang, and Zechao Li. VRP-SAM: SAM with visual reference prompt. In Proceedings of IEEE Conference on Computer Vision and Pattern Recognition , pages 23565–23574, 2024. [33] Quan Tang, Bowen Zhang, Jiajun Liu, Fagui Liu, and Yifan Liu. Dynamic token pruning in plain vision transformers for semantic segmentation. In Proceedings of the IEEE Con-ference on Computer Vision and Pattern Recognition , pages 777–786, 2023. [34] Kaixin Wang, Jun Hao Liew, Yingtian Zou, Daquan Zhou, and Jiashi Feng. Panet: Few-shot image semantic segmenta-tion with prototype alignment. In Proceedings of the Inter-national Conference on Computer Vision , pages 9196–9205, 2019. [35] Chunlin Wen, Yu Zhang, Jie Fan, Hongyuan Zhu, Xiu-Shen Wei, Yijun Wang, Zhiqiang Kou, and Shuzhou Sun. Object-level correlation for few-shot segmentation. In Proceedings of the IEEE International Conference on Computer Vision ,2025. [36] Yunyang Xiong, Bala Varadarajan, Lemeng Wu, Xiaoyu Xi-ang, Fanyi Xiao, Chenchen Zhu, Xiaoliang Dai, Dilin Wang, Fei Sun, Forrest N. Iandola, Raghuraman Krishnamoorthi, and Vikas Chandra. Efficientsam: Leveraged masked im-age pretraining for efficient segment anything. In Proceed-ings of the IEEE Conference on Computer Vision and Pattern Recognition , pages 16111–16121, 2024. [37] Qianxiong Xu, Wenting Zhao, and Guosheng Lin. Self-calibrated cross attention network for few-shot segmenta-tion. In Proceedings of the IEEE International Conference on Computer Vision , pages 655–665, 2023. [38] Zheyu Zhang, Gang Yang, Yueyi Zhang, Huanjing Yue, Aip-ing Liu, Yunwei Ou, Jian Gong, and Xiaoyan Sun. Tm-former: Token merging transformer for brain tumor segmen-tation with missing modalities. In Proceedings of AAAI Con-ference on Artificial Intelligence , pages 7414–7422, 2024. [39] Zheng Zhang, Guanchun Yin, Bo Zhang, Wu Liu, Xiuzhuang Zhou, and Wendong Wang. A semantic knowledge comple-mentarity based decoupling framework for semi-supervised class-imbalanced medical image segmentation. In Proceed-ings of the IEEE Conference on Computer Vision and Pattern Recognition , pages 25940–25949, 2025. [40] Chao Zheng, Li Liu, Yu Meng, Xiaorui Peng, and Mei-jun Wang. Few-shot point cloud semantic segmentation via support-query feature interaction. IEEE Trans. Circuits Syst. Video Technol. , 34(11):10753–10763, 2024. [41] Ziqin Zhou, Hai-Ming Xu, Yangyang Shu, and Lingqiao Liu. Unlocking the potential of pre-trained vision trans-formers for few-shot semantic segmentation through rela-tionship descriptors. In Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition , pages 3817– 3827, 2024. [42] Lanyun Zhu, Tianrun Chen, Deyi Ji, and Jieping Ye. Llafs: When large language models meet few-shot segmentation. In Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition , pages 3065–3075, 2024. [43] Lanyun Zhu, Tianrun Chen, Jianxiong Yin, Simon See, and Jun Liu. Addressing background context bias in few-shot segmentation through iterative modulation. In Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition , pages 3370–3379, 2024. [44] Muzhi Zhu, Yang Liu, Zekai Luo, Chenchen Jing, Hao Chen, Guangkai Xu, Xinlong Wang, and Chunhua Shen. Unleash-ing the potential of the diffusion model in few-shot semantic segmentation. In Proceedings of the Annual Conference on Neural Information Processing Systems , 2024. [45] Tianyu Zou, Shengwu Xiong, Ruilin Yao, and Yi Rong. Bal-ancing conservatism and aggressiveness: Prototype-affinity hybrid network for few-shot segmentation. In Proceedings of the IEEE International Conference on Computer Vision ,pages 20561–20571, 2025. 12363

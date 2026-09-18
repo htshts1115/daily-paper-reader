@@ -1,0 +1,393 @@
+Title: Structure-Aware Representation Distillation for Tiny-Dense Object Segmentation
+
+URL Source: https://openaccess.thecvf.com/content/CVPR2026/papers/Liu_Structure-Aware_Representation_Distillation_for_Tiny-Dense_Object_Segmentation_CVPR_2026_paper.pdf
+
+Published Time: Sat, 16 May 2026 16:52:48 GMT
+
+Number of Pages: 9
+
+Markdown Content:
+# Structure-Aware Representation Distillation for Tiny-Dense Object Segmentation 
+
+# Xuesong Liu RIT 
+
+> xl2088@rit.edu
+
+# Anke Xu Independent Researcher 
+
+> ankexu329@gmail.com
+
+# Wenbo Cao Independent Researcher 
+
+> evancao1429@gmail.com
+
+# Emmett Ientilucci RIT 
+
+> ejipci@rit.edu
+
+# Abstract 
+
+Dense scenes containing numerous tiny objects pose a fun-damental challenge for segmentation models, where small localization errors can significantly degrade downstream measurements. We present Structure-Aware Representa-tion Distillation (SARD), a teacher-compatible framework that transfers structural knowledge from a large teacher to a compact student via feature-space alignment rather than mask imitation. SARD builds a structure-importance map by integrating boundary salience, geometric complex-ity, and local feature variation, and uses it to guide a unified representation loss that combines feature consis-tency with distribution alignment. This encourages the student to allocate capacity to geometrically informative regions while preserving global context. Experiments on Cityscapes, ADE20K, and a challenging rock fragmenta-tion benchmark (RockFrag) show that SARD consistently improves both mIoU and boundary IoU over strong dis-tillation baselines; on RockFrag, SARD improves a Swin-T student over CWD by +4.3 mIoU and +6.7 bIoU. A ResNet-50 student distilled from a Swin-L teacher achieves up to 7.7 × parameter reduction and 9 × higher through-put than the teacher, with no additional inference overhead beyond the student network, demonstrating that structure-aware representation distillation is effective and efficient for tiny-dense segmentation. Code is available at: https: //github.com/liuuuuuuxuesong/SARD .
+
+# 1. Introduction 
+
+Accurate segmentation of scenes containing many tiny and densely packed objects remains a fundamental challenge in computer vision. Applications ranging from medi-cal microscopy [20] and remote sensing [14] to industrial inspection depend on precise delineation of small struc-tures, where even a one-pixel deviation can significantly al-ter downstream measurements. Recent foundation models such as SAM [7] and Mask2Former [3] demonstrate strong generalization, yet remain computationally expensive. Ef-ficient variants including FastSAM [22], MobileSAM [19], and EfficientSAM [16] reduce computational cost but often underperform on domains dominated by tiny-scale patterns. Developing lightweight models that retain structural fidelity is therefore essential for practical deployment. Traditional knowledge distillation strategies [6] focus on mimicking the teacher’s output masks or intermediate log-its. Recent advances for dense prediction [9, 12] extend this through pixel-wise alignment, while others explore de-coupled logit distillation [21], masked generation [17], and multi-layer review [1]. While effective for coarse bound-aries, these approaches fail to capture subtle structural cues critical for dense regions. Consider rock fragmentation analysis, where thousands of irregular fragments must be individually segmented: uniform distillation devotes equal attention to fragment interiors and boundaries where touch-ing rocks separate, causing students to learn coarse seman-tic alignment while losing boundary fidelity. This failure mode is pervasive across tiny-dense scenarios. Existing methods assume uniform information density, treating all spatial locations equally despite fundamental differences in geometric complexity. We argue that successful transfer for tiny-dense objects requires structure-aware representation alignment rather than output imitation. While specialized architectures for boundaries [5, 10, 15] and multi-scale processing [8, 13] improve geometric precision, they require task-specific de-signs that limit generalizability. Instead of matching masks directly, the student should learn to reproduce the geome-try of the teacher’s feature space, where fine-scale edges, boundaries, and region density are encoded. This perspec-tive reframes distillation as a representation learning prob-lem: preserving spatial structure and local information flow, independent of specific teacher architectures. Crucially, not all locations contribute equally. Boundaries between touch-ing instances and crowded regions demand substantially more representational precision than homogeneous interi-ors. This CVPR paper is the Open Access version, provided by the Computer Vision Foundation. Except for this watermark, it is identical to the accepted version; the final published version of the proceedings is available on IEEE Xplore. 34775 To realize this idea, we introduce SARD, a general framework that transfers structural knowledge through feature-space alignment. SARD constructs a structure-importance map combining boundary salience, structural complexity, and local feature variation, and uses it to weight representation-level distillation losses. Rather than model-ing edges or regions in separate stages, SARD embeds these cues within the representation space itself, allowing the stu-dent to allocate capacity to structurally informative regions. This yields improved precision on tiny objects and sharper boundary delineation without architecture constraints or ad-ditional inference modules. Our main contributions are as follows: • A structure-aware representation distillation framework that emphasizes boundaries and dense regions, address-ing the spatial non-uniformity inherent in tiny-dense seg-mentation. • A unified formulation combining feature consistency and distribution alignment under structure-aware weight-ing, applicable to diverse teacher–student pairs without architecture-specific modifications. • Comprehensive validation showing consistent improve-ments across challenging scenarios. On our RockFrag benchmark, for example, SARD improves a Swin-T stu-dent over CWD [12] by +4.3 mIoU and +6.7 bIoU, high-lighting its benefit on boundary-critical tiny-dense seg-mentation. Extensive experiments on urban scenes (Cityscapes [4]), scene parsing (ADE20K [23]), and rock fragmentation (RockFrag) demonstrate that structure-aware representation alignment consistently improves geometric precision across architectures and compression ratios. 
+
+# 2. Related Work 
+
+## 2.1. Knowledge Distillation for Dense Prediction 
+
+Knowledge distillation [6] transfers knowledge from large teacher models to compact students by matching output distributions. While early methods focus on logit dis-tillation [6] or intermediate features [11, 18], recent ad-vances address the unique challenges of dense prediction tasks. Structured knowledge distillation [9] transfers pixel-wise and pair-wise relations for semantic segmentation. Channel-wise distillation (CWD) [12] normalizes activation maps into probability distributions and minimizes KL di-vergence to focus on salient regions. Other recent methods explore decoupling target and non-target knowledge [21], masked feature reconstruction [17], and multi-layer re-view [1]. However, these methods apply uniform spatial weighting, treating boundaries and interiors equally despite their vastly different importance for tiny and densely packed objects. 
+
+## 2.2. Compact Models for Segmentation 
+
+Deploying segmentation models on resource-constrained devices has motivated various compression strategies. Foundation models like SAM [7] achieve impressive zero-shot generalization but remain computationally expensive. Recent efforts including FastSAM [22], MobileSAM [19], and EfficientSAM [16] reduce parameters through architecture-specific modifications. Mask2Former [3] uses masked attention for universal segmentation, while boundary-focused methods [5, 10, 15] and multi-scale architectures [8, 13] improve geometric precision through specialized designs. These approaches achieve efficiency through either architecture engineering or task-specific components that limit their generalizability across different teacher-student configurations. 
+
+Our approach. We observe that existing distillation methods overlook a fundamental characteristic: not all spa-tial locations are equally important for tiny-dense segmen-tation. We propose SARD that dynamically emphasizes boundaries and crowded regions where geometric preci-sion matters most, providing a general framework appli-cable to diverse teacher-student pairs without architecture constraints. 
+
+# 3. Method 
+
+Standard knowledge distillation transfers representations uniformly across spatial locations, learning feature spaces optimized for general objects. However, tiny-dense ob-ject segmentation requires features specialized for geomet-ric complexity: sharp boundaries where instances contact, multi-faceted surfaces, and tightly packed spatial distribu-tions. SARD shifts the learned feature space toward these characteristics by weighting representation alignment ac-cording to local structural importance, guiding the student to prioritize boundaries, junctions, and crowded regions where uniform distillation is insufficient. Figure 1 sum-marizes the overall architecture: a frozen teacher provides feature maps, a structure-importance map W (i) is derived from these signals, and structure-weighted representation losses are applied to the student, together with a standard segmentation loss when labels are available. 
+
+## 3.1. Problem Formulation 
+
+Given an image x and optional prompts p, existing knowl-edge distillation methods extract intermediate features from a frozen teacher T and trainable student S, then align these representations to transfer knowledge: 
+
+FT = ET (x), FS = ES (x) (1) where ET and ES denote teacher and student encoders pro-ducing C-channel features F ∈ RC×H×W of spatial size 34776 Figure 1. Overview of SARD. A frozen teacher provides feature maps from which we compute a structure-importance map W (i) com-bining boundary salience, structural complexity, and local feature variation. This map weights feature-space distillation losses between teacher and student, while a standard segmentation loss supervises the student outputs when labels are available; at inference time, only the student network is used. 
+
+H × W . The student decoder DS uses these features to predict segmentation masks: 
+
+MS = DS (FS , p ) (2) where MS ∈ [0 , 1] H×W is the predicted mask. The learning objective aligns student features to teacher features across spatial domain Ω while supervising predic-tions with ground truth Mgt :
+
+min 
+
+> S
+
+1
+
+|Ω|
+
+X
+
+> i∈Ω
+
+Lrepr (FS (i), F T (i)) + λLseg (MS , M gt ) (3) where Lrepr measures feature distance over spatial locations 
+
+i ∈ Ω (H × W pixels), and Lseg is the segmentation loss. This procedure transfers the teacher’s feature organization to improve student segmentation performance. However, we observe that Eq. (3) lacks adequate mod-eling of structural importance. In tiny-dense scenarios with rock fragments, cells, or smoke plumes, objects are charac-terized by sharp boundaries, fine-scale edges, and crowded distributions. Treating homogeneous background regions equally with critical structural boundaries dilutes learning signals from geometrically important locations, leading to blurred fragment edges, lost junction points, and poor per-formance in dense regions. To enhance the capacity of distillation for tiny-dense ob-jects, we introduce structure-aware spatial weighting that explicitly prioritizes locations carrying geometric informa-tion. Accordingly, our approach can be formulated as: 
+
+min  
+
+> S
+
+Lrepr (FS , F T ; W ) + μLseg (MS , M gt ) (4) 
+
+W (i) = S(i)
+
+P 
+
+> j∈Ω
+
+S(j) , X
+
+> i
+
+W (i) = 1 (5) where Lrepr is the structure-aware representation transfer objective modulated by spatial weights W (i), and S(i)
+
+quantifies structural importance at location i, combining ge-ometric complexity (edges, corners) and spatial crowding (density). The computation of S(i) and its components are detailed in Sec. 3.2. By explicitly modeling structural infor-mation through W (i), improved feature alignment directly enhances segmentation quality for tiny-dense objects. 
+
+## 3.2. Structure-Aware Spatial Weighting 
+
+To quantify structural importance S(i) from Eq. (5), we must identify where geometric information concentrates in tiny-dense scenarios. Segmentation failures arise from complexity at two levels: (1) intra-instance structure ,where individual rocks have multiple facets and surface variations, cells contain nuclei and irregular membranes; 34777 (2) inter-instance crowding , where objects stack, touch, or overlap, creating ambiguous boundaries at contact points. Addressing these requires analyzing both within-object ge-ometric organization and between-object spatial density. 
+
+Geometric Complexity via Structure Tensor. We char-acterize geometric complexity through a unified structure analysis. Given teacher features FT ∈ RC×H×W , we com-pute spatial gradients ∇F (c) 
+
+> T
+
+(i) = [ ∂F (c) 
+
+> T
+> ∂x
+
+, ∂F (c) 
+
+> T
+> ∂y
+
+]⊤ for each channel c at location i. To capture gradient orientation, we form the structure tensor by accumulating gradient outer products: 
+
+J(i) = 
+
+> C
+
+X
+
+> c=1
+
+∇F (c) 
+
+> T
+
+(i)∇F (c) 
+
+> T
+
+(i)⊤ (6) which is a 2 × 2 symmetric matrix encoding directional gra-dient strength. To interpret this gradient distribution, we analyze the structure tensor through eigendecomposition. Since J(i) is a 2 × 2 symmetric matrix, it has exactly two real eigenval-ues λ1 ≥ λ2 ≥ 0 with corresponding orthogonal eigenvec-tors. These eigenvalues quantify gradient magnitude along perpendicular principal directions: λ1 measures gradient strength in the dominant direction, while λ2 measures gra-dient strength perpendicular to it. The relationship between these eigenvalues reveals local geometric organization, as established in structure tensor analysis [5, 15]. We derive two complementary geometric measures: 
+
+E(i) = λ1(i) − λ2(i), C(i) = pλ1(i)λ2(i) (7) The eigenvalue difference E(i) is a standard anisotropy measure quantifying gradient directional bias, while the geometric mean C(i) captures multi-directional gradient strength while maintaining dimensional consistency with 
+
+E(i) and numerical stability. Together, they characterize the full spectrum of geometric complexity: oriented transitions like boundaries and facet edges (high E), complex intersec-tion points and junctions (high C), and irregular surfaces where both contribute. This unified formulation treats inter-instance boundaries (rock contacts) and intra-instance struc-ture (surface facets) equivalently, since both represent crit-ical geometric information requiring precise feature align-ment. 
+
+Spatial Density. However, geometric measures alone are insufficient for dense scenarios. Consider a region contain-ing many small rock fragments: even if individual edges and corners are detected, uniform treatment of all geometric features fails to prioritize regions where crowding induces confusion. We therefore estimate local instance density to identify where many objects concentrate spatially. For la-beled images with instance map Y , we directly count in-stances intersecting a local window Wr (i). For unlabeled images, we proxy density through feature dispersion: 
+
+D(i) = 1
+
+|W r (i)|
+
+X 
+
+> j∈W r(i)
+
+∥FT (j) − μ(i)∥2 (8) where μ(i) = 1 
+
+> |W r(i)|
+
+P  
+
+> j∈W r(i)
+
+FT (j) is the local feature mean. High dispersion indicates many distinct structures co-occurring, characteristic of dense object regions where the student must learn fine discriminative features. Un-less otherwise stated, we use the feature-dispersion version of D(i) for all datasets, including labeled ones, to avoid dependence on instance maps and keep SARD compatible with both fully supervised and semi-supervised settings. 
+
+Combined Structure Score. Combining these measures produces a comprehensive structure map: 
+
+S(i) = βeE(i) + βcC(i) + βdD(i) (9) where the geometric measures E(i) and C(i) jointly cap-ture structural complexity (edges, corners, facets), while 
+
+D(i) captures spatial crowding. This formulation naturally addresses the two critical challenges in tiny-dense scenar-ios: intra and inter instance geometric complexity receive emphasis through E(i) and C(i), while spatial crowding gains additional weight through D(i).This structure score S(i) from Eq. (9) instantiates the structural importance measure in Eq. (5), completing the structure-aware weighting mechanism W (i) used through-out the distillation objective in Eq. (4). The normalized weights W (i) ensure that learning signals concentrate at ge-ometrically complex and spatially crowded locations crit-ical for tiny-dense object segmentation. This structure-aware weighting is the core innovation enabling feature space shifting: by amplifying learning signals at these criti-cal locations, the student’s feature representations naturally evolve toward sensitivity for tiny-dense object characteris-tics rather than general-purpose features. 
+
+## 3.3. Objective Functions 
+
+We now instantiate the representation objective Lrepr from Eq. (4) as a combination of complementary distillation terms. 
+
+Training Regime. SARD adopts a single-stage optimiza-tion in which representation distillation and segmentation supervision are trained jointly. The teacher network is al-ways frozen, and gradients flow only through the student, the projection head PS , and the denoising head gθ . This uni-fied optimization ensures that feature alignment and mask 34778 prediction reinforce each other throughout training. The full representation objective combines feature consistency and distribution alignment: 
+
+Lrepr = λf LFC + λdLDA (10) 
+
+Feature Consistency ( LFC ). Teacher and student features are projected into a shared latent space via learnable 1 ×
+
+1 convolutions: ˆFT = PT (FT ), ˆFS = PS (FS ). Direct pointwise matching under structure weighting: 
+
+LFC = X
+
+> i∈Ω
+
+W (i)∥ ˆFS (i) − ˆFT (i)∥22 (11) The structure weighting W (i) amplifies gradients at geo-metrically important locations, guiding the student to prior-itize boundaries and dense regions. 
+
+Distribution Alignment ( LDA ). To capture local feature distributions beyond pointwise values, we adopt a denois-ing score–matching inspired objective. We first define noisy teacher features by perturbing ˆFT with Gaussian noise: 
+
+˜FT = √α ˆFT + √1 − α ϵ, ϵ ∼ N (0 , I ). (12) This induces a smoothed teacher feature distribution whose score we would like the student to preserve. Instead of oper-ating directly on ˜FT , we train a lightweight denoising head 
+
+gθ to predict the injected noise from the student features: 
+
+LDA = X
+
+> i∈Ω
+
+W (i) gθ ( ˆFS (i)) − ϵ(i) 22. (13) Predicting the noise associated with the perturbed teacher features encourages the student representation to approx-imate the score (i.e., gradient of the log-density) of the noisy teacher feature distribution, which is especially rel-evant in regions with high feature variability inside dense object clusters. 
+
+Task Supervision. When ground-truth masks Mgt are available, we use a standard segmentation loss: 
+
+Ltask = Dice (MS , M gt ) + BCE (MS , M gt ). (14) Given a labeled dataset L = {(x, y )}, the training objec-tive is 
+
+min  
+
+> S
+
+E(x,y )∈L 
+
+Lrepr (x) + μ Ltask (x, y ). (15) The representation loss Lrepr is applied to every training im-age, while Ltask uses the corresponding ground-truth mask. During training we update only the student-side parameters and keep the teacher fixed; at inference time, only the stu-dent network is executed. The overall training procedure is formalized in Algo-rithm 1, which details how the structure-aware weights are computed and integrated into the combined loss. 
+
+Algorithm 1 One training step of SARD (corresponding to Eq. (5–15)) 
+
+Input: x (image), Mgt (mask); teacher T (frozen); student S.1) Forward: FT ← T (x); (FS , M S ) ← S(x). ( Teacher pro-vides features only; student outputs features + prediction MS for Dice/BCE. )2) Spatial gradients (Sobel): for each channel c, compute ∂xF (c)
+
+> T
+
+and ∂y F (c) 
+
+> T
+
+using standard Sobel-x/y filters on the H×W grid. 3) Structure tensor (Eq. 6): at each location i, form J(i) = 
+
+PCc=1 ∇F (c) 
+
+> T
+
+(i)∇F (c) 
+
+> T
+
+(i)⊤, then compute eigenvalues λ1(i) ≥
+
+λ2(i).4) Local cues (Eq. 7–8): E(i) = λ1(i) − λ2(i), C(i) =pλ1(i)λ2(i), and D(i) = 1 
+
+> |W r(i)|
+
+P  
+
+> j∈W r(i)
+
+∥FT (j) − μ(i)∥2
+
+with r=7 , where μ(i) = 1 
+
+> |W r(i)|
+
+P  
+
+> j∈W r(i)
+
+FT (j).5) Cue weights (Eq. 5,9): S(i) = βeE(i) + βcC(i) + βdD(i)
+
+and W (i) = S(i)P  
+
+> j∈ΩS(j)
+
+.6) Weighted repr. losses (Eq. 10–13): compute 
+
+LF C (FS , F T ; W ) and LDA (FS , F T ; W, α ), then Lrepr =
+
+λf LF C + λdLDA .7) Task loss (Eq. 14): Ltask = Dice( MS , M gt ) +BCE( MS , M gt ).8) Update (Eq. 15): L = Lrepr +μ Ltask ; backprop student only .
+
+Note: μ(i) in Eq. 8: local mean; μ in Eq. 15: task-loss weight. 
+
+# 4. Experiments 
+
+We evaluate SARD on tiny-dense object segmentation across standard benchmarks and an industrial rock fragmen-tation dataset. Our experiments focus on three aspects: (1) comparison with existing distillation methods in terms of mIoU and boundary IoU, (2) the effect of structure-aware weighting through controlled ablations, and (3) how SARD behaves with compact students and diverse teacher–student architectures, including promptable and non-promptable models. 
+
+## 4.1. Experimental Setup 
+
+Datasets. We evaluate on three datasets spanning stan-dard benchmarks and extreme tiny-dense scenarios: • Cityscapes [4] – Urban scene segmentation with 19 classes including vehicles, pedestrians, and infrastruc-ture. We use the standard train/val split (2,975/500 im-ages) at 1024 × 2048 resolution, focusing on boundary-critical objects such as poles and thin structures. • ADE20K [23] – Large-scale scene parsing with 150 di-verse categories spanning indoor and outdoor environ-ments. We use the standard split (20,210 train / 2,000 val) at 512 × 512 resolution to evaluate generalization across varied object scales and semantic complexity. • RockFrag – Industrial rock fragmentation dataset col-lected in quarry blasting scenarios, containing 1,600 high-resolution images of blasted material, each with thou-sands of irregular, touching fragments exhibiting com-34779 Table 1. Comparison of knowledge distillation methods on Cityscapes, ADE20K, and RockFrag. 
+
+Swin-L (teacher) → Swin-T (student) Swin-B (teacher) → Swin-S (student) 
+
+Cityscapes ADE20K RockFrag Cityscapes ADE20K RockFrag Method mIoU ↑ bIoU ↑ mIoU ↑ bIoU ↑ mIoU ↑ bIoU ↑ mIoU ↑ bIoU ↑ mIoU ↑ bIoU ↑ mIoU ↑ bIoU ↑
+
+Teacher 81.2 76.8 48.6 42.3 62.4 48.9 80.5 76.1 47.9 41.8 61.8 48.3 Student (scratch) 76.5 71.2 42.1 35.8 52.3 36.8 78.3 73.5 44.6 38.3 55.6 40.2 Vanilla KD 77.8 72.6 43.5 37.2 54.1 38.9 78.9 74.2 45.2 39.1 56.8 41.5 CWD 78.9 73.8 44.8 38.6 55.9 40.6 79.4 74.9 46.0 39.8 57.8 42.8 DKD 78.6 73.4 44.3 38.1 55.4 40.1 79.2 74.6 45.7 39.5 57.5 42.4 MGD 79.1 74.2 45.1 39.0 56.3 41.2 79.6 75.2 46.2 40.1 58.1 43.2 
+
+SARD (ours) 80.3 76.1 46.9 40.8 60.2 47.3 80.1 75.9 47.1 41.2 59.6 46.5 
+
+∆ vs CWD +1.4 +2.3 +2.1 +2.2 +4.3 +6.7 +0.7 +1.0 +1.1 +1.4 +1.8 +3.7 Input GT Student CWD SARD (ours) Cityscapes ADE20K 
+
+> RockFrag
+> Figure 2. Qualitative segmentation results on Cityscapes, ADE20K, and RockFrag.
+
+plex surface facets and multi-scale geometry. This repre-sents an extreme tiny-dense segmentation challenge criti-cal for mining and quarry operations. We use a 70/15/15 train/val/test split. 
+
+Evaluation metrics. We report mean Intersection-over-Union (mIoU) and Boundary IoU (bIoU) [2] as our primary accuracy metrics, and frames per second (FPS) as a measure of runtime efficiency. 
+
+Implementation Details. We implement SARD in Py-Torch. Unless otherwise specified, the teacher is a large-scale foundation model with frozen weights, and the student is a lightweight segmentation model with parameter counts ranging from 5M to 25M, depending on the backbone. The denoising head gθ for distribution alignment consists of two convolutional layers with hidden dimension of 128. 
+
+Hyperparameters. For all experiments reported in the main paper, we use the following settings. The structure-map coefficients in Eq. (9) are βe = 2 .0, βc = 1 .0, and 
+
+βd = 1 .0. The density term D(i) is computed over a square window Wr (i) of radius r = 7 (a 15 × 15 neighborhood). The loss weights are set to λf = 1 .0, λd = 0 .5, and μ =1.0, and the score-matching noise parameter is α = 0 .5.
+
+Training. We train for 100 epochs using the AdamW op-timizer (learning rate 1 × 10 −4, weight decay 0.01) with cosine annealing. The batch size is 8 with gradient accumu-lation over 2 steps (effective batch size 16). Data augmen-tation includes random horizontal flips, rotations of up to 
+
+±15 ◦, and color jitter. Teacher features are cached to avoid 34780 redundant computation. All experiments are run on a sin-gle NVIDIA RTX 4090 GPU. Each configuration is trained with three different random seeds, and we report the mean performance across runs. 
+
+## 4.2. Comparison with Distillation Baselines 
+
+Table 1 reports the main comparisons with knowledge dis-tillation baselines on Cityscapes, ADE20K, and RockFrag using same-backbone Swin teacher–student pairs. Table 2 evaluates cross-architecture teacher–student combinations, and Fig. 2 provides qualitative examples. 
+
+Consistent gains on standard benchmarks. On Cityscapes and ADE20K, SARD improves over all logit-and feature-level KD baselines for both the Swin-L →Swin-T and Swin-B →Swin-S settings. For the stronger compres-sion setting with Swin-L as teacher and Swin-T as student, SARD attains 80.3% mIoU on Cityscapes and 46.9% mIoU on ADE20K, surpassing CWD by +1.4 and +2.1 mIoU, respectively. With Swin-B as teacher and Swin-S as stu-dent, SARD still yields improvements (80.1% vs. 79.4% mIoU on Cityscapes, 47.1% vs. 46.0% on ADE20K), in-dicating that structure-aware representation transfer is ben-eficial even under milder compression. 
+
+Boundary-localized improvements. Across all datasets, gains in boundary IoU (bIoU) exceed those in mIoU. On Cityscapes, SARD improves bIoU from 73.8% (CWD) to 76.1% (+2.3), compared to a +1.4 mIoU gain. A similar pattern appears on ADE20K (+2.2 bIoU vs. +2.1 mIoU), and for Swin-B →Swin-S (+1.0 / +1.4 bIoU vs. +0.7 / +1.1 mIoU on Cityscapes/ADE20K). This consistent behavior supports the design goal that structure-aware weighting pri-marily enhances geometric precision rather than only region overlap. 
+
+Tiny-dense RockFrag segmentation. RockFrag is the most boundary-critical benchmark in our evaluation, con-taining thousands of touching fragments per image. With Swin-L as teacher and Swin-T as student, SARD improves the student from 55.9%/40.6% (mIoU/bIoU with CWD) to 60.2%/47.3%, i.e., +4.3 mIoU and +6.7 bIoU. With Swin-B as teacher and Swin-S as student, SARD reaches 59.6% mIoU and 46.5% bIoU versus 57.8%/42.8% for CWD (+1.8 / +3.7). These boundary gains are particularly important for rock fragmentation analysis, where accurate separa-tion of tiny fragments directly affects downstream size-distribution estimates. Qualitative examples in Fig. 2 show that SARD reduces merge/split errors and sharpens small-object boundaries on both Cityscapes and RockFrag. 
+
+Architecture diversity. Table 2 further shows that SARD generalizes across heterogeneous teacher–student pairs, including ViT-L →ViT-T, SAM-H →EfficientSAM-Ti, and Mask2Former-L →M2F-R50. Without changing the loss, SARD delivers average improvements of +1.5–+1.8 mIoU and +2.3–+2.7 bIoU over CWD, with RockFrag bIoU gains of +5.5–+6.2. Together with the Swin experiments, these results suggest that structure-aware representation distilla-tion generalizes across architectures rather than acting as an architecture-specific heuristic. 
+
+## 4.3. Effect of Structure-Aware Weighting 
+
+Table 3 isolates the contribution of structure-aware weight-ing on RockFrag using Swin-L as teacher and ResNet-50 as student. 
+
+Representation distillation as a baseline. Logit-level KD achieves 52.3% mIoU and 36.9% bIoU. Replacing logits with the representation objective in Eq. 10, while using uniform weighting W (i) = 1 , improves performance to 53.8% mIoU and 38.5% bIoU. This indicates that feature-level transfer already provides a strong baseline, and the uniform variant serves as a controlled reference for eval-uating structure-aware weighting. 
+
+Benefits of structure-aware weights. Introducing the full structure-aware weighting yields 58.6% mIoU and 45.2% bIoU, corresponding to +4.8 / +6.7 gains over uniform SARD and +6.3 / +8.3 over vanilla KD. The larger abso-lute improvement in bIoU suggests that emphasizing struc-turally important locations primarily enhances geometric accuracy along boundaries. 
+
+Complementary structure components. Ablating the components of the structure score S(i) = βeE(i) + 
+
+βcC(i) + βdD(i) reveals complementary roles. Boundary-only weighting ( W ∝ E) attains 56.2% mIoU and 42.8% bIoU, density-only weighting ( W ∝ D) yields 55.4% / 41.6%, and curvature-only weighting ( W ∝ C) achieves 55.8% / 42.1%. Pairwise combinations further improve performance (e.g., E+C reaches 57.8% / 44.6%), and the full E+C+D setting performs best. These trends indicate that geometric complexity (edges and curvature) and spatial crowding (density) capture distinct aspects of structure that are most effective when optimized jointly. 
+
+## 4.4. Compact Models and Practical Efficiency 
+
+We next examine how SARD interacts with model size and runtime on the RockFrag benchmark. 
+
+Efficient segmentation models. Table 4 compares SARD-distilled students with compressed foundation models (Fast-SAM, MobileSAM, EfficientSAM-Ti) and lightweight seg-mentation architectures (SegFormer-B0/B1, PP-LiteSeg-B) at comparable parameter budgets. Despite using similar or fewer parameters, SARD-distilled models achieve higher accuracy. The ViT-T student (5.7M parameters) distilled with SARD attains 59.4% mIoU and 46.8% bIoU on Rock-Frag, outperforming the best efficient baseline (SegFormer-B1, 55.1% / 41.5%) by +4.3 mIoU and +5.3 bIoU. The ResNet-50 student distilled from Swin-L reaches 58.6% / 45.2%, indicating that improved structure-aware represen-tations can yield larger gains on tiny-dense segmentation 34781 Table 2. Teacher–student diversity with SARD. 
+
+Teacher → Student Cityscapes ADE20K RockFrag Avg. vs CWD 
+
+mIoU bIoU mIoU bIoU mIoU bIoU mIoU bIoU bIoU †
+
+ViT-L → ViT-T 79.8 75.6 46.2 40.3 59.4 46.8 +1.6 +2.4 +5.8 SAM-H → EfficientSAM-Ti 78.2 73.9 45.1 39.1 57.9 44.5 +1.8 +2.7 +6.2 Mask2Former-L → M2F-R50 77.5 72.8 44.3 38.5 56.7 43.1 +1.5 +2.3 +5.5  
+
+> Table 3. Ablation study of structure-aware weighting on Rock-Frag.
+
+Weighting Strategy mIoU bIoU 
+
+Baseline 
+
+Student (scratch) 49.6 34.2 Teacher (Swin-L) 62.4 48.9 
+
+Uniform distillation 
+
+Vanilla KD (logit-level) 52.3 36.9 Uniform SARD ( W (i) = 1 ) 53.8 38.5 
+
+Structure-aware distillation 
+
+Boundary-only ( W ∝ E) 56.2 42.8 Density-only ( W ∝ D) 55.4 41.6 Curvature-only ( W ∝ C) 55.8 42.1 
+
+Combined components 
+
+Boundary + Density ( E + D) 57.5 44.3 Boundary + Curvature ( E + C) 57.8 44.6 Density + Curvature ( D + C) 56.9 43.5 
+
+SARD (full: E + C + D) 58.6 45.2 
+
+∆ vs Uniform SARD +4.8 +6.7 
+
+∆ vs Vanilla KD +6.3 +8.3 than increasing model capacity alone. 
+
+Runtime and compression. Table 5 reports computational efficiency on RockFrag at a resolution of 1024 × 1024 
+
+(RTX 4090). The Swin-L teacher has 197M parameters and 1014 GFLOPs, running at 9.8 FPS, whereas the ResNet-50 student has 25.6M parameters and 62 GFLOPs and achieves 88.5 FPS. Distilling the student with CWD raises mIoU from 49.6% to 54.1%, and SARD further improves it to 58.6% without changing parameter count, FLOPs, or FPS. This corresponds to a 7.7 × reduction in parameters and a 9.0 × speedup relative to the teacher, while recover-ing roughly 70% of the teacher–student performance gap (62.4% → 49.6% → 58.6%). Structure-aware weighting is applied only during train-ing. Structure maps are cached after the first epoch and teacher features are precomputed, so the additional com-putation is confined to training. At inference time, only 
+
+> Table 4. Comparison with efficient segmentation models on Rock-Frag.
+
+Model Params mIoU bIoU 
+
+Compressed foundation models 
+
+FastSAM-s 11.8M 53.8 39.5 MobileSAM 5.7M 52.4 38.2 EfficientSAM-Ti 5.7M 54.6 40.8 
+
+Lightweight architectures 
+
+SegFormer-B0 3.8M 51.2 37.1 SegFormer-B1 13.7M 55.1 41.5 PP-LiteSeg-B 10.9M 53.5 39.8 
+
+SARD-distilled models (ours) 
+
+SARD (ViT-T) 5.7M 59.4 46.8 SARD (R50) 25.6M 58.6 45.2                     
+
+> Table 5. Computational efficiency on RockFrag.
+> Model Params GFLOPs FPS mIoU
+> Teacher (Swin-L) 197M 1014 9.8 62.4 Student (R50, scratch) 25.6M 62 88.5 49.6 Student + CWD 25.6M 62 88.5 54.1 Student + SARD 25.6M 62 88.5 58.6
+
+the student network is executed, making SARD compati-ble with real-time deployment on high-resolution industrial imagery. 
+
+# 5. Conclusion 
+
+We introduced Structure-Aware Representation Distillation (SARD), which uses a structure-importance map combining boundary salience, structural complexity, and local feature variation to focus feature-level distillation on geometrically critical regions. Experiments on Cityscapes, ADE20K, and RockFrag show consistent improvements over strong distil-lation baselines, with especially large gains in boundary IoU on tiny-dense rock fragmentation. SARD applies across di-verse teacher–student architectures and compression ratios without modifying the inference pipeline, providing a sim-ple and effective way to transfer geometric knowledge in dense prediction. 34782 References 
+
+[1] Pengguang Chen, Shu Liu, Hengshuang Zhao, and Jiaya Jia. Distilling knowledge via knowledge review. In CVPR , 2021. 1, 2 [2] Bowen Cheng, Ross Girshick, Piotr Doll´ ar, Alexander C Berg, and Alexander Kirillov. Boundary iou: Improving object-centric image segmentation evaluation. In CVPR ,2021. 6 [3] Bowen Cheng, Ishan Misra, Alexander G. Schwing, Alexan-der Kirillov, and Rohit Girdhar. Masked-attention mask transformer for universal image segmentation. In CVPR ,pages 1290–1299, 2022. 1, 2 [4] Marius Cordts, Mohamed Omran, Sebastian Ramos, Timo Rehfeld, Markus Enzweiler, Rodrigo Benenson, Uwe Franke, Stefan Roth, and Bernt Schiele. The cityscapes dataset for semantic urban scene understanding. In CVPR ,pages 3213–3223, 2016. 2, 5 [5] Jianzhong He, Shiliang Zhang, Ming Yang, Yanhu Shan, and Tiejun Huang. Bi-directional cascade network for perceptual edge detection. In CVPR , pages 3828–3837, 2019. 1, 2, 4 [6] Geoffrey Hinton, Oriol Vinyals, and Jeff Dean. Distill-ing the knowledge in a neural network. arXiv preprint arXiv:1503.02531 , 2015. 1, 2 [7] Alexander Kirillov, Eric Mintun, Nikhila Ravi, Hanzi Mao, Chloe Rolland, Laura Gustafson, Tete Xiao, Spencer White-head, Alexander C. Berg, Wan-Yen Lo, Piotr Doll´ ar, and Ross Girshick. Segment anything. In ICCV , pages 4015– 4026, 2023. 1, 2 [8] Tsung-Yi Lin, Piotr Doll´ ar, Ross Girshick, Kaiming He, Bharath Hariharan, and Serge Belongie. Feature pyramid networks for object detection. In CVPR , pages 2117–2125, 2017. 1, 2 [9] Yifan Liu, Ke Chen, Chris Liu, Zengchang Qin, Zhenbo Luo, and Jingdong Wang. Structured knowledge distillation for semantic segmentation. In CVPR , pages 2604–2613, 2019. 1, 2 [10] Mengyang Pu, Yaping Huang, Yuming Liu, Qingji Guan, and Haibin Ling. Edter: Edge detection with transformer. In CVPR , pages 1402–1412, 2022. 1, 2 [11] Adriana Romero, Nicolas Ballas, Samira Ebrahimi Kahou, Antoine Chassang, Carlo Gatta, and Yoshua Bengio. Fitnets: Hints for thin deep nets. In ICLR , 2015. 2 [12] Changyong Shu, Yifan Liu, Jianfei Gao, Zheng Yan, and Chunhua Shen. Channel-wise knowledge distillation for dense prediction. In ICCV , 2021. 1, 2 [13] Jingdong Wang, Ke Sun, Tianheng Cheng, Borui Jiang, Chaorui Deng, Yang Zhao, Dong Liu, Yadong Mu, Mingkui Tan, Xinggang Wang, Wenyu Liu, and Bin Xiao. Deep high-resolution representation learning for visual recogni-tion. IEEE TPAMI , 43(10):3349–3364, 2021. 1, 2 [14] Junjue Wang, Zhuo Zheng, Ailong Ma, Xiaoyan Lu, and Yanfei Zhong. Loveda: A remote sensing land-cover dataset for domain adaptive semantic segmentation. In NeurIPS ,2021. 1 [15] Saining Xie and Zhuowen Tu. Holistically-nested edge de-tection. In ICCV , pages 1395–1403, 2015. 1, 2, 4 [16] Yunyang Xiong, Bala Varadarajan, Lemeng Wu, Xiaoyu Xi-ang, Fanyi Xiao, Chenchen Zhu, Xiaoliang Dai, Dilin Wang, Fei Sun, Forrest Iandola, et al. Efficientsam: Leveraged masked image pretraining for efficient segment anything. In 
+
+CVPR , pages 16111–16121, 2024. 1, 2 [17] Zhendong Yang, Zhe Li, Mingqi Shao, Dachuan Shi, Zehuan Yuan, and Chun Yuan. Masked generative distillation. In 
+
+ECCV , 2022. 1, 2 [18] Sergey Zagoruyko and Nikos Komodakis. Paying more at-tention to attention: Improving the performance of convolu-tional neural networks via attention transfer. In ICLR , 2017. 2[19] Chaoning Zhang, Dongshen Han, Yu Qiao, Jung Uk Kim, Sung-Ho Bae, Seungkyu Lee, and Choong Seon Hong. Faster segment anything: Towards lightweight sam for mo-bile applications. arXiv preprint arXiv:2306.14289 , 2023. 1, 2[20] Meng Zhang, Stephen W Eichhorn, Brian Zingg, Zizhen Yao, Kaelan Cotter, Hongkui Zeng, Hongwei Dong, and Xi-aowei Zhuang. Spatially resolved cell atlas of the mouse pri-mary motor cortex by merfish. Nature , 598:137–143, 2021. 1[21] Borui Zhao, Quan Cui, Renjie Song, Yiyu Qiu, and Jiajun Liang. Decoupled knowledge distillation. In CVPR , 2022. 1, 2 [22] Xu Zhao, Wenchao Ding, Yongqi An, Yinglong Du, Tao Yu, Min Li, Ming Tang, and Jinqiao Wang. Fast segment any-thing. arXiv preprint arXiv:2306.12156 , 2023. 1, 2 [23] Bolei Zhou, Hang Zhao, Xavier Puig, Sanja Fidler, Adela Barriuso, and Antonio Torralba. Scene parsing through ade20k dataset. In CVPR , pages 633–641, 2017. 2, 5 34783

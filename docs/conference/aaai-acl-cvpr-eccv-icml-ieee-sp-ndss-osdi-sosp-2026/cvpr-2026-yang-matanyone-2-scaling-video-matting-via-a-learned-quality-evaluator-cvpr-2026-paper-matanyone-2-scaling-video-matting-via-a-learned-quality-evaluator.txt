@@ -1,0 +1,267 @@
+Title: MatAnyone 2: Scaling Video Matting via a Learned Quality Evaluator
+
+URL Source: https://openaccess.thecvf.com/content/CVPR2026/papers/Yang_MatAnyone_2_Scaling_Video_Matting_via_a_Learned_Quality_Evaluator_CVPR_2026_paper.pdf
+
+Published Time: Sat, 16 May 2026 16:53:17 GMT
+
+Number of Pages: 10
+
+Markdown Content:
+# MatAnyone 2: Scaling Video Matting via a Learned Quality Evaluator 
+
+## Peiqing Yang 1 Shangchen Zhou 1† Kai Hao 1 Qingyi Tao 21S-Lab, Nanyang Technological University 2SenseTime Research, Singapore 
+
+https://pq-yang.github.io/projects/MatAnyone2/ Input  video  MatAnyone  MatAnyone  2 (ours) 
+
+> Input  video  GVM  MatAnyone  2 (ours)
+
+Figure 1. (a) Our MatAnyone 2 significantly outperforms MatAnyone [39] in preserving fine details and avoiding segmentation-like boundaries, while also showing enhanced robustness under challenging lighting conditions, e.g ., backlit scenes. (b) As a diffusion-based video matting method, GVM [5] often produces blurry alpha mattes with unnatural transitions along object boundaries, e.g ., hair strands. In contrast, MatAnyone 2 generates clear, high-quality alpha mattes with natural boundary details. (Zoom-in for best view) 
+
+## Abstract 
+
+Video matting remains limited by the scale and realism of existing datasets. While leveraging segmentation data can enhance semantic stability, the lack of effective boundary supervision often leads to segmentation-like mattes lack-ing fine details. To this end, we introduce a learned Mat-ting Quality Evaluator (MQE) that assesses semantic and boundary quality of alpha mattes without ground truth. It produces a pixel-wise evaluation map that identifies reli-able and erroneous regions, enabling fine-grained quality assessment. The MQE scales up video matting in two ways: (1) as an online matting-quality feedback during training to suppress erroneous regions, providing comprehensive su-pervision, and (2) as an offline selection module for data curation, improving annotation quality by combining the strengths of leading video and image matting models. This 
+
+> †Project lead.
+
+process allows us to build a large-scale real-world video matting dataset, VMReal, containing 28K clips and 2.4M frames. To handle large appearance variations in long videos, we introduce a reference-frame training strategy that incorporates long-range frames beyond the local win-dow for effective training. Our MatAnyone 2 achieves state-of-the-art performance on both synthetic and real-world benchmarks, surpassing prior methods across all metrics. 
+
+## 1. Introduction 
+
+Video matting (VM) has gained increasing attention for its broad applications in visual effects and video editing. De-spite recent advances [5, 7, 8, 17, 19, 39], existing meth-ods still suffer from blurry boundaries, missing regions, and unstable tracking. A key underlying reason is the limited scale, quality, and realism of existing VM datasets. The This CVPR paper is the Open Access version, provided by the Computer Vision Foundation. Except for this watermark, it is identical to the accepted version; the final published version of the proceedings is available on IEEE Xplore. 37476 recent VM800 dataset [39] provides the largest collection of video foregrounds, but it contains only 826 sequences (∼ 1/60 the size of the video object segmentation (VOS) dataset used in SAM 2 [27]). To enrich training samples, ex-isting pipelines typically composite foregrounds onto ran-dom backgrounds via RGBA blending. However, such syn-thetic data often exhibit inconsistent lighting and unnatural boundaries, leading to a domain gap from real videos that limits model generalization in challenging cases. To alleviate data limitations, recent video matting meth-ods have explored leveraging segmentation priors from pre-trained models and large-scale VOS data. (1) Pretrain-ing. Some works employ segmentation models [8] or data [5, 17, 44] for pretraining, followed by finetuning on matting datasets. However, the limited availability of high-quality matting data often causes the pretrained segmen-tation capability to degrade during finetuning. (2) Joint-training. Some studies [7, 19, 39] instead combine segmen-tation and matting supervision within a unified framework, enabling the model to learn both tasks simultaneously. However, segmentation data can only provide reliable su-pervision for non-boundary regions (where alpha values are 0 or 1). For boundary regions , MatAnyone [39] applies an unsupervised loss [22] that relies on a strong assump-tion, leading to weak boundary supervision. While this en-hances semantic and tracking accuracy, it often causes the predicted mattes degrade into segmentation-like masks, es-pecially around boundaries (see Fig. 1). These methods seek an optimal trade-off between matting and segmenta-tion through balanced data and loss, yet simultaneously im-proving semantic accuracy and boundary details remains highly challenging. To this end, we introduce a novel Matting Quality Eval-uator (MQE) that mitigates the long-standing shortage of real VM data and effectively harnesses segmentation infor-mation. This evaluator operates in two modes: (i) an on-line matting-quality guidance during training, and (ii) an 
+
+offline pixel-wise selection module for data curation, which together scale up video matting training. Given an in-put frame, its segmentation mask, and the predicted alpha matte, the evaluator produces a binary evaluation map that identifies “ reliable ” vs. “erroneous ” regions. It implic-itly inherits the binary labels of non-boundary regions from the input segmentation masks, while assessing fine-detail matting quality in boundary regions leveraging a DINOv3-based encoder [30]. This enables the learned MQE to accu-rately identify inaccurate or low-quality alpha predictions in a pixel-wise manner, thereby providing a comprehensive as-sessment of both semantic accuracy and detail fidelity (see Fig. 4), without requiring ground-truth mattes. 
+
+Online Guidance - MQE serves as an online guidance sig-nal that provides dynamic supervision through its on-the-fly quality assessment. Specifically, its binary evaluation map acts as a penalty map that encourages the network to correct errors in the erroneous regions. Operating without ground-truth mattes (requiring only segmentation masks), MQE of-fers effective boundary supervision for rich segmentation data, thereby enabling large-scale training for matting. 
+
+Offline Selection - MQE also serves as an offline selection module for scalable curation of a real-world video mat-ting dataset. Manual annotation of video alpha mattes is extremely challenging, if not impossible at scale, leaving such a dataset long absent and hindering progress in this field. To overcome this, we design an automated dual-branch annotation pipeline, where MQE acts as a quality arbiter to assess and fuse predictions from two comple-mentary methods: state-of-the-art video and image matting models, which excel in semantic stability and boundary de-tail, respectively. By selecting reliable regions from each, the MQE combines their strengths, yielding annotation with both stable semantics and high-quality details. This pipeline constructs VMReal , a large-scale and real-world video mat-ting dataset with about 28K clips ( ∼ 35 × larger than pre-vious dataset [39]) and 2.4M annotated frames covering di-verse scenes, lighting conditions, and motion patterns. Moreover, in long videos where subject appearance varies largely over time, propagation-based methods like MatAnyone [39] may fail to matte out new human or clothing parts unseen in earlier frames. Training on short sequences cannot model such variations, while long se-quences lead to excessive memory overhead. To address this, we introduce a reference-frame strategy that incorpo-rates long-range frames beyond the local training window, enabling the model to handle large appearance changes across long videos without large memory costs. In summary, our main contributions are as follows: • We present a learned MQE that performs semantic and detail assessment of predicted mattes without ground truth. It functions as both an online guidance signal for training and an offline selection module for data curation, effectively scaling up video matting. • Leveraging the MQE, we construct VMReal , a large-scale, scene-diverse, and real-world video matting dataset, with about 28K clips and 2.4M annotated frames. • We introduce a reference-frame training strategy that ex-pands the temporal context, allowing our method to han-dle large appearance variations in long videos efficiently. Together, these contributions lead to MatAnyone 2, which achieves superior results on both synthetic and real-world benchmarks, surpassing existing methods across all metrics. 
+
+## 2. Related Work 
+
+Video Matting. In the absence of auxiliary inputs [9, 13, 19, 24, 25, 45, 49], VM often becomes object-specific, with human video matting [5, 9, 13, 29, 49] being the 37477 Matting Data          
+
+> Segment. Data
+> MatAnyone
+> ℒ𝑢𝑛𝑐𝑒𝑟𝑡.
+> c
+> Matting Data
+> c
+> Matting Quality Evaluator
+> (MQE)
+> Synthetic Real
+> ℒ𝑚𝑎𝑡
+> Core + Bound.  Bound.
+> ℒ𝑐𝑒𝑟𝑡.
+> Core
+> ℒ𝑚𝑎𝑡 𝑀
+> Core + Bound.
+> c
+> ℒ𝑒𝑣𝑎𝑙
+> Core + Bound.
+> Matanyone 2
+> Alpha Label Eval. Map (binary)
+> Local window
+> …………𝑡𝑖 𝑡0 𝑡1 𝑡𝑖+(𝑛+1) 𝑡𝑇 𝑡𝑖+1 𝑡𝑖+𝑗 𝑡𝑖+𝑛
+
+(a)  MatAnyone          
+
+> Local-frame strategy
+> Memory:
+> Local window
+> …………𝑡𝑖 𝑡0 𝑡1 𝑡𝑖+(𝑛+1) 𝑡𝑇 𝑡𝑖+1 𝑡𝑖+𝑗 𝑡𝑖+𝑛 𝑡𝑟1 …𝑡𝑟2
+
+(b)  MatAnyone 2  
+
+> Reference-frame strategy
+> Ref. frame Ref. frame
+> Memory:
+
+Figure 2. Comparison of MatAnyone and MatAnyone 2. (a) MatAnyone [39] compensates for limited VM data by leveraging segmentation supervision, which provides reliable core-region guidance ( Lcert. ) but weak boundary supervision ( Luncert. ), leading to segmentation-like mattes. Its memory is restricted to the local training window, limiting its ability to model large appearance changes. (b) MatAnyone 2 is trained with our real-world VMReal dataset, where each alpha label is paired with a binary evaluation map. This enables masked matting loss LMmat on reliable pixels, while the learned MQE supplies Leval to supervise both core and boundary regions. For large variations, a reference-frame strategy adds long-range temporal cues, improving robustness to large appearance changes without extra memory cost. 
+
+most widely studied due to its strong real-world appli-cability. Nevertheless, these approaches tend to fail in challenging backgrounds when other visually similar ob-jects appear in the scene. Recent progress in promptable segmentation [10, 27, 47, 50] has enabled human masks to be obtained with minimal effort, inspiring a series of mask-guided image [2, 15, 41–43] and video matting meth-ods [7, 8, 14, 17, 39, 44] that incorporate segmentation pri-ors for improved robustness across scenes. With the emer-gence of video diffusion models [1, 40], several recent stud-ies have replaced traditional CNN backbones with diffusion networks [5, 38], reframing video matting as a generation problem. For example, GVM [5] leverages rich priors from a pretrained video diffusion model [1] by conditioning on the input video. Although the diffusion prior provides ro-bustness, GVM still yields blurry alpha mattes, revealing its limitation imposed by suboptimal training data. 
+
+Video Matting and Segmentation Datasets. Existing video matting datasets [5, 8, 18, 32, 38, 39, 46] suffer from limited scale, quality, and realism, which significantly con-strain model performance and generalization. Although recent efforts such as VM800 [39] have expanded data scale and quality compared to VideoMatte240K [18], and GVM [5] constructs high-fidelity 4K rendered clips, these datasets remain synthetic and are still much smaller than large-scale video object segmentation (VOS) datasets [27, 35]. For instance, the SA-V dataset used by SAM 2 [27] is roughly 60 times larger than VM800 and contains diverse real-world videos with dense annotations. While real-world image matting datasets such as P3M-10k [11], D646 [24], and AIM [12] are available, they are limited in scale and, when used for training alone, can harm the temporal consis-tency of video matting models. In this work, we construct VMReal, a large-scale real-world video matting dataset, to address the data deficiency in the video matting field. 
+
+Quality Assessment for Data Curation. Due to the high cost of manual annotation, large-scale datasets often rely on model-assisted or fully automated labeling pipelines. Recent works in image generation [21, 23, 31, 33] and restoration [3, 34] employ image quality assessment (IQA) models to construct better–worse data pairs within the Di-rect Preference Optimization (DPO) framework, guiding models toward perceptually better results. Also, automatic quality evaluation has been explored in low-level vision tasks [3, 16, 34, 37]. For instance, Depth Anything V2 [37] integrates multi-model voting with selective human veri-fication to ensure annotation reliability, and RORem [16] leverages human feedback to train a discriminator for auto-matic high-quality sample selection. These methods assess quality at the image level, whereas video matting demands pixel-level and temporally consistent evaluation, motivating our design of a learned MQE for constructing a large-scale video matting dataset. 
+
+## 3. Methodology 
+
+In this study, our goal is to scale up video matting with both 
+
+high semantic accuracy and fine boundary fidelity . Previous work, MatAnyone [39], improves video matting by jointly training with segmentation data (Fig. 2(a)) through an im-proved supervision structure and loss design. However, seg-mentation data can only provide reliable supervision for non-boundary regions, while boundary regions are weakly constrained by an unsupervised loss. Although this im-proves semantic accuracy, it inevitably degrades boundary 37478 DPT DINOv3       
+
+> 𝐼𝑟𝑔𝑏 ො𝛼 𝑀 𝑠𝑒𝑔 𝑀 𝑒𝑣𝑎𝑙
+> MQE
+> Erroneous
+> Reliable
+> DPT
+> DINOv3
+> 𝐼𝑟𝑔𝑏 ො𝛼 𝑀 𝑠𝑒𝑔 𝑀 𝑒𝑣𝑎𝑙
+> QE Network
+
+Figure 3. Given an input tuple of video frame Irgb , predicted alpha 
+
+ˆα, and segmentation mask M seg , MQE produces a binary evalua-tion map M eval at the pixel-wise level (1: reliable , 0: erroneous ). 
+
+fidelity, resulting in segmentation-like mattes (see Fig. 1). To this end, we propose MatAnyone 2 (Fig. 2(b)), featur-ing a novel MQE . The MQE provides effective supervision for both non-boundary and boundary regions, without re-quiring matting ground truth. Moreover, MQE facilitates the construction of a large-scale real-world video matting dataset, allowing VM models to be effectively trained on high-quality matting data. Thanks to the improved super-vision and training data brought by MQE, MatAnyone 2 achieves higher semantic accuracy while preserving fine boundary details. In the following sections, we first introduce the train-ing of the MQE model (Sec. 3.1), followed by its two roles for scaling up video matting: (i) an online matting-quality guidance during training (Sec. 3.2), and (ii) an offline pixel-wise selection module for data curation (Sec. 3.3). Finally, we present a reference-frame training strategy that incorpo-rates long-range frames to efficiently handle large appear-ance variations in long videos (Sec. 3.4). 
+
+3.1. Quality Evaluation Model 
+
+We aim to develop a reliable and pixel-wise MQE model that has the potential to provide effective matting-quality feedback during training while also assisting in data cura-tion. As shown in Fig. 3, our MQE network receives a tuple input Ieval in := < I rgb , ˆα, M seg >, consisting of the video frame, predicted alpha matte, and segmentation mask, and produces a binary evaluation map M eval ∈ { 0, 1}H×W ,where 1 and 0 indicate reliable and erroneous regions, re-spectively. Providing the segmentation mask as an auxiliary input is crucial for achieving reliable matting quality evaluation. As shown in Fig. 4(b), for non-boundary regions , the learned MQE tends to inherit semantic cues from the segmentation mask, allowing it to easily identify foreground and back-ground areas. For boundary regions , the MQE leverages the segmentation map to guide its attention toward fine-grained matting quality, such as hair mattes in Fig. 4(a). Moreover, as our MQE employs DINOv3 [30] as the encoder, it ben-efits from the rich and high-quality features, enabling it to effectively perceive and identify inaccurate or low-quality alpha predictions. 
+
+Training and Data for MQE. We formulate MQE learn-ing as a binary segmentation task. To train such a model, we require a binary ground-truth map M eval gt ∈ { 0, 1}H×W(a) Detail Fidelity Video Frame Predicted Alpha Seg. Mask Eval. Map (b) Semantic Accuracy 
+
+Figure 4. Our learned Matting Quality Evaluation (MQE) model accurately identifies: (a) low-quality matting details along the boundary, and (b) semantically wrong regions at core areas, in a pixel-wise manner without requiring ground-truth mattes. 
+
+for evaluating an alpha prediction ˆα, which does not nat-urally exist. Therefore, we construct training pairs using the existing image matting dataset P3M-10k [11], which provides human-annotated alpha mattes αgt corresponding to images Irgb . To evaluate ˆα against αgt and generate 
+
+M eval gt , we design a discrepancy measure D(·) that com-putes a weighted combination of standard video matting metrics (MAD and Grad) within local patches. This mea-sure effectively captures both semantic- and detail-level de-viations. Specifically, the ground-truth evaluation map is defined as M eval gt = I D(αgt , ˆα) < δ , where I(·) denotes the indicator function and δ is a threshold. Since erroneous regions primarily occur around boundaries, class 1 (reliable regions) dominate class 0 (erroneous regions) in the train-ing data, resulting in class imbalance. To mitigate this, we adopt the focal loss [20] to emphasize hard erroneous re-gions during training. 
+
+3.2. Online Matting-quality Guidance 
+
+Thanks to the pixel-wise quality evaluation provided by the learned MQE model, we leverage it as a matting-quality feedback signal during training, where its on-the-fly as-sessment offers dynamic online supervision, as shown in Fig. 2(b). For each input frame, the MQE first produces a probability map P (0)  
+
+> eval
+
+that indicates the likelihood of error for its alpha prediction in a pixel-wise manner, without re-quiring ground-truth alpha mattes. This map can serve as a penalty mask to guide the network in suppressing erroneous regions. The online guidance loss is defined as: 
+
+Leval = ∥P (0) 
+
+> eval
+
+∥1, (1) which encourages lower error probabilities and thus more accurate alpha predictions. Compared to the weak unsuper-vised loss used in MatAnyone [39], our MQE-based guid-ance loss Leval provides a more effective and stable learn-ing signal for boundary regions (see Table 3(b)), enabling large-scale video matting training with unlabeled videos. 37479 𝐵𝑉 : Alpha Matte  𝐵𝑉 : Eval. Map  Final Alpha Matte 
+
+> Video Matting Model ( 𝐵𝑉 )
+> Video
+> Frames
+> Image Matting Model ( 𝐵𝐼 )
+> SAM 2
+
+𝛼𝑉 
+
+> 𝑀 𝑠𝑒𝑔
+
+𝛼𝐼 
+
+> Matting
+> Quality
+> Evaluator
+> (MQE)
+> 𝑀𝑉 𝑒𝑣𝑎𝑙
+> 𝑀𝐼 𝑒𝑣𝑎𝑙
+> Alpha Fusion
+> (Eq. 2) +
+> Map Update
+> (𝑀𝑉 𝑒𝑣𝑎𝑙 ∪ 𝑀𝐼 𝑒𝑣𝑎𝑙 )
+
+𝛼      
+
+> Alpha Matte
+> Alpha Matte
+> Seg. Map
+> Eval. Maps Final Alpha Matte
+> Final Eval. Map
+> 𝑀 𝑒𝑣𝑎𝑙
+> Input Video Frame
+> 𝐵𝐼 : Alpha Matte 𝐵𝐼 : Eval. Map Final Eval. Map
+
+Figure 5. Our automated dual-branch annotation pipeline. This pipeline enables large-scale construction of real-world VM datasets, resulting in our VMReal dataset. We combine two complementary annotation branches: the temporally stable BV branch provides the base annotation, while the detail-preserving BI branch offers fine boundary details. Pixels where BV fails but BI succeeds are selectively integrated to produce the fused alpha and its evaluation map. The example on the right shows that the fused annotation preserves semantic stability as well as rich boundary details, making it suitable for VM training. 
+
+3.3. Offline Pixel-wise Selection 
+
+Beyond using MQE as matting-quality guidance during training, we further employ it to directly construct a large-scale, high-quality, real-world video matting dataset with detailed alpha annotations. Manual annotation of video al-pha mattes at scale is prohibitively expensive, if not impos-sible, making such a dataset long unattainable and hindering progress in this field. To this end, we design an automated dual-branch annotation pipeline, as shown in Fig. 5, where MQE acts as a quality arbiter to evaluate and fuse predic-tions from two complementary branches, employing state-of-the-art video and image matting models. 
+
+Dual-branch Annotation. The first branch ( BV ) employs a video matting model, e.g ., MatAnyone [39], which en-sures stable temporal consistency and robust overall struc-ture but sometimes lacks fine details around object bound-aries. In contrast, the second branch ( BI ) adopts an image matting model, e.g ., MattePro [43], guided by per-frame segmentation masks from SAM 2 [27]. Although it strug-gles to maintain temporal stability and semantic consis-tency, it produces sharper boundary details that effectively complement the video-matting branch. For each video se-quence, these two branches generate complementary anno-tations: BV excels in semantic stability, while BI provides high-quality boundary details. 
+
+MQE as Quality Arbiter. The learned MQE acts as a quality arbiter that identifies reliable regions from each branch and fuses their strengths in a pixel-wise manner. As shown in Fig. 5, given video-based data, the two branches 
+
+BV and BI respectively produce alpha mattes αV and 
+
+αI . The MQE then performs quality evaluation on both branches, generating corresponding evaluation maps M eval V
+
+and M eval I . We take the stable and temporally consistent predictions from BV as the base, while MQE selectively in-tegrates boundary details from BI in regions where BV is unreliable ( M eval V = 0 ) but BI is reliable ( M eval I = 1 ). We denote such regions with a fusion mask, i.e ., M f use =
+
+M eval I ⊙ (1 − M eval V ), which is used to blend the two branches. To avoid boundary artifacts, we smooth the mask 
+
+M f use with a Gaussian blur, resulting in seamless and soft blending between the two branches. The final fused alpha matte is obtained by: 
+
+α = αV ⊙ (1 − M f use ) + αI ⊙ M f use , (2) which preserves both semantic stability of BV and fine boundary details from BI . Meanwhile, the fused evaluation map is updated as M eval = M eval V ∪ M eval I .
+
+VMReal Dataset. Leveraging the proposed MQE-based dual-branch annotation pipeline, we construct VMReal ,a large-scale, scene-diverse, and real-world video mat-ting dataset with high-quality alpha annotations, compris-ing about 28K clips ( ∼ 35 × larger than the previous dataset [39]) and 2.4M frames. Among them, a high-quality subset of 4.5K clips is collected from video footage web-sites and YouTube, featuring 1080p resolution with abun-dant fine-grained hair details. The remaining videos are de-rived from the SA-V dataset [27] (we filter out a human-centric subset), typically at 720p resolution, offering rich diversity in scenes, motions, and lighting conditions. 
+
+Train with VMReal Dataset. With the scalable auto-matic annotation pipeline, we can convert large amounts of unlabeled videos into matting data for training. Thus, we no longer perform joint training with both matting and segmentation data, effectively avoiding the segmentation-like results and loss of fine boundary details often caused by segmentation supervision. Instead, all samples are unified through our annotation pipeline into triplets of 
+
+⟨Irgb , α, M eval ⟩, where M eval denotes the pixel-wise reli-ability map. During training, the matting loss LMmat is com-puted only over reliable regions where M eval = 1 , ensur-ing that supervision focuses on high-confidence areas while ignoring uncertain or low-quality regions. In this way, our unified training scheme as shown in Fig. 2(b) fully leverages diverse heterogeneous data sources and effectively scales up video matting training. 37480 Table 1. Quantitative comparisons on different video matting benchmarks from diverse sources. The best and second-best performances are marked in red and orange , respectively. ∗ indicates that GVM [5] is a diffusion-based video matting method that leverages rich Stable Video Diffusion [1] priors, while our method is purely CNN-based. † indicates that MaGGIe [8] requires the instance mask as guidance for each frame, while our method only requires it in the first frame.                                                                                                                                                                                           
+
+> Metrics Auxiliary-free (AF) Methods Mask-guided Methods
+> MODNet [9] RVM [19] RVM-Large [19] GVM ∗[5] AdaM [17] FTP-VM [6] MaGGIe †[8] MatAnyone [39] Ours
+> VideoMatte (512 ×288 )MAD ↓9.41 6.08 5.32 6.39 5.30 6.13 5.49 5.15 4.73 MSE ↓4.30 1.47 0.62 1.82 0.78 1.31 0.60 0.93 0.55 Grad ↓1.89 0.88 0.59 0.72 0.72 1.14 0.57 0.67 0.51 dtSSD ↓2.23 1.36 1.24 1.27 1.33 1.60 1.39 1.18 1.12 Conn ↓0.81 0.41 0.30 0.43 0.30 0.41 0.31 0.26 0.20
+> VideoMatte (1920 ×1080 )MAD ↓11.13 6.57 5.81 6.33 4.42 8.00 4.42 4.24 4.10 MSE ↓5.54 1.93 0.97 2.08 0.39 3.24 0.40 0.33 0.28 Grad ↓15.30 10.55 9.65 8.04 5.12 23.75 4.03 4.00 3.45 dtSSD ↓3.08 1.90 1.78 1.59 1.39 2.37 1.31 1.19 1.15
+> YoutubeMatte (512 ×288 )MAD ↓19.37 4.08 3.36 3.30 -3.08 3.54 2.72 2.30 MSE ↓16.21 1.97 1.04 1.52 -1.29 1.23 1.01 0.78 Grad ↓2.05 1.34 1.03 0.79 -1.16 1.10 0.97 0.78 dtSSD ↓2.79 1.81 1.62 1.52 -1.83 1.88 1.60 1.45 Conn ↓2.68 0.60 0.50 0.44 -0.41 0.49 0.39 0.32
+> YoutubeMatte (1920 ×1080 )MAD ↓15.29 4.37 3.58 2.68 -6.49 2.37 1.99 1.61 MSE ↓12.68 2.25 1.23 1.34 -4.58 0.98 0.71 0.50 Grad ↓8.42 15.10 12.97 8.38 -29.78 7.69 8.91 7.14 dtSSD ↓2.74 2.28 2.04 1.72 -2.41 1.77 1.65 1.53
+
+3.4. Reference-Frame Strategy for Long Videos 
+
+In long videos, the subject appearance can vary largely over time. Previous MatAnyone [39], which relies on a memory-propagation mechanism, often fails to matte out newly ap-pearing human or clothing parts that were unseen in ear-lier frames. This limitation arises because, during train-ing, it is exposed only to short sequences ( e.g ., 8 frames), where only frames within local window are stored in mem-ory (Fig. 2(a)), preventing the model from modeling large appearance variations. Simply extending the training win-dow ( e.g ., 40 frames [19]) would drastically increase mem-ory consumption. To overcome this issue, we propose a reference-frame strategy that introduces long-range refer-ence frames into memory beyond the local training window (Fig. 2(b)), following the training scheme of [48], thereby extending the temporal context without additional memory overhead. To strengthen the reference-frame strategy, we further apply a random dropout augmentation that randomly masks patches in both RGB and alpha maps, which miti-gates over-reliance on historical memory and enhances the model’s ability to handle unseen regions. This strategy ef-fectively simulates the challenging large appearance varia-tions commonly encountered in long videos, leading to im-proved stability under challenging scenarios (see Fig. 7). 
+
+## 4. Experiments 
+
+Implementation Details. Our MatAnyone 2 is trained on 8 A800-80G GPUs with a batch size of 16. Training clips are cropped to 480 × 480 and 8 frames. The matting back-bone follows MatAnyone [39]. With VMReal as the train-ing set, no separate networks or losses for different data types are needed. The Matting Quality Evaluator (MQE) is also trained on 8 A800-80G GPUs with a batch size of 16. Inspired by Depth Anything [36], the MQE uses pre-trained DINOv3 [30] for feature extraction and a DPT [26] decoder for evaluation map prediction. 
+
+4.1. Comparisons 
+
+We compare MatAnyone 2 with several state-of-the-art methods, including auxiliary-free (AF) methods : MOD-Net [9], RVM [19], RVM-Large [19], and diffusion-based GVM [5]; as well as mask-guided methods : AdaM [17], FTP-VM [7], MaGGIe [8], and MatAnyone [39]. 
+
+4.1.1. Quantitative Evaluations Synthetic Benchmarks. We evaluate on synthetic bench-marks using MAD and MSE for semantic accuracy, Grad [28] for detail fidelity, Conn [28] for perceptual qual-ity, and dtSSD [4] for temporal coherence. As shown in 37481 Video Frame  RVM  GVM  MatAnyone  MatAnyone 2 (Ours) Figure 6. Qualitative comparisons on real-world videos. Our MatAnyone 2 significantly outperforms leading auxiliary-free (RVM [19]), diffusion-based (GVM [5]), and mask-guided (MatAnyone [39]) approaches in both detail extraction and semantic accuracy under chal-lenging conditions, e.g ., wind-blown hair (first row) and complex lighting scenes (last two rows). 
+
+Table 1, our method achieves the best scores across all four benchmarks, demonstrating strong semantic accuracy, de-tail quality, and temporal stability. Compared with the lead-ing mask-guided MatAnyone [39], our model reduces Grad and Conn by 27 .1% and 22 .4% , validating the effectiveness of MQE-based video matting scaling. Moreover, despite GVM’s diffusion prior and MaGGIe’s per-frame instance masks, our CNN model with only first-frame masks still outperforms all methods, demonstrating the effectiveness of online matting-quality guidance and the VMReal dataset for video matting training. 
+
+Real Benchmark. To assess model generalization on real-world videos, we further evaluate our method on the real-world CRGNN dataset [32], as shown in Table 2. This dataset contains 19 real-world videos with ground-truth al-pha mattes manually annotated every 10 frames. The sub-stantial metric improvements over MatAnyone [39] indicate enhanced semantic accuracy, finer details, and better tem-
+
+Table 2. Quantitative comparisons on the CRGNN real-world dataset [32], where ground-truth alpha mattes are manually an-notated every 10 frames on 19 videos. The best and second per-formances are marked in red and orange , respectively.                                 
+
+> Methods MAD ↓MSE ↓Grad ↓dtSSD ↓
+> Auxiliary-free
+> RVM [19] 5.98 2.79 13.68 5.36 RVM-Large [19] 5.75 2.47 13.26 5.17 GVM [5] 5.03 2.15 14.28 4.86
+> Mask-guided
+> FTP-VM [7] 6.64 3.54 15.10 5.98 MaGGIe [8] 9.50 6.11 16.51 6.02 MatAnyone 5.76 3.04 15.55 5.44
+> Ours 4.24 2.00 11.74 4.54
+
+poral consistency. Although GVM [5] achieves competitive results due to its strong diffusion prior, our MatAnyone 2 still delivers the best performance across all metrics, high-lighting the superior generalizability and robustness of our scaling design under real-world conditions. 37482 Table 3. Ablation study of online guidance Leval , VMReal dataset, and reference-frame strategy on YouTubeMatte ( 1920 ×                              
+
+> 1080 ). We employ MatAnyone [39] as the baseline, i.e. , Exp. (a).
+> Exp. Leval VMReal Ref. Train MAD ↓MSE ↓Grad ↓dtSSD ↓
+> (a) 1.99 0.71 8.91 1.65 (b) ✓1.90 0.62 8.20 1.63 (c) ✓✓1.76 0.61 7.65 1.54 (d) ✓✓✓1.61 0.50 7.13 1.53
+
+4.1.2. Qualitative Evaluations 
+
+Qualitative results on real-world videos are shown in Fig. 6. While the diffusion-based GVM [5] is robust across scenes, it produces blurry mattes with unnatural transitions, espe-cially around hair. Mask-guided MatAnyone [39] is also ro-bust due to segmentation supervision, but its weak boundary constraints lead to segmentation-like edges. In contrast, our method delivers superior semantic robustness and fine mat-ting details under challenging real-world conditions, includ-ing wind-blown hair ( e.g ., first row) and complex lighting (e.g ., last two rows), showing that MQE-guided supervision and VMReal offer strong, reliable signals for high-quality real-world video matting. 
+
+4.1.3. MQE Performance Evaluations 
+
+For the MQE to provide effective guidance in both online training and offline selection, it should accurately identify erroneous regions in the predicted mattes. As illustrated in Fig. 4, the MQE successfully highlights common fail-ure cases such as (a) segmentation-like mattes along object boundaries and (b) semantic mispredictions between fore-ground and background. These results demonstrate that the learned MQE provides a solid foundation for guiding video matting training and data curation. More evaluation and analysis are provided in the supplementary (see Sec. C.3). 
+
+4.2. Ablation Study 
+
+Effectiveness of Online Guidance Leval . To verify the ef-fectiveness of MQE’s online guidance, we train our video matting model using the same schedule as MatAnyone, where matting and segmentation data are supervised by dif-ferent losses (Fig. 2(a)). Since the MQE can generate eval-uation maps for both data types, we incorporate Leval as an additional online quality-guidance loss. As shown in Ta-ble 3, the improvement is most apparent in metrics related to semantic accuracy (MAD, MSE) and detail fidelity (Grad). This indicates that the MQE provides a more comprehen-sive and reliable assessment of both semantic correctness and fine details, offering stronger and more stable guidance than the previous weak boundary supervision. 
+
+Enhancement from Training with VMReal. Beyond pro-viding online guidance during training, we further employ MQE to construct a large-scale real-world video matting dataset, VMReal. From Table 3(b) to (c), noticeable im-Video Frame Predicted Alpha Seg. Mask Eval. Map cy  Video Frames  MatAnyone  MatAnyone 2 
+
+> Figure 7. Effectiveness of the reference-frame strategy. MatAny-one [39] struggles with newly appearing subject regions in long videos, whereas MatAnyone 2, trained with the reference-frame strategy, robustly identifies them.
+
+provements are observed in MAD, Grad, and dtSSD, sug-gesting comprehensive gains not only in semantic robust-ness and boundary fidelity, but also in temporal consistency. To further validate the benefit of VMReal, we also train RVM [19] on this dataset and observe consistent improve-ments across all metrics (Table C in the supplementary). These results demonstrate that VMReal serves as a strong and generalizable supervisory signal, boosting video mat-ting performance across different models. 
+
+Effectiveness of Reference-Frame Strategy for Large Variations. With the training sequence length kept un-changed, we adopt the reference-frame training strategy with random dropout augmentation in the data pipeline. As shown in Table 3(d), this yields further improvements, es-pecially in semantic accuracy (MAD and MSE), indicating enhanced semantic robustness without incurring additional memory cost. This improved capability allows the model to better handle large appearance changes across long videos, such as the emergence of new body or clothing parts that do not appear in earlier frames (see Fig. 7). 
+
+## 5. Conclusion 
+
+We presented MatAnyone 2, a next-generation video mat-ting framework that integrates a learned Matting Quality Evaluator (MQE) for scalable training. The MQE jointly assesses semantic accuracy and boundary detail without ground truth, serving as both an online guidance signal and an offline data selection module. Leveraging MQE, we fur-ther constructed VMReal, the first large-scale, real-world video matting dataset with diverse scenes and high-quality annotations. In addition, a reference-frame training strat-egy was introduced to handle large appearance variations in long videos. Extensive experiments show that MatAnyone 2 achieves leading performance on both synthetic and real-world benchmarks, significantly improving semantic stabil-ity, boundary fidelity, and generalization in real scenarios. 37483 Acknowledgement. This research is supported by cash and in-kind funding from NTU S-Lab and industry partner(s). 
+
+## References 
+
+[1] Andreas Blattmann, Tim Dockhorn, Sumith Kulal, Daniel Mendelevitch, Maciej Kilian, Dominik Lorenz, Yam Levi, Zion English, Vikram Voleti, Adam Letts, et al. Stable Video Diffusion: Scaling latent video diffusion models to large datasets. arXiv preprint , 2023. 3, 6 [2] Huanqia Cai, Fanglei Xue, Lele Xu, and Lili Guo. Trans-Matting: Enhancing transparent objects matting with trans-formers. In ECCV , 2022. 3 [3] Miaomiao Cai, Simiao Li, Wei Li, Xudong Huang, Hanting Chen, Jie Hu, and Yunhe Wang. DSPO: Direct semantic pref-erence optimization for real-world image super-resolution. 
+
+arXiv preprint arXiv:2504.15176 , 2025. 3 [4] Mikhail Erofeev, Yury Gitman, Dmitriy S Vatolin, Alexey Fedorov, and Jue Wang. Perceptually motivated benchmark for video matting. In BMVC , 2015. 6 [5] Yongtao Ge, Kangyang Xie, Guangkai Xu, Li Ke, Mingyu Liu, Longtao Huang, Hui Xue, Hao Chen, and Chunhua Shen. Generative video matting. In SIGGRAPH , 2025. 1, 2, 3, 6, 7, 8 [6] Wei-Lun Huang and Ming-Sui Lee. End-to-end video mat-ting with trimap propagation. In CVPR , 2023. 6 [7] Wei-Lun Huang and Ming-Sui Lee. End-to-end video mat-ting with trimap propagation. In CVPR , 2023. 1, 2, 3, 6, 7[8] Chuong Huynh, Seoung Wug Oh, , Abhinav Shrivastava, and Joon-Young Lee. MaGGIe: Masked guided gradual human instance matting. In CVPR , 2024. 1, 2, 3, 6, 7 [9] Zhanghan Ke, Jiayu Sun, Kaican Li, Qiong Yan, and Ryn-son W.H. Lau. MODNet: Real-time trimap-free portrait mat-ting via objective decomposition. In AAAI , 2022. 2, 6 [10] Alexander Kirillov, Eric Mintun, Nikhila Ravi, Hanzi Mao, Chloe Rolland, Laura Gustafson, Tete Xiao, Spencer White-head, Alexander C Berg, Wan-Yen Lo, et al. Segment any-thing. In ICCV , 2023. 3 [11] Jizhizi Li, Sihan Ma, Jing Zhang, and Dacheng Tao. Privacy-preserving portrait matting. In ACMMM , pages 3501–3509, 2021. 3, 4 [12] Jizhizi Li, Jing Zhang, and Dacheng Tao. Deep automatic natural image matting. In IJCAI , 2021. 3 [13] Jiachen Li, Vidit Goel, Marianna Ohanyan, Shant Navasardyan, Yunchao Wei, and Humphrey Shi. VMFormer: End-to-end video matting with transformer. In WACV , 2024. 2[14] Jiachen Li, Roberto Henschel, Vidit Goel, Marianna Ohanyan, Shant Navasardyan, and Humphrey Shi. Video instance matting. In WACV , 2024. 3 [15] Jiachen Li, Jitesh Jain, and Humphrey Shi. Matting Any-thing. In CVPR , 2024. 3 [16] Ruibin Li, Tao Yang, Song Guo, and Lei Zhang. RORem: Training a robust object remover with human-in-the-loop. In 
+
+CVPR , 2025. 3 [17] Chung-Ching Lin, Jiang Wang, Kun Luo, Kevin Lin, Linjie Li, Lijuan Wang, and Zicheng Liu. Adaptive human matting for dynamic videos. In CVPR , 2023. 1, 2, 3, 6 [18] Shanchuan Lin, Andrey Ryabtsev, Soumyadip Sengupta, Brian L Curless, Steven M Seitz, and Ira Kemelmacher-Shlizerman. Real-time high-resolution background matting. In CVPR , 2021. 3 [19] Shanchuan Lin, Linjie Yang, Imran Saleemi, and Soumyadip Sengupta. Robust high-resolution video matting with tempo-ral guidance. In WACV , 2022. 1, 2, 6, 7, 8 [20] Tsung-Yi Lin, Priya Goyal, Ross Girshick, Kaiming He, and Piotr Doll´ ar. Focal loss for dense object detection. In ICCV ,2017. 4 [21] Jie Liu, Gongye Liu, Jiajun Liang, Ziyang Yuan, Xiaokun Liu, Mingwu Zheng, Xiele Wu, Qiulin Wang, Wenyu Qin, Menghan Xia, et al. Improving video generation with human feedback, 2025. NeurIPS , 2025. 3 [22] Wenze Liu, Zixuan Ye, Hao Lu, Zhiguo Cao, and Xiangyu Yue. Training matting models without alpha labels. arXiv preprint arXiv:2408.10539 , 2024. 2 [23] Sanghyeon Na, Yonggyu Kim, and Hyunjoon Lee. Boost your human image generation model via direct preference optimization. In CVPR , 2025. 3 [24] Yu Qiao, Yuhao Liu, Xin Yang, Dongsheng Zhou, Mingliang Xu, Qiang Zhang, and Xiaopeng Wei. Attention-guided hier-archical structure aggregation for image matting. In CVPR ,2020. 2, 3 [25] Haotong Qin, Xianglong Liu, Xudong Ma, Lei Ke, Yulun Zhang, Jie Luo, and Michele Magno. BiVM: Accurate bi-narized neural network for efficient video matting. IEEE TPAMI , 2025. 2 [26] Ren´ e Ranftl, Alexey Bochkovskiy, and Vladlen Koltun. Vi-sion transformers for dense prediction. In ICCV , 2021. 6 [27] Nikhila Ravi, Valentin Gabeur, Yuan-Ting Hu, Ronghang Hu, Chaitanya Ryali, Tengyu Ma, Haitham Khedr, Roman R¨ adle, Chloe Rolland, Laura Gustafson, Eric Mintun, Junt-ing Pan, Kalyan Vasudev Alwala, Nicolas Carion, Chao-Yuan Wu, Ross Girshick, Piotr Doll´ ar, and Christoph Feicht-enhofer. SAM 2: Segment anything in images and videos. 
+
+arXiv preprint arXiv:2408.00714 , 2024. 2, 3, 5 [28] Christoph Rhemann, Carsten Rother, Jue Wang, Margrit Gelautz, Pushmeet Kohli, and Pamela Rott. A perceptually motivated online benchmark for image matting. In CVPR ,2009. 6 [29] Xiaoyong Shen, Xin Tao, Hongyun Gao, Chao Zhou, and Jiaya Jia. Deep automatic portrait matting. In ECCV , 2016. 2[30] Oriane Sim´ eoni, Huy V. Vo, Maximilian Seitzer, Federico Baldassarre, Maxime Oquab, Cijo Jose, Vasil Khalidov, Marc Szafraniec, Seungeun Yi, Micha¨ el Ramamonjisoa, Francisco Massa, Daniel Haziza, Luca Wehrstedt, Jianyuan Wang, Timoth´ ee Darcet, Th´ eo Moutakanni, Leonel Sentana, Claire Roberts, Andrea Vedaldi, Jamie Tolan, John Brandt, Camille Couprie, Julien Mairal, Herv´ e J´ egou, Patrick La-batut, and Piotr Bojanowski. DINOv3. arXiv preprint , 2025. 2, 4, 6 [31] Bram Wallace, Meihua Dang, Rafael Rafailov, Linqi Zhou, Aaron Lou, Senthil Purushwalkam, Stefano Ermon, Caiming 37484 Xiong, Shafiq Joty, and Nikhil Naik. Diffusion model align-ment using direct preference optimization. In CVPR , 2024. 3[32] Tiantian Wang, Sifei Liu, Yapeng Tian, Kai Li, and Ming-Hsuan Yang. Video matting via consistency-regularized graph neural networks. In ICCV , 2021. 3, 7 [33] Chenfei Wu, Jiahao Li, Jingren Zhou, Junyang Lin, Kaiyuan Gao, Kun Yan, Sheng-ming Yin, Shuai Bai, Xiao Xu, Yilei Chen, et al. Qwen-image technical report. arXiv preprint arXiv:2508.02324 , 2025. 3 [34] Rongyuan Wu, Lingchen Sun, Zhengqiang Zhang, Shihao Wang, Tianhe Wu, Qiaosi Yi, Shuai Li, and Lei Zhang. DP 2O-SR: Direct perceptual preference optimization for real-world image super-resolution. NeurIPS , 2025. 3 [35] Linjie Yang, Yuchen Fan, and Ning Xu. Video instance seg-mentation. In ICCV , 2019. 3 [36] Lihe Yang, Bingyi Kang, Zilong Huang, Xiaogang Xu, Jiashi Feng, and Hengshuang Zhao. Depth Anything: Unleashing the power of large-scale unlabeled data. In CVPR , 2024. 6 [37] Lihe Yang, Bingyi Kang, Zilong Huang, Zhen Zhao, Xiao-gang Xu, Jiashi Feng, and Hengshuang Zhao. Depth Any-thing V2. In NeurIPS , 2024. 3 [38] Lehan Yang, Jincen Song, Tianlong Wang, Daiqing Qi, Weili Shi, Yuheng Liu, and Sheng Li. VRMDiff: Text-guided video referring matting generation of diffusion. arXiv preprint , 2025. 3 [39] Peiqing Yang, Shangchen Zhou, Jixin Zhao, Qingyi Tao, and Chen Change Loy. MatAnyone: Stable video matting with consistent memory propagation. In CVPR , 2025. 1, 2, 3, 4, 5, 6, 7, 8 [40] Zhuoyi Yang, Jiayan Teng, Wendi Zheng, Ming Ding, Shiyu Huang, Jiazheng Xu, Yuanming Yang, Wenyi Hong, Xiao-han Zhang, Guanyu Feng, et al. CogVideoX: Text-to-video diffusion models with an expert transformer. In ICLR , 2025. 3[41] Jingfeng Yao, Xinggang Wang, Shusheng Yang, and Baoyuan Wang. ViTMatte: Boosting image matting with pre-trained plain vision transformers. Information Fusion ,2024. 3 [42] Jingfeng Yao, Xinggang Wang, Lang Ye, and Wenyu Liu. Matte Anything: Interactive natural image matting with seg-ment anything model. Image and Vision Computing , page 105067, 2024. [43] Chenyi Zhang, Yiheng Lin, Ting Liu, Xiaochao Qu, Luoqi Liu, Fang Zhao, Yao Zhao, and Yunchao Wei. MattePro: A professional matting model for anything. https:// github.com/ChenyiZhang007/MattePro/tree/ master?tab=readme-ov-file , 2025. 3, 5 [44] Huayu Zhang, Dongyue Wu, Yuanjie Shao, Nong Sang, and Changxin Gao. Object-aware video matting with cross-frame guidance. arXiv preprint , 2025. 2, 3 [45] Yunke Zhang, Lixue Gong, Lubin Fan, Peiran Ren, Qixing Huang, Hujun Bao, and Weiwei Xu. A late fusion cnn for digital matting. In CVPR , 2019. 2 [46] Yunke Zhang, Chi Wang, Miaomiao Cui, Peiran Ren, Xuan-song Xie, Xian-Sheng Hua, Hujun Bao, Qixing Huang, and Weiwei Xu. Attention-guided temporally coherent video ob-ject matting. In ACMMM , 2021. 3 [47] Chong Zhou, Xiangtai Li, Chen Change Loy, and Bo Dai. EdgeSAM: Prompt-in-the-loop distillation for on-device de-ployment of sam. arXiv preprint , 2023. 3 [48] Shangchen Zhou, Chongyi Li, Kelvin C. K. Chan, and Chen Change Loy. ProPainter: Improving propagation and transformer for video inpainting. In ICCV , 2023. 6 [49] Bingke Zhu, Yingying Chen, Jinqiao Wang, Si Liu, Bo Zhang, and Ming Tang. Fast deep matting for portrait ani-mation on mobile phone. In ACMMM , 2017. 2 [50] Xueyan Zou, Jianwei Yang, Hao Zhang, Feng Li, Linjie Li, Jianfeng Wang, Lijuan Wang, Jianfeng Gao, and Yong Jae Lee. Segment everything everywhere all at once. In NeurIPS ,2024. 3 37485
