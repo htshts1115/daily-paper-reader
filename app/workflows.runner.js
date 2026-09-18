@@ -2,6 +2,14 @@
 // 依赖：GitHub Token（Classic PAT），需要 repo + workflow 权限
 
 window.DPRWorkflowRunner = (function () {
+  const CONFERENCE_COST_POLICY = Object.freeze({
+    utcOffsetHours: 8,
+    peakStartMinutes: 9 * 60,
+    peakEndMinutes: 18 * 60,
+    queueDispatchHour: 18,
+    queueDispatchMinute: 10,
+  });
+
   const WORKFLOWS = [
     { key: 'topic-research', id: 'topic-research.yml', name: '专题研究', desc: '固定评审预算与最终结果名额，可继续生成内容。' },
     {
@@ -709,6 +717,57 @@ window.DPRWorkflowRunner = (function () {
     return merged;
   };
 
+  const isConferencePeakTime = (now = new Date()) => {
+    const beijing = new Date(now.getTime() + CONFERENCE_COST_POLICY.utcOffsetHours * 60 * 60 * 1000);
+    const weekday = beijing.getUTCDay();
+    const minutes = beijing.getUTCHours() * 60 + beijing.getUTCMinutes();
+    return weekday >= 1 && weekday <= 5
+      && minutes >= CONFERENCE_COST_POLICY.peakStartMinutes
+      && minutes < CONFERENCE_COST_POLICY.peakEndMinutes;
+  };
+
+  const getConferenceOffPeakLabel = () => {
+    const { queueDispatchHour, queueDispatchMinute } = CONFERENCE_COST_POLICY;
+    return `${String(queueDispatchHour).padStart(2, '0')}:${String(queueDispatchMinute).padStart(2, '0')}`;
+  };
+
+  const encodeBase64Utf8 = (text) => {
+    const bytes = new TextEncoder().encode(String(text || ''));
+    let binary = '';
+    bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
+    return btoa(binary);
+  };
+
+  const queueConferenceRequest = async (token, repoContext, dispatchInputs) => {
+    const { owner, repo } = repoContext;
+    const branch = String(repoContext.defaultBranch || 'main');
+    const suffix = Math.random().toString(36).slice(2, 8);
+    const path = `.github/conference-queue/${Date.now()}-${suffix}.json`;
+    const payload = {
+      created_at: new Date().toISOString(),
+      ref: branch,
+      inputs: dispatchInputs,
+    };
+    const url = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
+    const res = await ghFetch(token, url, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: '[queue] defer conference retrieval to off-peak hours',
+        branch,
+        content: encodeBase64Utf8(`${JSON.stringify(payload, null, 2)}\n`),
+      }),
+    });
+    if (!res.ok) {
+      const txt = await res.text().catch(() => '');
+      throw new Error(`加入闲时队列失败：HTTP ${res.status} ${res.statusText} - ${txt}`);
+    }
+    const dispatchLabel = getConferenceOffPeakLabel();
+    setStatus(`当前为计费高峰，任务已加入闲时队列，将在北京时间 ${dispatchLabel} 后自动触发。`, '#080');
+    runsEl.innerHTML = `<div style="color:#666;">无需保持页面打开；可在北京时间 ${dispatchLabel} 后到 Actions 查看运行进度。</div>`;
+    return 'queued';
+  };
+
   const dispatchAndMonitor = async (workflow, extraInputs) => {
     const wf = workflow || {};
     const workflowFile = String(wf.id || '');
@@ -754,6 +813,17 @@ window.DPRWorkflowRunner = (function () {
         '<div style="color:#c00;">当前仓库不是 Fork 仓库，Upstream Sync 不会运行。</div>' +
         `<div style="margin-top:8px;"><a class="arxiv-tool-btn" style="padding:6px 10px; text-decoration:none;" target="_blank" href="https://github.com/${owner}/${repo}/fork">前往 Fork 当前仓库</a></div>`;
       return false;
+    }
+
+    if (workflowFile === 'conference-paper-retrieval.yml' && isConferencePeakTime()) {
+      try {
+        return await queueConferenceRequest(token, repoContext, dispatchInputs);
+      } catch (e) {
+        const msg = e.message || String(e);
+        setStatus(msg, '#c00');
+        runsEl.innerHTML = `<div style="color:#c00;">${escapeHtml(msg)}</div>`;
+        return false;
+      }
     }
 
     setStatus(`正在检查工作流状态：${wf.name || workflowFile} ...`, '#666', { waiting: true });
@@ -1224,7 +1294,7 @@ window.DPRWorkflowRunner = (function () {
     runConferenceRetrieval(conference, years);
 
   return {
-    __test: { buildQuickFetchRequest, buildStarterPackRequest, buildTopicResearchRequest, sanitizeResearchProfile },
+    __test: { buildQuickFetchRequest, buildStarterPackRequest, buildTopicResearchRequest, sanitizeResearchProfile, isConferencePeakTime, getConferenceOffPeakLabel },
     buildTopicResearchRequest,
     sanitizeResearchProfile,
     continueTopicResearch,
@@ -1233,6 +1303,7 @@ window.DPRWorkflowRunner = (function () {
     open,
     runWorkflowByKey,
     runQuickFetchByDays,
+    getConferenceOffPeakLabel,
     runConferenceRetrieval,
     runConferenceMaintain,
   };

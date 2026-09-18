@@ -51,6 +51,12 @@ class ConferenceWorkflowAndUiTest(unittest.TestCase):
         self.assertIn("DPR_FILTER_PROFILE_TAG", text)
         self.assertIn("CONFERENCE_PAIRS", text)
         self.assertIn("--conference-pairs", text)
+        self.assertIn("group: conference-paper-retrieval", text)
+
+        queue_text = (root / ".github" / "workflows" / "conference-paper-queue.yml").read_text(encoding="utf-8")
+        self.assertIn('cron: "10 10 * * 1-5"', queue_text)
+        self.assertIn("conference-paper-retrieval.yml", queue_text)
+        self.assertIn(".github/conference-queue", queue_text)
 
     def test_frontend_triggers_conference_retrieval_workflow(self):
         root = pathlib.Path(__file__).resolve().parents[1]
@@ -106,6 +112,9 @@ class ConferenceWorkflowAndUiTest(unittest.TestCase):
             self.assertIn(conference, runner)
         self.assertIn("profile_tag: profileTags.join(',')", manager)
         self.assertIn("会议论文检索", manager)
+        self.assertIn("isConferencePeakTime", runner)
+        self.assertIn("queueConferenceRequest", runner)
+        self.assertIn("getConferenceOffPeakLabel", manager)
         self.assertNotIn("showPrettyConfirm", manager)
         self.assertNotIn("确认对 <strong>", manager)
         self.assertNotIn("dpr-run-confirm", css)

@@ -1186,7 +1186,12 @@ window.SubscriptionsManager = (function () {
       return false;
     }
     if (msgEl) {
-      msgEl.textContent = `已发起 ${selectedPairSpecs.length} 个会议年份的统一会议论文检索任务。`;
+      const dispatchLabel = typeof window.DPRWorkflowRunner.getConferenceOffPeakLabel === 'function'
+        ? window.DPRWorkflowRunner.getConferenceOffPeakLabel()
+        : '晚间闲时';
+      msgEl.textContent = success === 'queued'
+        ? `当前为计费高峰，${selectedPairSpecs.length} 个会议年份的检索已排队，将在北京时间 ${dispatchLabel} 后自动触发。`
+        : `已发起 ${selectedPairSpecs.length} 个会议年份的统一会议论文检索任务。`;
       msgEl.style.color = '#080';
     }
     showWorkflowSuccessEffects();

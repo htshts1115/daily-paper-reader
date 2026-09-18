@@ -1,0 +1,61 @@
+name: conference-paper-queue
+
+on:
+  schedule:
+    # GitHub cron 不支持变量；修改前端 CONFERENCE_COST_POLICY 时需同步这里。
+    # 北京时间工作日 18:10；中午不执行，避免跨过短暂闲时后又进入高峰。
+    - cron: "10 10 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: write
+
+concurrency:
+  group: conference-paper-queue
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Dispatch queued conference retrievals
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import subprocess
+
+          queue_dir = Path('.github/conference-queue')
+          for path in sorted(queue_dir.glob('*.json')):
+              request = json.loads(path.read_text(encoding='utf-8'))
+              inputs = request.get('inputs') or {}
+              ref = str(request.get('ref') or 'main')
+              command = [
+                  'gh', 'workflow', 'run', 'conference-paper-retrieval.yml',
+                  '--ref', ref,
+              ]
+              for key, value in inputs.items():
+                  command.extend(['-f', f'{key}={value}'])
+              subprocess.run(command, check=True, env=os.environ.copy())
+              path.unlink()
+          PY
+
+      - name: Remove dispatched requests
+        run: |
+          if [ ! -d .github/conference-queue ]; then exit 0; fi
+          git add -A .github/conference-queue
+          if git diff --cached --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m '[queue] dispatch off-peak conference retrievals'
+          git pull --rebase origin "${GITHUB_REF_NAME:-main}"
+          git push origin HEAD:"${GITHUB_REF_NAME:-main}"

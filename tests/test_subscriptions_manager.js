@@ -525,6 +525,11 @@ async function testConferenceRetrievalDispatchesUnifiedConferencePairs() {
   assert.equal(calls[0].options.dispatchInputs.conference_pairs, 'ieee_sp:2026,iclr:2025,neurips:2024');
   assert.equal(calls[0].options.dispatchInputs.profile_tag, 'GENE');
 
+  global.window.DPRWorkflowRunner.runConferenceRetrieval = () => 'queued';
+  global.window.DPRWorkflowRunner.getConferenceOffPeakLabel = () => '19:30';
+  assert.equal(await runQuickConferenceRetrieval(msgEl), true);
+  assert.ok(msgEl.textContent.includes('北京时间 19:30'));
+
   __setRunSelectionState({});
   delete global.window.DPRWorkflowRunner;
   delete global.window.SubscriptionsSmartQuery;
