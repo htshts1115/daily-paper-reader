@@ -1,0 +1,741 @@
+Title: Real-Time Dynamic Scene Rendering with Controlled Compressibility and Contact Awareness
+
+URL Source: https://openaccess.thecvf.com/content/CVPR2026/papers/Shi_Real-Time_Dynamic_Scene_Rendering_with_Controlled_Compressibility_and_Contact_Awareness_CVPR_2026_paper.pdf
+
+Published Time: Sat, 16 May 2026 16:47:12 GMT
+
+Number of Pages: 11
+
+Markdown Content:
+# Real-Time Dynamic Scene Rendering with Controlled Compressibility and Contact Awareness 
+
+## Boya Shi 1,2 Naiyang Guan 2* Xiaodong Yi 2*
+
+> 1
+
+## MoE Key Lab of Artificial Intelligence, AI Institute, Shanghai Jiao Tong University 
+
+> 2
+
+## Intelligent Game and Decision Lab, Academy of Military Science  
+
+> boya.shi@sjtu.edu.cn, nyguan@sina.com, yixiaodong@nudt.edu.cn
+
+## Abstract 
+
+Existing dynamic scene rendering methods often adopt rigid-body or direction-limited assumptions, yet real-world motion and contact routinely violate these, producing arti-facts near occlusion boundaries. To address this, we intro-duce a unified, source-aware framework for dynamic ren-dering that enforces the consistency of Gaussian primitives under explicit manifold constraints. We project predicted velocities onto physically grounded priors via efficient, par-allel inner solves: (i) a Helmholtz parameterization that separates divergence-free and potential-flow motion com-ponents; (ii) an anisotropic, compressible directional prior; and (iii) an affine family that disentangles rotation from isotropic scaling. Experiments on extensive benchmarks show consistent improvements over state-of-the-art meth-ods in reconstruction fidelity and temporal coherence. Our approach ensures physically realistic rendering, especially near contacts, and substantially reduces motion-boundary artifacts. 
+
+## 1. Introduction 
+
+Dynamic scene reconstruction and view synthesis from time-varying, multi-view imagery require a temporally con-sistent scene representation and an accompanying veloc-ity field, while enforcing manifold and contact constraints at interfaces. This problem is central to computer graph-ics because real scenes commonly exhibit non–volume pre-serving effects, e.g., compression/expansion, exposure drift, and growth/decay, as well as contact, which violate the source-free or strictly divergence-free assumptions often used in dynamic view synthesis. An approach that jointly handles compressibility and contact with an identifiable, well-conditioned estimator yields more stable training and higher-fidelity results, benefiting AR/VR telepresence, vi-sual effects, and robotics/digital-twin applications where 
+
+> *Corresponding author.
+
+accuracy, physical plausibility, and turnaround time are crit-ical. Recent progress in dynamic view synthesis and re-construction has been driven by Neural Radiance Fields (NeRFs) [3, 13, 32, 39–41, 45, 50, 55] and 3D Gaussian Splatting (3DGS) [26], which encode time via learned de-formation fields or by estimating per-frame scene flow; later variants introduce kinematic priors (e.g., piecewise-rigid or affine parts) to stabilize optimization and improve extrap-olation. Continuity-based formulations further reduce re-liance on explicit flow supervision by matching residuals of the advection/continuity equation, yielding linear inner solves that scale to large datasets. However, prevailing methods typically assume source-free, volume-preserving motion and thus struggle with compressibility, appear-ance/exposure drift, and material growth or disappearance. Contact and friction are rarely modeled—non-penetration and tangential slip at interfaces are often ignored or approx-imated with soft penalties, leading to boundary artifacts. In addition, low-texture regions and spectrally overlapping bases can produce ill-conditioned normal equations, while richer or piecewise basis families impose substantial mem-ory overhead. Addressing this problem poses intertwined challenges in modeling, algorithms, and systems. Separating compress-ible flow from a source field is only weakly identifiable from image evidence. Reliable separation, especially under par-tial observability or low signal, requires carefully designed priors and temporal regularization. Manifold constraints add further difficulty: contact sets change discretely over time, making the objective nonsmooth and inducing combi-natorial interactions among motion priors. Moreover, mov-ing boundaries should satisfy mass conservation to prevent spurious flux. Contemporary rendering pipelines are pre-dominantly data-driven and thus noise-sensitive, weakening convergence guarantees. Robustly extracting approximate signed-distance isosurfaces, normals, and surface-normal velocities from monocular, noisy sequences is nontrivial. Image-domain derivatives amplify noise and demand stable This CVPR paper is the Open Access version, provided by the Computer Vision Foundation. Except for this watermark, it is identical to the accepted version; the final published version of the proceedings is available on IEEE Xplore. 8308 estimators. Each iteration need also solve inner problems at scale under tight memory budgets, motivating locality-aware methods. Finally, runtime and stability hinge on care-ful loss scheduling and hyperparameter tuning: overly hard priors introduce bias, overly soft priors reintroduce ambi-guity, and although stop-gradient projection improves sta-bility, unreliable contact detection can impede learning. Continuity-driven projection with compressibility, ex-plicit sources, and contact constraints introduces coupled challenges in identifiability, numerical conditioning, and systems design. Once a source term is allowed, divergence and sources become partially interchangeable; identifiabil-ity therefore depends on boundary conditions, sampling density, and image-gradient structure, and benefits from ap-propriate gauges and a global mass budget to preclude de-generacy. Geometric constraints and temporal regulariza-tion can be ill-conditioned in low-texture regions, under repetitive viewpoints, or with spectrally overlapping bases. Stable optimization requires normalization, damping, and structure-preserving preconditioning. Contact and friction further increase nonsmoothness; robustness improves with hysteresis in contact detection and a fallback from sticking to non-penetration to avoid solver chattering. Estimation remains fragile under illumination changes, occlusions, and sensor noise. Simple finite differences amplify artifacts and bias the projection, motivating multi-scale smoothing and robust loss functions, at the inevitable cost of attenuating high-frequency motion. When density changes induced by velocity divergence are confounded with genuine appearance or disappearance, and objects undergo contact that violates standard direc-tional priors, dynamic scene reconstruction from images alone becomes ill-posed. We address this by formulating a source-augmented continuity objective and jointly estimat-ing the velocity field and source–sink field so that they ex-plain observations in the 2D image plane or in 3D while remaining feasible on time-evolving constraint manifolds. Constraint surfaces are represented implicitly. Their ma-terial derivatives yield the surface-normal speed, and on the active set we impose non-penetration and Coulomb friction, restricting admissible motion to the tangent cone. Our motion priors instantiate convex, efficiently solvable subproblems, including directional, divergence-free, and compressible variants, together with manifold/contact pri-ors. The overall solver follows a projection-based strat-egy: each iteration computes closed-form solutions for the compressibility-aware priors and solves small second-order cone programs for manifold/contact constraints, producing a projected field via a local linear model. Compared with existing velocity-prior methods, this formulation disentan-gles divergence-driven density change from true appear-ance/disappearance, enforces physically plausible contact, and preserves analytic structure in all inner problems, yield-ing a stable, batched solver that integrates seamlessly with standard rendering pipelines. We present a continuity-driven, projection-based frame-work for dynamic reconstruction that accommodates com-pressible motion and appearance change while retaining closed-form, linear inner solves and avoiding explicit phys-ical simulation. At each time step, we augment the con-tinuity equation with an explicit source term and solve a unified convex least-squares projection onto velocity and source priors, yielding surrogate fields with analytic or ef-ficiently solvable structure. These projected fields super-vise learning in an alternating scheme: we compute the in-ner projection with stop-gradient, then update model pa-rameters in an outer loop using a projection loss and a continuity-consistency term. To enhance physical plausi-bility and control, we replace directional priors with man-ifold constraints, enforcing non-penetration and Coulomb friction via per-sample closed-form projections, with both pointwise and local-linear variants. To ensure identi-fiability between divergence and sources, we impose a global mass budget and a zero-mean gauge, complemented by boundary-aware bases and a curriculum that progres-sively enables compressibility and sources. Compared with existing velocity-prior approaches, our method yields greater stability, contact-aware behavior, and higher accu-racy across diverse dynamic scenes. Overall, our contribu-tions are as follows: • The introduction of a source term explicitly separates motion-driven density variation from genuine creation or annihilation to keep continuity, a capability not afforded by existing physics-based modelling methods. • The implicit-surface representation of obstacles with ex-plicitly constructed normal and tangential physical priors for computing the moving boundaries, thereby enforc-ing geometric constraints and enabling the handling of curved-surface obstacles. • The model of a non-penetration constraint and a Coulomb friction cone, thereby unifying sticking and sliding con-tact and incorporating physically accurate contact me-chanics into the priors. • Controllable priors, which integrate with the potential flow channels and temporal smoothing on density, effec-tively mitigating ambiguities among physical quantities and improving the decomposability and interpretability. 
+
+## 2. Related Work 
+
+Point-Based Rendering Conventional image-based re-construction underpins 3D scene synthesis [5, 9, 14, 20, 21, 33, 34, 52] but degrades as geometry and appearance be-come more complex [6, 10, 14, 19, 28, 29, 37, 44, 46, 48, 51, 53, 57, 61, 68]. Neural Radiance Fields (NeRF) learn an im-plicit, continuous volumetric density and radiance field pa-rameterized by multilayer perceptrons (MLPs) [2, 4, 23, 27, 8309 38–41, 45, 56, 64, 67], often surpassing geometry-driven methods in visual fidelity, but come with substantial train-ing and inference compute [2, 4, 27, 39–41, 45, 56, 64, 67]. In contrast, 3D Gaussian Splatting (3DGS) [26] represents scenes explicitly with highly parallelizable Gaussian primi-tives, delivering real-time rendering while preserving strong visual quality. 
+
+Dynamic Scene Rendering Unlike traditional meth-ods [9, 25, 30, 63, 69], neural rendering techniques improve image quality using neural networks but remain computa-tionally expensive [1, 2, 8, 11, 17, 22, 32, 38, 50, 54]. While some approaches accelerate rendering with efficient net-work structures [7, 13, 15, 16, 18, 31, 36, 40, 41, 43, 45, 49, 55, 59, 60], they still fall short of real-time performance in dynamic scenes. 3D Gaussian Splatting (3DGS) [26] offers a promising alternative, using Gaussian functions to repre-sent scenes in a lightweight, point-based rendering frame-work. Furthermore, 3DGS introduces a GPU-accelerated rendering pipeline for real-time rendering. Recent work has extended 3DGS to dynamic scenes, but maintaining consis-tent point cloud associations over time remains a challenge, especially under fast motion or complex object changes, of-ten leading to blur and degraded quality. Although recent efforts have extended 3DGS to dynamic scenes by intro-ducing temporal models [12, 24, 35, 62, 65, 66], existing methods still fall short of capturing the underlying physics of motion, resulting in renderings that lack convincingly re-alistic dynamics. 
+
+## 3. Method 
+
+3.1. Source-Aware Compressible Flow 
+
+Prior work in dynamic scene rendering typically assumes incompressible, source-free transport, an approximation that fails to capture real-world volumetric and appearance changes. We instead introduce an explicit source–sink field 
+
+q to model growth, decay, and other variations in the ad-vected scalar. Let  ψ(x, t ) denote the transported signal, e.g., pixel intensity, density, opacity,  u(x, t ) the velocity field, and  q(x, t ) the source term, where  q > 0 for creation,  q < 0
+
+for loss. The resulting transport law is the continuity equa-tion with sources. 
+
+∂tψ + u · ∇ ψ + ψ ∇ · u = q.  (1) which unifies compressible advection and photometric vari-ation within a single conservation principle. In our frame-work, we replace the source-free residual in the matching objective with this source-aware residual, so that changes in  ψ are attributed either to transport and volumetric com-pression via  ∇ · u or to genuine dissipation via  q, while preserving a linear, efficiently solvable inner projection. 
+
+2D & 3D Objectives. We estimate the velocity field most consistent with the image’s spatiotemporal variations by minimizing a source-aware continuity residual on the im-age plane. For pixels at locations  xi with  si = ∂tψt(xi),
+
+gi = ∇ψt(xi), the per-frame least-squares objective is            
+
+> ρ(u, q ;ψt) = P
+> i
+> h
+> si+g⊤
+> iu(xi, t ) + ψi(∇· u)( xi, t )−q(xi, t )
+> i2
+> .
+
+(2) which penalizes violations of the continuity equation  ∂tψ +
+
+∇ψ · u + ψ ∇ · u = q evaluated at the sample locations. Minimizing  ρ yields the velocity field  u compatible with the observed image dynamics. In 3D space we represent the Gaussian primitives’ trans-ported signal as 
+
+ψt(x) = X
+
+> i
+
+mti δ x − γti
+
+. (3) where δ(·) is the Dirac delta distribution in R3, and γti ∈
+
+R3 denotes the 3D position of the i-th Gaussian primitive at time t. From the source augmented continuity equation the Gaussian primitive dynamics at sampled times satisfy 
+
+u γti , t  ≈ ˙γti and  ˙mti + mti
+
+ ∇· u  γti , t  ≈ q γti , t , where 
+
+˙mti denotes the time derivative of the weight  mti of the  i-th Gaussian primitive at time  t. We fit these relations via the geometric matching energy                 
+
+> ρ(u, q ;{γ, m }) = P
+> iu γti, t −˙γti
+> 2
+> +λm
+> P
+> i
+> 
+> ˙mti+mti(∇· u) γti, t −q γti, t 2
+> .
+
+(4) which penalizes deviations from the Gaussian primitive kinematics and the mass balance. In practice we parame-terize masses as  mti = log  1 + e−| sti | + max  sti, 0, and these variables are used only in the continuity objective and are not coupled to the color branch of the renderer. For a discrete update we form a forward difference residual at trajectory samples  xti,
+
+rti = mt+1  
+
+> i
+
+− mti
+
+∆t + mti (∇· u)( xti, t ) − q(xti, t ). (5) and solve a least squares problem  min P
+
+> i,t
+
+(rti )2 +
+
+λsm 
+
+P
+
+> i,t
+
+(mt+1  
+
+> i
+
+− mti)2 subject to nonnegativity  mti ≥ 0,where  λsm  weakly regularizes temporal changes in mass. The mass variables participate only in the continuity sub-problem so keeping them fixed preserves a linear solve for 
+
+u and  q, and their update reduces to an independent linear smoothing step. For source modeling we include a propor-tional decay prior  q = λt ψ, which yields exponential evo-lution controlled by a single time dependent scalar  λt and provides a compact yet expressive baseline for appearance change. 
+
+Compressible Parameterizations. We generalize the di-rectional prior to an anisotropic, compressible, and source-aware model  P comp  
+
+> I
+
+by restricting volumetric change to a 8310 Sparse Point Cloud  Differentiable 
+
+> Rasterization
+
+𝒇 pred,𝑖 𝑡 𝒖 𝑖 𝑡  ෝ𝒖 𝑖 𝑡+𝛿𝑡  𝛿𝒇 𝑝𝑟𝑒𝑑, 𝑖 𝑡 
+
+𝐷 𝑜𝑏𝑠 𝑡 (𝒖 𝑖 𝑡 ) 
+
+> Sparse Point Cloud Differentiable
+> Rasterization
+> Geometry -Aware
+> Motion Supervision
+> 4D Velocity
+> Supervision
+> Compressible and
+> Source -aware Modeling
+> 2D and3D
+> observations
+> Contact -aware
+> physical prior
+> multi -contact solving
+> Contact detection
+> Implicit manifold
+> representation
+> Deformation
+> Field
+
+𝑦 
+
+𝑧 
+
+𝑡 
+
+𝑥 
+
+2D and3D 
+
+observations Figure 1. Framework Overview. We begin with sparse 3D point clouds and encode them into a space–time set of Gaussian primitives, which evolve under a learned deformable field. Compressibility and contact priors jointly constrain the motion of Gaussian primitives, yielding dynamics that are physically consistent and temporally stable. Images are generated with a differentiable rasterization pipeline. 
+
+prescribed subspace  E = span( V ) with stable fluid solvers, where  V has orthonormal columns and  P = V V ⊤ is the projector onto  E. We decompose the velocity as u(x, t ) = 
+
+uτ (x, t ) + P ∇Φ( x, t ), with uτ (x, t ) ⊥ E and ∇· uτ ≡ 0.In this decomposition, uτ (x, t ) represents the incompress-ible, i.e., divergence-free, part of the velocity field. Φ( x, t )
+
+is a scalar potential function and P ∇Φ( x, t ) carries all vol-umetric change within the subspace E. All divergence is carried by the potential component along  E:
+
+∇· u = tr  P ∇2Φ =
+
+> r
+
+X
+
+> k=1
+
+∂2Φ
+
+∂ξ 2
+
+> k
+
+, ξ = V ⊤x.  (6) We relax the rigid prior by allowing uniform volumetric change and trace-free strain within a linear velocity fam-ily. Let u(x, t ) = Ω( t) x + E0(t) x + κ(t) x + b(t) with 
+
+∇ · u = d κ (t). Among which, Ω( t) ∈ Rd×d is a skew-symmetric matrix. Ω⊤(t) = − Ω( t) encodes the rotational component, E0(t) ∈ Rd×d is a symmetric, trace-free strain tensor, E⊤ 
+
+> 0
+
+(t) = E0(t), tr E0(t) = 0 modeling volume-preserving shear, κ(t) ∈ R is a scalar isotropic scaling fac-tor controlling volumetric changes, so that ∇ · u = d κ (t)
+
+with d the spatial dimension, and b(t) ∈ Rd denotes the translational component. We regularize it via  λκκ2.The continuity equation with sources yields the linear row               
+
+> si+g⊤
+> i
+>  Ωxi+E0xi+κx i+b+ψi(d κ )−q(xi, t ) = 0 .
+
+(7) and stacking these rows forms a least-squares system for the unknown coefficients. The kinematic relation remains 
+
+u(γi(t), t ) ≈ ˙γi(t) as in the rigid case, while the mass bal-ance becomes 
+
+˙mi(t) + mi(t) d κ (t) − q(γi(t), t ) ≈ 0. (8) where  ∇ · u = d κ (t). We adopt a Helmholtz parameteri-zation that augments a divergence-free velocity basis with a potential-flow basis, and regularizes compressibility sep-arately. At a fixed time  t,
+
+u(x, t ) = X
+
+> k
+
+βk(t) bk(x) + X
+
+> ℓ
+
+αℓ(t) ∇ϕℓ(x). (9) where  bk(x) are divergence-free vector basis functions with time-varying coefficients  βk(t). ϕℓ are scalar potential bases.  αℓ(t) weight the potential flow basis  ∇ϕℓ(x) and thus control the compressible component of the velocity field.  β, α, ζ  are time-varying coefficients. Let rp(x) de-note scalar basis functions for the source sink field q(x, t ),with associated time-dependent coefficients ζp(t). We de-fine Ri,p = rp(xi) as the evaluation at sample location xi.Let ∆ϕℓ(x) denote the Laplacian of the scalar potential ba-sis functions ϕℓ(x). The divergence of the velocity field 
+
+u(x, t ) is then given by ∇ · u(x, t ) = P 
+
+> ℓ
+
+αℓ(t) ∆ ϕℓ(x) and the source field is expanded as q(x, t ) = P 
+
+> p
+
+ζp(t) rp(x).In 2D image plane, for image samples  xi,
+
+si + X
+
+> k
+
+βk ⟨gi, b k(xi)⟩ + X
+
+> ℓ
+
+αℓ ⟨gi, ∇ϕℓ(xi)⟩
+
++ ψi
+
+X
+
+> ℓ
+
+αℓ ∆ϕℓ(xi) − X
+
+> p
+
+ζp rp(xi) = 0 . (10) Stacking all samples yields a linear least-squares problem. Let (Hb)i,k = ⟨gi, b k(xi)⟩, (H∇)i,ℓ = ⟨gi, ∇ϕℓ(xi)⟩,
+
+(H∆)i,ℓ = ∆ ϕℓ(xi), and define  Mψ = diag( ψ) H∆ with 
+
+ψ = { ψi }i. We then solve 
+
+min  
+
+> β,α,ζ
+
+Hbβ+H∇α+Mψ α−Rζ +s 22 + λcomp ∥α∥22 + R.
+
+(11) where  s = { si }i, λcomp  penalizes compressible flow, and 
+
+R collects additional convex regularizers. For Gaussian primitive state  γi(t) with velocities  ˙γi(t)
+
+and nonnegative masses  mi(t),             
+
+> min
+> β,α,ζ
+> X
+> i
+> X
+> k
+> βkbk(γi) + X
+> ℓ
+> αℓ∇ϕℓ(γi)−˙γi
+> 2
+> +
+> λm
+> X
+> i
+> 
+> ˙mi+mi
+> X
+> ℓ
+> αℓ∆ϕℓ(γi)−X
+> p
+> ζprp(γi)
+> 2
+> +
+> λcomp ∥α∥22+R.
+
+(12) This construction remains linear and convex, admits ef-ficient least-squares solvers, and provides explicit control over compressible transport and source expressivity. 8311 3.1.1. Physics-Guided Training Objectives 
+
+Training minimizes a weighted sum of complementary ob-jectives that couple the renderer with the projected fields. The projection gap enforces agreement between the net-work velocity vθ and the projected field ˜v,
+
+Lproj =
+
+> n
+
+X
+
+> i=1
+
+wi vθ (xi, t ) − ˜v(xi, t ) 22. (13) where wi denotes a per-sample weight. We stop gradients through ˜v and ˜q and apply the Danskin principle so that only 
+
+vθ receives gradients, 
+
+∇θ Lproj = X
+
+> i
+
+2wi (vθ − ˜v)⊤ ∂v θ
+
+∂θ . (14) where ˜q(x, t ) denotes the projected source–sink field ob-tained from the physics-based continuity projection, i.e., the effective rate of creation or loss of the transported signal that, together with the projected velocity ˜v, explains the ob-served spatio-temporal variations of ψt. A pixel wise con-tinuity consistency term penalizes violations of the source augmented transport law,            
+
+> LCE =P
+> i∂tψt(xi) + ∇ψt(xi)⊤˜v(xi, t ) + ψt(xi) ( ∇· ˜v)( xi, t )−˜q(xi, t )2
+> .
+
+(15) When trajectories and masses are available, a geometric term aligns projected motion and mass balance with obser-vations,                   
+
+> Lgeo =P
+> i˜v(γti, t )−˙γti
+> 2+λm
+> P
+> i
+>  ˙mti+mti(∇· ˜v)( γti, t )−˜q(γti, t )2.
+
+(16) 
+
+λm denotes a scalar hyperparameter. 
+
+3.2. Manifold and Contact Constraints on Implicit Surfaces 
+
+Implicit Surfaces and Normals Constraint manifolds are represented implicitly as ϕk(x, t ) = 0 , k = 1 , . . . , K . De-fine the unit normals nk = ∇ϕk/∥∇ ϕk∥, the tangent pro-jector PT,k = I − nkn⊤ 
+
+> k
+
+, and the surface normal speed 
+
+bk(x, t ) = −∂tϕk(x, t )/∥∇ ϕk(x, t )∥. When a tangential velocity is available, denote it by  u(t)surf ,k and set  usurf ,k =
+
+u(t)surf ,k + bknk. The active contact set at tolerance  ε > 0
+
+is A(x, t ) = { k : |ϕk(x, t )| ≤ ε }. For sticking at an image sample  xi, set  a = gi and stack the active normal constraints into  Au = b, one row per  n⊤ 
+
+> k
+
+u = bk with 
+
+bk = n⊤ 
+
+> k
+
+usurf ,k. The KKT system for the quadratic pro-jection  min u(a⊤u + si)2 subject to  Au = b is 
+
+2aa ⊤ A⊤
+
+A 0
+
+  u∗
+
+λ
+
+
+
+=
+
+−2a s i
+
+b
+
+
+
+. (17) which admits a closed-form solution for the projected ve-locity  u∗ and multipliers  λ. With unilateral constraints or Coulomb friction, the per-sample problem becomes a small quadratic program with linear and second-order cone con-straints. It is efficiently solved using proximal cone pro-jections and can be batched across samples. For each ac-tive contact k, we denote by Ck(x, t ) the local feasible set of velocities at (x, t ) induced by the corresponding con-tact model (e.g., sticking, non-penetration, or Coulomb friction). The pointwise feasible set is the intersection 
+
+C(x, t ) = T 
+
+> k∈A (x,t )
+
+Ck(x, t ).
+
+Multi-Contact Resolution At time  t, we estimate a con-strained velocity field at Gaussian primitive centers. The fit can be performed pointwise or by estimating a local affine field  u(x) = Ax + b over a neighborhood for additional smoothness. In 3D space, for a primitive at  xi = γti with target velocity  vtar  
+
+> i
+
+= ˙ γti , solve 
+
+u∗ 
+
+> i
+
+= arg min  
+
+> u
+
+∥u − vtar  
+
+> i
+
+∥2 s.t. u ∈ \
+
+> k∈A (xi,t )
+
+Ck. (18) where  A(xi, t ) is the active contact set and  Ck is the defined constraint sets, i.e., sticking, non-penetration, or frictional contact. For sticking constraints, if only the normal equal-ities  n⊤ 
+
+> k
+
+u = bk with  bk = n⊤ 
+
+> k
+
+usurf ,k  are enforced, stacking all active constraints yields  Au = b, with rows  n⊤ 
+
+> k
+
+. The orthogonal projection onto this affine subspace is 
+
+u∗ 
+
+> i
+
+= vtar  
+
+> i
+
+− A⊤(AA ⊤)−1(Av tar  
+
+> i
+
+− b). (19) For frictional contact, the per-point problem is a convex QP in inequality and Coulomb constraints. Using KKT condi-tions or Moreau’s decomposition gives explicit projections. Define the relative trial velocity to surface  k, ¯v = vtar  
+
+> i
+
+−
+
+usurf ,k , ¯vn = n⊤ 
+
+> k
+
+¯v, and  ¯vt = PT,k ¯v. Project the normal component to enforce non-penetration ˆvn = max(¯ vn, 0) .Then project onto the Coulomb cone with apex at  usurf ,k :
+
+˜vt =
+
+
+
+0, ∥¯vt∥ ≤ μk ˆvn (stick) ,μk ˆvn
+
+¯vt
+
+∥¯vt∥ , (slide) . (20) The projected velocity is 
+
+u∗ 
+
+> i
+
+= usurf ,k + ˆ vn nk + ˜ vt. (21) For multiple contacts, compute  u∗ 
+
+> i
+
+by solving the small QP with all constraints stacked, or by a short sequence of successive projections. Both yield the intersection of the per-contact feasible sets. To obtain smoother fields, fit 
+
+u(x) = Ax + b over a neighborhood of  xi via constrained least squares using the same per-sample contact constraints, which preserves linearity and remains efficient. 8312 We fit a local affine field  u(x) = Ax + b over a neigh-borhood  N using constrained least squares:                                   
+
+> min
+> A,b
+> X
+> xi∈N
+> Ax i+b−vtar
+> i
+> 2
+> s.t. ∀xi∈ N ,∀k∈ A (xi, t ) :
+> sticking: n⊤
+> k(Ax i+b) = n⊤
+> kusurf ,k ,
+> non-penetration: n⊤
+> k
+>  Ax i+b−usurf ,k
+> ≥0,
+> friction: PT,k
+>  Ax i+b−usurf ,k
+> ≤μkn⊤
+> k
+>  Ax i+b−usurf ,k
+> .
+
+(22) Equality-only instances reduce to linear systems and can be solved in batch via standard KKT or QR-based constrained least squares. For the 2D image plane, each sample  xi
+
+solves 
+
+min  
+
+> u
+
+si + g⊤ 
+
+> i
+
+u 2 s.t. u ∈ \
+
+> k∈A (xi,t )
+
+Ck. (23) For equality sticking at an image sample, set  a = gi and stack active normal constraints into  Au = b, one row per 
+
+n⊤ 
+
+> k
+
+u = bk with  bk = n⊤ 
+
+> k
+
+usurf ,k . When unilateral constraints or Coulomb friction are present, the per-sample problem be-comes a small quadratic program with linear and second-order cone constraints. It is efficiently solved with stan-dard SOCP solvers or proximal cone projections and can be batched across samples or neighborhoods. 
+
+Contact-Aware Prior Given samples {xi}ni=1 and pre-dicted velocities vi = vθ (xi, t ), we project velocity onto the admissible set C(xi, t ):
+
+u∗ 
+
+> i
+
+= Π C(xi,t )(vi) = arg min 
+
+> u∈Rd
+
+∥u − vi∥22 s.t. u ∈ C (xi, t ). (24) When the active constraints can be written as Au = b where each row encodes either n⊤ 
+
+> k
+
+u = bk or a tangential equality, the orthogonal projection admits the closed form 
+
+u∗ 
+
+> i
+
+= vi − A⊤ (AA ⊤)−1 Av i − b. (25) For unilateral non-penetration with a single inequality 
+
+n⊤u ≥ b, the projection is 
+
+u∗ 
+
+> i
+
+=
+
+
+
+vi, n⊤vi ≥ b, vi − b − n⊤vi
+
+∥n∥2 n, otherwise. 
+
+(26) For a single Coulomb friction cone, we project onto the second-order cone {(x, t ) : ∥x∥ ≤ μ t, t ≥ 0}. Let 
+
+x0 = PT,k 
+
+ vi − usurf ,k 
+
+, t0 = n⊤
+
+> k
+
+ vi − usurf ,k 
+
+. (27) The Euclidean projection (x∗, t ∗) is              
+
+> (x∗, t ∗) =
+> 
+> (x0, t 0),∥x0∥ ≤ μ t 0and t0≥0,
+> 12
+>  1 + μ t 0
+> ∥x0∥
+> x0,12μ
+>  ∥x0∥+μ t 0
+> 
+> ,otherwise.
+
+(28) and the projected velocity is 
+
+u∗ 
+
+> i
+
+= usurf ,k + x∗ + t∗nk. (29) With multiple active planes or cones, the per-point problem is a small SOCP. A few iterations of projections onto convex sets also work well in practice. To obtain a smoother field over a neighborhood N , we fit an affine model u∗(x) = 
+
+Ax + b via constrained weighted least squares:                                   
+
+> min
+> A,b
+> X
+> xi∈N
+> wi∥Ax i+b−vθ(xi, t )∥2
+> s.t. ∀xi∈ N ,∀k∈ A (xi, t ) :
+> n⊤
+> k(Ax i+b) = bk(sticking) ,n⊤
+> k(Ax i+b)≥bk(non-penetration) ,
+> PT,k
+>  Ax i+b−usurf ,k
+> ≤μkn⊤
+> k
+>  Ax i+b−usurf ,k
+> (friction) .
+
+(30) This objective is convex, decomposes across clusters for parallelism, and yields the local projection u∗(x) = Ax +b.
+
+Physics Consistent Objectives Let the projected velocity at sample  xi be  ˜v(xi, t ) = u∗ 
+
+> i
+
+. We penalize deviation of the network prediction  vθ from this projection via 
+
+Lproj =
+
+> n
+
+X
+
+> i=1
+
+wi vθ (xi, t ) − ˜v(xi, t ) 22. (31) In 3D, given estimated particle velocities  ˙γti , we enforce kinematic consistency with 
+
+Lvel geo = X
+
+> i
+
+˜v(γti , t ) − ˙γti
+
+> 22
+
+. (32) To encode contact, let  A(xi, t ) be the active set with surface normal  nk, tangent projector  PT,k , surface veloc-ity  usurf ,k, and friction coefficient  μk. We use soft penalties for non-penetration and Coulomb friction: 
+
+Lnopen = X
+
+> i
+
+X
+
+> k∈A (xi,t )
+
+ bk(xi, t ) − n⊤ 
+
+> k
+
+vθ (xi, t ) 2. (33)               
+
+> Lfric =X
+> i
+> X
+> k∈A (xi,t )
+> ∥PT,k
+>  vθ−usurf ,k
+> ∥ − μkn⊤
+> k
+>  vθ−usurf ,k
+>   2
+> +−n⊤
+> k
+>  vθ−usurf ,k
+>   + 2 
+> .
+
+(34) where  [a]+ = max( a, 0) . Our objectives align learning with the governing transport, mass-balance, and contact conditions while preserving a stable outer optimization. 
+
+## 4. Experiments 
+
+4.1. Experimental Settings 
+
+We run experiments on two standard dynamic-scene bench-marks. Plenoptic Video Dataset [32] includes six real scenes, each captured by 15–20 fixed cameras. For each 8313 Conference’17, July 2017, Washington, DC, USA       
+
+> Ground Truth Ours Deformable4DGS MixVoxels HyperReel
+> Figure 1: Qualitative Comparison on Plenoptic Video Dataset. Compared with prior work, our method recovers finer details of dynamic regions, e.g ., the magnified human parts, and renders sharper static regions, e.g ., the zoomed-in hook in row 3.
+
+Figure 2. Qualitative Comparison on Plenoptic Video Dataset . Our approach outperforms strong baselines by rendering physically plausible moving surfaces. 
+
+scene we train with 17–20 views and reserve one view for testing. All images are 1352 × 1014 pixels. From the first frame we build an SfM point cloud [47] and subsample it to fewer than 10 5 points to keep memory usage in check. With our lightweight 4D Gaussian splatting pipeline, high-quality novel views are achieved in about 14 ,000 optimiza-tion steps. D-NeRF [45] consists of eight monocular video sequences. For each sequence, we use 50–200 frames for training, 10–20 for validation, and 20 for testing; all frames are resized to 800 ×800 . The clips cover diverse capture set-tings. In training, we apply pruning every 8,000 steps and use a single ×2 upsampling for the multi-resolution Hex-Plane module R(i, j ), which is sufficient given the dataset’s simplicity. Optimization runs for 20 ,000 iterations, and we disable further 3D Gaussian growth after iteration 15 ,000 .Our implementation is built on PyTorch [42], and all exper-iments are executed on a single NVIDIA RTX 3090 GPU. 
+
+4.2. Results 
+
+Evaluation on Plenoptic Video Dataset. On the Plenoptic Video dataset, as shown in Table 1, our method attains the highest reconstruction quality among both NeRF-based and Gaussian-based baselines, reaching 33.84 dB PSNR, a mar-gin of roughly +3.0 dB over the strongest prior result. Be-yond fidelity, our approach is efficient: training completes in 35 minutes, which is about 5.4 × faster than K-Planes and over 15 × faster than HyperReel. At inference, the method sustains 120 FPS, exceeding RealTime4DGS by about  1.6×
+
+and substantially outpacing other baselines. Figure 2 further 
+
+Table 1. Quantitative Comparison on Plenoptic Video Dataset .We compare our approach with both NeRF-based and Gaussian-based methods. Our approach outperforms the baselines in PSNR. *: trained on 8 GPUs and tested only on the Flame Salmon scene.                                                            
+
+> Method PSNR ↑SSIM ↑LPIPS ↓Train ↓FPS ↑
+> DyNeRF [32]* 29.58 -0.08 1344 h 0.015 StreamRF [31] 28.16 0.85 0.31 79 min 8.50 HyperReel [1] 30.36 0.92 0.17 9 h 2.00 NeRFPlayer [50] 30.69 -0.11 6 h 0.05 K-Planes [15] 30.73 0.93 0.07 190 min 0.10 MixVoxels [59] 30.85 0.96 0.21 91 min 16.70 MSTH [58] 29.46 0.92 0.17 36 min 2.66 STG [35] 30.43 0.94 0.16 62min 27.51 RealTime4DGS [66] 29.95 0.92 0.16 8 h 72.80 Deformable4DGS [62] 28.42 0.92 0.17 72 min 39.93 Ours 33.84 0.965 0.07 35 min 120.00
+
+shows detailed rendering outputs, e.g ., the flowing coffee. Experimental results confirm favorable accuracy, with con-sistent gains in PSNR and a competitive perceptual score at substantially lower compute. 
+
+Evaluation on D-NeRF Dataset. On the D-NeRF bench-mark, as shown in the Table 2, our approach achieves a fa-vorable trade-off between computational efficiency and re-construction quality, attaining 35.24 dB PSNR, 0.99 SSIM, and 0.02 LPIPS. Relative to representative NeRF-style ap-proaches, the PSNR margins are substantial, for example, +2.37 dB over TiNeuVox and +4.17 dB over K-Planes, while training is fast and rendering throughput is orders of magnitude higher. Against recent Gaussian splatting base-lines, our method improves upon Deformable4DGS in both 8314 Table 2. Quantitative Comparison on D-NeRF Dataset . Our ap-proach surpasses both NeRF-based and Gaussian-based baselines in PSNR. 
+
+Method PSNR ↑ SSIM ↑ LPIPS ↓ Train ↓ FPS ↑
+
+D-NeRF [45] 29.17 0.95 0.07 24 h 0.13 TiNeuVox [13] 32.87 0.97 0.04 28 min 1.60 K-Planes [15] 31.07 0.97 0.02 54 min 1.20 FFDNeRF [22] 31.70 0.96 0.05 - < 1.20 MSTH [58] 30.40 0.97 0.05 9.80 min -V4D [16] 32.67 0.97 0.05 10.21 h 2.64 Deformable3DGS [65] 39.31 0.99 0.01 26 min 85.45 Deformable4DGS [62] 32.99 0.97 0.05 13 min 104.00 Ours 35.24 0.99 0.02 6 min 300.00 fidelity and speed, and matches the best reported percep-tual scores in the table. We note that Deformable3DGS reports a higher PSNR at the cost of slower training and inference, whereas our approach prioritizes interactive per-formance with competitive image quality. Experimental re-sults demonstrate that controlled compressibility, explicit source modeling, and contact-aware priors enable state-of-the-art efficiency with consistently strong rendering fidelity on D-NeRF. 
+
+4.3. Ablation Studies 
+
+Source-Aware Compressible Flow. As shown in Table 3, enabling only the source-aware compressible flow (Table 3 (b)) delivers a substantial accuracy gain over the baseline at essentially no extra cost. PSNR improves by 3.53 dB, while LPIPS decreases by 74%. This improvement stems from attributing intensity changes to divergence instead of forcing them to be explained by flow alone, the model sup-presses stretching and smearing artifacts, preserves high-frequency detail, and yields more temporally coherent re-constructions. Because the inner projection remains a lin-ear least-squares solve, the configuration maintains training stability and wall-clock efficiency. 
+
+Manifold and Contact Constrains. Enabling only mani-fold and contact constraints (Table 3 ( c)) improves recon-struction quality over the baseline at unchanged wall-clock cost. Our approach yields a +1.33 dB PSNR gain and 63% lower LPIPS. These gains stem from projecting predicted velocities onto the Gaussian primitive feasible set induced by non-penetration and frictional kinematics at implicit sur-faces, which curbs occlusions, sharpens boundaries, and promotes temporally consistent motion without introducing additional degrees of freedom. 
+
+Training Efficiency. To isolate the effect of the inner pro-jection strategy, we compare the Gaussian-primitive (GP) projection (Table 3 ( e)) with the local-linear (LL) field projection (Table 3 ( f )) under otherwise identical settings. The LL variant yields the strongest overall performance. By contrast, the GP strategy projects velocities per primi-tive, offering tight consistency but less cross primitive cou-
+
+Table 3. Ablation Study on the D-NeRF Dataset. GP represents the Gaussian-primitive level projection, LL represents the local-linear field projection.                                               
+
+> Ablation Items Overall Metrics (Avg.) ID Compressible Flow Contact Constrains GP LL PSNR ↑SSIM ↑LPIPS ↓time ↓
+> a28.97 0.90 0.19 16 min
+> b✓32.50 0.97 0.05 16 min
+> c✓30.30 0.95 0.07 16 min
+> d✓✓34.80 0.98 0.03 13 min
+> e✓✓✓35.00 0.99 0.03 8 min
+> f✓✓✓35.24 0.99 0.02 6 min Base w/o Contact Constrains
+> Full w/o Compressible Flow
+
+Figure 3. Qualitative Ablation Study. 
+
+pling, which leads to slightly higher perceptual error and longer training times. Both strategies preserve the linear in-ner solves and integrate cleanly with stop-gradient training, but the LL projection achieves a superior quality–efficiency trade-off. 
+
+## 5. Conclusion 
+
+We have presented a source-aware, compressible dynamic scene rendering framework, which addresses real-world motion rendering where incompressible, source-free as-sumptions fail. Our approach combines three complemen-tary parameterizations with a lightweight projection solver. We first decompose the velocity field into divergence-free and potential-flow components and represent the source term in a dedicated basis, capturing compressible behav-ior while separating true growth from divergence-induced concentration changes. Furthermore, we confine the com-pressible component to a prescribed subspace, ensuring volumetric change occurs only along controlled directions and improving identifiability. Third, we decouple rota-tion, trace-free strain, and isotropic scaling, yielding a low-parameter, robust approximation of local motion. Our ap-proach achieves high rendering fidelity and temporal co-herence with physically realistic motion, while maintaining competitive training and inference cost. 8315 References 
+
+[1] Benjamin Attal, Jia-Bin Huang, Christian Richardt, Michael Zollhoefer, Johannes Kopf, Matthew O’Toole, and Changil Kim. Hyperreel: High-fidelity 6-dof video with ray-conditioned sampling. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition ,pages 16610–16620, 2023. 3, 7 [2] Jonathan T Barron, Ben Mildenhall, Matthew Tancik, Peter Hedman, Ricardo Martin-Brualla, and Pratul P Srinivasan. Mip-nerf: A multiscale representation for anti-aliasing neu-ral radiance fields. In Proceedings of the IEEE/CVF Inter-national Conference on Computer Vision , pages 5855–5864, 2021. 2, 3 [3] Jonathan T Barron, Ben Mildenhall, Dor Verbin, Pratul P Srinivasan, and Peter Hedman. Mip-nerf 360: Unbounded anti-aliased neural radiance fields. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 5470–5479, 2022. 1 [4] Mojtaba Bemana, Karol Myszkowski, Jeppe Revall Frisvad, Hans-Peter Seidel, and Tobias Ritschel. Eikonal fields for refractive novel-view synthesis. In ACM SIGGRAPH 2022 Conference Proceedings , pages 1–9, 2022. 2, 3 [5] Michael Broxton, John Flynn, Ryan Overbeck, Daniel Erick-son, Peter Hedman, Matthew Duvall, Jason Dourgarian, Jay Busch, Matt Whalen, and Paul Debevec. Immersive light field video with a layered mesh representation. ACM Trans-actions on Graphics (TOG) , 39(4):86–1, 2020. 2 [6] Chris Buehler, Michael Bosse, Leonard McMillan, Steven Gortler, and Michael Cohen. Unstructured lumigraph ren-dering. ACM Transactions on Graphics (Proc. SIGGRAPH) ,2001. 2 [7] Ang Cao and Justin Johnson. Hexplane: A fast representa-tion for dynamic scenes. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition ,pages 130–141, 2023. 3 [8] Anpei Chen, Zexiang Xu, Andreas Geiger, Jingyi Yu, and Hao Su. Tensorf: Tensorial radiance fields. In European Conference on Computer Vision , pages 333–350. Springer, 2022. 3 [9] Alvaro Collet, Ming Chuang, Pat Sweeney, Don Gillett, Den-nis Evseev, David Calabrese, Hugues Hoppe, Adam Kirk, and Steve Sullivan. High-quality streamable free-viewpoint video. ACM Transactions on Graphics (ToG) , 34(4):1–13, 2015. 2, 3 [10] Paul E Debevec, Camillo J Taylor, and Jitendra Malik. Mod-eling and rendering architecture from photographs: A hybrid geometry-and image-based approach. ACM Transactions on Graphics (Proc. SIGGRAPH) , 1996. 2 [11] Yilun Du, Yinan Zhang, Hong-Xing Yu, Joshua B Tenen-baum, and Jiajun Wu. Neural radiance flow for 4d view synthesis and video processing. In 2021 IEEE/CVF In-ternational Conference on Computer Vision (ICCV) , pages 14304–14314. IEEE Computer Society, 2021. 3 [12] Yuanxing Duan, Fangyin Wei, Qiyu Dai, Yuhang He, Wen-zheng Chen, and Baoquan Chen. 4d-rotor gaussian splatting: Towards efficient novel view synthesis for dynamic scenes. In ACM SIGGRAPH 2024 Conference Papers , pages 1–11, 2024. 3 [13] Jiemin Fang, Taoran Yi, Xinggang Wang, Lingxi Xie, Xi-aopeng Zhang, Wenyu Liu, Matthias Nießner, and Qi Tian. Fast dynamic radiance fields with time-aware neural vox-els. In SIGGRAPH Asia 2022 Conference Papers , pages 1–9, 2022. 1, 3, 8 [14] John Flynn, Michael Broxton, Paul Debevec, Matthew Du-Vall, Graham Fyffe, Ryan Overbeck, Noah Snavely, and Richard Tucker. Deepview: View synthesis with learned gra-dient descent. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 2367– 2376, 2019. 2 [15] Sara Fridovich-Keil, Giacomo Meanti, Frederik Rahbæk Warburg, Benjamin Recht, and Angjoo Kanazawa. K-planes: Explicit radiance fields in space, time, and appearance. In 
+
+Proceedings of the IEEE/CVF Conference on Computer Vi-sion and Pattern Recognition , pages 12479–12488, 2023. 3, 7, 8 [16] Wanshui Gan, Hongbin Xu, Yi Huang, Shifeng Chen, and Naoto Yokoya. V4d: Voxel for 4d novel view synthesis. 
+
+IEEE Transactions on Visualization and Computer Graph-ics , 2023. 3, 8 [17] Chen Gao, Ayush Saraf, Johannes Kopf, and Jia-Bin Huang. Dynamic view synthesis from dynamic monocular video. In 
+
+Proceedings of the IEEE/CVF International Conference on Computer Vision , pages 5712–5721, 2021. 3 [18] Xiangjun Gao, Jiaolong Yang, Jongyoo Kim, Sida Peng, Zicheng Liu, and Xin Tong. Mps-nerf: Generalizable 3d hu-man rendering from multiview images. IEEE Transactions on Pattern Analysis and Machine Intelligence , 2022. 3 [19] Steven J. Gortler, Radek Grzeszczuk, Richard Szeliski, and Michael F. Cohen. The lumigraph. ACM Transactions on Graphics (Proc. SIGGRAPH) , 1996. 2 [20] Kaiwen Guo, Feng Xu, Yangang Wang, Yebin Liu, and Qionghai Dai. Robust non-rigid motion tracking and sur-face reconstruction using l0 regularization. In Proceedings of the IEEE International Conference on Computer Vision ,pages 3083–3091, 2015. 2 [21] Kaiwen Guo, Peter Lincoln, Philip Davidson, Jay Busch, Xueming Yu, Matt Whalen, Geoff Harvey, Sergio Orts-Escolano, Rohit Pandey, Jason Dourgarian, et al. The re-lightables: Volumetric performance capture of humans with realistic relighting. ACM Transactions on Graphics (ToG) ,38(6):1–19, 2019. 2 [22] Xiang Guo, Jiadai Sun, Yuchao Dai, Guanying Chen, Xiao-qing Ye, Xiao Tan, Errui Ding, Yumeng Zhang, and Jingdong Wang. Forward flow for novel view synthesis of dynamic scenes. In Proceedings of the IEEE/CVF International Con-ference on Computer Vision , pages 16022–16033, 2023. 3, 8[23] Tao Hu, Tao Yu, Zerong Zheng, He Zhang, Yebin Liu, and Matthias Zwicker. Hvtr: Hybrid volumetric-textural render-ing for human avatars. In 2022 International Conference on 3D Vision (3DV) , pages 197–208. IEEE, 2022. 2 [24] Yi-Hua Huang, Yang-Tian Sun, Ziyi Yang, Xiaoyang Lyu, Yan-Pei Cao, and Xiaojuan Qi. Sc-gs: Sparse-controlled 8316 gaussian splatting for editable dynamic scenes. In Proceed-ings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 4220–4230, 2024. 3 [25] Takeo Kanade, Peter Rander, and PJ Narayanan. Virtualized reality: Constructing virtual worlds from real scenes. IEEE multimedia , 4(1):34–47, 1997. 3 [26] Bernhard Kerbl, Georgios Kopanas, Thomas Leimk¨ uhler, and George Drettakis. 3d gaussian splatting for real-time radiance field rendering. ACM Transactions on Graphics (ToG) , 42(4):1–14, 2023. 1, 3 [27] Georgios Kopanas, Thomas Leimk¨ uhler, Gilles Rainer, Cl´ ement Jambon, and George Drettakis. Neural point cata-caustics for novel-view synthesis of reflections. ACM Trans-actions on Graphics (TOG) , 41(6):1–15, 2022. 2, 3 [28] Kiriakos N Kutulakos and Steven M Seitz. A theory of shape by space carving. International journal of computer vision ,38:199–218, 2000. 2 [29] Marc Levoy and Pat Hanrahan. Light field rendering. ACM Transactions on Graphics (Proc. SIGGRAPH) , 1996. 2 [30] Hao Li, Linjie Luo, Daniel Vlasic, Pieter Peers, Jovan Popovi´ c, Mark Pauly, and Szymon Rusinkiewicz. Tempo-rally coherent completion of dynamic shapes. ACM Trans-actions on Graphics (TOG) , 31(1):1–11, 2012. 3 [31] Lingzhi Li, Zhen Shen, Zhongshu Wang, Li Shen, and Ping Tan. Streaming radiance fields for 3d video synthe-sis. Advances in Neural Information Processing Systems , 35: 13485–13498, 2022. 3, 7 [32] Tianye Li, Mira Slavcheva, Michael Zollhoefer, Simon Green, Christoph Lassner, Changil Kim, Tanner Schmidt, Steven Lovegrove, Michael Goesele, Richard Newcombe, et al. Neural 3d video synthesis from multi-view video. In 
+
+Proceedings of the IEEE/CVF Conference on Computer Vi-sion and Pattern Recognition , pages 5521–5531, 2022. 1, 3, 6, 7 [33] Zhong Li, Yu Ji, Wei Yang, Jinwei Ye, and Jingyi Yu. Ro-bust 3d human motion reconstruction via dynamic template construction. In 2017 International Conference on 3D Vision (3DV) , pages 496–505. IEEE, 2017. 2 [34] Zhong Li, Minye Wu, Wangyiteng Zhou, and Jingyi Yu. 4d human body correspondences from panoramic depth maps. In Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition , pages 2877–2886, 2018. 2 [35] Zhan Li, Zhang Chen, Zhong Li, and Yi Xu. Spacetime gaus-sian feature splatting for real-time dynamic view synthesis. 
+
+arXiv preprint arXiv:2312.16812 , 2023. 3, 7 [36] Haotong Lin, Sida Peng, Zhen Xu, Tao Xie, Xingyi He, Hu-jun Bao, and Xiaowei Zhou. High-fidelity and real-time novel view synthesis for dynamic scenes. In SIGGRAPH Asia Conference Proceedings , 2023. 3 [37] Ben Mildenhall, Pratul P Srinivasan, Rodrigo Ortiz-Cayon, Nima Khademi Kalantari, Ravi Ramamoorthi, Ren Ng, and Abhishek Kar. Local light field fusion: Practical view syn-thesis with prescriptive sampling guidelines. ACM Transac-tions on Graphics (TOG) , 38(4):1–14, 2019. 2 [38] B Mildenhall, PP Srinivasan, M Tancik, JT Barron, R Ra-mamoorthi, and R Ng. Nerf: Representing scenes as neural radiance fields for view synthesis. In European conference on computer vision , 2020. 3 [39] Ben Mildenhall, Pratul P Srinivasan, Matthew Tancik, Jonathan T Barron, Ravi Ramamoorthi, and Ren Ng. Nerf: Representing scenes as neural radiance fields for view syn-thesis. Communications of the ACM , 65(1):99–106, 2021. 1, 3[40] Keunhong Park, Utkarsh Sinha, Jonathan T Barron, Sofien Bouaziz, Dan B Goldman, Steven M Seitz, and Ricardo Martin-Brualla. Nerfies: Deformable neural radiance fields. In Proceedings of the IEEE/CVF International Conference on Computer Vision , pages 5865–5874, 2021. 3 [41] Keunhong Park, Utkarsh Sinha, Peter Hedman, Jonathan T Barron, Sofien Bouaziz, Dan B Goldman, Ricardo Martin-Brualla, and Steven M Seitz. Hypernerf: A higher-dimensional representation for topologically varying neural radiance fields. ACM Transactions on Graphics (TOG) , 40 (6):1–12, 2021. 1, 3 [42] Adam Paszke, Sam Gross, Francisco Massa, Adam Lerer, James Bradbury, Gregory Chanan, Trevor Killeen, Zeming Lin, Natalia Gimelshein, Luca Antiga, et al. Pytorch: An imperative style, high-performance deep learning library. In 
+
+Advances in neural information processing systems , 2019. 7 [43] Sida Peng, Yunzhi Yan, Qing Shuai, Hujun Bao, and Xi-aowei Zhou. Representing volumetric videos as dynamic mlp maps. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 4252– 4262, 2023. 3 [44] Eric Penner and Li Zhang. Soft 3d reconstruction for view synthesis. ACM Transactions on Graphics (TOG) , 36(6):1– 11, 2017. 2 [45] Albert Pumarola, Enric Corona, Gerard Pons-Moll, and Francesc Moreno-Noguer. D-nerf: Neural radiance fields for dynamic scenes. In Proceedings of the IEEE/CVF Con-ference on Computer Vision and Pattern Recognition , pages 10318–10327, 2021. 1, 3, 7, 8 [46] Gernot Riegler and Vladlen Koltun. Free view synthesis. In 
+
+European Conference on Computer Vision , pages 623–640, 2020. 2 [47] Johannes L Schonberger and Jan-Michael Frahm. Structure-from-motion revisited. In Proceedings of the IEEE con-ference on computer vision and pattern recognition , pages 4104–4113, 2016. 7 [48] Steven M Seitz and Charles R Dyer. Photorealistic scene reconstruction by voxel coloring. International Journal of Computer Vision , 35:151–173, 1999. 2 [49] Ruizhi Shao, Zerong Zheng, Hanzhang Tu, Boning Liu, Hongwen Zhang, and Yebin Liu. Tensor4d: Efficient neural 4d decomposition for high-fidelity dynamic reconstruction and rendering. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 16632– 16642, 2023. 3 [50] Liangchen Song, Anpei Chen, Zhong Li, Zhang Chen, Lele Chen, Junsong Yuan, Yi Xu, and Andreas Geiger. Nerf-player: A streamable dynamic scene representation with de-composed neural radiance fields. IEEE Transactions on Visu-alization and Computer Graphics , 29(5):2732–2742, 2023. 1, 3, 7 [51] Pratul P Srinivasan, Richard Tucker, Jonathan T Barron, Ravi Ramamoorthi, Ren Ng, and Noah Snavely. Pushing the 8317 boundaries of view extrapolation with multiplane images. In 
+
+Proceedings of the IEEE/CVF Conference on Computer Vi-sion and Pattern Recognition , pages 175–184, 2019. 2 [52] Zhuo Su, Lan Xu, Zerong Zheng, Tao Yu, Yebin Liu, and Lu Fang. Robustfusion: Human volumetric capture with data-driven visual cues using a rgbd camera. In Computer Vision– ECCV 2020: 16th European Conference, Glasgow, UK, Au-gust 23–28, 2020, Proceedings, Part IV 16 , pages 246–264. Springer, 2020. 2 [53] Justus Thies, Michael Zollh¨ ofer, and Matthias Nießner. De-ferred neural rendering: Image synthesis using neural tex-tures. Acm Transactions on Graphics (TOG) , 38(4):1–12, 2019. 2 [54] Fengrui Tian, Shaoyi Du, and Yueqi Duan. Monon-erf: Learning a generalizable dynamic radiance field from monocular videos. In Proceedings of the IEEE/CVF Interna-tional Conference on Computer Vision , pages 17903–17913, 2023. 3 [55] Edith Tretschk, Ayush Tewari, Vladislav Golyanik, Michael Zollh¨ ofer, Christoph Lassner, and Christian Theobalt. Non-rigid neural radiance fields: Reconstruction and novel view synthesis of a dynamic scene from monocular video. In 
+
+Proceedings of the IEEE/CVF International Conference on Computer Vision , pages 12959–12970, 2021. 1, 3 [56] Dor Verbin, Peter Hedman, Ben Mildenhall, Todd Zickler, Jonathan T Barron, and Pratul P Srinivasan. Ref-nerf: Struc-tured view-dependent appearance for neural radiance fields. In 2022 IEEE/CVF Conference on Computer Vision and Pat-tern Recognition (CVPR) , pages 5481–5490. IEEE, 2022. 3 [57] Michael Waechter, Nils Moehrle, and Michael Goesele. Let there be color! large-scale texturing of 3d reconstructions. In 
+
+European Conference on Computer Vision , pages 836–850. Springer, 2014. 2 [58] Feng Wang, Zilong Chen, Guokang Wang, Yafei Song, and Huaping Liu. Masked space-time hash encoding for efficient dynamic scene reconstruction. Advances in neural informa-tion processing systems , 2023. 7, 8 [59] Feng Wang, Sinan Tan, Xinghang Li, Zeyue Tian, Yafei Song, and Huaping Liu. Mixed neural voxels for fast multi-view video synthesis. In Proceedings of the IEEE/CVF In-ternational Conference on Computer Vision , pages 19706– 19716, 2023. 3, 7 [60] Yiming Wang, Qin Han, Marc Habermann, Kostas Dani-ilidis, Christian Theobalt, and Lingjie Liu. Neus2: Fast learning of neural implicit surfaces for multi-view recon-struction. In Proceedings of the IEEE/CVF International Conference on Computer Vision , pages 3295–3306, 2023. 3 [61] Daniel N Wood, Daniel I Azuma, Ken Aldinger, Brian Cur-less, Tom Duchamp, David H Salesin, and Werner Stuetzle. Surface light fields for 3d photography. In Seminal Graphics Papers: Pushing the Boundaries, Volume 2 , pages 487–496. 2023. 2 [62] Guanjun Wu, Taoran Yi, Jiemin Fang, Lingxi Xie, Xiaopeng Zhang, Wei Wei, Wenyu Liu, Qi Tian, and Xinggang Wang. 4d gaussian splatting for real-time dynamic scene rendering. 
+
+arXiv preprint arXiv:2310.08528 , 2023. 3, 7, 8 [63] Qingshan Xu, Weihang Kong, Wenbing Tao, and Marc Polle-feys. Multi-scale geometric consistency guided and planar prior assisted multi-view stereo. IEEE Transactions on Pat-tern Analysis and Machine Intelligence , 45(4):4945–4963, 2022. 3 [64] Zhiwen Yan, Chen Li, and Gim Hee Lee. Nerf-ds: Neural ra-diance fields for dynamic specular objects. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , pages 8285–8295, 2023. 3 [65] Ziyi Yang, Xinyu Gao, Wen Zhou, Shaohui Jiao, Yuqing Zhang, and Xiaogang Jin. Deformable 3d gaussians for high-fidelity monocular dynamic scene reconstruction. arXiv preprint arXiv:2309.13101 , 2023. 3, 8 [66] Zeyu Yang, Hongye Yang, Zijie Pan, Xiatian Zhu, and Li Zhang. Real-time photorealistic dynamic scene represen-tation and rendering with 4d gaussian splatting. In Inter-national Conference on Learning Representations (ICLR) ,2024. 3, 7 [67] Kai Zhang, Gernot Riegler, Noah Snavely, and Vladlen Koltun. Nerf++: Analyzing and improving neural radiance fields. arXiv preprint arXiv:2010.07492 , 2020. 3 [68] Tinghui Zhou, Richard Tucker, John Flynn, Graham Fyffe, and Noah Snavely. Stereo magnification. ACM Transactions on Graphics , 37(4):1–12, 2018. 2 [69] C Lawrence Zitnick, Sing Bing Kang, Matthew Uyttendaele, Simon Winder, and Richard Szeliski. High-quality video view interpolation using a layered representation. ACM transactions on graphics (TOG) , 23(3):600–608, 2004. 3 8318

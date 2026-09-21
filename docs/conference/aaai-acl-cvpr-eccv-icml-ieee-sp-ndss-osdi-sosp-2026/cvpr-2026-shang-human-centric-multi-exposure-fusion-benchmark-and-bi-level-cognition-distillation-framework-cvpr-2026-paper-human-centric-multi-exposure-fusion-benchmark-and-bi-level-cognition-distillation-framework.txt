@@ -1,0 +1,1280 @@
+Human-Centric Multi-Exposure Fusion:
+Benchmark and Bi-level Cognition Distillation Framework
+Jingjie Shang1,∗, Tengyu Ma2,∗, Heng Zhang2, Jinyuan Liu2,†, Risheng Liu2, Yuan Wang1,†, Xiaochen Bo1,†
+1School of Integrated Circuits, Peking University
+2School of Software Engineering, Dalian University of Technology
+shangjingjie@stu.pku.edu.cn, {tyma0913, zhangheng1429}@gmail.com
+atlantis918@hotmail.com, rsliu@dlut.edu.cn, wangyuan@pku.edu.cn, boxiaoc@163.com
+Ours
+CCF
+Retinex-MEF
+HoLoCo
+GITNet
+Input
+(a) Overview of the proposed method
+(c) Quantitative comparison
+(b) Qualitative comparison
+CCF
+HoLoCo
+Cognition
+Distillation 
+Bi-level optimization
+Bi-level optimization
+Mental Integrated
+Transformer
+GIFNet
+Ours
+Retinex-MEF
+Figure 1. Overview of our proposed method and comprehensive evaluation.
+Abstract
+Multi-Exposure Fusion (MEF) aims to generate a high-
+quality image from multiple inputs captured at different
+exposure levels. Although recent methods have achieved
+promising results, most rely on statistical metrics that do
+not adequately reflect human perceptual preferences. Elec-
+troencephalography (EEG) provides a direct physiological
+signal of human cognitive responses, but its use in low-level
+vision is limited by scarce paired data and the absence of
+bio-signals at inference time.
+In this paper, we address
+these limitations from both data and method perspectives.
+We introduce Cog-Expo, the first dataset of human cognitive
+responses to multi-exposure stimuli, which connects neuro-
+science and computational photography. We then propose
+a bi-level coupled learning framework that uses cognitive
+information during training but requires only image inputs
+during inference. Specifically, a Mental Integrated Trans-
+former serves as the Teacher to learn visual representa-
+tions guided by cognitive priors, while a lightweight Stu-
+dent is trained to approximate such guidance from image
+inputs. Through bi-level optimization, the Teacher learns
+representations amenable to distillation, enabling the Stu-
+dent to recover cognitive guidance efficiently. Extensive ex-
+∗Equal contribution.
+† Corresponding author
+periments show that the proposed method achieves state-
+of-the-art performance on MEF benchmarks and produces
+results consistent with human perception.
+1. Introduction
+Multi-Exposure Fusion (MEF) is a fundamental task in
+computational photography that aims to synthesize a single
+high-dynamic-range image from multiple inputs captured
+at different exposure levels. The primary goal of MEF is
+to produce fused images that are visually consistent with
+human perception. Although both hand-crafted and deep
+learning-based methods have achieved substantial progress,
+most existing approaches still depend on statistical metrics
+or pixel-level reconstruction losses [22, 23]. Such optimiza-
+tion objectives are convenient for training, but they do not
+adequately reflect human perceptual preferences. In partic-
+ular, they often fail to capture subtle perceptual factors such
+as visual comfort, artifact tolerance, and saliency, which
+are closely related to the inherent properties of the Human
+Visual System (HVS). This limitation highlights the need
+to incorporate authentic human cognitive feedback into the
+image fusion process.
+Recent advances in high-throughput electroencephalog-
+raphy (EEG) provide a potential way to introduce human
+This CVPR paper is the Open Access version, provided by the Computer Vision Foundation.
+Except for this watermark, it is identical to the accepted version;
+the final published version of the proceedings is available on IEEE Xplore.
+26572
+
+
+cognitive feedback into MEF. EEG offers direct and time-
+resolved measurements of neural activity, making it pos-
+sible to observe how the brain responds to visual stim-
+uli with millisecond-level precision [8, 34]. Unlike sub-
+jective ratings, EEG provides objective physiological evi-
+dence of perception, which makes it particularly suitable
+for modeling fine-grained perceptual preferences.
+How-
+ever, its application to low-level vision tasks such as MEF
+still faces two major obstacles. First, existing EEG-vision
+datasets [9, 10, 15] mainly target high-level recognition
+tasks and do not include exposure-varying stimuli. Conse-
+quently, there is still no dataset that establishes a connection
+between EEG signals and multi-exposure image sequences.
+Second, although EEG can provide valuable cognitive pri-
+ors during training, the corresponding signals cannot be col-
+lected during inference. Therefore, a central challenge is
+how to leverage EEG-based cognitive guidance in training
+while preserving an image-only inference pipeline.
+To address these limitations, we make two main con-
+tributions. First, we construct Cog-Expo, the first EEG-
+based cognitive dataset designed for MEF. Built on the
+SICE benchmark [5], this dataset covers diverse exposure
+subcategories. EEG signals were collected from ten par-
+ticipants while they viewed images with different exposure
+levels, resulting in 10,800 high-quality samples. Each stim-
+ulus was presented for 1000 milliseconds and recorded at
+1000 Hz to capture the fine-grained temporal dynamics of
+visual cognition. We applied minimal preprocessing to pre-
+serve the original neural information and to provide a re-
+liable foundation for data-driven cognitive guidance. Sec-
+ond, we propose a Bi-level Optimization (BLO) framework
+with a Teacher–Student architecture. The Teacher, termed
+the Mental Integrated Transformer, learns fusion strategies
+under the guidance of EEG signals and models perceptual
+cues preferred by humans. The Student is a image-only net-
+work that is jointly trained through BLO to approximate the
+cognitive supervision provided by the Teacher. Rather than
+using a separate two-stage distillation procedure, the cou-
+pled optimization process encourages the Teacher to learn
+representations that are naturally distillable. This design al-
+lows the Student to emulate cognitive guidance effectively
+while maintaining an EEG-free inference process. To sum-
+marize, our main contributions are as follows:
+• We construct Cog-Expo, the first EEG-based dataset
+for investigating human cognitive responses in multi-
+exposure image processing, bridging neuroscience and
+low-level vision for cognition-aware MEF.
+• A novel Bi-level Optimization framework is proposed to
+transfer cognitive guidance from a privileged Teacher to
+an EEG-free Student, allowing human-aligned learning
+during training and image-only inference.
+• The Mental Integrated Transformer is devised to explic-
+itly guide visual feature extraction with cognitive priors
+through a spatial-cognitive cross-attention mechanism.
+• Extensive experiments show that the proposed method
+achieves superior performance and produces results that
+are more consistent with human visual perception.
+2. Related Works
+2.1. Multi-Exposure Fusion
+Multi-exposure image fusion (MEF) aims to generate a vi-
+sually enhanced image by integrating complementary in-
+formation from inputs captured at different exposure lev-
+els. Early methods mainly relied on hand-crafted priors and
+multi-scale representations [1, 17, 19, 20, 38]. With the de-
+velopment of deep learning, data-driven MEF methods have
+achieved substantial progress. DeepFuse [33] introduced
+an unsupervised CNN that learns luminance and chromi-
+nance fusion from unpaired data, while MEF-GAN [44]
+employed adversarial learning to produce sharper textures
+and richer details. More recently, Transformer-based frame-
+works have further improved global consistency by model-
+ing long-range dependencies [26, 32, 35, 39]. Despite these
+advances, existing methods remain vulnerable to motion
+misalignment, extreme exposure variation, and content-
+dependent degradation. More importantly, they rely exclu-
+sively on visual priors [37, 46] and largely ignore cogni-
+tive cues, such as perceptual attention and neural feedback,
+which may provide additional guidance for exposure selec-
+tion and structural preservation.
+2.2. Cognition Information Utilization
+In recent years, human cognitive information has received
+increasing attention with the development of advanced
+neuro-observation technologies. The human cognitive sys-
+tem processes visual information efficiently and exhibits
+strong robustness across diverse environments. These prop-
+erties differ substantially from those of conventional com-
+puter vision methods and may offer complementary advan-
+tages for visual information processing. In particular, event-
+related potential (ERP) components in EEG signals, such as
+P300, are closely associated with attentional allocation and
+decision-making. Prior studies have shown that such signals
+are involved in high-level cognitive functions, including ob-
+ject recognition [3, 21], visual attention regulation [27], and
+scene understanding [45, 48]. Some studies have further at-
+tempted to directly decode cognitive information into visual
+content by reconstructing presented stimuli [10, 15, 18].
+In addition, cognitive responses have been used as objec-
+tive indicators of perceptual experience in subjective visual
+quality assessment [12]. However, these studies generally
+integrate cognitive signals through a brain–machine loop
+and still depend on raw cognitive signals. As a result, they
+do not enable a more general paradigm in which cognitive
+capabilities can be transferred into vision models without
+26573
+
+
+Preparation
+Information Collection
+Pre-experiment Practice
+EEG Record
+0.5s
+1s
+Blank Screen
+Under-Exposure
+Normal
+Blank Screen
+Blank Screen
+Over-Exposure
+Block 1
+Block 2
+Block 3
+…
+Block 120
+Section 2
+Ques
+-tion
+Section 1
+Rest
+Section 3
+0.5s
+0.5s
+1s
+1s
+Rest
+Image Stimuli 
+EEG Cap
+Amplifier
+One Block
+One 
+Section
+One 
+Participant
+Figure 2. The construction process of the Cog-Expo dataset.
+requiring cognitive signals during deployment.
+3. Cog-Expo Dataset
+3.1. Participants
+Ten healthy adult participants were recruited for this study
+from the undergraduate student population, including 8
+males and 2 females, with a mean age of 22.3 years (SD
+= 1.68). All participants reported normal or corrected-to-
+normal vision. Written informed consent was obtained from
+all participants after a full explanation of the experimental
+procedures, and monetary compensation was provided. The
+study procedure was reviewed and approved by the Institu-
+tional Ethics Committee.
+3.2. Experimental paradigm
+Preparation. To strengthen the cognitive characteristics of
+the dataset, we collected participant information and pro-
+vided pre-experiment practice. We collected basic personal
+information, including handedness, recent sleep status, re-
+cent emotional state. Our procedure required participants
+to sensitively attend to different exposure regions and their
+semantic content within them, engaging higher-level cog-
+nitive processing. Participants were informed of their at-
+tentional tasks and completed a 30-minute practice session
+before the formal recording. The practice images were dis-
+tinct from those used in the formal recording.
+Stimuli. The multi-exposure image stimuli were obtained
+from the SICE dataset [5], which contains 360 image groups
+with multiple exposure levels and a normal-reference im-
+age. For each group, the highest-, lowest-, and normal-
+exposure images were selected to form a stimulus block,
+enhancing cognitive responses to exposure variation and en-
+abling assessment under extreme conditions. In total, 306
+groups were used for training and 44 for validation.
+Recording Process.
+The experiment followed a design
+similar to the rapid serial visual presentation (RSVP)
+paradigm, but with longer presentation times for each im-
+age to emphasize the visual-cognitive processing. As illus-
+trated in Fig. 2, participants were seated approximately 57
+cm from the screen, with a visual angle of about 10 de-
+grees. A fixation cross was superimposed at the center of
+each image to assist participants in maintaining their gaze,
+enhancing attention and engagement. We used Psychtool-
+box [4] to control stimulus presentation and recorded EEG
+data throughout the experiment. At the beginning and end
+of the recording, we collected five minutes of resting-state
+data. Within a block, a blank screen with a fixation cross
+preceded the stimuli, which were shown sequentially as un-
+derexposed, normal, and overexposed images for 1 second
+per image, separated by 0.5 s blank screens. After every
+three blocks, participants answered whether the main object
+remained recognizable under extreme exposure, encourag-
+ing them to actively focus on cognitive-semantic informa-
+tion. After 120 blocks, a session was completed, followed
+by a triggered extended rest. The entire data collection re-
+quired 3 sessions, and all 10 participants completed four
+identical experimental rounds, resulting in 10 datasets.
+3.3. Equipment and Preprocessing
+EEG data were recorded using a Neuracle NSW364 EEG
+acquisition system (Neuracle, China), equipped with a
+standard 10–20 electrode cap containing 64 channels and
+a high-resolution amplifier.
+The electrodes were made
+of powder-sintered material with antioxidant properties to
+minimize signal drift during extended sessions. During data
+acquisition, electrode impedance was maintained below 18
+kΩ, and the sampling rate was set to 1 kHz. After recording,
+offline preprocessing was conducted using pyedflib [11]. To
+preserve the integrity of the original signals, only EMG and
+EOG artifacts were removed, with a 50 Hz notch filter, and
+channels with poor signal quality were excluded.
+4. The Proposed Method
+This section presents our framework for utilizing human
+cognitive signals to guide multi-exposure fusion. We for-
+mulate the problem as a bi-level optimization, coupling a
+cognition-guided Teacher with an LDR-only Student. Un-
+like previous two-stage approaches, this coupled formula-
+tion ensures that the Teacher produces knowledge that is
+inherently distillable, bridging the gap between training-
+time privileged information and inference-time constraints.
+We first introduce the preliminaries and the EEG-as-a-prior
+mechanism. We then detail the bi-level formulation, the ar-
+chitecture of the proposed Mental Integrated Transformer,
+and the specific objective functions used to align perceptual
+feedback with image reconstruction.
+4.1. Preliminaries
+Given a sequence of K low-dynamic-range (LDR) images
+I = {I1, . . . , IK} captured at varying exposure levels, the
+26574
+
+
+(a) Bilevel Formulation
+Upper Level
+Lower Level
+Cognitive Prior Embedding
+Cognitive-Guided Distillation
+(b) Distillation Framework
+(c) Prior-Guided Attention
+EEG Signal
+Under Exposure Over Exposure
+EEG Signal
+Normal
+Privilege 
+Information
+Teacher
+Student
+Prior learning
+Visual Prior Extraction
+Norm
+Norm
+Norm
+Linear
+Linear
+Linear
+SoftMax
+Q
+K
+V
+Linear
+Cognition/Visual Prior
+Residual 
+Connection
+Matrix Multiplication
+Element-wise Add
+Reshape
+Reshape
+Feature
+Figure 3. The overall architecture of the proposed framework, detailing its cognition injection and finetune procedures.
+goal of MEF is to synthesize a single high-dynamic-range
+image IF that preserves optimal details and texture. For-
+mally, IF = F(I; θ), where F is the fusion network pa-
+rameterized by θ. Regarding the cognitive guidance, raw
+EEG signals Eraw capture the human subject’s perceptual
+response to visual stimuli. In our framework, we treat these
+signals as a cognitive prior to condition the fusion pro-
+cess. Since raw EEG is high-dimensional and noisy, we
+employ a learnable EEG Encoder, EEEG (implemented as a
+lightweight 1D-CNN-Transformer hybrid), to project Eraw
+into a compact latent cognitive token E ∈RD. Instead
+of pre-training a separate embedding space, we integrate
+EEEG directly into the Teacher network, allowing the cog-
+nitive representation to be optimized end-to-end for the fu-
+sion task via cross-attention mechanisms.
+4.2. Bi-level Optimization Formulation
+The main challenge in leveraging EEG is that it is avail-
+able during training but unavailable during inference. To
+address this issue, we adopt a teacher–student distillation
+framework, where the Teacher is guided by EEG signals and
+the Student relies only on visual inputs. However, standard
+two-stage distillation is not ideal in this setting, because
+a fixed Teacher may learn representations that are difficult
+for the Student to imitate. We therefore propose a coupled
+learning framework formulated as a Bi-level Optimization
+problem. This joint optimization encourages the Teacher to
+learn representations that are more distillable, allowing the
+Student to absorb cognitive guidance more effectively.
+The Teacher defines the lower-level problem, optimizing
+its parameters θT utilizing both the LDR images I and the
+projected EEG prior E. Crucially, we formulate the lower-
+level objective as dependent on the Student’s parameters θS,
+denoted as LLower(θT , θS). This formulation implies that
+the Teacher’s optimization is conditioned on the Student’s
+current state. The Student constitutes the upper-level prob-
+lem, optimizing its parameters θS using only LDR images I
+to mimic the optimal Teacher T(·; θ∗
+T ). We denote the Stu-
+dent’s output as IS
+F = S(I; θS) and the optimal Teacher’s
+output as IT ∗
+F
+= T(I, E; θ∗
+T ). Our complete BLO formula-
+tion combines these nested objectives:
+min
+θS
+LUpper(θS, θ∗
+T )
+s.t.
+θ∗
+T = arg min
+θT LLower(θT , θS)
+(1)
+Note that θS is explicitly included in the lower-level con-
+straint to capture the coupled nature of the system. It serves
+as a dynamic context that reflects the current capacity of
+the Student. Therefore, the optimal Teacher is not static but
+evolves during training to maintain a representation space
+that remains accessible and distillable to the Student.
+4.3. Cognitional Sensitive Solution
+This section outlines the objective functions and optimiza-
+tion strategy for the proposed bi-level framework. The goal
+is to ensure high-fidelity fusion while distilling cognition-
+guided knowledge from the Teacher to the Student. To pre-
+serve structural and perceptual fidelity, we apply a recon-
+struction loss to both networks:
+Lrecon(IF , IGT ) = |IF −IGT |1
+(2)
+The distillation loss transfers privileged knowledge from
+the Teacher to the Student through pixel- and feature-level
+supervision:
+LDistill = |IS
+F −sg(IT ∗
+F )|1 + β
+X
+l|ϕl
+S −sg(ϕl
+T )|2
+2 (3)
+where β is a weighting factor and sg(·) denotes stop-
+gradient, ensuring stable upper-level updates. The nested
+bi-level objective (Eq. 1) is optimized using Alternating
+Gradient Descent (A-GD), which iteratively updates the
+Teacher and Student within a unified training loop.
+26575
+
+
+Table 1. Quantitative comparison with state-of-the-art methods on SICE and MEF-LUT benchmark datasets with reference images (GT).
+The symbols ↑and ↓indicate whether higher or lower is better. We highlight the best , second-best results.
+SICE
+MEF-LUT
+Method
+PSNR ↑
+SSIM ↑
+MS SSIM ↑
+CC ↑
+MSE ↓
+PSNR ↑
+SSIM ↑
+MS SSIM ↑
+CC ↑
+MSE ↓
+AGAL
+19.060
+0.5810
+0.7731
+0.9087
+0.0187
+20.004
+0.6204
+0.8445
+0.9499
+0.0141
+CCF
+18.294
+0.4078
+0.6879
+0.8844
+0.0206
+19.831
+0.4540
+0.7696
+0.9134
+0.0134
+DeFusion
+13.493
+0.4404
+0.5847
+0.7674
+0.0637
+18.555
+0.5757
+0.7830
+0.9261
+0.0205
+EMEF
+18.602
+0.4666
+0.7254
+0.8467
+0.0161
+21.392
+0.5888
+0.8354
+0.9368
+0.0094
+GIFNet
+13.417
+0.3688
+0.6253
+0.8383
+0.0548
+16.557
+0.4805
+0.7421
+0.8986
+0.0274
+HoLoCo
+19.800
+0.4909
+0.7585
+0.9126
+0.0149
+20.191
+0.5761
+0.8206
+0.9399
+0.0121
+HSDS-MEF
+20.568
+0.5593
+0.7679
+0.9049
+0.0115
+22.623
+0.6033
+0.8357
+0.9500
+0.0074
+Retinex-MEF
+16.441
+0.4550
+0.6323
+0.8754
+0.0254
+19.123
+0.5416
+0.7582
+0.9360
+0.0150
+U2Fusion
+18.740
+0.4494
+0.6619
+0.8979
+0.0158
+21.496
+0.5820
+0.8037
+0.9429
+0.0093
+Ours
+23.764
+0.6065
+0.8203
+0.9388
+0.0085
+22.793
+0.6369
+0.8508
+0.9549
+0.0076
+HoLoCo
+Input
+HSDS-MEF
+AGAL
+Retinex-MEF
+CCF
+U2Fusion
+DeFusion
+Ours
+EMEF
+GT
+GIFNet
+AGAL
+HSDS-MEF
+EMEF
+CCF
+DeFusion
+U2Fusion
+Retinex-MEF
+Ours
+GT
+GIFNet
+HoLoCo
+Input
+Figure 4. Visual comparison with state-of-the-art methods on SICE dataset (first row) and MEF-LUT dataset (second row).
+4.4. Mental Integrated Transformer
+We design the Teacher model, termed the Mental Integrated
+Transformer (T), as a multi-modal U-Net that integrates vi-
+sual features with cognitive priors. The model takes a pair
+of LDR images I = Ilow, Iover and leverages exposure-
+specific cognitive states to guide feature extraction and re-
+construction.
+During encoding, the concatenated visual
+inputs are processed by a hierarchical encoder, while the
+corresponding EEG signals Eraw
+low and Eraw
+over are mapped
+into latent embeddings through an EEG encoder and trans-
+formed by MLP adapters into cognitive tokens vlow
+cog and
+vover
+cog .
+Each encoder block performs cross-attention, us-
+ing intermediate visual features as Query and the cogni-
+tive tokens as Key and Value. This mechanism enables the
+network to dynamically modulate visual features based on
+the subject’s cognitive responses, emphasizing perceptually
+salient or visually demanding regions. During decoding, the
+network reconstructs the fused image IT
+F under the guid-
+ance of a target cognitive state Eraw
+GT , which is encoded into
+a global token vGT
+cog. At each upsampling stage, the decoder
+features attend to this target token, aligning the reconstruc-
+tion with human perceptual preferences represented by the
+high-quality reference state.
+For the Student network (S), which operates without
+EEG signals, we preserve architectural consistency by re-
+placing biological priors with pseudo-cognitive priors de-
+rived directly from the input LDR images. These image-
+based priors act as Key and Value in the cross-attention lay-
+ers, enabling the Student to approximate cognition-aware
+guidance using only visual cues available during inference.
+5. Experiments
+5.1. Experimental Settings
+Datasets.
+We use the SICE [5] dataset for training and
+primary evaluation. For each scene, only the most under-
+exposed and overexposed images are used. Cross-dataset
+generalization is further evaluated on MEF-LUT [14] and
+MEFB [47], both of which do not provide reference images.
+Evaluation Metrics and Compared Methods.
+For the
+benchmark with reference image, we comprehensively
+26576
+
+
+AGAL
+CCF
+DeFusion
+GIFNet
+EMEF
+HoLoCo
+HSDS-MEF
+Retinex-MEF
+U2Fusion
+Input
+Ours
+Figure 5. Visual comparison with state-of-the-art methods on MEFB benchmark.
+Table 2. Computational efficiency Comparison with state-of-the-art methods on SICE datasets.
+Methods
+AGAL
+CCF
+DeFusion
+EMEF
+GIFNet
+HoLoCo
+HSDS-MEF
+Retinex-MEF
+U2Fusion
+Ours
+Params (M)
+1.5889
+552.81
+7.8740
+82.948
+0.6134
+17.387
+1.1663
+0.2263
+0.6592
+1.3731
+FLOPs (G)
+170.43
+44550
+30.529
+145.74
+79.628
+78.232
+114.72
+29.595
+86.340
+30.8720
+Table 3. Quantitative comparisons on the MEFB benchmark.
+Method
+BRISQUE ↓
+MUSIQ ↑
+DBCNN ↑
+EN ↑
+Qabf ↑
+AGAL
+21.591
+66.178
+0.6082
+7.1818
+0.6107
+CCF
+27.675
+55.407
+0.4495
+7.1166
+0.5124
+DeFusion
+26.854
+62.701
+0.5446
+6.8373
+0.5756
+EMEF
+26.707
+59.395
+0.4774
+7.2785
+0.5887
+GIFNet
+33.253
+65.293
+0.5689
+7.0476
+0.3321
+HoLoCo
+29.719
+58.715
+0.4555
+7.1911
+0.5231
+HSDS-MEF
+20.112
+66.454
+0.5977
+7.1148
+0.6317
+Retinex-MEF
+23.158
+65.954
+0.5897
+6.8491
+0.4744
+U2Fusion
+34.866
+50.7410
+0.3826
+6.9615
+0.4364
+Ours
+19.492
+67.310
+0.6208
+7.2865
+0.6645
+evaluated fusion quality using five metrics: PSNR [41],
+SSIM [41], MS SSIM [40, 41], CC [31], and MSE [13, 41].
+For the benchmark without reference image, we employed
+BRISQUE [28], MUSIQ [16], DBCNN [29], EN [36],
+and QABF [30] to assess perceptual quality.
+Further-
+more, we compared our method against a series of state-
+of-the-art multi-exposure image fusion methods, includ-
+ing AGAL [23], CCF [6], DeFusion [22], EMEF [25],
+GIFNet [7], HoLoCo [24], HSDS-MEF [42], Retinex-
+MEF [2], and U2Fusion [43]. For all comparison meth-
+ods, we used official implementations with recommended
+parameter and settings to ensure fair evaluation.
+Implementation Details. All experiments are conducted
+on a single NVIDIA RTX 4090 GPU. We use the AdamW
+optimizer with an initial learning rate of 2e-4, followed
+by a warm-up and scheduled decay.
+The pixel-wise L1
+loss with a weight of 1.0 and mean reduction is adopted.
+Models are trained for 300K iterations to ensure conver-
+gence.
+The code and dataset are available at https:
+//github.com/501586528/HC-MEF.
+SSIM
+PSNR
+AGAL
+CCF
+DeFusion
+EMEF
+GIFNet
+HoLoCo
+HSDS_MEF
+Retinex-MEF U2Fusion
+Ours
+Figure 6. Distribution of enhancement results on the SICE dataset.
+5.2. Evaluation on Benchmarks
+Quantitative Comparison. Our method achieves state-of-
+the-art performance on all full- and no-reference metrics, as
+shown in Table 1 and Table 3. On SICE, it surpasses the
+second-best approach (HSDS-MEF) by 3.9% in PSNR. On
+MEF-LUT, the SSIM improvement reaches 13.8%. On the
+reference-free MEFB benchmark, our model attains a 9.7%
+better BRISQUE score and the highest MUSIQ, indicating
+superior perceptual quality and alignment with human vi-
+sual comfort. Fig. 6 illustrates the PSNR and SSIM distri-
+butions, showing consistent advantages across samples. As
+reported in Table 2, our model maintains strong computa-
+tional efficiency with a lightweight architecture.
+Qualitative Comparison. As shown in Fig. 4 and Fig. 5,
+our method delivers higher-quality fused images than com-
+26577
+
+
+AGAL
+CCF
+DeFusion
+EMEF
+U2Fusion
+GIFNet
+HSDS_MEF
+HoLoCo
+Retinex-MEF
+Ours
+Figure 7. Visual comparison of the downstream depth-estimation task.
+peting approaches. In challenging high-dynamic-range re-
+gions, where existing methods such as Retinex-MEF and
+GIFNet often suffer from blurring, halos, and color shifts,
+our model preserves finer textures and more natural color
+balance. It also shows stronger robustness by effectively re-
+ducing ghosting, color distortion, and overexposure, leading
+to better perceptual fusion quality.
+5.3. Depth Estimation Analysis
+We evaluate the depth estimation capability of our model
+through the quality of the generated depth maps. Accurate
+depth estimation is important for MEF because it provides
+geometric cues for preserving structural coherence across
+different exposure levels. As shown in Fig. 7, we compare
+the results on the MEFB dataset with several state-of-the-
+art methods. The qualitative comparison shows clear dif-
+ferences in structural accuracy. Our method produces depth
+maps with sharper edges, clearer boundaries, and smoother,
+more geometrically consistent depth transitions, indicating
+a better understanding of the underlying 3D scene structure.
+6. Analysis
+6.1. Brain Response Analysis for Cog-Expo Dataset
+To investigate the intrinsic response of the Cog-Expo
+Dataset and their relevance to multi-exposure fusion, we vi-
+sualize EEG intensity topographies across time (Fig. 8). As
+shown in Fig. 8(a), normal exposure evokes relatively stable
+and moderate activation in the right occipital lobe, whereas
+extreme exposure leads to pronounced over-activation in the
+same region. This suggests that exposure intensity mod-
+ulates early visual processing in a highly specific man-
+ner, providing a foundational basis for utilization by mod-
+els. Leveraging long-duration EEG recording, Fig. 8(b) fur-
+ther reveals activity spreading from occipital to parietal and
+frontal regions, consistent with higher-order cognitive en-
+gagement. These findings indicate that short-term stimula-
+tion mainly elicits passive occipital responses, whereas se-
+(a)
+(b)
+Under Exposure
+Normal
+Over Exposure
+200ms
+500ms
+24ms
+162ms
+295ms
+350ms
+576ms
+663ms
+886ms
+890ms
+Figure 8. EEG intensity topography for brain region analysis.
+mantic and discriminative information processing requires
+engagement of higher-order cognitive regions.
+6.2. Ablation Studies
+To validate the efficacy of our proposed framework, we con-
+duct a series of ablation studies analyzing the core compo-
+nents: the cognition distillation strategy, the bi-level op-
+timization, and the architecture of our Mental Integrated
+Transformer.
+6.2.1. Ablation on Cognition Distillation
+Cognition distillation is a central component of this work.
+To evaluate its effectiveness, we conduct three settings on
+the SICE dataset.
+The first is a baseline Student model
+trained only on images with Lrecon.
+The second is a
+Fusion-only model that incorporates EEG features through
+26578
+
+
+Under-Exposure Input
+Over-Exposure Input
+GT
+Setting (2)
+Setting (1)
+Setting (3) 
+Ours
+Figure 9. Visual ablation study on the cognition distillation.
+Table 4. Ablation study on the cognition distillation.
+Setting Image
+Cognition
+Distillation
+PSNR ↑
+SSIM ↑
+MS-SSIM ↑
+MSE ↓
+(1)
+✓
+×
+×
+17.900
+0.5094
+0.7484
+0.0162
+(2)
+✓
+✓
+×
+18.980
+0.5128
+0.7429
+0.0126
+Ours
+✓
+✓
+✓
+23.764
+0.6065
+0.8203
+0.0085
+w/o EEG
+Ours
+w/o Distillation
+102
+101
+100
+102
+101
+100
+102
+101
+100
+Figure 10. Difference maps for the cognitive distillation ablation.
+A shift toward blue indicates a smaller difference from the ground
+truth and thus better performance.
+cross-attention but is still optimized only with Lrecon, i.e.,
+the Teacher architecture without distillation. The third is
+our full framework, which introduces cognition distillation.
+The quantitative results are reported in Table 4. Our full
+framework consistently outperforms the other two settings
+across all metrics, demonstrating that the proposed method
+not only uses cognitive information but also effectively dis-
+tills perceptual knowledge from it. Fig. 9 shows the vi-
+sual comparison results, and Fig. 10 presents the difference
+maps between the outputs and the groundtruth. Both figures
+further confirm the effectiveness of cognition distillation.
+6.2.2. Ablation on Bi-level Optimization
+Bi-level optimization (BLO) also plays a critical role in
+our framework. We compared our BLO strategy against
+two conventional optimization methods: (1) “Two-stage”:
+training the Teacher to convergence first, then freezing it
+and training the Student; and (2) “Joint Training”: training
+both T and S simultaneously with LLower and LUpper, but
+without the nested optimization structure. As summarized
+in Table 5, our BLO formulation achieves the best perfor-
+mance. While both alternative strategies show reasonable
+results, BLO enhances the effect of distillation by dynam-
+ically coupling the Teacher and Student. This joint opti-
+mization encourages the Teacher to produce representations
+Table 5. Comparison of different optimization strategies.
+Optimization Strategy
+PSNR ↑
+SSIM ↑
+CC ↑
+(1) Two-stage Training
+20.531
+0.5012
+0.8549
+(2) Joint Training
+22.108
+0.5539
+0.9011
+(3) Ours (Bi-level Opt.)
+23.764
+0.6065
+0.9388
+that are not just accurate, but also readily distillable by the
+Student, thereby strengthening the utilization of cognitive
+signals and enhancing model robustness.
+Table 6. Ablation study on the mental integrated transformer.
+Architecture Variant
+PSNR ↑
+SSIM ↑
+CC ↑
+Ours (Full Model)
+23.764
+0.6065
+0.9388
+w/o Encoder EEG Guidance
+23.155
+0.5891
+0.9252
+w/o Decoder EEG Guidance
+23.420
+0.5983
+0.9315
+w/ Concat Fusion (no Cross-Attn)
+22.887
+0.5750
+0.9160
+6.2.3. Ablation on Mental Integrated Transformer
+To assess the structural effectiveness of the proposed Men-
+tal Integrated Transformer (T), we performed ablation stud-
+ies on its key components. We compared the full model
+with three variants: (1) removing cognitive guidance from
+the encoder, (2) removing cognitive guidance from the de-
+coder, and (3) replacing the cross-attention mechanism with
+simple feature concatenation. As shown in Table 6, the full
+model consistently outperforms all variants across metrics.
+The largest decline occurs when replacing cross-attention
+with concatenation, highlighting its essential role in inte-
+grating high-dimensional cognitive priors into the visual
+feature space.
+7. Conclusion
+This work presents a cognitively aware framework for
+multi-exposure fusion. To address the lack of task-specific
+cognitive data, we construct Cog-Expo, the first dataset that
+pairs MEF sequences with human EEG responses and pro-
+vides a dedicated benchmark for cognition-aware fusion re-
+search. To overcome the unavailability of EEG signals dur-
+ing inference, we further propose a novel bi-level distilla-
+tion framework that transfers cognitive guidance from an
+EEG-guided Teacher, namely the Mental Integrated Trans-
+former, to an image-only Student. Extensive experiments
+demonstrate that the proposed method achieves state-of-the-
+art performance and produces fused images that are bet-
+ter aligned with human perception in both quantitative and
+qualitative evaluations across multiple benchmarks. These
+results verify the effectiveness of bio-signals as a supervi-
+sory prior and further suggest their broader potential for
+cognitively aware low-level vision tasks.
+26579
+
+
+Acknowledgments.
+This work is partially supported by
+the National Natural Science Foundation of China (No.
+U22B2052), the National Key Research and Develop-
+ment Program of China (No.
+2024YFB4405501), Cen-
+tral Guidance for Local Science and Technology Develop-
+ment Fund (Youth Science Fund Project, Category A, No.
+2025JH6/101100001), the Distinguished Young Scholars
+Funds of Dalian (No. 2024RJ002), the Key Research and
+Development Program of Liaoning Province under Grant
+(No. 2023JH26/10200014).
+References
+[1] Jianhua Adu, Jianhong Gan, Yan Wang, and Jian Huang. Im-
+age fusion based on nonsubsampled contourlet transform for
+infrared and visible light image. Infrared Physics & Tech-
+nology, 61:94–100, 2013. 2
+[2] Haowen Bai, Jiangshe Zhang, Zixiang Zhao, Lilun Deng,
+Yukun Cui, and Shuang Xu. Retinex-mef: Retinex-based
+glare effects aware unsupervised multi-exposure image fu-
+sion. arXiv preprint arXiv:2503.07235, 2025. 6
+[3] Mohammed Wasim Bhatt and Sparsh Sharma. Next genera-
+tion imaging in consumer technology for erp detection-based
+eeg cross-subject visual object recognition. IEEE Transac-
+tions on Consumer Electronics, 70(1):3688–3696, 2024. 2
+[4] David H Brainard and Spatial Vision. The psychophysics
+toolbox. Spatial vision, 10(4):433–436, 1997. 3
+[5] Jianrui Cai, Shuhang Gu, and Lei Zhang. Learning a deep
+single image contrast enhancer from multi-exposure images.
+IEEE Transactions on Image Processing, 27(4):2049–2062,
+2018. 2, 3, 5
+[6] Bing Cao, Xingxin Xu, Pengfei Zhu, Qilong Wang, and
+Qinghua Hu. Conditional controllable image fusion. In Ad-
+vances in Neural Information Processing Systems, 2024. 6
+[7] Chunyang Cheng, Tianyang Xu, Zhenhua Feng, Xiaojun
+Wu, Zhangyong Tang, Hui Li, Zeyang Zhang, Sara Atito,
+Muhammad Awais, and Josef Kittler.
+One model for all:
+Low-level task interaction is a key to task-agnostic image
+fusion. In Proceedings of the Computer Vision and Pattern
+Recognition Conference, pages 28102–28112, 2025. 6
+[8] Colin Conwell, Jacob S Prince, Kendrick N Kay, George A
+Alvarez, and Talia Konkle.
+A large-scale examination of
+inductive biases shaping high-level visual representation in
+brains and machines. Nature communications, 15(1):9383,
+2024. 2
+[9] Alessandro T. Gifford, Kshitij Dwivedi, Gemma Roig, and
+Radoslaw M. Cichy. A large and rich eeg dataset for mod-
+eling human visual object recognition.
+NeuroImage, 264:
+119754, 2022. 2
+[10] Zhanqiang Guo, Jiamin Wu, Yonghao Song, Jiahui Bu, Wei-
+jian Mai, Qihao Zheng, Wanli Ouyang, and Chunfeng Song.
+Neuro-3d: Towards 3d visual decoding from eeg signals. In
+Proceedings of the Computer Vision and Pattern Recognition
+Conference, pages 23870–23880, 2025. 2
+[11] Holger,
+Simon
+Kern,
+Dimitri
+Papadopoulos
+Orfanos,
+Raphael Vallat, Clemens Brunner, Luca Cerina, Stefan Ap-
+pelhoff, David T.H. Kao, Craig Franklin, Florian Hofer, bit-
+terisland07, myd7349, Marijn van Vliet, Jukka Zitting, Guil-
+laume Cathelain, David Ojeda, Chadwick Boulay, Blake,
+Ben Beasley, Iztok Fister Jr., Emmanuel Ferdman, John
+Mongan, Wouter Potters, WEN Hao, Ogi Moore, Matthias
+Klumpp, Matteo, Mmadu Manasseh, Joseph, and Jacob
+Svensson. holgern/pyedflib: v0.1.40, 2025. 3
+[12] Shuzhan Hu, Yiping Duan, Xiaoming Tao, Geoffrey Ye Li,
+Jianhua Lu, Guangyi Liu, Zhimin Zheng, and Chengkang
+Pan.
+Brain-inspired image perceptual quality assessment
+based on eeg: A qoe perspective. IEEE Transactions on Pat-
+tern Analysis and Machine Intelligence, 46(12):8424–8441,
+2024. 2
+[13] Quan Huynh-Thu and Mohammed Ghanbari. Scope of va-
+lidity of psnr in image/video quality assessment. Electronics
+letters, 44(13):800–801, 2008. 6
+[14] Ting Jiang, Chuan Wang, Xinpeng Li, Ru Li, Haoqiang Fan,
+and Shuaicheng Liu. Meflut: Unsupervised 1d lookup ta-
+bles for multi-exposure image fusion. In Proceedings of the
+IEEE/CVF International Conference on Computer Vision,
+pages 10542–10551, 2023. 5
+[15] Isaak Kavasidis, Simone Palazzo, Concetto Spampinato,
+Daniela Giordano, and Mubarak Shah. Brain2image: Con-
+verting brain signals into images. In Proceedings of the 25th
+ACM international conference on Multimedia, pages 1809–
+1817, 2017. 2
+[16] Junjie Ke, Qifei Wang, Yilin Wang, Peyman Milanfar, and
+Feng Yang. Musiq: Multi-scale image quality transformer.
+In Proceedings of the IEEE/CVF international conference on
+computer vision, pages 5148–5157, 2021. 6
+[17] John J Lewis, Robert J O’Callaghan, Stavri G Nikolov,
+David R Bull, and Nishan Canagarajah. Pixel-and region-
+based image fusion with complex wavelets. Information fu-
+sion, 8(2):119–130, 2007. 2
+[18] Dongyang Li, Chen Wei, Shiying Li, Jiachen Zou, and
+Quanying Liu. Visual decoding and reconstruction via eeg
+embeddings with guided diffusion. Advances in Neural In-
+formation Processing Systems, 37:102822–102864, 2024. 2
+[19] Hui Li, Kede Ma, Hongwei Yong, and Lei Zhang. Fast multi-
+scale structural patch decomposition for multi-exposure im-
+age fusion.
+IEEE Transactions on Image Processing, 29:
+5805–5816, 2020. 2
+[20] Shutao Li, Xudong Kang, and Jianwen Hu. Image fusion
+with guided filtering. IEEE Transactions on Image process-
+ing, 22(7):2864–2875, 2013. 2
+[21] Shurui Li, Ian Daly, Cuntai Guan, Andrzej Cichocki, and
+Jing Jin.
+Inter-participant transfer learning with attention
+based domain adversarial training for p300 detection. Neural
+Networks, 180:106655, 2024. 2
+[22] Pengwei Liang, Junjun Jiang, Xianming Liu, and Jiayi Ma.
+Fusion from decomposition: A self-supervised decomposi-
+tion approach for image fusion. In European conference on
+computer vision, pages 719–735. Springer, 2022. 1, 6
+[23] Jinyuan Liu, Jingjie Shang, Risheng Liu, and Xin Fan.
+Attention-guided global-local adversarial learning for detail-
+preserving multi-exposure image fusion. IEEE Transactions
+on Circuits and Systems for Video Technology, 32(8):5026–
+5040, 2022. 1, 6
+26580
+
+
+[24] Jinyuan Liu, Guanyao Wu, Junsheng Luan, Zhiying Jiang,
+Risheng Liu, and Xin Fan. Holoco: Holistic and local con-
+trastive learning network for multi-exposure image fusion.
+Information Fusion, 95:237–249, 2023. 6
+[25] Renshuai Liu, Chengyang Li, Haitao Cao, Yinglin Zheng,
+Ming Zeng, and Xuan Cheng.
+Emef: Ensemble multi-
+exposure image fusion. In Proceedings of the AAAI Con-
+ference on Artificial Intelligence, 2023. 6
+[26] Jun Luo, Wenqi Ren, Xinwei Gao, and Xiaochun Cao. Multi-
+exposure image fusion via deformable self-attention. IEEE
+Transactions on Image Processing, 32:1529–1540, 2023. 2
+[27] Ying Mao, Jing Jin, Ren Xu, Shurui Li, Yangyang Miao, and
+Andrzej Cichocki. The influence of visual attention on the
+performance of a novel tactile p300 brain-computer interface
+with cheeks-stim paradigm. International Journal of Neural
+Systems, 31(04):2150004, 2021. 2
+[28] Anish Mittal, Anush Krishna Moorthy, and Alan Conrad
+Bovik. No-reference image quality assessment in the spatial
+domain. IEEE Transactions on image processing, 21(12):
+4695–4708, 2012. 6
+[29] A Deep Bilinear Convolutional Neural Network. Blind im-
+age quality assessment using a deep bilinear convolutional
+neural network. Deep Bilinear Convolutional Neural, 2022.
+6
+[30] Theodosia R Paclawskyj, Johnny L Matson, Karena S Rush,
+Yemonja Smalls, and Timothy R Vollmer. Questions about
+behavioral function (qabf):: A behavioral checklist for func-
+tional assessment of aberrant behavior. Research in develop-
+mental disabilities, 21(3):223–229, 2000. 6
+[31] Gemma Piella and Henk Heijmans. A new quality metric for
+image fusion. In Proceedings 2003 international conference
+on image processing (Cat. No. 03CH37429), pages III–173.
+IEEE, 2003. 6
+[32] Linhao Qu, Shaolei Liu, Manning Wang, and Zhijian Song.
+Transmef: A transformer-based multi-exposure image fusion
+framework using self-supervised multi-task learning. In Pro-
+ceedings of the AAAI conference on artificial intelligence,
+pages 2126–2134, 2022. 2
+[33] K Ram Prabhakar, V Sai Srikar, and R Venkatesh Babu.
+Deepfuse: A deep unsupervised approach for exposure fu-
+sion with extreme exposure image pairs. In Proceedings of
+the IEEE international conference on computer vision, pages
+4714–4722, 2017. 2
+[34] Katja Seeliger and Martin N Hebart. What comparing deep
+neural networks can teach us about human vision. Nature
+Machine Intelligence, 6(2):122–123, 2024. 2
+[35] Xiaoke Shang, Gehui Li, Zhiying Jiang, Shaomin Zhang, Nai
+Ding, and Jinyuan Liu. Holistic dynamic frequency trans-
+former for image fusion and exposure correction. Informa-
+tion Fusion, 102:102073, 2024. 2
+[36] Claude E Shannon.
+A mathematical theory of communi-
+cation. The Bell system technical journal, 27(3):379–423,
+1948. 6
+[37] Yu Shi, Yu Liu, Juan Cheng, Z Jane Wang, and Xun Chen.
+Vdmufusion: A versatile diffusion model-based unsuper-
+vised framework for image fusion. IEEE Transactions on
+Image Processing, 2024. 2
+[38] Mingli Song, Dacheng Tao, Chun Chen, Jiajun Bu, Jiebo
+Luo, and Chengqi Zhang.
+Probabilistic exposure fusion.
+IEEE Transactions on Image Processing, 21(1):341–357,
+2011. 2
+[39] Wei Tang and Fazhi He. Eat: Multi-exposure image fusion
+with adversarial learning and focal transformer. IEEE Trans-
+actions on Multimedia, 2025. 2
+[40] Zhou Wang, Eero P Simoncelli, and Alan C Bovik. Multi-
+scale structural similarity for image quality assessment. In
+The thrity-seventh asilomar conference on signals, systems
+& computers, 2003, pages 1398–1402. Ieee, 2003. 6
+[41] Zhou Wang, Alan C Bovik, Hamid R Sheikh, and Eero P Si-
+moncelli. Image quality assessment: from error visibility to
+structural similarity. IEEE transactions on image processing,
+13(4):600–612, 2004. 6
+[42] Guanyao Wu, Hongming Fu, Jinyuan Liu, Long Ma, Xin
+Fan, and Risheng Liu.
+Hybrid-supervised dual-search:
+Leveraging automatic learning for loss-free multi-exposure
+image fusion. In Proceedings of the AAAI conference on ar-
+tificial intelligence, pages 5985–5993, 2024. 6
+[43] Han Xu, Jiayi Ma, Junjun Jiang, Xiaojie Guo, and Haibin
+Ling. U2fusion: A unified unsupervised image fusion net-
+work. IEEE transactions on pattern analysis and machine
+intelligence, 44(1):502–518, 2020. 6
+[44] Han Xu, Jiayi Ma, and Xiao-Ping Zhang. Mef-gan: Multi-
+exposure image fusion via generative adversarial networks.
+IEEE Transactions on Image Processing, 29:7203–7216,
+2020. 2
+[45] Yuki Yamamoto, Kohma Kurahashi, Nobuhiko Wagatsuma,
+Sou Nobukawa, and Keiichiro Inagaki. Investigating p300
+response in visual searching of multiple traffic objects during
+driving. International Journal on Informatics Visualization,
+9(3), 2025. 2
+[46] Jia-Li Yin, Bo-Hao Chen, and Yan-Tsung Peng. Two expo-
+sure fusion using prior-aware generative adversarial network.
+IEEE Transactions on Multimedia, 24:2841–2851, 2021. 2
+[47] Xingchen Zhang.
+Benchmarking and comparing multi-
+exposure image fusion algorithms. Information Fusion, 74:
+111–131, 2021. 5
+[48] Howe Yuan Zhu, Hsiang-Ting Chen, and Chin-Teng Lin.
+Understanding the effects of stress on the p300 response dur-
+ing naturalistic simulation of heights exposure. Plos one, 19
+(4):e0301052, 2024. 2
+26581

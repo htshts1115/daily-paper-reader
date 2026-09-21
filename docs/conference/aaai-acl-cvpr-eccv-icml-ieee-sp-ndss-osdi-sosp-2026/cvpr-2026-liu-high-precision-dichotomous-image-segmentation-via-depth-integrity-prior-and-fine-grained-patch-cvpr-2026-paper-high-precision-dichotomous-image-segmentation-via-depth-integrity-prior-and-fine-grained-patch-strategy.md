@@ -1,6 +1,6 @@
 ---
 title: High-Precision Dichotomous Image Segmentation via Depth Integrity-Prior and Fine-Grained Patch Strategy
-title_zh: 基于深度完整性先验与细粒度分块的高精度二值图像分割
+title_zh: 基于深度完整性先验与细粒度分块策略的高精度二分图像分割
 authors: "Liu, Xianjie, Fu, Keren, Zhao, Qijun"
 date: 2026
 publication_date: 2026
@@ -9,16 +9,16 @@ publication_date_source: conference year only; exact release date unverified
 publication_date_kind: unknown
 pdf: "https://openaccess.thecvf.com/content/CVPR2026/papers/Liu_High-Precision_Dichotomous_Image_Segmentation_via_Depth_Integrity-Prior_and_Fine-Grained_Patch_CVPR_2026_paper.pdf"
 tags: ["query:seg"]
-score: 5.0
-evidence: 结合深度先验的精细二值分割与清晰边界
-tldr: 高精度二值图像分割需从高分辨率图中提取精细目标，现有方法在效率与精度间难以兼顾。本文提出深度完整性先验，认为完整目标在深度图中呈内部平滑、边界锐利的低方差区域，并配合细粒度分块策略实现高效精细分割。实验表明该方法在提升边界精度的同时兼顾效率，对细结构与边界敏感的分割需求有参考价值。
+score: 6.0
+evidence: 深度先验引导的精细分割
+tldr: 高精度二分图像分割需从高分辨率图像中提取精细目标，现有方法难以兼顾效率与精度。本文观察到深度图中完整目标呈内部平滑、边界锐利的低方差区域，背景则高方差混乱，据此提出深度完整性先验并结合细粒度分块策略。实验表明该方法可有效抑制误检、提升细粒度目标提取精度，为高质量前景分割提供了深度先验驱动的新思路。
 source: CVPR-2026-Accepted
 selection_source: conference_retrieval
 figures_json: "[{\"url\": \"assets/figures/cvpr-2026-accepted/cvpr-2026-liu-high-precision-dichotomous-image-segmentation-via-depth-integrity-prior-and-fine-grained-patch-cvpr-2026-paper/fig-001.webp\", \"caption\": \"\", \"page\": 1, \"index\": 1, \"width\": 11841, \"height\": 3708}, {\"url\": \"assets/figures/cvpr-2026-accepted/cvpr-2026-liu-high-precision-dichotomous-image-segmentation-via-depth-integrity-prior-and-fine-grained-patch-cvpr-2026-paper/fig-002.webp\", \"caption\": \"\", \"page\": 1, \"index\": 2, \"width\": 2450, \"height\": 345}, {\"url\": \"assets/figures/cvpr-2026-accepted/cvpr-2026-liu-high-precision-dichotomous-image-segmentation-via-depth-integrity-prior-and-fine-grained-patch-cvpr-2026-paper/fig-003.webp\", \"caption\": \"\", \"page\": 2, \"index\": 3, \"width\": 1720, \"height\": 720}, {\"url\": \"assets/figures/cvpr-2026-accepted/cvpr-2026-liu-high-precision-dichotomous-image-segmentation-via-depth-integrity-prior-and-fine-grained-patch-cvpr-2026-paper/fig-004.webp\", \"caption\": \"\", \"page\": 3, \"index\": 4, \"width\": 3390, \"height\": 1110}, {\"url\": \"assets/figures/cvpr-2026-accepted/cvpr-2026-liu-high-precision-dichotomous-image-segmentation-via-depth-integrity-prior-and-fine-grained-patch-cvpr-2026-paper/fig-005.webp\", \"caption\": \"\", \"page\": 4, \"index\": 5, \"width\": 2235, \"height\": 1215}, {\"url\": \"assets/figures/cvpr-2026-accepted/cvpr-2026-liu-high-precision-dichotomous-image-segmentation-via-depth-integrity-prior-and-fine-grained-patch-cvpr-2026-paper/fig-006.webp\", \"caption\": \"\", \"page\": 7, \"index\": 6, \"width\": 3725, \"height\": 1240}, {\"url\": \"assets/figures/cvpr-2026-accepted/cvpr-2026-liu-high-precision-dichotomous-image-segmentation-via-depth-integrity-prior-and-fine-grained-patch-cvpr-2026-paper/fig-007.webp\", \"caption\": \"\", \"page\": 7, \"index\": 7, \"width\": 2040, \"height\": 845}]"
-motivation: 高精度二值图像分割在效率与精度间难以兼顾，非扩散方法语义弱、扩散方法计算昂贵。
-method: 提出深度完整性先验，将完整目标视为深度图中的低方差平滑区域，并结合细粒度分块策略进行精细分割。
-result: 实验表明该方法在提升细粒度目标边界精度的同时保持了较高计算效率。
-conclusion: 该工作为高精度细结构图像分割提供了结合深度先验的实用方案。
+motivation: 高精度二分图像分割中现有方法难以兼顾效率与精度，且缺乏深度信息。
+method: 利用深度图目标低方差、背景高方差的深度完整性先验，结合细粒度分块策略。
+result: 有效抑制误检并提升细粒度目标的提取精度。
+conclusion: 为高质量前景分割提供深度先验驱动的分割思路。
 ---
 
 ## Abstract

@@ -1,0 +1,1403 @@
+OMoBlur: An Object Motion Blur Dataset and Benchmark for Real-World
+Local Motion Deblurring
+Dingchuan Yu, Jiatong Li, Jingwen Zhou, Zhengyue Zhuge, Yueting Chen, Qi Li
+Zhejiang University
+{yudingchuan,jtli777,12430018,zgzy,chenyt,liqi}@zju.edu.cn
+Abstract
+Object motion blur in static scenes is spatially heteroge-
+neous, differing from conventional deblurring problems yet
+frequently occurring in real handheld capture scenarios.
+Existing datasets either rely on costly beam-splitting cap-
+ture with residual misalignment or employ synthetic blur
+that fails to model the continuous photon-integration pro-
+cess during exposure. To overcome these limitations, we
+introduce OMoBlur, a physically grounded dataset that em-
+ulates realistic exposure integration via programmable sen-
+sor control, ensuring close alignment between synthetic
+and real blur distributions.
+OMoBlur provides 20,000
+blur–sharp–mask pairs covering diverse object motion
+types. Leveraging this dataset, we further propose OMD-
+Net, an object-motion-aware deblurring network that inte-
+grates a Motion–Appearance Extract Block, a Flow-Guided
+Gate Predictor, and an Adaptive Gated Fusion mecha-
+nism. This design enables the network to selectively restore
+blurred regions while preserving static backgrounds, with-
+out requiring pixel-accurate mask annotations. Extensive
+experiments demonstrate that OMoBlur’s physically faith-
+ful data collection and large-scale diversity significantly
+enhance the network’s generalization to real-world mo-
+tion blur, establishing OMoBlur and OMDNet as a robust
+benchmark and practical solution for local motion deblur-
+ring. The dataset and code is publicly released at https:
+//yudingchuan.github.io/OMoBlur_homepage/.
+1. Introduction
+Motion blur generally falls into two categories: camera
+shake blur and object motion blur. Camera shake blur is
+spatially continuous across the image and has seen remark-
+able progress in restoration [3, 5, 6, 9, 17, 18, 24, 30, 32].
+In contrast, object motion blur arises when independently
+moving objects appear in a static scene with a static cam-
+era. This blur is typically localized and discontinuous: mul-
+tiple objects may move with different velocities and di-
+Blur Image in ReLoBlur Dataset
+Blur
+Trained on
+ReLoBlur
+GT
+Trained on
+OMoBlur
+Figure 1.
+Deblurring results on a challenging scene using
+LBAG[19], a baseline model for local motion deblurring. The
+model trained on OMoBlur demonstrates powerful generalization
+to real-world blur, benefiting from the large-scale, physically-
+consistent, and high-quality nature of our dataset.
+rections, form sharp semantic boundaries against the static
+background, and occlude one another, collectively produc-
+ing complex, spatially heterogeneous blur. Moreover, the
+motion trajectories of objects differ fundamentally from
+those induced by camera shake, underscoring the need for
+datasets that specifically target object motion blur.
+ReLoBlur [19], the first dataset for locally motion-
+blurred objects, has advanced deblurring research [12, 20,
+34] by providing 2,405 blur-sharp pairs captured via a
+beam-splitting camera system. However, this cumbersome
+hardware setup impedes large-scale data collection, and in-
+troduces alignment challenges from optical and electronic
+inconsistencies, leading to residual misalignments that de-
+grade performance.
+Unlike fully real-captured datasets,
+GoPro [24] synthesizes blur by accumulating consecutive
+frames. Although it includes object-motion scenes and is
+widely used, the accumulation relies on a simplified model
+and creates a domain gap to real blur, limiting generaliza-
+tion. Another common approach generates blur by convolv-
+ing a sharp image with blur kernel(s) [6, 7, 31]. However,
+this method faces inherent limitations in modeling object
+motion. First, while spatially varying kernels can theoret-
+ically represent non-uniform blur, the arbitrary kernels do
+not adhere to the kinematic constraints of physical motion
+(e.g. the cycloidal path of a rolling wheel). Second, com-
+plex motions like a spinning ball cause pixels to appear or
+This CVPR paper is the Open Access version, provided by the Computer Vision Foundation.
+Except for this watermark, it is identical to the accepted version;
+the final published version of the proceedings is available on IEEE Xplore.
+22626
+
+
+disappear along object outlines, which kernel-based mod-
+els struggle to replicate[23, 26]. Most critically, moving
+objects induce occlusion dynamics: a single pixel can inte-
+grate light from both the foreground and background over
+the exposure time. Kernel-based modeling is fundamentally
+incapable of representing this time-varying mixing process.
+To address these limitations, we introduce an exposure-
+faithful accumulation model that adheres to the physical
+imaging process.
+Combined with programmable sensor
+control and carefully selected optics, it enables efficient col-
+lection of well-aligned, high-quality data pairs. The result-
+ing dataset, OMoBlur, contains blur–sharp-mask pairs with
+only object motion blur against static backgrounds. Thanks
+to its minimal domain gap, models trained on OMoBlur
+generalize well to real blur, as verified on real-captured blur
+image in ReLoBlur (see Fig. 1).
+Building on OMoBlur, we present OMDNet, a single-
+image deblurring framework designed for local motion blur
+removal and static background preservation without manual
+blur region annotation. The architecture comprises two core
+components: a Motion–Appearance Extract Block (MAEB)
+for rich feature representation and flexible propagation, and
+a Flow-guided Gate Predictor (FGP). The FGP guides the
+motion branch within the MAEB to supply higher-quality
+motion information, which in turn supports more reliable
+blur region gating. Additionally, we introduce an Adaptive
+Gated Fusion (AGF) mechanism, which leverages coarse
+blur masks as soft supervision to further enhance the pre-
+cision of gate prediction.
+Our main contributions are summarized as follows:
+• We establish OMoBlur, the first physically faithful,
+accumulation-based object motion blur dataset that sim-
+ulates exposure formation by accumulating raw frames
+with almost full exposure. It substantially narrows the
+synthetic-to-real gap and offers 20K+ pairs covering di-
+verse motion types with static backgrounds.
+• We design an object-motion deblurring network OMD-
+Net, which elegantly integrates motion-aware represen-
+tation learning with adaptive gating to restore blurred re-
+gions while preserving sharp backgrounds.
+• Extensive experiments demonstrate that our OMoBlur
+dataset enables strong generalization to real-world local
+motion blur, establishing it as an effective resource for
+both training and evaluation.
+The proposed OMDNet
+further achieves superior performance, leading across all
+quantitative metrics and visual comparisons.
+2. Related Work
+2.1. Motion Blur Datasets
+Kernel-based methods initially modeled motion blur us-
+ing a single global blur kernel [2, 29], and were later ex-
+tended to patch or pixel-wise kernels [1, 8, 13, 31, 40, 44].
+Their reliance on the spatially smooth kernel assumption re-
+stricts the effectiveness on real-world object motion. Multi-
+frame accumulation methods generate blur by averaging
+consecutive sharp frames [24, 30], with frame interpola-
+tion often used beforehand to produce visually continuous
+blur trajectories [25, 28, 33, 42]. While multi-frame meth-
+ods excel at temporal modeling and are the mainstream for
+dataset generation, the potential for high-fidelity blur sim-
+ulation remains unrealized in existing datasets, hindering
+real-world generalization. Fully real-captured datasets (e.g.
+RealBlur [27], ReLoBlur [19], RBI [43]) use coaxial beam-
+splitters to simultaneously capture blur-sharp pairs. How-
+ever, significant challenges in achieving pixel-wise align-
+ment, both geometrically and photometrically, limit their
+performance for supervised deblurring.
+2.2. Object Motion Deblurring Methods
+Restoring motion blur caused by independently moving ob-
+jects requires recovering blurred regions while preserving
+sharp backgrounds. LBAG [19] introduces a simple gate
+block to localize blurred areas using ground-truth masks
+from their ReLoBlur dataset. LMD-ViT [20] improves effi-
+ciency via adaptive pruning, retaining transformer windows
+likely to contain blur and avoiding computation elsewhere.
+MUGNet [34] uses a probabilistic model to represent mo-
+tion uncertainty, improving the reliability of blur map es-
+timation. PGDN [12] trains an additional self-supervised
+network to predict a 3-parameter blur kernel, which serves
+as an explicit prior to guide deblurring.
+3. OMoBlur Dataset
+In this section, we first examine the physical exposure pro-
+cess to develop a model that more accurately reflects real
+motion blur formation. We then discuss the characteristics
+of object motion blur. Finally, we describe the image acqui-
+sition procedure and the construction of the dataset.
+3.1. Motion Blur Formation and Modeling
+A digital image forms when photons strike a sensor’s photo-
+diodes, generating photoelectrons via the photoelectric ef-
+fect. The accumulated charge is converted to a voltage by
+the pixel capacitance, then processed by the programmable
+gain amplifier (PGA), analog-to-digital converter (ADC),
+and other on-sensor circuitry. This pipeline outputs the orig-
+inal digital signal, known as the RAW image, which can be
+modeled as:
+RAW(x, y) = C(Nph(x, y), G, ε)
+= C
+ Z T +∆T
+T
+p(t, x, y) dt, G, ε
+!
+(1)
+where Nph denotes the photon count at pixel (x, y) during
+the exposure interval ∆T; p(t, x, y) denotes the photon ar-
+22627
+
+
+rival rate at pixel (x, y) at time t; G denotes the sensor gain;
+ε denotes noise introduced along the sensor’s photon-to-
+digital conversion pipeline C(·). Without loss of generality,
+we assume Nph lies within the linear response region and
+that G has been linearized via calibration. When the scene’s
+projection on the sensor undergoes less than half-pixel rel-
+ative displacement over the exposure interval ∆T, the cap-
+tured image can be regarded as absolutely sharp. Once the
+displacement exceeds a certain threshold, perceptible mo-
+tion blur emerges.
+A simplified blur accumulation process can be modeled
+as follows [24]:
+B = g
+(
+1
+n
+n−1
+X
+i=0
+g−1 [Si]
+)
+(2)
+where
+Si = ISP (RAWi) = ISP
+"
+C
+ Z ti+∆t
+ti
+p(t)dt, Gi, εi
+!#
+(3)
+ISP denotes the camera image-signal-processing pipeline
+that converts the raw digital signal into an RGB image, and
+g−1(·) denotes an inverse camera response that maps the
+ISP output back to a domain approximately linear in pho-
+ton accumulation. For brevity, we omit spatial coordinates
+(x, y).
+The blur synthesis model Eq. (2) upgrades to a time-
+integrated signal-accumulation model Eq. (4) under the
+premises that g−1 →ISP−1, ti + ∆t →ti+1, Gi ≡G,
+and negligible noise, thereby providing an effective approx-
+imation of a real blurred image captured with exposure time
+n∆t and gain G
+n :
+B ≈ISP
+(
+1
+n
+n−1
+X
+i=0
+C
+ Z ti+∆t
+ti
+p(t) dt, G
+!)
+≈ISP
+
+C
+Z tn
+t0
+p(t) dt, G
+n
+
+(4)
+However, consumer-grade cameras usually output Si
+with g−1 unknown. Approximating it with a gamma func-
+tion [24] or simulating the inverse ISP [28, 33] before aver-
+aging does not faithfully reconstruct the physical process of
+signal accumulation. More importantly, the valid exposure
+ratio ρt =
+∆t
+ti+1−ti between adjacent frames is limited by
+readout time, leading to unnatural and discontinuous blur
+trajectories [30].
+Although high-rate frame interpolation
+(FI) can render trajectories visually more natural [25, 42],
+such aggressive temporal upsampling is inconsistent with
+real exposure process. This physical inconsistency com-
+bined with interpolation artifacts in regions of complex mo-
+tion, induces a domain gap between synthesized and real
+blur, thereby degrading generalization to real-world deblur-
+ring tasks.
+3.2. Object Motion Discussion
+We adopt a rigid-body kinematic perspective to catego-
+rize object motion according to its projection characteristics
+onto the image plane.
+• In-plane motion: Translation perpendicular to the opti-
+cal axis and rotation about it. The resulting blur stems
+from a sequence of well-defined 2D image transforma-
+tions, which preserve the scene’s relative structure and
+thus present a more constrained deblurring problem.
+• Out-of-plane motion: Motion involving a translational
+component along the optical axis or rotational compo-
+nents of yaw/pitch. Such motion introduces inherent 3D
+geometric effects that cannot be captured by 2D motion
+models, such as scaling from depth variation and self-
+occlusions from rotation, leading to a severely ill-posed
+inverse problem.
+This classification guides our data collection in Sec. 3.3,
+ensuring our dataset comprehensively covers object motion
+patterns across the full spectrum of deblurring difficulty.
+3.3. Image Acquisition and Dataset Construction
+We construct our dataset based on the upgraded model
+Eq. (4). To satisfy the model’s premises, we pick a Basler
+a2A1920-160ucBAS industrial camera for its ability to
+output RAW data directly (namely g−1 exactly equal to
+ISP−1). With hardware features and programmable con-
+trol, we also greatly increase the valid exposure ratio ρt.
+Compared with previous work using RAW to eliminate
+g−1, whose ρt is hardware-limited to about 10% [22], ours
+achieves 98%.
+Exposure
+Readout
+Frame Acquisition n
+Exposure
+Readout
+Frame Acquisition n+1
+Time
+it
+it
+t
++ ∆
+1
+it +
+1
+it
+t
++ + ∆
+1960us
+40us
+1960us
+Frame
+Trigger signal
+Frame
+Acquisition
+sequence
+1921us
+1
+i
+r
+t
+t
+t
++ + ∆+ ∆
+Figure 2. Illustration of our overlapping image acquisition using
+an industrial camera.
+Specifically, we employ an overlapping image acquisi-
+tion strategy via hardware programming, where the expo-
+sure of the next frame starts during the readout of the pre-
+vious one (see Fig. 2). A hardware constraint is that each
+frame’s readout must complete before the next frame’s read-
+out begins, requiring the exposure time to exceed the read-
+out time. Meanwhile, a short exposure is needed to ensure
+ground-truth sharpness, making a short readout essential.
+Since deblurring network training generally does not re-
+quire full-resolution input, we restrict the region of interest
+(ROI) to 1920×360 on the 1920×1200 sensor, reducing the
+22628
+
+
+RAW frames
+Averaged 
+RAW frames
+Sharp Pics
+Blur Pics
+Mask Generator
+Optical Flow
+Clustering
+Post-processing
+Blur Masks
+Data 
+Pairs
+Image Signal Processing
+WB
+LSC
+Demosaic
+Color Correction
+Gamma
+Figure 3. OMoBlur dataset generation pipeline and examples. Green and red boxes mark zoomed regions from sharp and blurred images,
+respectively; gray dotted boxes denote algorithm-generated blur masks.
+readout time to 1921 µs. With an inherent hardware delay of
+approximately 40µs at this resolution (for sensor reset and
+charge clearing between exposures), we set exposure time
+to 1960µs. This configuration yields a capture rate of 500
+fps with ρt of 98%.
+To further mitigate the domain gap caused by the 2%
+exposure gap, we select optics via imaging-geometry anal-
+ysis [19].
+Considering typical object velocities, com-
+mon shooting distances, and the CMOS pixel size, we
+choose a Basler C23-0824-5M lens with an 8 mm focal
+length (≈45 mm full-frame equivalent). Under this cam-
+era–lens–exposure configuration, the moving object dis-
+placement on the image plane during the exposure gap is
+limited to 0.1 pixel, closely matching real motion-blur for-
+mation.
+Guided by the discussion in Sec. 3.2 , we capture pedes-
+trians, vehicles, ball games, and other activities from mul-
+tiple viewing angles to cover diverse in-plane and out-of-
+plane motion. We also print modern posters and traditional
+Chinese calligraphy/paintings and record them with hand-
+held motion to enrich complex motion and scene textures.
+Our dataset construction pipeline (Fig. 3) is as follows.
+The blurry image is produced by averaging consecutive
+RAW frames and converting the result to RGB via the ISP.
+Each single RAW frame is then processed through the ISP
+to RGB: the middle frame serves as sharp ground-truth,
+while consecutive frames are used for optical flow estima-
+tion via MeFlow [35] to derive blur masks. Despite care-
+ful processing, optical flow errors in areas with repetitive
+textures or dark backgrounds can still cause mask inaccura-
+cies. Therefore, we introduce AGF mechanism to mitigate
+unreliable mask supervision during training and manually
+correct inaccurate masks in the test set to ensure fair evalu-
+ation. After carefully filtering invalid scenes, we release a
+total of over 20,000 blur-sharp-mask image pairs.
+In summary, through systematic blur modeling and pre-
+cise acquisition engineering, we introduce, to the best of
+our knowledge, the first large-scale, high-quality dataset of
+physically faithful, accumulation-based object motion blur.
+See Appendix A for implementation details.
+4. Deblurring Method
+In this section, we present a framework for object mo-
+tion deblurring based on its inherent properties. The net-
+work learns from multi-frame supervision during training
+and performs single-image deblurring at test time, achiev-
+ing higher restoration fidelity and stronger static region pro-
+tection.
+4.1. Model Architecture and Modules
+Base
+Block
+Base
+Block
+Base
+Block
+Base
+Block
+MAEB
+conv
+Base
+Block
+MAEB
+Base
+Block
+MAEB
+3
+B
+3
+S
+3G
+S
+3
+G
+3
+×
+2
+B
+2
+S
+2G
+S
+2
+G
+2
+×
+1
+B
+1G
+S
+1
+G
+1
+×
+1B
+Motion 
+Feature
+Concatenate
+Appearance 
+Feature
+Element-wise 
+Addition
+Downsample
+Upsample
+3
+mf
+3
+G
+2
+mf
+2
+G
+FGP
+1
+mf
+1
+G
+3
+af
+2
+af
+1
+af
+FGP
+FGP
+Adaptive
+Gated Fusion
+conv
+conv
+1
+S
+i
+mf
+i
+af
+Figure 4. The architecture of the proposed OMDNet.
+Object Motion Deblurring Network.
+As illustrated in
+Fig. 4, we employ a U-Net backbone in a SIMO (single-
+input, multiple-output) configuration and replace skip
+22629
+
+
+Matrix Multiplication
+Reshape
+1×1 Conv + 3×3 Dconv
+Motion-Appearance Extract Block
+NAF Block
+Diff-TAM
+NAF Block
+Conv
+Conv
+i
+mf
+i
+af
+1
+i
+af +
+Differential Transposed Attention Module (Diff-TAM)
+Convs
+hw c
+×
+c
+hw
+×
+1
+Q
+1
+K
+hw c
+×
+c
+hw
+×
+2
+Q
+2
+K
+ λ
+−
+1
+V
+c c
+×
+h
+w c
+×
+×
+conv
+X
+ˆX
+Norm
+Differential Transposed
+Attention Map
+Norm
+1A
+2
+A
+A
+X
+2
+V
+h
+w c
+×
+×
+h
+w c
+×
+×
+h
+w c
+×
+×
+Convs
+Convs
+Convs
+Convs
+Convs
+X
+Flow-guided Gate Predictor
+conv
+3
+×
+2
+×
+Sigmoid
+Modulus
+i
+mf
+iF
+1
+i+
+F
+i
+G
+,
+i
+i
+
+
+
+
+F
+F
+Merge
+conv
+Warp
+iS
+iS
+Loss
+Train
+Only
+c
+hw
+×
+c
+hw
+×
+Figure 5. The architecture of Motion-Appearance Extract Block and Flow-guided Gate Predictor.
+connections with a dual-path Motion-Appearance Extract
+Block (MAEB) for flexible, multi-scale feature propa-
+gation.
+The appearance features from each MAEB are
+both passed to the corresponding decoder and higher level
+MAEB. Meanwhile, motion features are processed by a
+Flow-guided Gate Predictor (FGP), which uses multi-frame
+ground-truth to supervise motion flow and predict a blur re-
+gion confidence gate. This gate fuses the decoder output
+with the blurred input to produce gated restoration. The de-
+sign makes gate prediction explicitly depend on flow cues
+while implicitly guiding the encoder to learn more precise
+motion representations, yielding stronger static-background
+preservation and improved blur removal.
+Motion-Appearance Extract Block.
+We employ a NAF-
+Block (from NAFNet [4]) as a shared stem in the MAEB
+(Fig. 5) for efficient feature extraction, then split the path-
+way into two branches. The appearance branch uses an-
+other NAFBlock, while the motion branch is processed by a
+Differential Transposed Attention Module (Diff-TAM). The
+design of Diff-TAM is inspired by differential amplifiers in
+electrical engineering and differential attention[36] in lan-
+guage modeling, a mechanism that suppresses background
+responses by comparing paired attention paths. This prop-
+erty makes it highly effective for isolating motion patterns,
+thereby providing high-quality input for subsequent optical
+flow prediction. For efficiency, we implement a Restormer-
+style transposed attention that operates along channel di-
+mensions and restrict Diff-TAM to the MAEB rather than
+throughout the backbone. Architectural details are provided
+in Appendix B.1.
+Flow-guided Gate Predictor.
+We integrate the extracted
+motion features with upsampled lower-level flow predic-
+tions via convolution to generate bidirectional optical flows
+F = {F−→0, F+→0} and a flow mask O ∈[0, 1]. The flow
+magnitude ∥F∥is then concatenated with F to produce gate
+bGi for further adaptive fusion (Fig. 5).
+To supervise the predicted flow with a dual role of guid-
+ing upstream motion extraction and downstream gate pre-
+diction, we introduce two constraints:
+1. Warp constraint. The ground-truth middle frame Si
+backwarped by F should reconstruct the first and last
+sharp frames within the blur interval, i.e., bSi−≈Si−
+and bSi+ ≈Si+.
+2. Merge constraint. Considering occluded regions where
+warping fails, we require that the merged result bmi
+from the restored middle frame bSi before gating and
+the warped frames {bSi−, bSi+} match the ground-truth
+merge mi from {Si−, Si, Si+}. Concrete merge equa-
+tions are as follows:
+bmi = 2
+3
+
+bSi−⊗O + bSi+ ⊗(1 −O)
+
++ 1
+3
+bSi
+(5)
+mi = 1
+3 (Si−+ Si + Si+)
+(6)
+where ⊗denotes pixel-wise multiplication.
+In training, loss functions derived from these constraints
+jointly guide motion representation learning and middle-
+frame restoration.
+4.2. Adaptive Gated Fusion Mechanism
+Existing methods for complete motion region prediction[19,
+34] rely on dual supervision: (1) the predicted gate matches
+ground-truth mask, and (2) the gated restoration aligns with
+the ground-truth sharp image. This design has its draw-
+backs. First, algorithmic masks contain inaccuracies [12],
+which makes mask supervision unreliable unless using
+labor-intensive manual annotations[20]. Second, blur-sharp
+pair imperfections like misalignments and noise cause the
+gate to activate incorrectly in static backgrounds.
+Motivated by these observations, we propose an adap-
+tive gated fusion (AGF) mechanism that uses masks only as
+a soft prior during training. Concretely, we compute two
+gated predictions in training, both supervised by the sharp
+22630
+
+
+Restormer
+LBAG
+MIMO-Unet
+OMDNet (Ours)
+LMD-ViT
+NAFNet
+EVSSM
+GT
+Blur
+Blur Image in OMoBlur 
+and its Motion
+Blur Image in ReLoBlur
+Restormer
+LBAG
+MIMO-Unet
+OMDNet (Ours)
+LMD-ViT
+NAFNet
+EVSSM
+GT
+Blur
+b
+a
+Figure 6. Visual comparison of various deblurring models trained on our proposed OMoBlur dataset. (a) Results on a spinning ball from
+the OMoBlur dataset. (b) Results on a moving car from the ReLoBlur dataset.
+ground truth Si: a standard gated output bSiG and an en-
+hanced version bS∗
+iG:
+bSiG = bSi ⊗bGi + Bi ⊗(1 −bGi),
+(7)
+bS∗
+iG = bSi ⊗bGi +
+
+Mi ⊗Bi+(1−Mi) ⊗Si
+
+⊗(1−bGi).
+(8)
+where Bi is the blurred input, bGi ∈[0, 1] is the predicted
+gate, and Mi ∈{0, 1} is the pre-generated blur mask. At
+test time, the model only outputs bSiG in Eq. (7).
+The standard form drives bGi →1 in blurred regions, as
+bSi is also supervised by Si. However, in background re-
+gions where Bi deviates from Si, the gate can be falsely
+activated, allowing potential artifacts from bSi to propagate
+into the final output. The enhanced form addresses this by
+using a mixed target that substitutes Si for Bi on back-
+ground pixels, encouraging bGi →0 there. Even with im-
+perfect Mi, the joint supervision from Eqs. (7) and (8) dur-
+ing training works complementarily to correct errors of gate
+bGi in both blurred and background regions.
+4.3. Loss Functions
+Our objective consists of four components: a warp loss
+Lwarp that directly supervises the flow F, a merge loss
+Lmerge that softly supervises both F and bSi, a restoration
+loss Lr that strongly supervises bSi, and a gated restoration
+loss Lg that adaptively supervises bGi and bSi.
+Due to the motion ambiguity inherent in blurred im-
+ages [14, 41], we avoid imposing a fixed warping direction
+on the network. The loss functions are defined as follows:
+Lwarp =
+X
+min
+h
+L1(bSi−, Si−) + L1(bSi+, Si+),
+L1(bSi−, Si+) + L1(bSi+, Si−)
+i
+,
+(9)
+Lmerge =
+X
+L1( bmi, mi),
+(10)
+Lr =
+X
+f(bSi, Si),
+(11)
+Lg =
+X 1
+2
+h
+f(bSiG, Si) + f(bS∗
+iG, Si)
+i
+,
+(12)
+where L1 is the pixelwise ℓ1 loss and f denotes ℓ1 loss plus
+FFT loss. The total loss function is:
+Ltotal = λ1Lwarp + λ2Lmerge + λ3Lr + λ4Lg,
+(13)
+with λ1 = 0.05, λ2 = 0.4, λ3 = 1.0, and λ4 = 0.4.
+Note that Lwarp is necessary to prevent the network from
+collapsing down to encode bidirectional information into a
+single, mixed flow field.
+5. Experiments and Analysis
+Models are trained on OMoBlur dataset, which contains
+18,910 image pairs for training and 1,354 pairs for test-
+ing. We use the Adam optimizer with a batchsize of 8 to
+train models for 500K iterations. The initial learning rate
+is 1 × 10−4 and is decayed at predefined milestones. Fol-
+lowing BAPC [19], we adopt a similar blur-aware cropping
+strategy to sample 256×256 patches that are more likely to
+cover blurred regions as inputs for all models.
+5.1. Benchmarking Deblurring Methods
+We evaluate the proposed OMDNet and open-sourced
+baseline methods on the OMoBlur test set at the na-
+tive resolution of 1920 × 360 using 1 NVIDIA GeForce
+RTX 4090 GPU. These deblurring methods include CNN-
+based [4, 10, 19], Transformer-based [20, 37], and Mamba-
+based method [16].
+We measure reconstruction fi-
+delity using PSNR/SSIM and weighted PSNR/SSIM [20]
+which focus on blurred regions. Additionally, we report
+LPIPS(VGG)[39] and DISTS[11] to better assess percep-
+tual quality in the context of deblurring.
+As summarized in Tab. 1, OMDNet achieves the best
+performance across all metrics.
+Its most substantial
+gains are on weighted PSNR/SSIM and perceptual metrics
+LPIPS/DISTS, highlighting exceptional capability in restor-
+ing blurred regions and producing visually realistic outputs.
+Thanks to our gating mechanism, OMDNet intelligently
+focuses on severely blurred areas and preserves the back-
+ground by refraining from forcibly correcting the inherent
+22631
+
+
+Blur
+Trained on 
+GoPro
+GT
+Trained on 
+OMoBlur-FI
+Trained on 
+OMoBlur
+Blur Image in ReLoBlur Dataset
+MIMO-Unet
+Restormer
+Blur
+Trained on 
+GoPro
+GT
+Trained on 
+OMoBlur-FI
+Trained on 
+OMoBlur
+Blur Image in ReLoBlur Dataset
+MIMO-Unet
+Restormer
+Blur
+Trained on 
+GoPro
+GT
+Trained on 
+OMoBlur-FI
+Trained on 
+OMoBlur
+Blur Image in ReLoBlur Dataset
+MIMO-Unet
+Restormer
+Blur
+Trained on 
+GoPro
+GT
+Trained on 
+OMoBlur-FI
+Trained on 
+OMoBlur
+Blur Image in ReLoBlur Dataset
+MIMO-Unet
+Restormer
+a
+b
+c d
+Figure 7. Visual comparisons of cross-dataset generalization on the real-world ReLoBlur dataset [19].
+Table 1. Quantitative evaluations on OMoBlur dataset.
+Methods
+PSNR↑SSIM↑PSNRw↑SSIMw↑LPIPS↓DISTS↓
+MIMO-UNet [10]
+35.36
+0.8819
+33.15
+0.8543
+0.2301
+0.0889
+Restormer [37]
+35.55
+0.8880
+33.24
+0.8613
+0.2379
+0.0964
+NAFNet [4]
+35.51
+0.8878
+33.18
+0.8607
+0.2375
+0.0971
+EVSSM [16]
+35.54
+0.8862
+33.21
+0.8578
+0.2419
+0.0987
+LBAG [19]
+35.55
+0.8883
+33.23
+0.8615
+0.2360
+0.0947
+LMD-ViT [20]
+35.68
+0.8888
+33.55
+0.8660
+0.2345
+0.0923
+OMDNet (Ours)
+35.73
+0.8891
+34.04
+0.8716
+0.2171
+0.0788
+residual misalignments in blur-sharp pairs. Consequently,
+improvements on global PSNR/SSIM are less pronounced,
+which is consistent with this intentional design. More quan-
+titative evaluation see Appendix C.1.
+Figure 6(a) depicts a challenging scenario with a ball
+spinning around its axis while the axis itself undergoes si-
+multaneous rotation and translation. In this complex setting,
+OMDNet achieves the clearest visual output and preserves
+the most authentic structural details.
+5.2. Generalization Analysis
+Generalization of Models Trained on OMoBlur.
+We re-
+construct the middle frame, which is the physically consis-
+tent choice for solving motion-direction ambiguity [15, 21].
+ReLoBlur instead targets the beginning frame. This mis-
+match limits cross-dataset score comparability, so we focus
+on qualitative comparisons.
+As illustrated in Fig. 6(b), models trained on OMoBlur
+consistently remove the cycloidal trails of rapidly rotat-
+ing wheels. The reconstructions even appear cleaner than
+the ground-truth in ReLoBlur. This indicates that our syn-
+thesized blur distribution closely matches real motion blur
+and that the sharp references used for training are suffi-
+ciently clean to support high fidelity restoration. In harder
+cases such as rapidly moving small text, OMDNet shows
+stronger dealiasing and detail preservation, benefiting from
+the multi-frame flow-guided supervision. Additional visual
+results are provided in Appendix C.2.
+Superiority of OMoBlur over Other Synthetic Strate-
+gies.
+To assess the validity and necessity of our time-
+integrated signal-accumulation blur model together with
+carefully engineered capture-side refinements, we conduct a
+cross-dataset training. Two widely used baselines, MIMO-
+UNet and Restormer, are trained on three sources: GoPro,
+OMoBlur-Frame Interpolated version (OMoBlur-FI), and
+OMoBlur, and then evaluated on ReLoBlur to examine gen-
+eralization. All ReLoBlur images are downsampled by 2×
+to ensure a consistent input scale. Specifically, OMoBlur-
+FI follows the REDS protocol [25]: we reduce the original
+500 fps sequences in our dataset to 125 fps, apply 16× in-
+terpolation with the high-performing EMA-VFI [38], and
+synthesize blur. For GoPro, we use the official pre-trained
+models released by MIMO-UNet and Restormer.
+Figure 7 presents representative scenes from ReLoBlur.
+Restormer trained on GoPro shows minimal restoration
+in these cases, and MIMO-UNet trained on GoPro pro-
+duces noticeable artifacts (particularly evident in Fig. 7(b)),
+likely reflecting overfitting to the physically inconsistent
+blur distribution. Although FI-based blur appears as nat-
+ural as OMoBlur (see Fig. 8), its distribution and physi-
+22632
+
+
+cal formation differ from real blur.
+This mismatch lim-
+its generalization.
+Consequently, for in-plane translation
+on low-frequency content (e.g. smooth white-car contours
+in Fig. 7(a)), models trained on OMoBlur-FI show some
+deblurring.
+For in-plane rotation with rich textures (e.g.
+wheels in Fig. 7(a)) and for out-of-plane motion (e.g. a
+turning black car in Fig. 7(c)), they largely fail to remove
+blur. By contrast, models trained on our OMoBlur main-
+tain strong performance across these scenes. In the walk-
+ing scene with severely blurred pocket zipper (Fig. 7(d)),
+prior work on ReLoBlur use complex network designs, yet
+the results are still limited [20, 34]. Baselines trained on
+our OMoBlur handle it cleanly, showing the strength of our
+large-scale, physically-faithful dataset.
+Blur Image in OMoBlur Dataset
+GT
+Blur
+Blur-FI
+Blur Image in OMoBlur Dataset
+GT
+Blur
+Blur-FI
+Figure 8. Visual comparison of two blur syntheses: physically
+grounded OMoBlur and frame-interpolated (FI) version. The blur
+results appear visually indistinguishable.
+5.3. Ablation Study
+Effectiveness of the Network Modules.
+We ablate three
+core components:
+Motion–Appearance Extract Block
+(MAEB), Flow-Guided Gate Predictor (FGP), and Differ-
+ential Transposed Attention Module (Diff-TAM) with re-
+sults in Tab. 2. All variants use the adaptive gated fusion
+mechanism.
+A minimalist backbone without extra modules already
+matches the CNN SOTA LBAG. With MAEB alone, gates
+come from appearance cues.
+They offer coarse guid-
+ance and enable cross-level information flow, but without
+optical-flow supervision they lack motion specificity, so the
+gain is modest. Adding FGP supplies flow-supervised mo-
+tion features and gate maps, sharpening motion focus and
+improving gate accuracy. Adding Diff-TAM further boosts
+the efficiency of motion modeling, delivering the best blur
+removal (see Appendix C.3 for visual result).
+Table 2. Ablations of OMDNet on OMoBlur. DTAM denote ab-
+breviations of Diff-TAM.
+DTAM
+FGP
+MAEB
+PSNR
+SSIM
+PSNRw SSIMw
+35.53
+0.8865
+33.39
+0.8662
+✓
+35.58
+0.8871
+33.46
+0.8673
+✓
+✓
+35.69
+0.8885
+33.88
+0.8702
+✓
+✓
+✓
+35.73
+0.8891
+34.04
+0.8716
+Comparison of the Gating Mechanism.
+Figure 9 illus-
+trates a representative case from the OMoBlur test set. The
+gate block used in LBAG produce false positives, marking
+static background as blurred. In contrast, our adaptive gated
+fusion more accurately highlights truly blurred areas in this
+challenging scene. Figure 10 further demonstrates the role
+of gating. With our gating mechanism, static areas remain
+almost unchanged. Removing gating introduces noticeable
+artifacts, and using LBAG’s gating fails to preserve back-
+ground content as well as ours.
+Blur Image in OMoBlur Test Set
+Blur
+(a)
+(b)
+(c)
+Figure 9. Gating comparison on OMoBlur. (a) LBAG, (b) ours, (c)
+manual annotation. Our gating highlights the actual blurred region
+while avoiding background activations.
+0
+0.15
+0
+0.15
+Blur Image in ReLoBlur
+MAE=0.041
+MAE=0.023
+MAE=0.007
+Static Region
+Zoom1
+w/o
+Gating
+w/ LBAG’s
+Gating
+w/ Our
+Gating
+Static Region
+Zoom2
+MAE=0.026
+MAE=0.017
+MAE=0.006
+w/o
+Gating
+w/ LBAG’s
+Gating
+w/ Our
+Gating
+Figure 10. Evaluation of static region preservation on ReLoBlur.
+In the second row, images are arranged from the center to the sides
+as follows: the blurred input, deblurring without gating, deblurring
+with LBAG’s gating, and deblurring with our gating. The dotted
+insets show the corresponding gate predictions. The first row dis-
+plays the absolute error maps between the restorations and the in-
+put, with the Mean Absolute Error (MAE) reported above. Our
+gating achieves the best preservation of background regions.
+6. Conclusion
+In this paper, we introduce OMoBlur, the first large-scale,
+physically grounded dataset for object motion blur, along
+with OMDNet, a novel deblurring framework tailored to
+this challenge. By optimizing the acquisition strategy to
+closely approximate the photon-integrated exposure pro-
+cess, OMoBlur significantly narrows the gap between syn-
+thetic and real-world blur and provides a high-fidelity
+benchmark for localized motion deblurring. The proposed
+OMDNet effectively integrates motion-aware feature ex-
+traction with adaptive gated fusion, which achieves accu-
+rate blur removal while maintaining background integrity.
+Extensive experiments demonstrate that our dataset and
+method achieve state-of-the-art performance. We believe
+that our physically consistent dataset construction method-
+ology can benefit a broader range of vision tasks and inspire
+the development of more effective real-world deblurring so-
+lutions.
+22633
+
+
+Acknowledgments
+This
+work
+was
+supported
+by
+the
+National
+Natu-
+ral Science Foundation of China (No.
+62275229)
+and
+the
+State
+Key
+Laboratory
+of
+Extreme
+Pho-
+tonics
+and
+Instrumentation,
+Zhejiang
+University.
+We also thank Haoying Li for helpful discussions.
+References
+[1] Guillermo Carbajal, Patricia Vitoria, Jos´e Lezama, and Pablo
+Mus´e. Blind motion deblurring with pixel-wise kernel esti-
+mation via kernel prediction networks. IEEE Transactions
+on Computational Imaging, 9:928–943, 2023. 2
+[2] Ayan Chakrabarti. A neural approach to blind motion de-
+blurring. In European conference on computer vision, pages
+221–235. Springer, 2016. 2
+[3] Liangyu Chen, Xin Lu, Jie Zhang, Xiaojie Chu, and Cheng-
+peng Chen. Hinet: Half instance normalization network for
+image restoration. In Proceedings of the IEEE/CVF confer-
+ence on computer vision and pattern recognition, pages 182–
+192, 2021. 1
+[4] Liangyu Chen, Xiaojie Chu, Xiangyu Zhang, and Jian Sun.
+Simple baselines for image restoration. In Computer Vision
+– ECCV 2022, pages 17–33, Cham, 2022. Springer Nature
+Switzerland. 5, 6, 7
+[5] Shiqi Chen, Huajun Feng, Keming Gao, Zhihai Xu, and
+Yueting Chen. Extreme-quality computational imaging via
+degradation framework. In Proceedings of the IEEE/CVF
+International Conference on Computer Vision (ICCV), pages
+2632–2641, 2021. 1
+[6] Shiqi Chen, Huajun Feng, Dexin Pan, Zhihai Xu, Qi Li, and
+Yueting Chen. Optical aberrations correction in postprocess-
+ing using imaging simulation. ACM Trans. Graph. (Post.Rec
+in SIGGRAPH 2022), 40(5), 2021. 1
+[7] Shiqi Chen, Ting Lin, Huajun Feng, Zhihai Xu, Qi Li, and
+Yueting Chen. Computational optics for mobile terminals
+in mass production. IEEE Transactions on Pattern Analysis
+and Machine Intelligence, 45(4):4245–4259, 2023. 1
+[8] Shiqi Chen, Jingwen Zhou, Menghao Li, Yueting Chen, and
+Tingting Jiang. Mobile image restoration via prior quantiza-
+tion. Pattern Recognition Letters, 174:64–70, 2023. 2
+[9] Shiqi Chen, Yuhang Li, Yuntian Wang, Hanlong Chen, and
+Aydogan Ozcan. Optical generative models. Nature, 644:
+903–911, 2025. 1
+[10] Sung-Jin Cho, Seo-Won Ji, Jun-Pyo Hong, Seung-Won Jung,
+and Sung-Jea Ko. Rethinking coarse-to-fine approach in sin-
+gle image deblurring. In Proceedings of the IEEE/CVF inter-
+national conference on computer vision, pages 4641–4650,
+2021. 6, 7
+[11] Keyan Ding, Kede Ma, Shiqi Wang, and Eero P Simoncelli.
+Image quality assessment: Unifying structure and texture
+similarity. IEEE transactions on pattern analysis and ma-
+chine intelligence, 44(5):2567–2581, 2020. 6
+[12] Zhenxuan Fang, Fangfang Wu, Tao Huang, Le Dong,
+Weisheng Dong, Xin Li, and Guangming Shi. Parameter-
+ized blur kernel prior learning for local motion deblurring.
+In Proceedings of the Computer Vision and Pattern Recogni-
+tion Conference, pages 23006–23015, 2025. 1, 2, 5
+[13] Dong Gong, Jie Yang, Lingqiao Liu, Yanning Zhang, Ian
+Reid, Chunhua Shen, Anton Van Den Hengel, and Qinfeng
+Shi. From motion blur to motion flow: A deep learning so-
+lution for removing heterogeneous motion blur. In Proceed-
+ings of the IEEE conference on computer vision and pattern
+recognition, pages 2319–2328, 2017. 2
+[14] Xiang Ji, Haiyang Jiang, and Yinqiang Zheng. Motion blur
+decomposition with cross-shutter guidance. In Proceedings
+of the IEEE/CVF Conference on Computer Vision and Pat-
+tern Recognition, pages 12534–12543, 2024. 6
+[15] Meiguang Jin, Givi Meishvili, and Paolo Favaro. Learning to
+extract a video sequence from a single motion-blurred image.
+In Proceedings of the IEEE Conference on Computer Vision
+and Pattern Recognition, pages 6334–6342, 2018. 7
+[16] Lingshun Kong, Jiangxin Dong, Jinhui Tang, Ming-Hsuan
+Yang, and Jinshan Pan. Efficient visual state space model for
+image deblurring. In Proceedings of the Computer Vision
+and Pattern Recognition Conference, pages 12710–12719,
+2025. 6, 7
+[17] Orest Kupyn, Volodymyr Budzan, Mykola Mykhailych,
+Dmytro Mishkin, and Jiˇr´ı Matas.
+Deblurgan: Blind mo-
+tion deblurring using conditional adversarial networks. In
+Proceedings of the IEEE conference on computer vision and
+pattern recognition, pages 8183–8192, 2018. 1
+[18] Orest Kupyn, Tetiana Martyniuk, Junru Wu, and Zhangyang
+Wang.
+Deblurgan-v2:
+Deblurring (orders-of-magnitude)
+faster and better.
+In Proceedings of the IEEE/CVF inter-
+national conference on computer vision, pages 8878–8887,
+2019. 1
+[19] Haoying Li, Ziran Zhang, Tingting Jiang, Peng Luo, Huajun
+Feng, and Zhihai Xu. Real-world deep local motion deblur-
+ring.
+In proceedings of the AAAI conference on artificial
+intelligence, pages 1314–1322, 2023. 1, 2, 4, 5, 6, 7
+[20] Haoying Li, Jixin Zhao, Shangchen Zhou, Huajun Feng,
+Chongyi Li, and Chen Change Loy. Adaptive window prun-
+ing for efficient local motion deblurring. In The Twelfth In-
+ternational Conference on Learning Representations, 2024.
+1, 2, 5, 6, 7, 8
+[21] Haoying Li, Honghao Chen, Jixin Zhao, Bingkun Chen, Hao
+Xu, Peng Luo, Huajun Feng, Zhihai Xu, Qi Li, and Yueting
+Chen. Real-world deep local motion deblurring with position
+guidance. IEEE Transactions on Circuits and Systems for
+Video Technology, 2025. 7
+[22] Chih-Hung Liang, Yu-An Chen, Yueh-Cheng Liu, and Win-
+ston H Hsu. Raw image deblurring. IEEE Transactions on
+Multimedia, 24:61–72, 2020. 3
+[23] Ting Lin, Shiqi Chen*, Huajun Feng, Zhihai Xu, Qi Li, and
+Yueting Chen. Non-blind optical degradation correction via
+frequency self-adaptive and finetune tactics. Opt. Express,
+30(13):23485–23498, 2022. 2
+[24] Seungjun Nah, Tae Hyun Kim, and Kyoung Mu Lee. Deep
+multi-scale convolutional neural network for dynamic scene
+deblurring.
+In Proceedings of the IEEE conference on
+computer vision and pattern recognition, pages 3883–3891,
+2017. 1, 2, 3
+22634
+
+
+[25] Seungjun Nah, Sungyong Baik, Seokil Hong, Gyeongsik
+Moon, Sanghyun Son, Radu Timofte, and Kyoung Mu Lee.
+Ntire 2019 challenge on video deblurring and super-
+resolution:
+Dataset and study.
+In Proceedings of the
+IEEE/CVF conference on computer vision and pattern
+recognition workshops, pages 0–0, 2019. 2, 3, 7
+[26] Zheng Ren, Jingwen Zhou, Wenguan Zhang, Jiapu Yan,
+Bingkun Chen, Huajun Feng, and Shiqi Chen*.
+Succes-
+sive optimization of optics and post-processing with differ-
+entiable coherent psf operator and field information. IEEE
+Transactions on Computational Imaging, 11:599–608, 2025.
+2
+[27] Jaesung Rim, Haeyun Lee, Jucheol Won, and Sunghyun Cho.
+Real-world blur dataset for learning and benchmarking de-
+blurring algorithms.
+In Computer Vision – ECCV 2020,
+pages 184–201, Cham, 2020. Springer International Publish-
+ing. 2
+[28] Jaesung Rim, Geonung Kim, Jungeon Kim, Junyong Lee,
+Seungyong Lee, and Sunghyun Cho. Realistic blur synthesis
+for learning image deblurring. In European conference on
+computer vision, pages 487–503. Springer, 2022. 2, 3
+[29] Christian J Schuler, Michael Hirsch, Stefan Harmeling, and
+Bernhard Sch¨olkopf. Learning to deblur. IEEE transactions
+on pattern analysis and machine intelligence, 38(7):1439–
+1451, 2015. 2
+[30] Shuochen Su, Mauricio Delbracio, Jue Wang, Guillermo
+Sapiro, Wolfgang Heidrich, and Oliver Wang. Deep video
+deblurring for hand-held cameras.
+In Proceedings of the
+IEEE conference on computer vision and pattern recogni-
+tion, pages 1279–1288, 2017. 1, 2, 3
+[31] Jian Sun, Wenfei Cao, Zongben Xu, and Jean Ponce. Learn-
+ing a convolutional neural network for non-uniform motion
+blur removal.
+In Proceedings of the IEEE conference on
+computer vision and pattern recognition, pages 769–777,
+2015. 1, 2
+[32] Xin Tao, Hongyun Gao, Xiaoyong Shen, Jue Wang, and Ji-
+aya Jia. Scale-recurrent network for deep image deblurring.
+In Proceedings of the IEEE conference on computer vision
+and pattern recognition, pages 8174–8182, 2018. 1
+[33] Hao Wei, Chenyang Ge, Xin Qiao, and Pengchao Deng.
+Real-world image deblurring using data synthesis and fea-
+ture complementary network. IET Image Processing, 18(5):
+1328–1343, 2024. 2, 3
+[34] Zeyu Xiao, Zhihe Lu, Michael Bi Mi, Zhiwei Xiong, and
+Xinchao Wang. Unraveling motion uncertainty for local mo-
+tion deblurring. In Proceedings of the 32nd ACM Interna-
+tional Conference on Multimedia, pages 3065–3074, 2024.
+1, 2, 5, 8
+[35] Gangwei Xu, Shujun Chen, Hao Jia, Miaojie Feng, and Xin
+Yang. Memory-efficient optical flow via radius-distribution
+orthogonal cost volume. arXiv preprint arXiv:2312.03790,
+2023. 4
+[36] Tianzhu Ye, Li Dong, Yuqing Xia, Yutao Sun, Yi Zhu, Gao
+Huang, and Furu Wei.
+Differential transformer.
+In The
+Thirteenth International Conference on Learning Represen-
+tations, 2025. 5
+[37] Syed Waqas Zamir, Aditya Arora, Salman Khan, Mu-
+nawar Hayat, Fahad Shahbaz Khan, and Ming-Hsuan Yang.
+Restormer: Efficient transformer for high-resolution image
+restoration. In Proceedings of the IEEE/CVF conference on
+computer vision and pattern recognition, pages 5728–5739,
+2022. 6, 7
+[38] Guozhen Zhang, Yuhan Zhu, Haonan Wang, Youxin Chen,
+Gangshan Wu, and Limin Wang. Extracting motion and ap-
+pearance via inter-frame attention for efficient video frame
+interpolation. In Proceedings of the IEEE/CVF Conference
+on Computer Vision and Pattern Recognition, pages 5682–
+5692, 2023. 7
+[39] Richard Zhang, Phillip Isola, Alexei A Efros, Eli Shecht-
+man, and Oliver Wang. The unreasonable effectiveness of
+deep features as a perceptual metric. In Proceedings of the
+IEEE conference on computer vision and pattern recogni-
+tion, pages 586–595, 2018. 6
+[40] Youjian Zhang, Chaoyue Wang, Stephen J Maybank, and
+Dacheng Tao.
+Exposure trajectory recovery from motion
+blur. IEEE Transactions on Pattern Analysis and Machine
+Intelligence, 44(11):7490–7504, 2021. 2
+[41] Zhihong Zhang, Runzhao Yang, Jinli Suo, Yuxiao Cheng,
+and Qionghai Dai.
+Lightweight high-speed photography
+built on coded exposure and implicit neural representation
+of videos. International Journal of Computer Vision, 133
+(3):991–1011, 2025. 6
+[42] Zhihang Zhong, Xiao Sun, Zhirong Wu, Yinqiang Zheng,
+Stephen Lin, and Imari Sato. Animation from blur: Multi-
+modal blur decomposition with motion guidance.
+In Eu-
+ropean Conference on Computer Vision, pages 599–615.
+Springer, 2022. 2, 3
+[43] Zhihang Zhong, Mingdeng Cao, Xiang Ji, Yinqiang Zheng,
+and Imari Sato. Blur interpolation transformer for real-world
+motion from blur. In Proceedings of the IEEE/CVF Con-
+ference on Computer Vision and Pattern Recognition, pages
+5713–5723, 2023. 2
+[44] Jingwen Zhou, Shiqi Chen*, Zheng Ren, Wenguan Zhang,
+Jiapu Yan, Huajun Feng, Qi Li, and Yueting Chen. Revealing
+the preference for correcting separated aberrations in joint
+optic-image design. Optics and Lasers in Engineering, 178:
+108220, 2024. 2
+22635
