@@ -1,0 +1,1898 @@
+PixelART: Image-to-Layer Decomposition without
+Latents or Text-to-Image Pretraining
+Zelin Jia1
+Zhao Zhang2
+Zhicong Tang2
+Yuhui Yuan2∗
+Shixia Liu1∗
+1School of Software, BNRist, Tsinghua University
+2Canva Research
+ryanyuan@canva.com, shixia@tsinghua.edu.cn
+RGB-VAE
+Encoder
+Regional Crop
+Latent-space
+MMDiT
+RGBA-VAE
+Decoder
+Text-to-image
+Text-to-layers
+Image-to-layers
+Training Recipe
+Text-to-image
+Text-to-RGBA
+Image-to-layers
+Training Recipe
+Text-to-layers
+Alpha
+Discarded
+Regional Crop
+Pixel-space
+MMDiT
+Training Recipe
+Image-to-layers
+✅ Native pixel space, no VAE bottleneck
+✅ Single-stage, from scratch training
+✅ Fast sampling, low GPU memory usage
+RGBA-VAE
+Encoder
+Latent-space
+MMDiT
+RGBA-VAE
+Decoder
+Repeat
+×N layers
+❌ RGB VAE
+❌ Alpha discarded
+⚠️ VAE bottleneck
+❌ Per-layer decode
+Figure 1: Comparison with previous Image-to-Layer decomposition systems. Left: ART [1] and its variant;
+Middle: Qwen-Image-Layered [2]; Right: Ours. Our PixelART is much simpler and trained from scratch.
+Abstract
+Image-to-layer decomposition converts a flattened image into editable RGBA lay-
+ers, enabling element-level editing in design workflows. Existing diffusion-based
+systems typically adapt large pretrained text-to-image (T2I) models and introduce
+RGBA autoencoders or variable-layer architectural modules. We revisit this design
+choice and ask whether layer decomposition truly requires these heavyweight
+components. We introduce PixelART, a pixel-space rectified-flow Transformer
+trained from scratch for image-to-layer (I2L) decomposition. PixelART directly
+denoises regional RGBA pixel patches using a single-stream multi-modal diffusion
+Transformer, avoiding RGBA-VAEs, pretrained T2I backbones, and layer-specific
+decoders. We identify a key property of the task: high-noise timesteps determine
+layer assignment and coarse layer organization, while low-noise timesteps mainly
+refine color, alpha, texture, and boundaries. Based on this observation, we pro-
+pose a terminal-boosted timestep sampling strategy to increase training coverage
+in the high-noise layer assignment regime. Trained on 4M multi-layer design
+templates, PixelART achieves state-of-the-art layer decomposition and composite
+reconstruction on DESIGN-MULTI-LAYER-BENCH and LICA with over 80% fewer
+parameters, 98% lower latency, and 85% lower memory than the recent Qwen-
+Image-Layered model. Ablation experiments show that pixel-space x-prediction,
+terminal-boosted timestep sampling, and data/model scaling are critical, while T2I
+pretraining brings marginal benefits to the I2L task.
+∗Corresponding author.
+Preprint. Under review.
+arXiv:2609.22789v1  [cs.CV]  19 Sep 2026
+
+
+Figure 2: Image-to-layer decomposition results with our PixelART-H/32.
+1
+Introduction
+Flat image generators, such as Nano-Banana [3, 4, 5] and GPT-Image [6, 7, 8], can synthesize visually
+rich raster images, but their outputs remain difficult to edit. In contrast, professional design tools rely
+on layered representations, where text, graphics, backgrounds, shadows, and decorative elements can
+be edited independently [9]. Image-to-layer (I2L) decomposition aims to recover this editable struc-
+ture by converting a flattened RGB image into an ordered stack of RGBA layers, enabling element-
+level editing, restyling, and recomposition. Recent diffusion-based systems, including ART [1],
+Qwen-Image-Layered [2], OmniPSD [10], and OmniAlpha [11], have made rapid progress on layered
+generation and decomposition. Despite their differences, they largely follow a common recipe:
+adapt a large pretrained text-to-image (T2I) backbone, extend an RGB autoencoder into an RGBA
+autoencoder, and add task-specific mechanisms for transparent and variable-layer outputs. While
+natural, this design is complex, and the latent autoencoder can become a bottleneck when modeling
+design layers with transparency, small text, sparse strokes, flat colors, and sharp alpha boundaries.
+We revisit this recipe and ask whether strong I2L performance can be obtained without latent
+autoencoding or T2I pretraining. To this end, we propose PixelART, a pixel-space rectified-flow
+Transformer trained from scratch. PixelART directly denoises regional RGBA pixel patches using a
+single-stream Transformer, avoiding RGBA-VAEs, pretrained T2I backbones, layer-specific decoders,
+and variable-layer modules (Figure 1). We formulate the I2L task as a pixel-native assignment-and-
+completion problem, in which the model must assign visible pixels to layers, complete occluded
+content, and refine RGBA values. We observe that layer assignment and detail refinement occur
+at different stages of the diffusion trajectory. High-noise timesteps determine layer assignment
+and structure; low-noise timesteps refine appearance like color, alpha, texture, and boundaries. We
+propose a novel terminal-boosted timestep sampling strategy to increase training coverage in the
+high-noise assignment regime.
+PixelART achieves state-of-the-art layer decomposition and composite reconstruction quality on
+DESIGN-MULTI-LAYER-BENCH and LICA while using substantially fewer parameters, lower latency,
+and memory than VAE-based diffusion baselines. Ablations show that pixel-space x-prediction,
+high-noise timestep coverage, and data/model scaling are all critical, whereas T2I initialization
+reduces early loss but yields marginal gain under our data-rich I2L setup. Figure 2 presents additional
+I2L decomposition visual results. The main contributions of our work are:
+2
+
+
+• We show that I2L decomposition can be effectively solved by a pixel-space diffusion Transformer
+trained from scratch, without latent autoencoding or T2I pretraining.
+• We introduce PixelART, a single-stream regional Transformer that directly predicts editable
+RGBA pixel patches without layer-specific decoders or variable-layer modules.
+• We identify the importance of high-noise timesteps for layer assignment and propose terminal-
+boosted timestep sampling to improve decomposition reliability. System-level comparisons and
+ablations demonstrate that PixelART matches or outperforms larger T2I-initialized pipelines
+while maintaining a simpler and more efficient design.
+2
+Related Work
+Pixel-space Diffusion Models.
+Pixel-space diffusion has evolved through three waves. The first
+wave operates directly in RGB pixel space with U-Net backbones, including DDPM [12], ADM [13],
+GLIDE [14], Imagen [15], DALL-E 2 [16], and Cascaded Diffusion [17], all relying on overcomplete
+channels and dense skip connections to cope with high dimensionality. The second wave shifted
+denoising into a compressed VAE latent, including LDM [18], SDXL [19], eDiff-I [20], DALL-
+E 3 [21], FLUX [22], SD3 [23], and Qwen-Image [24], dramatically lowering per-step compute but
+tying generation quality to VAE capacity—a poor fit for downstream tasks like layer decomposition
+whose inputs and targets are pixel-native. The third wave revisits pixel space with Transformer
+backbones. SiD2 [25], PixelFlow [26], and PixNerd [27] demonstrate that ViT-based pixel diffusion
+is competitive at high resolution when combined with loss weighting, cascaded multi-resolution
+training, and an auxiliary patch decoder, respectively. JiT [28], pMF [29], and PixelGen [30] go
+further, showing that a plain ViT with x-prediction on large pixel patches matches latent diffusion
+without any tokenizer. PixelART builds directly on this third wave: we inherit JiT’s x-prediction ViT
+and extend pixel-space diffusion from T2I to I2L decomposition, where the pixel-native input/output
+structure is an especially natural fit.
+Multi-Layer Generation and Decomposition.
+Layered RGBA generation has mainly followed
+two paradigms. Simultaneous methods generate all layers in a single forward pass, including
+Text2Layer [31], LayerDiff [32], ART [1], PrismLayer [33], DreamLayer [34], and Qwen-Image-
+Layered [2]. Sequential methods generate or extract layers one at a time, including LayerDiffuse [35],
+COLE [36], OpenCOLE [37], LayerD [38], and OmniPSD [10]. Recent image-to-layer systems, such
+as Qwen-Image-Layered and CLD [39], adapt pretrained text-to-image backbones with substantial
+task-specific engineering, including RGBA VAEs, variable-layer tokenization, region-conditioned
+Transformers, and multi-stage training. Commercial systems such as Magic Layers [40], Lovart [41],
+and Ideogram [42] appear to follow similar recipes at product scale. Adjacent work addresses matting,
+segmentation, and alpha-aware representation learning. Matting- and segmentation-based pipelines,
+including LayerD and trimap-free methods based on SAM [43], SAM2 [44], HQ-SAM [45], and
+ZIM [46], decompose images through cascaded detection, segmentation, matting, and inpainting, but
+lack end-to-end optimization and often struggle with hard boundaries or semi-transparent content.
+Transparency-focused VAE methods, including LayerDiffuse [35], AlphaVAE [47], Wan-Alpha [48],
+and OmniAlpha [11], extend RGB autoencoders to RGBA latent spaces for downstream generative
+models. Overall, prior approaches rely on T2I pretraining, RGBA-specific tokenizers, or cascaded
+expert modules. PixelART instead uses a single pixel-space diffusion Transformer trained from
+scratch, without a VAE or pretrained backbone, achieving competitive performance.
+3
+Our Approach
+3.1
+Image-to-Layer as Pixel-Space Inverse Generation
+Most previous layered diffusion systems [1, 39, 2] adapt pretrained text-to-image backbones, typically
+by extending an RGB VAE into an RGBA VAE and modifying an MMDiT backbone to support
+alpha transparency, variable layer numbers, and multiple resolutions. In contrast, we formulate
+image-to-layer decomposition as a pixel-native inverse problem: assigning visible pixels to editable
+layers and completing occluded content behind them. These two subproblems are naturally defined
+in RGB/RGBA pixel space and do not inherently require text-to-image priors.
+3
+
+
+Formulation.
+Given a flattened RGB image I ∈[0, 1]H×W ×3,2 image-to-layer decomposition
+aims to recover an ordered stack of editable RGBA layers L = {L0, L1, . . . , LK}, where Li ∈
+[0, 1]H×W ×4. Here L0 denotes the background layer and {Li}K
+i=1 denote the foreground layers in
+design z-order. The predicted layers should reconstruct the input under alpha compositing:
+ΠRGB (Over(L0, L1, . . . , LK)) ≈I,
+(1)
+where Over(·) denotes source-over compositing all transparent layers and the background layer in
+normalized RGBA space and ΠRGB extracts the RGB channels.
+Regional layer parameterization.
+Following the anonymous regional formulation of ART [1],
+we do not assign semantic labels to layer slots. Each layer is specified only by a spatial region
+and its z-order. Let R = {r0, r1, . . . , rK} denote the region set, where r0 is the full canvas and
+ri = (xi, yi, hi, wi) for i > 0 is the padded bounding box of the non-transparent support of layer i.
+During training, R is obtained from the ground-truth design file. At inference, R can be provided by
+a user or produced by an automatic layout detector; PixelART is agnostic to the source of the regions.
+For each RGBA crop Xi = crop(Li, ri) ∈[0, 1]hi×wi×4, we pad it to a multiple of patch size P and
+form exact non-overlapping pixel patches:
+ϕP (Xi) ∈RNi×4P 2,
+Ni = ⌈hi/P⌉⌈wi/P⌉.
+(2)
+The clean target sequence is always defined in exact RGBA pixel-patch space:
+Y = [ϕP (X0); ϕP (X1); . . . ; ϕP (XK)].
+(3)
+The flattened input image is converted to normalized RGBA by appending an opaque alpha channel,
+eI = [I; 1]. We pad variable-length regional sequences and mask padding tokens in attention and loss.
+3.2
+PixelART Architecture
+Pixel patch embedding.
+PixelART keeps the denoising target in exact pixel space but embeds
+patches into the Transformer width d for computation. Let E(·) denote the selected patch embedding.
+We support two choices. The default is a shared linear projection from 4P 2 to d. The second is a
+lightweight convolutional bottleneck, implemented as a P × P, stride-P convolution from 4 channels
+to db, followed by a 1 × 1 convolution from db to d, following the spirit of JiT [28]. This module
+only embeds pixel patches into the Transformer; it is not a VAE or latent decoder. The output head
+still predicts exact RGBA pixel patches in RNi×4P 2.
+Anonymous regional tokens with 3D RoPE.
+PixelART treats all visual regions as anonymous
+RGBA patch sequences. We do not provide regional prompts or use learned role embeddings to
+distinguish the input image, the background layer, or foreground layers, nor do we use layer-specific
+decoders. For patch j from region ri, the initial Transformer token is hi,j = E(Xi)j. Spatial and
+layer-slot information is injected only through 3D RoPE inside the attention layers. Each visual token
+is assigned a 3D coordinate that specifies the x, y, and z positions, where x and y correspond to the
+spatial position within the image, and z refers to layer index. For clean conditioning-image tokens,
+we use the full-canvas spatial coordinates and a single fixed layer slot reserved for the input image;
+for target layer tokens, zi follows the anonymous layer order.
+Single-stream pixel diffusion Transformer.
+Inspired by single-stream diffusion Transformers [49],
+PixelART concatenates optional text tokens, clean conditioning-image tokens, and noisy target-layer
+tokens into one sequence:
+St = [T; G; E(Y(0)
+t ); E(Y(1)
+t ); . . . ; E(Y(K)
+t
+)],
+(4)
+where T denotes text tokens, G = E(eI) denotes clean conditioning-image tokens, and Y(i)
+t
+denotes
+the noised pixel-patch sequence of target region i. After lightweight modality-specific processors,
+we apply all multi-modal self-attention layers over the entire sequence, allowing every target layer
+to attend to the input image, text, and all other layers. The output head is read only on target-layer
+positions:
+bYθ = fθ(St, t, R)target.
+(5)
+Conditioning and target tokens are separated by the diffusion mask: conditioning tokens remain clean,
+while target layer tokens are noised and supervised.
+2All RGB and RGBA tensors are represented as normalized floating-point values in [0, 1] if not specified.
+4
+
+
+t = 0
+t = 0.04
+t = 0.16
+t = 1
+Failed
+Successful
+Input
+✗
+✓
+t = 0.08
+t = 0.32
+Figure 3: High-noise timesteps are critical for layer assignment. We compare layer states along the sampling
+trajectory for checkpoints with and without terminal boosting. The boosted model (1st row) assigns regions
+correctly at the earliest high-noise stage, whereas the unboosted model (2nd row) makes a persistent layer-
+assignment error. Later steps mainly refine RGBA details. Green/red boxes mark correct/incorrect assignments.
+3.3
+Learning Objective and Sampling
+PixelART follows rectified-flow training with the convention that t = 0 denotes pure noise and t = 1
+denotes clean data. Given clean target pixel patches Y, Gaussian noise ϵ ∼N(0, I), and timestep
+t ∼q(t), we define Yt = tY + (1 −t)ϵ. The model predicts clean pixel patches bYθ. Following the
+x-prediction with v-loss formulation, we convert the clean prediction into a velocity estimate:
+bvθ =
+bYθ −Yt
+1 −t
+,
+v = Y −ϵ.
+(6)
+We optimize the velocity-space flow-matching objective:
+Lflow = EY,ϵ,t
+
+1
+|Ω|
+X
+j∈Ω
+∥bvθ,j −vj∥2
+2
+
+,
+(7)
+where Ωdenotes valid non-padding target tokens. Equivalently, this objective corresponds to clean-
+pixel prediction with a timestep-dependent weight 1/(1 −t)2. We also incorporate an LPIPS
+perceptual loss based on both VGG and ConvNeXt-V2, following [29] for improved performance.
+Sampling and reconstruction.
+At inference, we feed the conditioning-image and text tokens,
+initialize the target pixel-patch sequence Y0 ∼N(0, I), and integrate the rectified-flow ODE from
+t = 0 to t = 1. At each step t < 1, the model predicts clean patches bYθ and estimates the velocity
+following Equation (6). We adopt classifier-free guidance (CFG) [50] in velocity space. After
+sampling, each predicted region sequence bYi is unpatchified, cropped to remove padding, and pasted
+back to the canvas:
+bLi(p) =
+(
+clip[0,1]
+
+bXi(p −oi)
+
+,
+p ∈ri,
+(0, 0, 0, 0),
+otherwise,
+(8)
+where bXi = crophi,wi(ϕ−1
+P ( bYi)) and oi = (xi, yi) is the origin of region ri. The final output is the
+ordered editable RGBA stack {bL0, bL1, . . . , bLK}.
+3.4
+Terminal-Boosted Timestep Sampling
+Logit-normal base schedule.
+Modern rectified-flow Transformers such as SD3, FLUX, and JiT [28]
+commonly sample timesteps from a logit-normal distribution [23, 22, 24]. A latent variable u ∼
+N(µ, σ2) is mapped to t ∈(0, 1) by t = sigmoid(u), yielding density
+qbase(t) =
+1
+σ
+√
+2π
+1
+t(1 −t) exp
+
+−(logit(t) −µ)2
+2σ2
+
+.
+(9)
+With t = 0 as pure noise and t = 1 as clean data, µ controls which endpoint receives more mass; the
+standard logit-normal schedule concentrates mass at intermediate timesteps, with little near t = 0.
+High-noise layer assignment.
+Image-to-layer decomposition differs from standard image genera-
+tion because it must first solve a discrete assignment problem: which visible pixels belong to which
+output layer. We interpret the output space as a disjoint union of manifolds, one for each valid layer
+assignment. The model must choose the correct branch at the beginning of the sampling trajectory,
+when t ≈0. Once denoising has progressed, later steps mainly refine continuous RGBA values and
+5
+
+
+0.00
+0.25
+0.50
+0.75
+1.00
+t
+0.0
+0.5
+1.0
+1.5
+2.0
+2.5
+3.0
+density
+0.1
+0.2
+(a) qboost =
+(t = 0),
+0
+p = 0.1
+p = 0.2
+qbase (lognorm)
+0.00 0.10
+0.25
+0.50
+0.75
+1.00
+t
+0.0
+0.5
+1.0
+1.5
+2.0
+2.5
+3.0
+(b) qboost = U(0, 0.1),
+= 0.1
+p = 0.1
+p = 0.2
+qbase (lognorm)
+0.00
+0.20
+0.50
+0.75
+1.00
+t
+0.0
+0.5
+1.0
+1.5
+2.0
+2.5
+3.0
+(c) qboost = U(0, 0.2),
+= 0.2
+p = 0.1
+p = 0.2
+qbase (lognorm)
+Figure
+4:
+Terminal-boosted
+timestep distributions.
+We mix
+the base schedule with either a
+point mass at t = 0 or a uniform
+distribution U(0, τ) to increase the
+mass in the high-noise region.
+often cannot switch to a different layer-assignment branch. This motivates increasing the training
+probability of the high-noise region near t = 0. Figure 3 visualizes several examples illustrating
+failures caused by incorrect layer assignments at high-noise timesteps.
+Terminal-boost formulation.
+We augment base schedule with an auxiliary high-noise component:
+q(t) = p · qboost(t; τ) + (1 −p) · qbase(t),
+(10)
+where p is the boost probability and qboost is supported on [0, τ]. We consider two simple choices:
+qboost(t; τ) =
+δ(t = 0),
+τ →0,
+U(0, τ),
+τ > 0.
+(11)
+The point-mass boost emphasizes the pure-noise endpoint, while the uniform boost spreads probability
+over an early high-noise interval. Figure 4 visualizes the resulting mixture density for p ∈{0.1, 0.2}
+and τ ∈{0, 0.1, 0.2}. All these variants allocate more probability mass to high-noise regions. The
+compatibility of the terminal-boosted schedule with x-prediction v-loss in Supplementary F.
+4
+Experiments
+Architecture.
+We instantiate three model variants, PixelART-B/L/H, following ViT [51] naming.
+Each variant has 12/24/32 transformer blocks, 768/1024/1280 hidden dimensions, 12/16/16 atten-
+tion heads, 128/256/256 bottleneck dimensions, and 168M/523M/1.05B parameters, respectively.
+Training setting.
+We conduct all ablation experiments with PixelART-B/16 (i.e., patch size p=16)
+at 256×256 resolution by default, and train each model for 100K steps, i.e. 20 epochs and one day of
+training with 8× H200 GPUs by default. For system-level experiments, we train PixelART-H/32 with
+32× H200 GPUs first at 256 × 256 resolution with patch size 32 for 80 epochs, then progressively
+scale to 512 × 512 and 1024 × 1024 resolutions for additional 60 and 10 epochs, respectively. All
+experiments use the same internal multi-layer design dataset consisting of 4M high-quality samples.
+Evaluation setting.
+We mainly evaluate on DESIGN-MULTI-LAYER-BENCH [1]3 and LICA [53].
+We report Layer L1/PSNR/SSIM on non-transparent pixels using the ground-truth alpha mask,
+and Composite L1/PSNR/SSIM between the composited prediction and the input image. We also
+report VLM-based ratings of Alpha (matte and transparency quality) and Visual (layer integrity and
+separation), judged by GPT-5.5 [54] and Gemini-3.1 Pro [55], and the system prompt is detailed in
+Supplementary D.4. For the user study, we collect two-dimensional pairwise preferences from 10
+annotators with diverse backgrounds.
+Layout setting.
+To extract the regional tokens from flat design pixels, we adopt a graphic design
+layout detector DAD [56] based on Qwen3-VL-2B [57]. The additional latency introduced by the
+layout detector is only 1 second when predicting around 20 bounding boxes in z-order.
+4.1
+Main Results
+Comparison with State-of-the-Art.
+We compare PixelART-H against state-of-the-art image-to-
+layer decomposers on DESIGN-MULTI-LAYER-BENCH [1] and LICA [53]: Qwen-Image-Layered
+(QIL) [2], which adapts Qwen-Image-20B [24] with a VLD-MMDiT architecture, and CLD [39], an
+ART-style [1] variant built on FLUX.1[dev]-12B [22]. Both methods rely on pretrained T2I backbones
+and RGBA latent autoencoders. We additionally include LayerD [38], a non-diffusion pipeline based
+on matting and LaMa [58] inpainting. For fair comparison, we use the official checkpoint, codebase,
+and default inference configuration of each baseline. We use the same layout detector for PixelART
+and CLD, while QIL and LayerD are evaluated in their native bbox-free setting.
+3A graphic-design benchmark curated from VistaCreate [52]
+6
+
+
+0
+25
+50
+75
+100
+Preference rate (%)
+Quality
+Fidelity
+45.1
+44.5
+10.4
+44.3
+50.0
+5.7
+PixelART Win
+Draw
+CLD Win
+0
+25
+50
+75
+100
+Preference rate (%)
+Quality
+Fidelity
+75.4
+20.0
+4.6
+65.7
+32.6
+PixelART Win
+Draw
+QIL Win
+0
+25
+50
+75
+100
+Preference rate (%)
+Quality
+Fidelity
+81.5
+16.2
+64.5
+32.6
+PixelART Win
+Draw
+LayerD Win
+0
+25
+50
+75
+100
+Preference rate (%)
+Quality
+Fidelity
+26.4
+59.2
+14.4
+23.0
+66.7
+10.3
+PixelART Win
+Draw
+Magic Layers Win
+Figure 5: User study. Comparison with previous SoTA methods and the commercial system Magic Layers [40].
+DESIGN-MULTI-LAYER-BENCH
+LICA
+Pixel PSNR↑VLM (GPT/Gem.)↑Pixel PSNR↑VLM (GPT/Gem.)↑
+Inference Efficiency
+Method
+T2I Pre. VAE #Params (Layout)
+Comp.
+Alpha
+Visual
+Comp.
+Alpha
+Visual
+Time (s)↓Mem (GB)↓
+CLD [39]
+✓
+✓
+14B (12+2)
+29.79
+4.24/4.83 4.50/4.68
+28.84
+4.21/4.78 4.38/4.62 58.7 (+0.7) 55.6 (+4.2)
+Qwen-Image-Layered [2]
+✓
+✓
+20B
+32.46
+4.30/4.73 4.14/4.37
+31.99
+4.22/4.65 3.93/4.20
+213.4
+72.4
+PixelART
+✗
+✗
+3.05B (1.05+2)
+36.92
+4.32/4.91 4.57/4.81
+36.39
+4.26/4.87 4.44/4.75 3.1 (+0.7)
+6.6 (+4.2)
+LayerD† [38]
+✓
+✓
+0.27B
+36.07
+4.12/3.94 3.49/3.13
+37.22
+4.06/4.01 3.64/3.37
+15.0
+3.4
+Table 1: System-level comparison. T2I Pre.: whether initialized from pretrained T2I. Pixel PSNR: PSNR
+between the alpha-composited reconstruction and the input image. VLM: scores (1–5) from GPT-5.5 / Gemini-3.1
+Pro (separated by ‘/’) on alpha and visual quality. Efficiency: per-image latency and peak memory on one H200.
+Parenthesized values for PixelART and CLD report the additional layout detector overhead (#parameters, latency,
+GPU memory). LayerD† is non-diffusion (segmentation + inpainting), which inflates Composite PSNR but
+yields the lowest VLM Visual score. Bold = best within the diffusion-based group.
+Table 1 shows that PixelART achieves both the best Composite PSNR and the highest VLM rating,
+despite using 6× fewer parameters than QIL and 4× fewer parameters than CLD. Beyond accu-
+racy, PixelART-H also delivers substantial efficiency gains: measured on 100 randomly sampled
+1024 × 1024 inputs from DESIGN-MULTI-LAYER-BENCH [1] on a single H200 GPU without any
+acceleration tricks (quantization, distillation, or step reduction), it runs 19× faster than CLD and
+69× faster than QIL while using 8–11× less peak GPU memory. These efficiency gains come from
+both the smaller diffusion transformer backbone and the absence of a VAE during sampling.4
+Qualitative Comparison.
+Figure 6 compares PixelART with prior methods along three comple-
+mentary qualitative axes. (1) Reconstruction fidelity: CLD and QIL often introduce visible artifacts
+on fine textures, small text, and fuse characters together, which is consistent with the information
+loss of latent autoencoding, whereas PixelART directly denoises RGBA pixels and better preserves
+high-frequency details. (2) Semi-transparency: for soft shadows, feathered boundaries, and gradient
+overlays, CLD tends to collapse alpha into nearly binary masks and fails to produce transparency,
+while QIL bakes background colors into foreground layers and even introduces color shifts. In
+contrast, PixelART maintains significantly better RGB consistency and smooth alpha transitions. (3)
+Assignment rationality: bbox-free baselines such as QIL and LayerD do not require layout input, but
+their outputs can mix unrelated elements, split coherent ones across layers, or suffer from segmen-
+tation leakage and incomplete extraction. On the other hand, PixelART uses bboxes as conditions,
+provides explicit control, and can produce more coherent editable layers.
+User Study.
+Figure 5 summarizes the user study results. Our approach is consistently preferred
+over prior state-of-the-art methods and achieves comparable or superior performance to the latest
+commercial system, Canva Magic Layers [40].
+4.2
+Ablation Study
+Pixel-space outperforms latent-space diffusion for I2L.
+Table 2 compares pixel-space and latent-
+space diffusion under matched settings, differing only in whether layers are encoded through a
+pretrained RGBA-VAE. We use the RGBA-VAE from Qwen-Image-Layered [2] as the strongest
+publicly available latent baseline. Pixel diffusion wins on every metric, with a +5.57 dB gain on
+Composite PSNR. These results indicate that latent representations are suboptimal for image-to-layer
+decomposition, and we therefore adopt pixel-space diffusion by default unless otherwise specified.
+T2I pretraining provides limited benefit for I2L.
+We test whether text-to-image pretraining
+improves image-to-layer decomposition. Following PixelGen [30], we pretrain PixelART-B on
+the public BLIP-3o corpus [61] (∼36 million text–image pairs) for 250K steps with standard flow
+matching, then fine-tune on I2L using the same training budget as the from-scratch baseline. As
+shown in Table 3, T2I pretraining brings a marginal improvement in the Layer SSIM metric (+0.005)
+and a slight regression on Composite PSNR (−0.39 dB). Figure 7(c) reveals the underlying training
+dynamics to better understand model behavior [62]: the T2I-initialized model starts at a substantially
+lower loss thanks to its generic image generation prior, but the from-scratch run closes this gap
+within roughly 60K fine-tuning iterations. These results suggest that T2I priors transfer poorly to
+I2L decomposition once sufficient I2L training is applied. We hypothesize that this is because T2I
+4LayerD [38] reports a small parameter count but exhibits non-negligible latency due to costly CPU-side
+segmentation, matting, and inpainting operations in its official implementation.
+7
+
+
+Ground Truth
+CLD
+Merged
+Zoom in
+PixelART (Ours)
+Merged
+Zoom in
+QIL (4 layers)
+Merged
+Layers
+Reconstruction fidelity
+Semi-transparency
+Ground Truth
+CLD
+PixelART (Ours)
+QIL (4 layers)
+Merged
+Layers
+Merged
+Layers
+Ground Truth
+QIL (4 layers)
+Merged
+Layers
+Assignment rationality
+Ground Truth
+CLD
+PixelART (Ours)
+QIL (4 layers)
+Ground Truth
+CLD
+PixelART (Ours)
+QIL (4 layers)
+PixelART (Ours)
+LayerD
+Ground Truth
+QIL (4 layers)
+PixelART (Ours)
+LayerD
+Figure 6: Qualitative comparison with state-of-the-art approaches. QIL: Qwen-Image-Layered.
+Layer metrics
+Composite metrics
+Method
+L1↓
+PSNR↑
+SSIM↑
+L1↓
+PSNR↑
+SSIM↑
+Latent VAE
+0.0749
+26.37
+0.8172
+0.0202
+28.79
+0.9155
+Pixel
+0.0626
+28.66
+0.8609
+0.0132
+34.36
+0.9539
+Table 2: Latent diffusion vs. Pixel diffusion
+Layer metrics
+Composite metrics
+Initialization
+L1↓
+PSNR↑
+SSIM↑
+L1↓
+PSNR↑
+SSIM↑
+From scratch
+0.0626
+28.66
+0.8609
+0.0132
+34.36
+0.9539
+From T2I pretrained
+0.0639
+28.27
+0.8614
+0.0132
+33.97
+0.9504
+Table 3: Effect of T2I pretraining.
+Layer metrics
+Composite metrics
+Prediction
+L1↓
+PSNR↑
+SSIM↑
+L1↓
+PSNR↑
+SSIM↑
+x-pred
+0.0626
+28.66
+0.8609
+0.0132
+34.36
+0.9539
+v-pred
+0.2504
+9.92
+0.1718
+0.2703
+9.05
+0.0383
+Table 4: Effect of prediction space.
+Layer metrics
+Composite metrics
+Optimizer
+L1↓
+PSNR↑
+SSIM↑
+L1↓
+PSNR↑
+SSIM↑
+AdamW [59]
+0.0682
+27.75
+0.8475
+0.0129
+33.76
+0.9501
+Muon [60]
+0.0626
+28.66
+0.8609
+0.0132
+34.36
+0.9539
+Table 5: Effect of optimizer.
+Layer metrics
+Composite metrics
+Training data
+L1↓
+PSNR↑
+SSIM↑
+L1↓
+PSNR↑
+SSIM↑
+40K
+0.0971
+24.02
+0.7671
+0.0160
+31.23
+0.9292
+400K
+0.0698
+27.67
+0.8424
+0.0144
+33.71
+0.9479
+4M
+0.0626
+28.66
+0.8609
+0.0132
+34.36
+0.9539
+Table 6: Effect of training data scale.
+Layer metrics
+Composite metrics
+Model variant
+L1↓
+PSNR↑
+SSIM↑
+L1↓
+PSNR↑
+SSIM↑
+PixelART-B/16
+0.0626
+28.66
+0.8609
+0.0132
+34.36
+0.9539
+PixelART-L/16
+0.0475
+31.78
+0.8968
+0.0094
+36.79
+0.9677
+PixelART-H/16
+0.0451
+32.71
+0.9011
+0.0096
+37.96
+0.9696
+Table 7: Effect of model size scaling.
+Background metrics
+Layer metrics
+Composite metrics
+Loss
+FID↓
+LPIPS↓
+L1↓
+PSNR↑
+SSIM↑
+L1↓
+PSNR↑
+SSIM↑
+MSE
+45.623
+0.2910
+0.0603
+27.72
+0.8431
+0.0139
+33.03
+0.9410
++ LPIPS (VGG)
+41.478
+0.2739
+0.0656
+26.86
+0.8324
+0.0155
+31.94
+0.9314
++ LPIPS (VGG, ConvNeXt)
+35.846
+0.2577
+0.0631
+27.28
+0.8383
+0.0145
+32.46
+0.9360
+Table 8: Effect of perceptual losses evaluated on the non-solid-background subset.
+Layer metrics
+Composite metrics
+Assignment metrics
+qboost
+p
+L1↓
+PSNR↑
+SSIM↑
+L1↓
+PSNR↑
+SSIM↑
+α-IoU↑
+Owner Acc.↑
+Leak.↓
+–
+–
+0.0626
+28.66
+0.8609
+0.0132
+34.36
+0.9539
+0.8983
+0.9040
+0.1245
+δ(t=0)
+0.1
+0.0588
+27.89
+0.8563
+0.0137
+33.06
+0.9449
+0.9471
+0.9292
+0.0987
+0.2
+0.0609
+27.01
+0.8444
+0.0157
+31.90
+0.9327
+0.9468
+0.9347
+0.0943
+U(0, 0.1)
+0.1
+0.0535
+28.89
+0.8778
+0.0125
+34.08
+0.9545
+0.9476
+0.9341
+0.0951
+0.2
+0.0523
+28.87
+0.8763
+0.0125
+33.82
+0.9509
+0.9501
+0.9395
+0.0909
+U(0, 0.2)
+0.1
+0.0516
+29.51
+0.8802
+0.0119
+34.53
+0.9568
+0.9466
+0.9358
+0.0944
+0.2
+0.0534
+28.86
+0.8765
+0.0125
+34.01
+0.9530
+0.9476
+0.9377
+0.0944
+Table 9: Effect of the boost component qboost and mixing weight p in terminal-boosted timestep sampling.
+models rely on text to steer denoising while I2L decomposition relies on the visible conditioning
+image, making the learned prior largely irrelevant.
+x-prediction is critical for I2L.
+Table 4 compares x- and v-prediction. v-prediction fails to
+converge in our setting: each 16×16×4 RGBA patch has a dimensionality of 1024, exceeding the
+model’s hidden width of 768 and making it challenging to route a full-rank velocity target through
+the network. x-prediction instead targets the clean image, which lies on a much lower-dimensional
+manifold of design content and fits comfortably within 768 channels, consistent with the manifold
+argument of JiT [28]. Even at PixelART-H scale with d=1280 that exceeds the patch dimensionality,
+v-prediction still trails x-prediction in Supplementary F and Table 11.
+Muon outperforms AdamW.
+Table 5 compares Muon [60] with AdamW [59] under matched
+learning rate, warmup, batch size, and training budget. Muon improves Layer PSNR by +0.91 dB
+and Composite PSNR by +0.60 dB, with consistent SSIM gains across both. Figure 7(b) further
+shows that Muon achieves a lower training loss under the same recipe.
+I2L benefits substantially from data scale.
+Table 6 reports the effect of varying the training set
+across two orders of magnitude—from 40K to 4M real multi-layer designs—while holding all other
+settings fixed. Layer PSNR climbs by +4.64 dB (from 24.02 to 28.66) and Composite PSNR by
++3.13 dB (from 31.23 to 34.36) over this range, with monotonic improvements on every metric.
+8
+
+
+Input
+Baseline
++LPIPS,
+ConvNeXt
+(a) Perceptual loss.
+0
+20000
+40000
+60000
+80000
+100000
+Step
+10 2
+10 1
+Train loss
+AdamW
+Muon
+(b) Optimizer.
+0
+20000
+40000
+60000
+80000
+100000
+Step
+10 2
+10 1
+Train loss
+Pretrained
+From scratch
+(c) T2I initialization.
+Figure 7: Ablation visualizations. Left: qualitative effect of perceptual losses on background reconstruction.
+Right top: training loss curves of Muon vs. AdamW under the same recipe. Right bottom: I2L fine-tuning loss
+curves for T2I-pretrained vs. from-scratch initializations on PixelART-B.
+Although the marginal gain from 400K to 4M (+0.99 dB Layer PSNR) is smaller than from 40K to
+400K (+3.65 dB), the curve has not yet plateaued, suggesting that further real-data scaling remains a
+promising direction. We adopt 4M as our default training scale.
+PixelART scales monotonically with model size.
+Table 7 reports performance across three model
+variants—PixelART-B/16 (168M), PixelART-L/16 (523M), and PixelART-H/16 (1.05B)—trained
+with the same data and training budget. Layer PSNR climbs by +4.05 dB (from 28.66 to 32.71)
+and Composite PSNR by +3.60 dB (from 34.36 to 37.96) as the model grows from 168M to 1.05B
+parameters, with monotonic improvements on nearly every metric. Combined with the data-scaling
+results in Table 6, this confirms that PixelART scales effectively with both data and model size.
+Perceptual loss improves background reconstruction.
+Table 8 ablates LPIPS-based perceptual
+supervision on the background layer, where large occluded regions make perceptual quality particu-
+larly visible to human observers. To avoid solid-color backgrounds dominating the evaluation, we
+report all metrics on the 1,474-sample non-solid-background subset. Adding VGG [63] reduces
+background FID from 45.6 to 41.5 and LPIPS from 0.291 to 0.274; jointly using ConvNeXt [64]
+further improves them to 35.8 and 0.258, respectively, while Layer and Composite metrics remain
+comparable. Figure 7(a) confirms the trend qualitatively: perceptual supervision yields sharper and
+more coherent background completions. We therefore adopt both perceptual losses in the final system.
+Terminal-boosted sampling improves layer assignment.
+Table 9 ablates the boost component
+qboost and mixing probability p. Any boost—point-mass at t=0 or truncated-uniform U(0, τ)—
+improves all assignment metrics over the no-boost baseline, confirming that additional supervision
+in the high-noise regime helps the model learn layer assignment. Truncated-uniform boosts further
+outperform the point-mass variant on both reconstruction and assignment metrics. Within truncated-
+uniform variants, we observe a consistent trade-off: stronger terminal weighting (larger p or wider τ)
+improves assignment metrics (α-IoU, Owner Acc., Leakage) but slightly reduces Layer/Composite
+reconstruction quality. This matches the two-phase structure of I2L training: heavier terminal
+weighting allocates more capacity to the high-noise assignment phase at the expense of the low-noise
+refinement phase. We adopt U(0, 0.2) with p=0.1 as our default configuration, as it achieves the best
+reconstruction metrics while maintaining strong assignment performance.
+5
+Conclusion
+We introduce PixelART, a pixel-space rectified-flow Transformer trained from scratch for image-
+to-layer decomposition. PixelART directly denoises regional RGBA pixel patches, removing the
+RGBA-VAE bottleneck and avoiding pretrained T2I backbones, and layer-specific decoders. Our
+results indicate that layer decomposition is naturally modeled as a pixel-space assignment-and-
+completion problem: high-noise timesteps determine layer assignment, while low-noise timesteps
+refine RGBA details. On DESIGN-MULTI-LAYER-BENCH, PixelART achieves state-of-the-art layer
+decomposition and composite reconstruction with substantially lower latency and memory than
+VAE-based diffusion baselines. Ablations show that pixel-space x-prediction, high-noise timestep
+coverage, perceptual supervision, and data/model scaling are important, while T2I initialization
+provides marginal final gain in our data-rich I2L setting. These findings establish from-scratch
+pixel-space diffusion as a simple and scalable approach for editable layer decomposition.
+9
+
+
+References
+[1] Y. Pu, Y. Zhao, Z. Tang, R. Yin, H. Ye, Y. Yuan et al., “Art: Anonymous region transformer for
+variable multi-layer transparent image generation,” in CVPR, 2025, pp. 7952–7962.
+[2] S. Yin, Z. Zhang, Z. Tang, K. Gao, X. Xu, K. Yan, J. Li, Y. Chen, Y. Chen, H.-Y. Shum, L. M.
+Ni, J. Zhou, J. Lin, and C. Wu, “Qwen-image-layered: Towards inherent editability via layer
+decomposition,” arXiv preprint arXiv:2512.15603, 2025.
+[3] Google, “Introducing Gemini 2.5 Flash Image, our state-of-the-art image model,” https://
+developers.googleblog.com/introducing-gemini-2-5-flash-image/, 2025, also known as Nano
+Banana. Accessed: 2025-08-26.
+[4] Google DeepMind, “Nano Banana 2: Google’s latest AI image generation model,” https:
+//blog.google/innovation-and-ai/technology/ai/nano-banana-2/, 2026, accessed: 2026-02-26.
+[5] ——, “Nano Banana Pro: Gemini 3 Pro Image model from Google DeepMind,” https://blog.
+google/innovation-and-ai/products/nano-banana-pro/, 2025, accessed: 2025-11-20.
+[6] OpenAI, “GPT Image 1 Model,” https://developers.openai.com/api/docs/models/gpt-image-1,
+2025, accessed: 2025-03-25.
+[7] ——, “GPT Image 1.5 Model,” https://developers.openai.com/api/docs/models/gpt-image-1.5,
+2025, accessed: 2025-12-16.
+[8] ——, “GPT Image 2 Model,” https://developers.openai.com/api/docs/models/gpt-image-2,
+2026, accessed: 2026-04-21.
+[9] Z. Li, D. Li, Y. Guo, X. Guo, B. Li, L. Xiao, S. Qiao, J. Chen, Z. Wu, H. Zhang, and S. Liu,
+“Chartgalaxy: A dataset for infographic chart understanding and generation,” in ICLR, 2026, pp.
+52 484–52 546.
+[10] C. Liu, Y. Song, H. Wang, and M. Z. Shou, “Omnipsd: Layered psd generation with diffusion
+transformer,” arXiv preprint arXiv:2512.09247, 2025.
+[11] H. Yu, J. Wang, J. Zhan, R. Chen, Z. Wang, H. Zhang et al., “OmniAlpha: Aligning
+transparency-aware generation via multi-task unified reinforcement learning,” arXiv preprint
+arXiv:2511.20211, 2025.
+[12] J. Ho, A. Jain, and P. Abbeel, “Denoising diffusion probabilistic models,” in NeurIPS, 2020.
+[13] P. Dhariwal and A. Nichol, “Diffusion models beat GANs on image synthesis,” in NeurIPS,
+2021.
+[14] A. Nichol, P. Dhariwal, A. Ramesh, P. Shyam, P. Mishkin, B. McGrew, I. Sutskever, and
+M. Chen, “GLIDE: Towards photorealistic image generation and editing with text-guided
+diffusion models,” in ICML, 2022.
+[15] C. Saharia, W. Chan, S. Saxena, L. Li, J. Whang, E. Denton, S. K. S. Ghasemipour, B. K. Ayan,
+S. S. Mahdavi, R. G. Lopes, T. Salimans, J. Ho, D. J. Fleet, and M. Norouzi, “Photorealistic
+text-to-image diffusion models with deep language understanding,” in NeurIPS, 2022.
+[16] A. Ramesh, P. Dhariwal, A. Nichol, C. Chu, and M. Chen, “Hierarchical text-conditional image
+generation with CLIP latents,” arXiv preprint arXiv:2204.06125, 2022.
+[17] J. Ho, C. Saharia, W. Chan, D. J. Fleet, M. Norouzi, and T. Salimans, “Cascaded diffusion
+models for high fidelity image generation,” JMLR, vol. 23, no. 47, pp. 1–33, 2022.
+[18] R. Rombach, A. Blattmann, D. Lorenz, P. Esser, and B. Ommer, “High-resolution image
+synthesis with latent diffusion models,” in CVPR, 2022, pp. 10 684–10 695.
+[19] D. Podell, Z. English, K. Lacey, A. Blattmann, T. Dockhorn, J. Müller, J. Penna, and R. Rom-
+bach, “SDXL: Improving latent diffusion models for high-resolution image synthesis,” in ICLR,
+2024.
+[20] Y. Balaji, S. Nah, X. Huang, A. Vahdat, J. Song, Q. Zhang, K. Kreis, M. Aittala, T. Aila,
+S. Laine, B. Catanzaro, T. Karras, and M.-Y. Liu, “eDiff-I: Text-to-image diffusion models with
+an ensemble of expert denoisers,” arXiv preprint arXiv:2211.01324, 2022.
+[21] J. Betker, G. Goh, L. Jing, T. Brooks, J. Wang, L. Li, L. Ouyang, J. Zhuang, J. Lee, Y. Guo,
+W. Manassra, P. Dhariwal, C. Chu, Y. Jiao, and A. Ramesh, “Improving image generation with
+better captions,” OpenAI Technical Report, 2023, https://cdn.openai.com/papers/dall-e-3.pdf.
+10
+
+
+[22] B. F. Labs, “Flux,” https://github.com/black-forest-labs/flux, 2024.
+[23] P. Esser, S. Kulal, A. Blattmann, R. Entezari, J. Müller, H. Saini et al., “Scaling rectified flow
+transformers for high-resolution image synthesis,” in ICML, 2024.
+[24] C. Wu, J. Li, J. Zhou, J. Lin, K. Gao, K. Yan et al., “Qwen-image technical report,” 2025.
+[Online]. Available: https://arxiv.org/abs/2508.02324
+[25] E. Hoogeboom, T. Mensink, J. Heek, K. Lamerigts, R. Gao, and T. Salimans, “Simpler diffusion
+(SiD2): 1.5 FID on ImageNet512 with pixel-space diffusion,” arXiv preprint arXiv:2410.19324,
+2024.
+[26] S. Chen, C. Ge, S. Zhang, P. Sun, and P. Luo, “PixelFlow: Pixel-space generative models with
+flow,” arXiv preprint arXiv:2504.07963, 2025.
+[27] S. Wang, Z. Gao, C. Zhu, W. Huang, and L. Wang, “PixNerd: Pixel neural field diffusion,”
+arXiv preprint arXiv:2507.23268, 2025.
+[28] T. Li and K. He, “Back to basics: Let denoising generative models denoise,” arXiv preprint
+arXiv:2511.13720, 2025.
+[29] Y. Lu, S. Lu, Q. Sun, H. Zhao, Z. Jiang, X. Wang, T. Li, Z. Geng, and K. He, “One-step
+latent-free image generation with pixel mean flows,” arXiv preprint arXiv:2601.22158, 2026.
+[30] Z. Ma, R. Xu, and S. Zhang, “PixelGen: Pixel diffusion beats latent diffusion with perceptual
+loss,” arXiv preprint arXiv:2602.02493, 2026.
+[31] X. Zhang, W. Zhao, X. Lu, and J. Chien, “Text2layer: Layered image generation using latent
+diffusion model,” arXiv preprint arXiv:2307.09781, 2023.
+[32] R. Huang, K. Cai, J. Han, X. Liang, R. Pei, G. Lu, S. Xu, W. Zhang, and H. Xu, “Layerdiff: Ex-
+ploring text-guided multi-layered composable image synthesis via layer-collaborative diffusion
+model,” in ECCV, 2024.
+[33] J. Chen, H. Jiang, Y. Wang, K. Wu, J. Li, C. Zhang, K. Yanai, D. Chen, and Y. Yuan, “Prism-
+layers: Open data for high-quality multi-layer transparent image generative models,” arXiv
+preprint arXiv:2505.22523, 2025.
+[34] J. Huang, P. Yan, J. Cai, J. Liu, Z. Wang, Y. Wang, X. Wu, and G. Li, “Dreamlayer: Simultaneous
+multi-layer generation via diffusion model,” in ICCV, 2025.
+[35] L. Zhang and M. Agrawala, “Transparent image layer diffusion using latent transparency,” ACM
+Transactions on Graphics, vol. 43, no. 4, 2024.
+[36] P. Jia, C. Li, Y. Yuan, Z. Liu, Y. Shen, B. Chen et al., “Cole: A hierarchical generation framework
+for multi-layered and editable graphic design,” arXiv preprint arXiv:2311.16974, 2023.
+[37] N. Inoue, K. Masui, W. Shimoda, and K. Yamaguchi, “Opencole: Towards reproducible
+automatic graphic design generation,” in CVPR Workshops, 2024.
+[38] T. Suzuki, K.-J. Liu, N. Inoue, and K. Yamaguchi, “Layerd: Decomposing raster graphic designs
+into layers,” in ICCV, 2025.
+[39] Z. Liu, Z. Xu, S. Shu, J. Zhou, R. Zhang, Z. Tang, and X. Li, “Controllable layer decomposition
+for reversible multi-layer image generation,” arXiv preprint arXiv:2511.16249, 2025.
+[40] Canva, “Using magic layers to turn images into editable layers,” https://www.canva.com/help/
+editable-magic-layers/, 2026, accessed 2026-05-02.
+[41] Lovart, “Lovart: Ai design agent,” https://www.lovart.ai/, 2026, accessed 2026-05-02.
+[42] Ideogram, “Ideogram canvas, magic fill, and extend,” https://ideogram.ai/features/canvas, 2026,
+accessed 2026-05-02.
+[43] A. Kirillov, E. Mintun, N. Ravi, H. Mao, C. Rolland, L. Gustafson, T. Xiao, S. Whitehead, A. C.
+Berg, W.-Y. Lo, P. Dollár, and R. Girshick, “Segment anything,” in ICCV, 2023.
+[44] N. Ravi, V. Gabeur, Y.-T. Hu, R. Hu, C. Ryali, T. Ma et al., “Sam 2: Segment anything in
+images and videos,” arXiv preprint arXiv:2408.00714, 2024.
+[45] L. Ke, M. Ye, M. Danelljan, Y. Liu, Y.-W. Tai, C.-K. Tang, and F. Yu, “Segment anything in
+high quality,” in NeurIPS, 2023.
+[46] B. Kim, C. Shin, J. Jeong, H. Jung, S.-Y. Lee, S. Chun et al., “Zim: Zero-shot image matting
+for anything,” in ICCV, 2025.
+11
+
+
+[47] Z. Wang, H. Yu, J. Zhan, and C. Yuan, “Alphavae: Unified end-to-end rgba image reconstruction
+and generation with alpha-aware representation learning,” arXiv preprint arXiv:2507.09308,
+2025.
+[48] H. Dong, W. Wang, C. Li, J. Lyu, and D. Lin, “Video generation with stable transparency via
+shiftable rgb-a distribution learner,” arXiv preprint arXiv:2509.24979, 2025.
+[49] Z-Image Team, H. Cai, S. Cao, R. Du, P. Gao, S. Hoi, Z. Hou et al., “Z-Image: An efficient
+image generation foundation model with single-stream diffusion transformer,” arXiv preprint
+arXiv:2511.22699, 2025.
+[50] J. Ho and T. Salimans, “Classifier-free diffusion guidance,” in NeurIPS Workshops, 2021.
+[51] A. Dosovitskiy, L. Beyer, A. Kolesnikov, D. Weissenborn, X. Zhai, T. Unterthiner, M. Dehghani,
+M. Minderer, G. Heigold, S. Gelly, J. Uszkoreit, and N. Houlsby, “An image is worth 16x16
+words: Transformers for image recognition at scale,” in ICLR, 2021.
+[52] VistaCreate Team, “Vistacreate (formerly crello) graphic design platform,” https://create.vista.
+com/, 2025, accessed: 2025-11-09.
+[53] E. Hirsch, S. Yadav, M. Garg, and P. Mehta, “Lica: Layered image composition annotations for
+graphic design research,” arXiv preprint arXiv:2603.16098, 2026.
+[54] OpenAI, “GPT-5.5 Model,” https://developers.openai.com/api/docs/models/gpt-5.5, 2026, ac-
+cessed: 2026-05-07.
+[55] Google, “Gemini 3.1 Pro Preview Model,” https://ai.google.dev/gemini-api/docs/models/
+gemini-3.1-pro-preview, 2026, model ID: gemini-3.1-pro-preview. Accessed: 2026-05-07.
+[56] J. Zhu, B. Li, S. Qiao, Y. Gu, Z. Zhang, Y. Yuan, and S. Liu, “Detect anything in graphic design:
+Element-level rewards for autoregressive detection,” arXiv preprint arXiv:2609.07072, 2026.
+[57] S. Bai, Y. Cai, R. Chen, K. Chen, X. Chen, Z. Cheng et al., “Qwen3-VL technical report,” arXiv
+preprint arXiv:2511.21631, 2025.
+[58] R. Suvorov, E. Logacheva, A. Mashikhin, A. Remizova, A. Ashukha, A. Silvestrov et al.,
+“Resolution-robust large mask inpainting with fourier convolutions,” in WACV, 2022, pp. 2149–
+2159.
+[59] I. Loshchilov and F. Hutter, “Decoupled weight decay regularization,” in ICLR, 2019.
+[60] K. Jordan, Y. Jin, V. Boza, J. You, F. Cesista, L. Newhouse, and J. Bernstein, “Muon: An
+optimizer for hidden layers in neural networks,” https://kellerjordan.github.io/posts/muon/,
+2024.
+[61] J. Chen, Z. Xu, X. Pan, Y. Hu, C. Qin, T. Goldstein et al., “BLIP3-o: A family of fully open uni-
+fied multimodal models—architecture, training and dataset,” arXiv preprint arXiv:2505.09568,
+2025.
+[62] M. Liu, J. Shi, Z. Li, C. Li, J. Zhu, and S. Liu, “Towards better analysis of deep convolutional
+neural networks,” IEEE transactions on visualization and computer graphics, vol. 23, no. 1, pp.
+91–100, 2017.
+[63] K. Simonyan and A. Zisserman, “Very deep convolutional networks for large-scale image
+recognition,” in ICLR, 2015.
+[64] S. Woo, S. Debnath, R. Hu, X. Chen, Z. Liu, I. S. Kweon, and S. Xie, “ConvNeXt V2: Co-
+designing and scaling convnets with masked autoencoders,” in CVPR, 2023, pp. 16 133–16 142.
+[65] D. Ghosh, H. Hajishirzi, and L. Schmidt, “GenEval: An object-focused framework for evaluating
+text-to-image alignment,” in NeurIPS, 2023.
+12
+
+
+A
+Data Source
+Training Data.
+Our 4M multi-layer training corpus is curated from internal multi-layer design
+templates that are explicitly licensed for model training. Each template is stored as an editable
+design file with vector and raster layers in z-order, and is rasterized at multiple resolutions (256,
+512, 1024) into the {flat image, ordered RGBA layer stack, layer bounding boxes,
+layer order} tuples that PixelART consumes.
+Evaluation Data.
+We use DESIGN-MULTI-LAYER-BENCH [1], which is curated from VistaCre-
+ate [52], and LICA [53] as evaluation datasets; we do not include any of their test samples in training.
+No personally identifying information, copyrighted third-party images, or human-subject content
+were used, and no human annotators were employed for the data collection.
+B
+Detailed Model and Training Configuration
+Table 10 summarizes the architecture, training, and sampling hyperparameters for all PixelART
+configurations used in the main paper. PixelART-B/L/H are the three variants used in the model-
+size ablation (PixelART-B is also the default for all other ablations); PixelART (main model) is a
+separately trained system-level model used for the comparison in Table 1, sharing the -H scale but
+with a coarser patch size and a multi-resolution training curriculum. Hyperparameters are inherited
+from JiT [28] and SD3 [23] defaults if not listed below.
+Table 10: Configurations of PixelART variants. PixelART-B is the default for all ablations and is
+also the small model in the model-size ablation, alongside PixelART-L and PixelART-H. PixelART
+(main model) is the separately trained system-level model reported in Table 1; it shares the H scale
+but uses a coarser patch size and a three-stage resolution curriculum. Settings that are common across
+multiple columns are merged. The pixel-space versus latent-space comparison (Table 2) uses the same
+PixelART-B architecture, but the latter operates on the RGBA-VAE latents of Qwen-Image-Layered
+with a patch size of 2, with the parameter count differing by ∼1M due to the smaller patch size.
+PixelART-B
+PixelART-L
+PixelART-H
+PixelART (main)
+Architecture
+# Transformer blocks
+12
+24
+32
+32
+hidden dim d
+768
+1024
+1280
+1280
+# attention heads
+12
+16
+16
+16
+patch size P
+16
+32
+input noise scale
+1
+2
+patch-embed bottleneck dim db
+128
+128
+256
+256
+# parameters
+168M
+523M
+1052M
+1057M
+MLP expansion ratio
+4
+positional encoding
+3D RoPE over (x, y, z)
+Training
+prediction target
+x-prediction with v-loss
+base timestep schedule
+logit(t) ∼N(µ=−0.8, σ=0.8)
+optimizer
+Muon [60]
+learning rate
+1e−4 (constant)
+warmup steps
+1000
+weight decay
+0
+EMA decay
+0.9996
+text-condition drop (CFG)
+0.1
+boost component qboost
+not used
+U(0, 0.2) with p=0.1
+perceptual loss (at t > 0.3)
+not used
+LPIPS (VGG, ConvNeXt-V2)
+hardware
+8× H200
+32× H200
+training resolution
+256
+256→512→1024
+batch size (per resolution)
+2048
+2048/2048/1024
+training duration (per resolution)
+100K steps (∼20 epochs)
+80/60/10 epochs
+Sampling
+inference time shift
+not used
+3 (at 1024 px only)
+ODE solver
+Euler
+# sampling steps
+25
+timestep grid
+linear in [0, 1]
+CFG scale
+2.2
+13
+
+
+C
+Layout Detector
+PixelART is a region-conditioned image-to-layer model: given a z-ordered set of regional bounding
+boxes R, it predicts an editable RGBA crop for each region. During training, R is obtained from the
+ground-truth design file. At inference time, R can either be specified by users to control the desired
+layer granularity, or be predicted by a layout detector from the flattened RGB image to enable fully
+automatic image-to-layer decomposition.
+For system-level comparisons, we use DAD [56], an internal graphic-design layout detector based
+on Qwen3-VL-2B [57]. The detector predicts foreground bounding boxes in back-to-front z-order.
+PixelART only uses the predicted box coordinates and their order; no masks, alpha mattes, RGB
+content, semantic labels, or layer pixels are passed from the detector. Thus, the layout detector serves
+as an automatic interface for providing the structural input required by PixelART.
+The detector is trained on internal design data disjoint from the DESIGN-MULTI-LAYER-BENCH and
+LICA test splits. On the 1024 × 1024 DESIGN-MULTI-LAYER-BENCH inputs reported in Table 1, it
+adds 0.7 s latency and 4.2 GB peak GPU memory per image, reported separately in the parenthesized
+terms of Table 1.
+D
+Evaluation Metric Definitions
+We evaluate three groups of pixel-level metrics: Layer metrics for decomposition fidelity, Composite
+metrics for visible reconstruction fidelity, and Assignment metrics for layer-assignment correctness.
+Throughout, let ˆLi ∈[0, 1]H×W ×4 and Li ∈[0, 1]H×W ×4 denote the predicted and ground-truth
+RGBA layer i, respectively, with Li = (Lrgb
+i
+, αi). We use I,ˆI ∈[0, 1]H×W ×3 for the input flat
+image and the predicted alpha-composite, and K+1 for the total number of layers (background plus
+K foreground).
+D.1
+Layer Metrics
+Layer metrics measure per-layer reconstruction fidelity. To jointly capture errors in both the predicted
+alpha and the predicted RGB channels, we compare alpha-premultiplied color, ˆαi(p) ˆLrgb
+i
+(p) versus
+αi(p) Lrgb
+i
+(p), with the per-pixel error further weighted by the ground-truth alpha. A pixel for which
+the predicted alpha is wrong then contributes a non-zero error even if its RGB happens to match.
+Concretely, for each layer i and pixel p, the layer L1 is
+L1(i)
+layer =
+P
+p αi(p)
+ˆαi(p) ˆLrgb
+i
+(p) −αi(p) Lrgb
+i
+(p)
+
+1
+3 P
+p αi(p) + ε
+.
+(12)
+PSNR and SSIM are computed analogously on the same alpha-premultiplied RGB pair, weighted by
+αi. We then average over all layers in the test sample, and finally over the test set.
+D.2
+Composite Metrics
+Composite metrics measure visible reconstruction fidelity. We first composite the predicted layers in
+z-order:
+ˆI = ΠRGB
+
+Over(ˆL0, ˆL1, . . . , ˆLK)
+
+,
+(13)
+and report L1, PSNR, and SSIM between ˆI and the input flat image I over all pixels.
+D.3
+Layer Assignment Metrics
+Pixel reconstruction metrics alone do not penalize a model for confusing two visually similar layers,
+so we additionally report three layer-assignment metrics. Let ˆαi, αi ∈[0, 1]H×W denote the predicted
+and ground-truth alpha of layer i, with index i = 0 for the background and i ≥1 for foreground
+layers in increasing z-order.
+14
+
+
+Alpha-IoU (soft IoU on alpha masks).
+We measure how well the predicted alpha masks overlap
+with the ground-truth ones via a continuous (soft) intersection-over-union, computed independently
+per layer and averaged across all layers including the background:
+α-IoUi =
+P
+p min
+ ˆαi(p), αi(p)
+
+P
+p max
+ ˆαi(p), αi(p)
+
++ ε,
+α-IoU =
+1
+K + 1
+K
+X
+i=0
+α-IoUi.
+(14)
+The min/max formulation reduces to the standard IoU when ˆαi, αi ∈{0, 1} and remains well-defined
+for soft alpha. Higher is better.
+Visible-pixel ownership (Owner Acc.).
+Owner accuracy answers that for each pixel the user
+actually sees, whether the model assigns it to the right layer. For a layer stack with index i increasing
+toward the front, the visible contribution of layer i at pixel p after z-ordered source-over compositing
+is
+wi(p) = αi(p)
+Y
+k>i
+ 1 −αk(p)
+
+,
+(15)
+and the per-pixel owner is the layer with the largest visible contribution:
+ogt(p) = arg max
+i
+wgt
+i (p),
+opred(p) = arg max
+i
+wpred
+i
+(p).
+(16)
+We restrict the metric to foreground pixels with a clearly dominant ground-truth owner: Ωfg = {p :
+ogt(p) > 0, maxi wgt
+i (p) > τvis, wgt
+(1)(p) −wgt
+(2)(p) > δ}, where w(1), w(2) are the top-1 and top-2
+visible weights and we use τvis = δ = 0.05. The background layer i = 0 is excluded from Ωfg to
+prevent it from dominating the metric. Owner accuracy is the fraction of Ωfg for which the predicted
+and ground-truth owners agree:
+Owner-Acc. =
+1
+|Ωfg|
+X
+p∈Ωfg
+1
+
+opred(p) = ogt(p)
+
+.
+(17)
+Wrong-layer leakage (Leak.).
+Wrong-layer leakage complements Owner accuracy by measuring
+how much predicted mass is misplaced rather than only whether the top-1 owner is correct. On
+each ground-truth owner mask M gt
+i
+= {p : ogt(p) = i}, it reports the fraction of predicted visible
+contribution that lands on layers other than i. We use the visible-weight form wpred
+j
+rather than
+raw alpha so that the metric remains stable in regions with semi-transparent overlays such as drop
+shadows, glows, and gradient fills:
+Leak. =
+P
+i
+P
+p∈M gt
+i
+P
+j̸=i wpred
+j
+(p)
+P
+i
+P
+p∈M gt
+i
+P
+j wpred
+j
+(p) + ε
+.
+(18)
+Lower is better. The denominator normalizes by the total predicted visible mass on the same set of
+pixels, so the metric is a unitless leakage ratio independent of overall alpha calibration.
+D.4
+VLM Quality Metrics
+For each test sample, we render a single PNG with the original input on the left and a packed grid of
+the predicted RGBA layers on the right (each cell labeled L1, L2, ..., in z-order), and ask a frontier
+VLM to score every layer along two dimensions on a 1–5 scale: Alpha (matte and edge quality,
+opacity correctness) and Visual (content integrity, object completeness, clean foreground/background
+separation). The exact prompt is shown in the listing below; it is identical across all methods and
+datasets compared in Table 1, with only the candidate decomposition image differing. The VLM
+returns a strict JSON record with one Alpha and one Visual score per layer. We parse this record,
+average per sample, and then average across the test set. We report results from GPT-5.5 [54] (with
+high image detail and default reasoning effort) and Gemini-3.1 Pro [55] (with high media resolution
+and default thinking level) separately.
+15
+
+
+VLM judge prompt for layer-decomposition quality.
+You are an expert judge for layer decomposition quality. You will evaluate all layers shown in a single
+concatenated image.
+## Image Layout
+The input image has this structure:
+• Left side: The original composite image (reference).
+• Right side: A grid of layer cutouts (collage layout). Each cell is labeled LN (e.g., L1, L2, . . . ) at the
+bottom. Larger elements occupy bigger cells.
+## Your Task
+Score ALL the layers shown in the grid, using two dimensions (1–5, higher is better).
+Score Scale:
+• 5 = Excellent, no visible issues.
+• 4 = Good with minor issues.
+• 3 = Acceptable with noticeable problems.
+• 2 = Poor, significant problems.
+• 1 = Unusable, severe failures.
+### Dimension 1: Alpha Quality (Transparency & Edge Integrity)
+Evaluate the matte quality, edge precision, and transparency correctness. This dimension focuses on
+the alpha channel and edge processing.
+What to check:
+• Edge artifacts: Haloing (light/dark outline), fringing (color bleeding at edges), jagged/aliased edges.
+• Opacity correctness: Is transparency logical? (glass = semi-transparent, solid objects = opaque).
+• Processing artifacts: Grid patterns in semi-transparent areas, alpha channel noise.
+Score Scale:
+• 5: Excellent matte. Crisp edges, smooth transitions, no halos or artifacts.
+• 4: Good. Minor edge softness or faint halo, clean overall.
+• 3: Acceptable. Visible halo, aliasing, or minor grid artifacts.
+• 2: Poor. Strong jagged edges, heavy halos, distinct grid patterns.
+• 1: Unusable. Massive halos, wrong transparency, severe alpha failure.
+### Dimension 2: Visual Quality (Content Integrity & Segmentation)
+Evaluate the pixel integrity, semantic correctness, completeness, and clean separation of the visible
+content.
+CRITICAL — Object Completeness Check: For EACH layer, carefully compare it with the original
+image and ask:
+1. Is this a complete semantic object? Look at the original — if you can see a whole surfboard,
+person, logo, etc., the layer should contain the ENTIRE object, not just a piece of it.
+2. Is the layer cleanly separated? Background layers should NOT contain fragments of foreground
+objects.
+What to check:
+• Visual artifacts: Strange gray values, noise, compression artifacts, color bleeding.
+• Structural issues: Distorted anatomy (extra fingers, melted faces), garbled text, twisted shapes.
+• Content fidelity: Does it match the corresponding element in the original?
+Segmentation Failures (penalize these severely):
+• Incomplete object: The layer contains only PART of an object that is COMPLETE in the original.
+Example: Original shows a full surfboard →Layer shows only half of it. This is WRONG — the
+entire surfboard should be in one layer.
+• Foreground residue: Background layers contain leftover pieces of foreground objects. Example: A
+background layer has someone’s arm or part of an object floating in it.
+• Missing inpainting: An object is partially hidden behind another object in the original, but the
+layer doesn’t complete the hidden portion.
+16
+
+
+Note on image boundary: If an object is cut off at the IMAGE BOUNDARY in the original (e.g., half
+a person at the edge of the photo), the layer cannot show the missing part because the output layer has
+the same dimensions as the original — there’s simply no canvas space beyond the boundary. This is
+NOT a failure. However, if an object is fully WITHIN the original image, it must be fully present in the
+layer.
+Score Scale:
+• 5: Excellent. All objects are complete, clean separation, no artifacts.
+• 4: Good. Minor artifacts. All objects complete and cleanly separated.
+• 3: Acceptable. Some artifacts. Minor incompleteness or small residue.
+• 2: Poor. Object is incomplete (cut off mid-object when it is complete in the original), OR noticeable
+foreground residue on the background layer.
+• 1: Unusable. Severe incompleteness, major residue, or unrecognizable content.
+## Output Requirements
+A) Return strict JSON only (no markdown fences, no extra text).
+B) Output scores for ALL layers visible in the grid (L1, L2, L3, . . . ).
+C) Use concise failure_tags:
+• Alpha:
+["halo", "jagged", "fringing", "grid_artifacts", "wrong_opacity",
+"edge_noise"].
+• Visual:
+["distorted_anatomy", "bad_text", "noise", "color_bleed",
+"blur", "pixel_corruption", "incomplete_object", "foreground_residue",
+"missing_inpainting", "abnormal_gray"].
+• incomplete_object = IMPORTANT: object is complete in the original but layer only shows a
+fragment.
+• foreground_residue = the background layer has leftover pieces of foreground objects (not
+cleanly removed).
+• missing_inpainting = hidden/occluded parts are not filled in.
+D) Provide a short, specific reason for each score.
+## Output JSON Schema
+{
+"layer_count": <number of layers evaluated>,
+"layers": [
+{
+"layer_id": "L1",
+"alpha_quality": {
+"score": 1-5,
+"failure_tags": [],
+"reason": "string"
+},
+"visual_quality": {
+"score": 1-5,
+"failure_tags": [],
+"reason": "string"
+}
+}
+],
+"overall_summary": "string"
+}
+Output strict JSON only.
+We invoke the VLM in a single round per sample. Responses are validated against the JSON schema
+above; samples whose response does not parse are re-queried up to three times before being discarded.
+E
+User Study Protocol
+The user study referenced in the main text complements the VLM-based metrics with pairwise human
+preferences. We describe recruitment and informed consent, the evaluation interface and protocol,
+and data-handling procedures.
+17
+
+
+Recruitment and informed consent.
+We recruit 10 annotators with diverse backgrounds. Before
+participation, each annotator receives a written informed-consent document covering: (i) the purpose
+of the study (comparing layer-decomposition methods on layer quality and composite fidelity); (ii)
+the procedure and expected duration (approximately 20–40 minutes); (iii) the data we collect (a self-
+chosen username, per-question choices, optional failure-mode tags, and optional free-text notes; no
+audio, video, or sensitive personal information); (iv) voluntary participation and the right to withdraw
+at any time, including post-hoc deletion of submitted data on request; and (v) the intended use of the
+results (anonymized, aggregated reporting). Annotators sign the document before beginning the task.
+Evaluation interface and protocol.
+Annotators complete the study through a web-based question-
+naire. Each question presents the original input image alongside two anonymized layer-decomposition
+outputs labelled A and B, produced by two different methods. For each pair, the annotator indepen-
+dently selects one of three options—“A is better”, “B is better”, or “tie”—on each of two dimensions:
+• Layer quality: how suitable the predicted layers are for downstream editing, including segmen-
+tation accuracy, alpha and edge quality, missing or mixed objects, residual foreground content in
+the background layer, and plausibility of inpainted regions.
+• Composite consistency: how faithfully the alpha-composited reconstruction matches the input,
+including text, small icons, edges, colour and texture, blur, and localized artefacts.
+The annotator may optionally add failure-mode tags and free-text notes; these fields are not required.
+Method identities (the A/B assignment) are randomized per question and not disclosed during the
+study. Figure 8 shows the annotation interface.
+Data handling and privacy.
+Submitted responses are stored on internal infrastructure accessible
+only to the research team. Beyond the self-chosen username we do not collect age, contact information,
+or any identifying data, and annotators are instructed not to enter sensitive personal information
+in free-text notes. We report only aggregated, anonymized statistics; raw responses are retained
+internally and are deleted on participant request.
+F
+Prediction Space Discussion
+This section discusses the prediction space of PixelART. We first explain why our x-prediction v-loss
+formulation is compatible with terminal-boosted timestep sampling (Sec. 3.4), and then complement
+the main-text ablation (Table 4) with x- vs. v-prediction at the PixelART-H scale.
+F.1
+Compatibility with x-prediction v-loss
+The boost distribution must avoid the clean-data endpoint. Because our x-prediction v-loss has
+an equivalent clean-prediction weight 1/(1 −t)2, any boost density with mass arbitrarily close to
+t = 1 would make the expected loss unstable. Our candidates, δ(t = 0) and U(0, τ) with τ < 1, are
+bounded away from t = 1, so
+Et∼qboost
+
+1
+(1 −t)2
+ bYθ −Y
+2
+2
+
+< ∞.
+(19)
+For U(0, τ), the weight is upper-bounded by 1/(1 −τ)2.
+F.2
+PixelART-H x- vs. v-Prediction
+The main-text ablation (Table 4) shows that v-prediction fails to converge at the PixelART-B scale,
+where each 16×16×4 RGBA patch has dimensionality 1024 exceeding the model’s hidden width of
+768. To test whether the failure is purely a capacity issue, we repeat the comparison at the PixelART-H
+scale (d=1280, exceeding the patch dimensionality) with the convolutional bottleneck removed, so
+the per-token dimensionality entering the Transformer is 1024 rather than the bottleneck width. The
+training recipe otherwise follows the PixelART-H ablation default in Table 10.
+At PixelART-H, v-prediction trails x-prediction by −2.71 dB Layer PSNR and −2.47 dB Composite
+PSNR. This residual gap is consistent with the manifold argument of JiT [28]: design layers occupy
+a much lower-dimensional manifold than the velocity target, and predicting clean pixels remains a
+better-conditioned regression problem than predicting velocities, even at high width.
+18
+
+
+Figure 8: Web interface used in the user study. Each question shows the original input image,
+two anonymized layer-decomposition outputs (A/B), the two-dimension ternary choice, and optional
+fields for failure tags and free-text notes.
+Table 11: x- vs. v-prediction at PixelART-H scale (d=1280, no bottleneck). Both runs use identical
+recipes apart from the prediction target. At this width, v-prediction does converge but still trails
+x-prediction, indicating that the manifold mismatch is not solely a capacity issue.
+Layer metrics
+Composite metrics
+Prediction
+L1↓
+PSNR↑
+SSIM↑
+L1↓
+PSNR↑
+SSIM↑
+x-pred
+0.0453
+32.88
+0.8995
+0.0086
+38.55
+0.9727
+v-pred
+0.0526
+30.17
+0.8691
+0.0114
+36.08
+0.9441
+19
+
+
+G
+RGBA-VAE Decoder for the Latent-Space Baseline
+The pixel-space versus latent-space comparison (Table 2) trains a PixelART-B variant on the RGBA-
+VAE latents released with Qwen-Image-Layered [2], using a patch size of 2 to match the latent’s spatial
+down-sampling; all other settings follow the PixelART-B ablation default in Table 10. PixelART
+operates on bounding-box-conditioned regional latents, but the official Qwen-Image-Layered decoder
+reconstructs only full-canvas latents and cannot be applied directly. We therefore train a separate
+ViT-based RGBA decoder (300M parameters) on the same 4M design-template corpus as PixelART,
+with the original encoder kept frozen; this decoder maps cropped regional latents to cropped RGBA
+layers, which are then composited into the canvas.
+Table 12: RGBA-VAE decoder reconstruction quality on DESIGN-MULTI-LAYER-BENCH at
+256 × 256. Each decoder takes the official Qwen-Image-Layered encoder’s latent of a ground-truth
+RGBA layer and produces a reconstruction, which is compared against the original. Both decoders
+share the same encoder. Layer L1/PSNR are alpha-pre-multiplied (Appendix D); layer SSIM is
+alpha-weighted.
+Composite metrics
+Layer metrics
+Decoder
+L1↓
+PSNR↑
+SSIM↑
+L1↓
+PSNR↑
+SSIM↑
+Qwen-Image-Layered (official)
+0.0132
+32.52
+0.9568
+0.0363
+31.66
+0.9289
+Ours (300M ViT)
+0.0083
+33.69
+0.9686
+0.0254
+37.49
+0.9569
+Table 12 reports reconstruction metrics for our trained decoder and the official Qwen-Image-Layered
+decoder under the same encoder. Our decoder is competitive with the official one on every metric,
+providing a comparable upper bound for any latent diffusion model that uses this encoder.
+H
+T2I-Pretrained PixelART-B Performance
+For the T2I-pretraining ablation in Table 3, we pretrain PixelART-B (168M parameters) on the public
+BLIP-3o corpus [61] (∼36M text–image pairs) for 250K steps with standard rectified-flow training,
+then fine-tune on our I2L corpus with the same recipe as the from-scratch baseline. Unless stated
+otherwise, all training hyperparameters follow the PixelART-B ablation default in Table 10. To verify
+that the pretrained checkpoint produces coherent T2I outputs, we evaluate it on GenEval [65] before
+I2L fine-tuning. The full breakdown is:
+Table 13: GenEval scores of the BLIP-3o-pretrained PixelART-B (168M params, batch 1024,
+250K iters), evaluated before I2L fine-tuning. Overall is the per-task average. The model does
+not adopt any specialized optimization recipes common in dedicated T2I models, yet still produces
+non-degenerate outputs across all six task categories at a level consistent with this parameter scale
+and training budget. This checkpoint serves as the T2I-initialized starting point for the I2L ablation
+in Table 3.
+single
+two
+counting
+colors
+color
+position
+overall
+obj.
+obj.
+attr.
+PixelART-B (BLIP-3o, T2I)
+74.38
+24.24
+18.12
+61.70
+12.75
+7.50
+33.12
+For completeness, the prompt-level statistics are: total images 2,212, total prompts 553, correct
+images 31.87%, correct prompts 53.16%. Despite the T2I pretraining, the I2L fine-tuning loss curve
+in Figure 7(c) closes within ∼60K steps and the final I2L metrics in Table 3 are no better than those of
+the from-scratch baseline, supporting our finding that I2L can be learned end-to-end without external
+T2I priors at this scale.
+I
+Generalization to Natural Images
+PixelART is trained exclusively on multi-layer design templates. Although natural photographs lie
+outside this training distribution, the main model still produces meaningful decompositions on many
+natural-image inputs, suggesting that the I2L objective and pixel-space architecture together transfer
+beyond the design domain to a useful degree. Figure 9 shows representative successful cases.
+20
+
+
+Figure 9: Zero-shot decomposition on natural images. Although trained only on multi-layer
+design templates, PixelART produces coherent foreground/background separation and plausible
+occluded-region completion on selected natural-image inputs.
+J
+Limitations
+We summarize the most prominent limitations of PixelART in this section.
+• Complex occlusion completion. Filling in regions hidden behind large foregrounds is the
+model’s clearest weakness, particularly on natural photographs. We attribute this to a coverage
+gap in our training distribution—multi-layer design templates rarely contain dense, photographic
+occlusions of the kind seen in natural scenes—rather than to a fundamental limit of the from-
+scratch pixel-diffusion architecture.
+• Reduced reliability on natural images. As shown in Appendix I, the model can produce
+coherent decompositions on natural photographs, but the success rate is noticeably lower and
+less stable than on design content. Beyond the completion artefacts above, failures on natural
+inputs frequently take the form of layer assignment errors: a near-empty foreground layer,
+residual foreground content in the background, multiple elements merged into one layer, or a
+single object split across layers. Closing this gap likely requires natural-image data with layered
+annotations during training.
+• Unusually large K. PixelART supports variable K through anonymous regional tokens, but only
+up to a maximum of K=32 layers seen during training. For inputs that exceed or approach this
+limit, reconstruction precision drops noticeably and assignment errors become more frequent.
+• Requires external layout. PixelART consumes a bounding-box layout, supplied either by the
+user or by an automatic detector (Appendix C); it does not operate end-to-end on the input image
+alone, unlike bbox-free baselines such as Qwen-Image-Layered.
+• Limited reproducibility from public assets. Because the 4M training corpus and the internal
+layout detector are not publicly released, the full system cannot be exactly reproduced from
+public assets alone. To support independent verification, we will release evaluation scripts,
+model outputs on the public LICA benchmark, the corresponding VLM-judge grids and per-
+sample metrics, and the detector-predicted bounding boxes used in our quantitative tables. The
+full architecture and training recipe are specified in Appendix B, enabling reimplementation on
+alternative layered datasets.
+K
+Broader Impacts
+Positive impacts.
+PixelART targets design and editing workflows. By recovering editable RGBA
+layer stacks from rasterized images, it reduces the manual cost of repurposing, retargeting, or
+21
+
+
+updating visual content, and lowers the barrier to image editing for users without professional design
+experience.
+Potential misuse.
+As with other generative editing systems, PixelART can be misused. The most
+direct risks are: (i) image manipulation with deceptive intent, such as removing or altering disclaimers,
+context-providing details, or other visible information; (ii) decomposition of copyrighted design assets
+to facilitate unauthorized reuse; and (iii) removal of watermarks, signatures, or other provenance
+markers. These risks are bounded relative to full text-to-image generation, since PixelART operates
+on an existing input rather than fabricating new scenes from scratch, but they are direct enough to
+warrant explicit acknowledgement.
+Mitigations.
+For any production deployment of this technology, we recommend a small set of
+pre-input safeguards: (i) automatic detection of copyrighted or otherwise protected material in the
+input image, with processing refused on positive matches; and (ii) automatic rejection of requests
+whose bounding-box layout targets watermarks, signatures, or other provenance markers. We also
+encourage the broader community to develop forensic methods that can detect layer-level re-editing,
+complementing existing image-tampering detection work.
+L
+External Assets and Licenses
+We list the external assets used in this work, citing the original creators and the licenses under which
+the assets are released. All assets are used in accordance with their respective licenses.
+Models.
+• Qwen3-VL-2B-Instruct [57], used as the base model for the internal layout detector. Apache
+License 2.0.
+• Qwen-Image-Layered [2], used as a system-level baseline (Table 1) and as the source of the
+RGBA-VAE encoder for the latent-space ablation (App. G). Apache License 2.0.
+• CLD [39], used as a system-level baseline (Table 1). License inherited from FLUX.1-dev:
+FLUX.1 [dev] Non-Commercial License.
+• LayerD [38], used as a non-diffusion paradigm reference (Table 1). Apache License 2.0.
+Datasets and benchmarks.
+• LICA [53], used as an evaluation benchmark in Table 1. CC BY 4.0.
+• BLIP-3o pretraining corpus [61], used for the T2I-pretraining ablation (App. H). Apache
+License 2.0.
+• GenEval [65], used to evaluate the T2I-pretrained checkpoint (App. H). MIT License.
+Closed external APIs.
+• GPT-5.5 (OpenAI), used as a VLM judge for layer quality scoring (App. D.4). Use is subject to
+OpenAI’s API usage policies.
+• Gemini-3.1 Pro (Google), used as a second VLM judge. Use is subject to Google’s Generative
+AI API terms of service.
+22

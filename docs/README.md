@@ -48,17 +48,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-09-21</span>
+      <span class="dpr-home-dashboard-kicker">2026-09-22</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 1 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 7 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>0</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>1</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>5</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>2</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-09-21 22:45:37 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-09-22 21:59:28 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -69,7 +69,10 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日仅速读 1 篇（精读 0 篇），聚焦开放词汇 3D 实例分割。最值得看的是《SenseFuse》提出的无标签图像与形状编码器融合思路（6.0/10），主打免标注实现开放词汇分割。普通读者可先了解其&quot;无标签融合&quot;如何省去标注成本，再关注该思路在真实 3D 场景中的落地效果。</p>
+<p>今日共生成 7 篇推荐（精读 5 篇，速读 2 篇）</p>
+<p>精读：《AnalogDepth: Multi-view Geometry from FPV drones under Analog Video Transmission》（9.0/10）, 《CMAMBADEPTH: Self-supervised Monocular Depth Estimation with Channel Mamba and Hybrid Attention》（9.0/10）</p>
+<p>速读：《PixelART: Image-to-Layer Decomposition without Latents or Text-to-Image Pretraining》（6.0/10）, 《Combining Foundation Model Confidence and Monocular Depth for Training-Free Out-of-Distribution Segmentation》（6.0/10）</p>
+<p>这些结果覆盖了当下较热的方向，建议先看精读区论文的关键问题与方法。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -78,12 +81,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">0 篇</strong>
+    <strong class="dpr-home-dashboard-count">5 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p class="dpr-home-dashboard-empty">今日暂无推荐。</p>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="AnalogDepth: Multi-view Geometry from FPV drones under Analog Video Transmission">AnalogDepth: Multi-view Geometry from FPV drones under Analog Video Transmission</span></li><li><span class="dpr-home-dashboard-paper-title" title="CMAMBADEPTH: Self-supervised Monocular Depth Estimation with Channel Mamba and Hybrid Attention">CMAMBADEPTH: Self-supervised Monocular Depth Estimation with Channel Mamba and Hybrid Attention</span></li><li><span class="dpr-home-dashboard-paper-title" title="SatOV: Restoring Spatial Priors for Training-Free Open-Vocabulary Segmentation in Remote Sensing Imagery">SatOV: Restoring Spatial Priors for Training-Free Open-Vocabulary Segmentation in Remote Sensing Imagery</span></li></ul>
   </div>
-
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">seg <strong>3</strong></span><span class="dpr-home-dashboard-tag">mono-depth <strong>2</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -91,12 +94,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">1 篇</strong>
+    <strong class="dpr-home-dashboard-count">2 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="SenseFuse: Label-Free Fusion of Image and Shape Encoders for Open-Vocabulary 3D Instance Segmentation">SenseFuse: Label-Free Fusion of Image and Shape Encoders for Open-Vocabulary 3D Instance Segmentation</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="PixelART: Image-to-Layer Decomposition without Latents or Text-to-Image Pretraining">PixelART: Image-to-Layer Decomposition without Latents or Text-to-Image Pretraining</span></li><li><span class="dpr-home-dashboard-paper-title" title="Combining Foundation Model Confidence and Monocular Depth for Training-Free Out-of-Distribution Segmentation">Combining Foundation Model Confidence and Monocular Depth for Training-Free Out-of-Distribution Segmentation</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">seg <strong>1</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">matting <strong>1</strong></span><span class="dpr-home-dashboard-tag">mono-depth <strong>1</strong></span></div>
 </section>
 </div>
 

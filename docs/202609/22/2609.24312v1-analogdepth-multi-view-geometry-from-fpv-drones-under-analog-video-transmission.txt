@@ -1,0 +1,140 @@
+Title: AnalogDepth: Multi-view Geometry from FPV drones under Analog Video Transmission
+
+URL Source: https://arxiv.org/pdf/2609.24312v1
+
+Published Time: Tue, 22 Sep 2026 03:06:57 GMT
+
+Number of Pages: 7
+
+Markdown Content:
+# AnalogDepth: Multi-view Geometry from FPV drones under Analog Video Transmission 
+
+Andr´ e Amorim 1 and Pedro F. Proenc ¸a 1
+
+Abstract — Analog video transmission (VTX) remains widespread in FPV drones due to low latency, weight and low cost. However analog VTX suffers from complex spatially structured image degradation which differ fundamentally from digital image corruption (e.g. AWGN) used in standard training augmentation. This work shows that this type of noise severely degrades the accuracy of Depth Anything 3 (DA3), a state-of-the-art feed forward visual geometry foundation model. To address this gap, we present AnalogDepth, a parameter-efficient training pipeline that adapts DA3 to analog FPV imagery using student-teacher knowledge distillation with Low-Rank Adaptation (LoRA) injected into the DINOv2 backbone. Rather than synthesizing noise analytically, we build a noise bank from static FPV recordings under diverse conditions and compare real-noise injection against PSD-matched Gaus-sian synthesis and AWGN as baselines. Experiments on six real FPV flight sequences across three indoor scenes show that training with our noise bank consistently reduces per-frame depth RMSE and 3D reconstruction Chamfer distance compared to the pretrained DA3 baseline and both Gaussian noise variants. These results demonstrate that replicating the spatial structure of real analog transmission noise is critical for effective adaptation. 
+
+I. INTRODUCTION Recent advances in feed-forward visual geometry models using large-scale pretraining have enabled strong generaliza-tion across diverse scenes and cameras. However, extending these models to analog video transmission (VTX) imagery remains largely unexplored. Despite the advances of digital VTX technology, analog VTX remains widespread in FPV drone applications, par-ticularly in micro-drones where cost, power consumption, and transmission latency are critical. Analog VTX intro-duces complex, spatially structured noise arising from radio-frequency channel degradation, composite-video distortion, and synchronization errors that differ fundamentally from standard camera sensor noise. As we demonstrate in this work, this structured noise severely impacts the accuracy of Depth Anything 3 (DA3) [1] even when standard AWGN augmentation is applied. To bridge this domain gap, we introduce AnalogDepth, a student-teacher knowledge distillation strategy with Low-Rank Adaptation (LoRA) [2] that efficiently adapts the DINOv2 backbone of DA3 to analog FPV imagery, trained with real analog noise samples drawn from a noise bank collected during static FPV recordings. Our experiments on six real flight sequences show that this approach significantly 
+
+> 1NOVA School of Science and Technology, NOVA University Lisbon, Caparica, Portugal.
+
+VTX Analog Image DA3 pretrained AnalogDepth 
+
+Fig. 1: Depth estimation on real analog FPV imagery. ( Top )The official pretrained DA3-Small loses the wall gradient due to Horizontal noise bands, which are picked up as structure. AnalogDepth shows better wall gradient. ( Bottom )Even under milder corruption, DA3-pretrained distorts the floor geometry. improves both depth accuracy and 3D reconstruction quality. Our paper makes the following contributions:  
+
+> •
+
+A parameter-efficient training pipeline for adapting a visual geometry foundation model (DA3) to analog FPV imagery, using student-teacher knowledge distillation with LoRA, requiring no access to the original pretrain-ing code or data.  
+
+> •
+
+A characterization of analog FPV VTX noise and a noise bank construction methodology, together with a comparison of three noise injection strategies: real noise bank, PSD-matched Gaussian synthesis, and AWGN.  
+
+> •
+
+An evaluation benchmark comprising real FPV flight sequences with pseudo ground-truth depth derived from RealSense-DA3 alignment, supporting both per-frame depth RMSE and 3D reconstruction Chamfer distance metrics. The noise bank, the six analog FPV flight sequences with their RealSense recordings, and the training and evaluation code will be released publicly upon acceptance. II. R ELATED WORK 
+
+Visual geometry foundation models. Recent models increasingly unify depth and 3D reconstruction within large pretrained visual backbones. Depth Anything V2 [3] achieves strong zero-shot monocular depth estimation using large-scale pretrained features. DUSt3R [4] and MASt3R [5] ex-tend feed-forward inference to multi-view geometry, jointly arXiv:2609.24312v1 [cs.CV] 21 Sep 2026 recovering scene structure and camera parameters through lo-cal feature matching grounded in 3D. DepthPro [6] achieves fast single-image metric depth estimation at high resolution, while VGGT [7] unifies multi-view scene reconstruction via a visual geometry grounded transformer. Depth Any-thing 3 (DA3) [1] further unifies monocular and multi-view geometry through a dense depth–ray representation predicted by a pretrained vision Transformer. These models exhibit strong cross-domain generalization, but are primarily developed and evaluated on conventional digital imagery and their robustness to analog video degradation remains largely unexplored. 
+
+Robust depth under image degradation. Robustness to visual degradation is distinct from clean-domain generaliza-tion. RoboDepth [8] shows that monocular depth estimators can degrade substantially under noise, blur, weather, and lossy compression (JPEG), motivating augmentation and corruption-aware training. However, commonly used corruptions such as additive white Gaussian noise (AWGN) or generic blur do not capture the structured artifacts produced by analog FPV transmission, which may include spatially correlated interference, line arti-facts, chromatic distortion, and transient signal degradation. For more complex degradation, monocular depth models were trained with diffusion model generation as input in [9] and [10] to improve performance under adverse weather and night. In this work, we instead derive an empirical corruption bank from static recordings of a real analog FPV imaging and transmission pipeline and compare it directly with AWGN and power-spectral-density-matched noise. 
+
+Image restoration and efficient adaptation. Modern restoration networks such as Restormer [11], NAFNet [12], and PromptIR [13] achieve strong denoising and blind restoration performance. These methods aim to reconstruct a clean image, but improved perceptual quality does not neces-sarily preserve geometric cues required for depth estimation. Rather than inserting a separate restoration stage, we directly adapt DA3 to corrupted observations. To retain the pretrained geometric prior while limiting trainable parameters, we use Low-Rank Adaptation (LoRA) [2] and train the model with corruption samples drawn from the measured analog FPV bank. This directly optimizes robustness for downstream depth estimation instead of image appearance. III. A NALOG DEPTH 
+
+A. Training Pipeline 
+
+Our training pipeline, shown in Fig . 2, follows a teacher-student Knowledge distillation scheme, where one frozen DA3 model, acting as the teacher, outputs N depth maps from a sequence of N clean images, sampled from our training set videos. These depth maps are used as supervision to train another DA3 model, which takes as input the same N
+
+image views but perturbed with noise from our noise model. For both the teacher and student, we used simply two iden-tical copies of DA3-Small since our goal is not compression. To train the student, LoRA [2] parameters were injected in every attention block of the DINOv2 backbone and the 
+
+Fig. 2: Training pipeline overview. One DA3 model used as teacher, with access to the clean images provides depth maps as supervision to the student model, which only sees the noisy images. The noisy images are composed by adding sampled analog VTX noise to the clean image sequence. 
+
+Fig. 3: ( Left ) Average PSD for all image residuals used in the noise bank. ( Middle ) Noise synthesized from the PSD. (Right ) Noise bank residual. student model base weights were frozen. This design choice was driven by early experiments where finetuning directly the backbone did not generalize to the validation set, and finetuning only the DA3 head failed to converge. This is intuitive since analog VTX noise should corrupt the local patch embeddings in lower layers and the structural feature representation in mid layers. More details of training are provided in Section IV-A. To inject noise during training, we simply sample a noise image, using the methods proposed below, and add it to each clean image. In the case of noise bank samples, these are first center-cropped and downsized to match the input tensor. The same preprocessing is applied to our clean images following [1]. Additionally, the camera intrinsics from the clean image sequences are adjusted to account for the image transformation and passed as inputs to the DA3. 
+
+B. Analog VTX Noise Extraction 
+
+To extract analog VTX noise, we collected several static videos across different lighting and scene conditions, e.g., placing metallic objects between the receiver and transmitter. Our VTX setup is described in Section IV-B. For each video, we computed residual maps from each frame to the median of all images in each video. To avoid scene leaking into the residuals, we found necessary to clamp the drone with its FPV camera facing a textureless surface without sharp gradients. The Power Spectral Density (PSD) averaged for all residual maps is shown in Fig. 3 along with some sampled image noise. Our analysis of the power spectrum revealed: (i) a spectral flatness of 0.218, (ii) most energy concentrated at low frequencies, (iii) strong banding expressed as a clear vertical axis, and (iv) a strong DC component arising from full image brightness flicker. Therefore, we can conclude the noise cannot be approxi-mated with AWGN. We can instead draw noise via spectral synthesis [14] as shown in Fig. 3 to approximate the noise’s spectral characteristics but it does not replicate the sharp band artifacts. Nevertheless, we have decided to test drawing noise during training using three approaches: AWGN, Noise Bank and PSD-matching Gaussian noise. For AWGN, we match the variance to the noise bank variance. For the noise bank, we simply store the residual maps and randomly sample during training, while the train and validation residuals are kept strictly disjoint. For the PSD-matching Gaussian noise, we synthesize a new noise map per sample by filtering white Gaussian noise in the frequency domain so its expected power spectrum matches the pooled power spectrum from the residual maps. IV. E XPERIMENTAL SETUP 
+
+A. Training Data and Implementation Details 
+
+For clean training-set images, we sampled 44 scenes from the TartanAir2 [15] with a total of 66,078 images. These were further split for validation. For the noise bank, we collected 11,412 residual maps from 6 videos. These were strictly split in train and validation set. We trained DA3-Small model for 10 epochs resulting in the loss shown in Fig. 4. The total loss simply combined the L1 depth loss LD with spatial gradient regularization 
+
+LG proposed in [1] such that Ltotal = LD + αL G with 
+
+α = 1 . Since TartanAir2 is synthetic, we feed the models the extrinsics and intrinsics but these are not used directly in the loss function for simplicity since we didn’t optimize the DA3 heads. Training optimized only the LoRA parameters injected in the backbone (i.e. DINOv2). For data loading, we used a batch of 4, each with a sequence of 3 images. These images were sampled every 5th frame from each scene sequence to create parallax. The input image was fixed at 476 × 476. Thus the clean images and noise images were center-cropped and downsized. The full training took about 8 hours in a GeForce RTX 2080 Ti. 
+
+B. Test Set: Analog FPV Flights 
+
+We collected 6 video sequences around 1 min each from 3 indoor scenes using two Meteor75 Tiny FPVs using C03 Cameras with 128° FOV. We used a custom 5.8 GHz FM video receiver and recorded videos at 30 fps using a lossless intra-frame codec (FFV1). We then sampled and retained every 5th frame for our test-set. To obtain pseudo ground-truth depth, we collected RGB-D sequences in all scenes with a RealSense D455 from viewpoints approximating the FPV perspective. 
+
+Fig. 4: Total loss curve during training with noise bank 
+
+C. Evaluation Protocol and Metrics 
+
+We evaluated the accuracy of both the depth-maps and the full 3D reconstructions from the different DA3 trained variants. To determine a suitable pseudo ground truth (GT), we first observed empirically in Fig. 5 and 8 that using DA3-pretrained on the RealSense RGB frames produces cleaner depth maps and more consistent 3D reconstructions than the RealSense depth maps. This is consistent with the known depth error model [16] of these stereo cameras for longer ranges and depth discontinuities, while DA3 can leverage multiple views. We therefore decided to evaluate the models against two different ground-truth geometry references: The raw RealSense depth and the RealSense-DA3 . We constructed the RealSense-DA3 by running DA3-Small with its origi-nal pretrained weights on the RealSense RGB sequences and subsequently scaling the predicted depth maps using the corresponding RealSense depth maps. Importantly, this reference is generated using the original pretrained DA3 weights rather than AnalogDepth. This makes the evalua-tion conservative with respect to our method: any model-specific bias introduced by the DA3-based reference would be expected to favor the pretrained DA3 baseline rather than our AnalogDepth model. For best results and deriving a consistent 3D reconstruction, we used a maximum sequence of 100 frames per inference, which fits the GPU memory thanks to FlashAttention [17]. The evaluation against these two pseudo-GT references is shown in Tables I and II. In the rest of the evaluation we used RealSense-DA3 due to reasons described above. 
+
+Depth Map Accuracy. We evaluate the depth estimation accuracy in our test-set as the scale-aligned RMSE per frame: 
+
+Depth RMSE = 
+
+s 1
+
+|V| 
+
+X
+
+> i∈V
+
+
+
+Dreproj  
+
+> i
+
+− s · Dest 
+
+> i
+
+2
+
+(1) where V is the set of all valid pixels. Dest is the estimated DA3 depth from the analog image and the Dreproj is the projected GT depth map and s is the median per-pixel ratio over V. We obtain the Dreproj as follows. For each test-set frame, we brute-force matched the image against the RealSense frames using LightGlue [18] feature matching. Then, we used RANSAC PnP with 3D cordinates from either the RealSense-DA3 or Realsense. We selected the VTX Analog Image RealSense-DA3 (GT) DA3 pretrained AnalogDepth 
+
+Fig. 5: Depth maps for several flight sequence frames used in our evaluation. Notice the depth map for top image is less crisp for the DA3 pretrained. The right wall also shows less depth gradient for top and bottom image.                             
+
+> Video / nr frames Pretrained Noise bank AWGN PSD-matched garage west / 49 0.399 0.275 0.414 0.339 garage south / 46 0.297 0.273 0.291 0.284 office 1 / 24 0.257 0.218 0.254 0.248 office 2 / 46 0.342 0.299 0.332 0.317 plants / 15 0.502 0.275 0.497 0.419 stairs / 30 0.631 0.490 0.640 0.573
+
+TABLE I: Depth RMSE by scene and noise model using the RealSense-DA3 as reference. Each inference pass took 10 images. nr frames is the number of frames evaluated that were selected by PnP protocol. top 3 matched images with an inlier threshold of 100 matches and reprojected the corresponding GT depth to the test-set image. Concretely, the depth maps from these Top-3 frames are reprojected and accumulated on the target frame using both camera intrinsics. To reduce the computational cost of this brute-force process, we sampled uniformly frames from both image sets. The actual number of frames that pass the RANSAC criteria and were evaluated is listed on Table I and II. 
+
+3D Reconstruction Accuracy. We compared the point clouds generated by RealSense-DA3 to each test-set point cloud using the Chamfer Distance [19]. Each test-set point cloud was produced by running either DA3-pretrained or                               
+
+> Video / nr frames Pretrained Noise bank AWGN PSD-matched garage west / 49 0.422 0.295 0.440 0.357 garage south / 46 0.343 0.311 0.338 0.325 office 1 / 20 †1.077 1.056 1.076 1.073 office 2 / 43 †1.970 1.967 1.969 1.968 plants / 15 0.785 0.572 0.781 0.703 stairs / 31 0.828 0.673 0.845 0.768
+
+TABLE II: Depth RMSE by scene and noise model as in Table I but using RealSense depth as ground-truth reference. 
+
+† RMSE is significantly higher for the office scene due to RealSense noise and outliers. AnalogDepth on 100 uniformly sampled frames from each flight sequence. Instead of relying on ICP for alignment, the point clouds were aligned using Umeyama Sim(3) closed-form solution on points matches found using the PnP RANSAC strategy above. More specifically, we aggregated 3D-to-3D matches from the inliers of the top 5 frame matches. The 3D coor-dinate of each keypoint was calculated by backprojecting it using the respective DA3 camera pose and depth map. 
+
+D. Noise Model Results 
+
+As shown in Table I, our training with a noise bank injection achieved consistently the best depth RMSE across all test frames. The gap between DA3-pretrained and Fig. 6: Average Depth RMSE vs Number of images used in inference. RMSE is the average of all frames sampled across the test-set.   
+
+> 1 view 10 views 100 views
+
+Fig. 7: Depth estimation for one corrupted analog VTX im-age by varying the number of images passed to AnalogDepth (top ) and DA3-pretrained ( Bottom ). AnalogDepth is preserved when we changed the pseudo ground truth to raw RealSense Depth, except in the office sequences, where RealSense is too noisy. Both training with AWGN and PSD-matched Gaussian noise did not work as well. This indicates that the spatial pattern of noise matters and this is not captured by the average PSD where noise is drawn by varying only phase. It’s also worth pointing that the loss gap in Fig. 4 was not as clear for the AWGN and PSD, thus expanding the noise bank could improve the results further. Fig. 5 shows some examples of these evaluated frames. We can observe that even with comparatively low noise, DA3-pretrained fails systematically on textureless walls. This is clear in the reconstructed point clouds in Fig. 8. 
+
+E. Multi-view Ablation 
+
+Increasing the number of views in the cross-attention should improve depth accuracy since analog VTX noise is transient. We tested, in Fig 6, if increasing the input of number of views makes our model redundant compared to DA3 pretrained. By increasing the number of images from single-image to a total of 100 images the RMSE drops for both models. This indicates that increasing the number of views is not enough. In Fig. 7 we can see that AnalogDepth with Single Image is affected by the horizontal bands however the structure is recovered when we use multi-              
+
+> Video Pretrained Noise Bank garage west 0.567 0.495
+> garage south 0.407 0.253
+> office 1 0.841 1.000 office 2 0.456 0.389
+> plants 3.281 2.186
+> stairs 1.112 0.776
+
+TABLE III: Reconstruction Error: Chamfer Distance between aligned point clouds view with 10 images. On the other hand for pretrained DA3 10 views were not enough to remove artifacts. Even with 100 it still shows horizontal lines. In terms of runtime, inference took on a GeForce RTX 2080 Ti respectively: 0.05 s for a single image, 0.35 s for 10 images and 7.12 s for 100 images. 
+
+F. Reconstruction Results 
+
+As shown on Table III, Similarly to the depth map accu-racy, training with a noise bank improved the reconstruction for all sequences except the office 1 . We observed that for that flight, the reconstructions have very little overlap. In the 
+
+garage west reconstructions, shown in Fig. 8, it is especially clear that DA3-pretrained distorts consistently the right wall causing a smear of points. Similar conclusions can be drawn from the other reconstructions where room orthogonality and planar structure are less well preserved. V. CONCLUSION We have presented AnalogDepth, a method for adapting the DA3 visual geometry foundation model to the degraded imagery produced by analog FPV video transmission. By analyzing real analog VTX noise through its power spectral density, we showed that it exhibits: spatial structure, low-frequency energy concentration and strong vertical band-ing that cannot be replicated by AWGN or PSD-matched Gaussian synthesis alone. Using a student-teacher knowledge distillation strategy with LoRA, we efficiently fine-tune the DINOv2 backbone of DA3 with noise sampled from a real analog noise bank, without requiring access to the original training procedure or datasets. Experiments on six real FPV flight sequences across three indoor scenes demonstrate consistent improvements in both per-frame depth RMSE and 3D reconstruction Chamfer distance compared to the pretrained DA3 baseline and both Gaussian noise variants. A multi-view ablation confirms that simply increasing the number of input views does not compensate for the domain gap introduced by analog transmission, motivating the need for dedicated adaptation. The results were also consistent for different ground-truth constructions. Qualitatively, AnalogDepth recovers accurate planar geometry on textureless walls where the pretrained model systematically fails. Future work will explore larger and more diverse noise banks collected across environments and interference condi-tions, extension to outdoor FPV sequences and different VTX RealSense-DA3 RGB RealSense-DA3 AnalogDepth DA3-pretrained 
+
+Fig. 8: Reconstructions for our test-set scenes (top to bottom): garage west, office and garage south. Rendered point clouds are colored by Z buffer. ( Top ) The right wall on DA3-pretrained appears smeared and distorted. ( Middle ) The walls are less defined and the ceiling is in the same depth plane as the back wall. ( Bottom ) The scene looks flat for the DA3-pretrained compared to AnalogDepth. Notice the floor and ceiling. hardware setups, and joint adaptation of both the backbone and the DA3 decoder heads for further accuracy gains. Fur-thermore, we will extend our work to other visual geometry models, including models that include Metric Scale. REFERENCES [1] H. Lin, S. Chen, J. Liew, D. Y. Chen, Z. Li, G. Shi, J. Feng, and B. Kang, “Depth anything 3: Recovering the visual space from any views,” arXiv preprint arXiv:2511.10647 , 2025. [2] E. J. Hu, Y. Shen, P. Wallis, Z. Allen-Zhu, Y. Li, S. Wang, L. Wang, and W. Chen, “LoRA: Low-rank adaptation of large language models,” in Proc. Int. Conf. Learning Representations (ICLR) , 2022. [3] L. Yang, B. Kang, Z. Huang, Z. Zhao, X. Xu, J. Feng, and H. Zhao, “Depth anything V2,” in Advances in Neural Information Processing Systems (NeurIPS) , 2024. [4] S. Wang, V. Leroy, Y. Cabon, B. Chidlovskii, and J. Revaud, “DUSt3R: Geometric 3D vision made easy,” in Proc. IEEE/CVF Conf. Computer Vision and Pattern Recognition (CVPR) , 2024. [5] V. Leroy, Y. Cabon, and J. Revaud, “Grounding image matching in 3D with MASt3R,” in Proc. European Conf. Computer Vision (ECCV) ,2024. [6] A. Bochkovskii, A. Dellenbach, H. Richter, S. F. Bhat, Y. Yang, and V. Koltun, “Depth Pro: Sharp monocular metric depth in less than a second,” arXiv preprint arXiv:2410.02073 , 2024. [7] J. Wang, M. Chen, N. Karaev, A. Vedaldi, C. Rupprecht, and D. Novotny, “VGGT: Visual geometry grounded transformer,” in Proc. IEEE/CVF Conf. Computer Vision and Pattern Recognition (CVPR) ,2025. [8] L. Kong, S. Xie, H. Hu, B. R. Cottereau et al. , “RoboDepth: Robust out-of-distribution depth estimation under corruptions,” in Advances in Neural Information Processing Systems (NeurIPS) , 2023. [9] S. Gasperini, N. Morbitzer, H. Jung, N. Navab, and F. Tombari, “Robust monocular depth estimation under challenging conditions,” in 2023 IEEE/CVF International Conference on Computer Vision (ICCV) . IEEE, 2023, pp. 8143–8152. [10] K. Jiang, J. Cao, Z. Yu, J. Jiang, and J. Zhou, “Always clear depth: Robust monocular depth estimation under adverse weather.” in IJCAI ,2025, pp. 1251–1259. [11] S. W. Zamir, A. Arora, S. Khan, M. Hayat, F. S. Khan, and M.-H. Yang, “Restormer: Efficient transformer for high-resolution image restoration,” in Proc. IEEE/CVF Conf. Computer Vision and Pattern Recognition (CVPR) , 2022. [12] L. Chen, X. Chu, X. Zhang, and J. Sun, “Simple baselines for image restoration,” in Proc. European Conf. Computer Vision (ECCV) , 2022. [13] V. Potlapalli, S. W. Zamir, S. Khan, and F. S. Khan, “PromptIR: Prompting for all-in-one blind image restoration,” in Advances in Neural Information Processing Systems (NeurIPS) , 2023. [14] N. J. Kasdin, “Discrete simulation of colored noise and stochastic processes and 1/f α power law noise generation,” Proc. IEEE , vol. 83, no. 5, pp. 802–827, 1995. [15] W. Wang, D. Zhu, X. Wang, Y. Hu, Y. Qiu, C. Wang, Y. Hu, A. Kapoor, and S. Scherer, “Tartanair: A dataset to push the limits of visual slam,” in 2020 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) . IEEE, 2020, pp. 4909–4916. [16] P. F. Proenc ¸a and Y. Gao, “Probabilistic rgb-d odometry based on points, lines and planes under depth uncertainty,” Robotics and Au-tonomous Systems , vol. 104, pp. 25–39, 2018. [17] T. Dao, “FlashAttention-2: Faster attention with better parallelism and work partitioning,” arXiv preprint arXiv:2307.08691 , 2023. [18] P. Lindenberger, P.-E. Sarlin, and M. Pollefeys, “LightGlue: Local feature matching at light speed,” in Proc. IEEE/CVF Int. Conf. Computer Vision (ICCV) , 2023. [19] H. Fan, H. Su, and L. Guibas, “A point set generation network for 3D object reconstruction from a single image,” in Proc. IEEE/CVF Conf. Computer Vision and Pattern Recognition (CVPR) , 2017.
