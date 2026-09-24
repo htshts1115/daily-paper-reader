@@ -1,0 +1,518 @@
+Title: DAVIO: Dense Monocular-Inertial SLAM with Feed-Forward Initialization and Pose-Conditioned Mapping
+
+URL Source: https://arxiv.org/pdf/2609.27702v1
+
+Published Time: Thu, 24 Sep 2026 00:57:40 GMT
+
+Number of Pages: 8
+
+Markdown Content:
+# DAVIO: Dense Monocular–Inertial SLAM with Feed-Forward Initialization and Pose-Conditioned Mapping 
+
+Jaafar Mahmoud, Arthur Movsesyan, Mikhail Iumanov, and Sergey Kolyubin 
+
+Abstract — A camera and an IMU are the minimal sensor setup for metric localization and dense mapping, yet classical visual–inertial filters must wait for parallax before they start and then retain only sparse landmarks. Feed-forward geometry models, in contrast, predict dense structure from a few images but provide neither metric scale nor gravity. We present DAVIO, which uses a single multi-view depth model, Depth Anything 3, for both start-up and mapping. At start-up, a five-image window and preintegrated IMU measurements form a feature-free lin-ear system. Its robust, conditioning-checked solution bootstraps a VIO filter through buffered replay. During tracking, the filter’s metric poses condition the depth model. Residual scale is corrected only along viewing rays, which preserves the metric camera baselines, and a gravity-preserving submap graph with drift-gated revisits refines the map. On EuRoC, DAVIO starts markedly earlier, reduces the localization error, and maps more accurately than SOTA feed-forward mappers given identical poses. On building-scale ORI sequences, DAVIO is on bar or better than SOTA mappers on the same odometry, and degrades far less when GT poses are replaced by real odometry. We release the code of DAVIO, a real-time dense metric SLAM system, to the community 1.
+
+I. I NTRODUCTION 
+
+Efficient 3 D perception in autonomous systems heavily relies on combining visual and inertial sensing, as a single camera paired with an IMU provides sufficient information for metric scale recovery and dense reconstruction. However, inertial measurements can resolve metric scale only after suf-ficient motion separates specific force from gravity [1]. Once initialized, classical visual–inertial odometry (VIO) [2], [3], [4], [5], [6] algorithms maintain tracked sparse landmarks. While sufficient for trajectory estimation, these representa-tions are far too sparse for downstream robotic applications such as autonomous navigation. Feed-forward geometry models predict dense point maps or depth directly from co-visible images in a single forward pass [7], [8], [9], [10], [11], [12]. Trained as foundation models on vast and diverse datasets, they offer strong gener-alizability and visual robustness. However, their predictions are strictly uncalibrated – lacking metric scale, gravity ori-entation, sensor velocity, and IMU biases. The two modal-ities are thus highly complementary: inertial measurements supply the physical quantities missing in learned geometry, while feed-forward models predict dense structure from the initial frames, well before sufficient parallax accumulates for classical initialization [13]. 
+
+The authors are with the Biomechatronics and Energy-Efficient Robotics (BE2R) Lab, ITMO University, Saint Petersburg, Russia. 
+
+jaafar.a.mahmoud@itmo.ru 
+
+> 1
+
+https://be2rlab.github.io/DAVIO/ 0 10 20 30 r01 r02 r03 r04 r05 015 30 
+
+> cm
+
+DAVIO From sensors to a dense metric map   
+
+> 5 images + IMU
+> Initialize
+> geometry + inertia
+> Track
+> metric VIO poses
+> Map
+> depth + graph
+> Unconditioned reference DAVIO ORI r01
+
+19.3 cm mean error  
+
+> F@10 0.38
+
+7.4 cm mean error   
+
+> F@10 0.75
+> Surface distance (cm)
+> Line: DAVIO camera path
+> Lower mean error on all five ORI sequences
+> Reference DAVIO
+
+Fig. 1: From a monocular camera and an IMU to a dense metric map. DAVIO initializes from images and IMU measurements, then conditions dense mapping on metric VIO poses through incremental submap fusion. 
+
+To bridge these complementary strengths while address-ing their individual limitations, we propose DAVIO , amonocular-inertial system that fuses feed-forward visual ge-ometry with filter-based VIO across two distinct operational phases. During initialization, DAVIO constructs a feature-free state proposal from a five-image window and preintegrated IMU measurements following [13] (Sec. IV). This proposal boot-straps an unmodified OpenVINS filter [4] via a buffered-replay mechanism (Sec. IV-C). Sensor data arriving during initialization are queued and replayed faster than real time, and the filter publishes only once it has caught up with the live stream, so no measurements are dropped. During tracking, the interaction reverses: the filter’s metric camera poses condition the geometric foundation model (DA3 [12]), yielding overlapping depth submaps (Sec. V-A). Residual scale corrections are applied only along viewing rays at depth back-projection, thereby preserving the filter’s metric camera baselines (Sec. V-B). Additionally, a gravity-preserving submap graph jointly refines depth scales and map-frame poses, admitting revisit constraints to the pose problem only after geometric verification and a drift test (Sec. V-C). The dense map is thus available within seconds arXiv:2609.27702v1 [cs.RO] 23 Sep 2026 of start-up, while the filter state is never modified; the map-frame correction lowers the final trajectory error. Our main contributions are summarized as follows: 1) Dual-purpose framework architecture: A real-time unified monocular–inertial system that uses one feed-forward geometry model for both initialization and dense mapping. 2) Robust point–inertial initializer: An extension of the feature-free formulation of [13]: a stratified, scale-normalized LMedS search with conditioning and physical-plausibility gates, designed to reject unreliable windows rather than pass a wrong scale to the VIO filter. 3) Pose-conditioned mapping formulation: A depth-scaling strategy that applies residual scale corrections only in camera space – preserving intra-window metric baselines – coupled with a submap graph in which relative-scale constraints and gravity-preserving pose updates pass through separate gates. II. R ELATED WORK 
+
+VIO and initialization. Filter-based VIO propagates inertial measurements against tracked features [2], [4], whereas optimization-based VIO solves a sliding-window problem [3], [5]. Initializers align a visual-only map with in-ertial measurements [14], decouple rotation from translation so that scale and gravity enter a small linear problem [15], [6], or refine a closed-form solution [16]. Learned depth priors have entered this problem [17], and Zhang et al. [13] replace tracked landmarks with feed-forward point clouds, removing feature tracking from start-up. DAVIO adopts this formulation and extends it with key components required for continuous operation: frame-balanced robust estimation, conditioning checks, and a buffered filter handoff, while online extrinsic and temporal calibration remain with the filter [4], [18]. 
+
+Learned dense geometry. DUSt3R [7] and MASt3R [8] regress pairwise point maps in a shared frame; VGGT [9] and 
+
+π3 [10] generalise this formulation to multi-view input; Ma-pAnything [11] and DA3 [12] also accept camera intrinsics and poses. SLAM systems built on these predictors jointly optimize pose and geometry [19], incrementally align feed-forward submaps [20], [21], [22], [23], or retain a lightweight feature tracker [24]. Being monocular, they recover scale per submap, naturally in Sim (3). In DAVIO the translations inside each window are already metric, so it keeps them and applies residual scale only where the prediction is uncertain, at depth back-projection. 
+
+Learned mapping anchored to inertial motion. Sim-pleMapping couples VIO with multi-view stereo [25], Kimera adds a dense mesh layer to a visual–inertial pipeline [26], MASt3R-Fusion couples learned alignment with IMU and GNSS factors [27], and VIDAR anchors learned mapping to VIO [28]. Most closely related to DAVIO, ScaRF-SLAM conditions DA3 on classical tracking poses and optimizes frame and submap scales with those poses fixed [29]. DAVIO similarly leaves the online VIO filter state untouched. However, it differs in two key aspects: first, DAVIO bootstraps the filter using predictions from the very same feed-forward model; second, it incorporates a gravity-preserving submap graph that refines map-frame poses during verified revisits, admitting loop closures only when the accumulated odometry drift exceeds the con-straint’s uncertainty. III. S YSTEM OVERVIEW 
+
+Notation. Bold lowercase symbols denote vectors, and log is the natural logarithm. For frames A and B, TAB ∈ SE (3)
+
+maps coordinates expressed in B to coordinates expressed in A, xA = TAB xB. It consists of the rotation RAB ∈ SO (3)
+
+and the position pAB ∈ R3 of the origin of B expressed in 
+
+A, so that TBA = T −1 
+
+> AB
+
+and RBA = R⊤
+
+> AB
+
+. The symbols I, C,
+
+O, and M denote the IMU, the camera, the odometry frame of the VIO filter, and the optimized map frame; Ii and Ci
+
+denote the IMU and the camera at image i, with i = 0 the reference image. The camera–IMU extrinsics are the rotation 
+
+RIC and the lever arm pIC , i.e., the camera origin expressed in the IMU frame, so the camera pose reported by the filter is TOC (t) = TOI (t) TIC .
+
+Architecture. A tracking process runs filter-based visual– inertial odometry (OpenVINS [4]), while a single worker hosts the GPU model (Fig. 2). At start-up, five images spaced 0.2 s apart form a geometry window; if its estimate is accepted, it initializes a fresh filter. The OpenVINS initializer remains armed, and whichever filter becomes ready first publishes. During tracking, the worker forms five-frame windows at 0.5 s keyframe spacing, with two images shared between consecutive windows, and commits one map version per window. Each commit defines a rigid correction TMO 
+
+that is applied to subsequently published poses, whereas velocities, biases, and calibration parameters remain in the filter. IV. F EED -F ORWARD INITIALIZATION 
+
+A. Point–inertial linear system 
+
+For the start-up window, DA3 [12] predicts per-image depth, confidence, intrinsics, and relative camera poses. Up to 100 points per image whose confidence exceeds the 25th percentile are sampled over a 4 × 4 grid. Let zik ∈ R2 be the normalized coordinates of pixel k in image i, ˜ zik = [ z⊤ 
+
+> ik
+
+, 1]⊤,and ¯dik its predicted up-to-scale depth. Using DA3’s relative pose (RC0Ci , ¯pC0Ci ), the pixel back-projects to the up-to-scale point ¯pik = RC0Ci ¯dik ˜zik + ¯pC0Ci (1) expressed in C0. Following [30], define 
+
+Hik =
+
+1 0 −zik ,x
+
+0 1 −zik ,y
+
+
+
+, (2) so that Hik y = 0 for every point y, expressed in Ci, that lies on the viewing ray of zik .IMU preintegration [31] at the current bias estimate yields the relative rotation RI0Ii and the gravity-free displacement 
+
+∆pi, i.e., the double integral of the rotated specific force, 01 234        
+
+> 01 INITIALIZE 02 TRACK 03 MAP
+> Monocular images + IMU
+> DA3 + inertial solve
+> geometry → metric state
+> scale · velocity · gravity gyroscope / accelerometer bias
+> Buffered handoff
+> bootstrap + replay + catch-up
+> Native initialization also remains available
+> Recorded metric VIO trajectory
+> OpenVINS
+> continuous metric tracking Camera poses + intrinsics rectified mapping windows
+> Live pose output
+> latest rigid map correction
+> Graph updates the output frame, not the running filter
+> Pose-conditioned DA3
+> metric depth → overlapping submaps
+> XFeat / LighterGlue ·24 of 702 matches shown
+> Pose / depth-scale graph
+> overlap + adjacent factors drift-gated revisits
+> Schematic Dense metric map
+
+Fig. 2: DAVIO in three stages. (1) A feed-forward visual–inertial solve on a five-image window proposes a metric state that bootstraps a fresh OpenVINS [4] filter through buffered replay and catch-up checks. (2) The filter tracks continuously and supplies metric camera poses and intrinsics. (3) Pose-conditioned DA3 windows form overlapping submaps; in-window matches refine per-frame depth scales, and shared-image ratios and verified correspondences constrain a gravity-preserving submap graph whose revisits move poses only past a drift gate. 
+
+expressed in I0 over the interval ∆ti. Let v0 and g denote the velocity of I0 and the gravity vector, both expressed in 
+
+I0. As in OpenVINS, g points upward, so the gravitational acceleration is −g, with ∥g∥ = g0; at rest, the measured specific force expressed in I0 is +g. The position of Ii
+
+expressed in I0 is then 
+
+pI0Ii = ∆ti v0 − 12 ∆t2 
+
+> i
+
+g + ∆pi. (3) For a metric scale s > 0, chaining C0 →I0 →Ii →Ci expresses the point in camera i as 
+
+yik = RCI 
+
+h
+
+RIiI0
+
+ s R IC ¯pik + pIC − pI0Ii
+
+ − pIC 
+
+i
+
+. (4) Substituting (3) shows that the ray constraint Hik yik = 0 is linear in x = [ s, v⊤ 
+
+> 0
+
+, g⊤]⊤ ∈ R7, i.e., Aik x = bik with Bik =
+
+Hik RCI RIiI0 and 
+
+Aik =
+
+h
+
+Bik RIC ¯pik , −∆ti Bik , 12 ∆t2 
+
+> i
+
+Bik 
+
+i
+
+,
+
+bik = Bik ∆pi − Hik RCI 
+
+ RIiI0 − I3
+
+pIC . (5) Since Hik yik = yik ,z
+
+ π(yik ) − zik 
+
+ and yik ,z ≈ s ¯dik , each row pair is divided by ¯dik and weighted by the square root of the point’s confidence. The resulting algebraic residual therefore approximates s times the normalized reprojection error. The lever arm pIC , which appears explicitly in (5), is fixed at its supplied value (zero when withheld; Sec. IV-D). The weighted least-squares solution is followed by two refinements of the gravity direction on the tangent plane of the sphere ∥g∥ = g0.
+
+B. Conditioning and robust estimation 
+
+Although DA3 [12] provides hundreds of points per image, the system in (5) is far less overdetermined than it appears. If DA3’s relative rotations agree with the preintegrated ones, 
+
+RC0Ci = RCI RI0Ii RIC , the depth component of each point lies on its own viewing ray and is annihilated by Hik . Equation (4) then reduces to Hik yik = Bik wi, with 
+
+wi = s R IC ¯pC0Ci − ∆ti v0 + 12 ∆t2 
+
+> i
+
+g − ∆pi −  RI0Ii − I3
+
+pIC . (6) Thus all points of image i test a single statement: the scaled DA3 camera center must match the IMU-integrated position. Because Hik has rank two, two points with distinct rays already determine wi, which is affine in x through a 3 × 7 block. Each image therefore contributes at most three independent equations to the seven unknowns, however many points it has; since w0 = 0, at least four images are required, and the five-image window adds one image of redundancy. Dense points and confidence weights improve robustness to outliers and noise but do not raise this rank. Rotation disagreement between DA3 and the IMU can raise the numerical rank, but the added rows reflect rotation error, not scale information. 
+
+Degenerate motion. Four images are necessary but not sufficient. If the up-to-scale trajectory is at most quadratic in time, ¯ pC0Ci = ∆ti a + ∆t2 
+
+> i
+
+c, then under the same rotation assumption 
+
+Aik 
+
+ 1, (RIC a)⊤, (−2RIC c)⊤⊤ = 0 ∀ (i, k), (7) so a change in s is absorbed by v0 and g. Constant-velocity motion ( c = 0), which is common at start-up, is the typical instance. We therefore accept the linear solution only if (i) at least four images are available, (ii) the column-equilibrated system in x has a singular-value ratio of at least 10 −3, and (iii) the baseline-to-depth ratio is at least 0.02. These are numerical safeguards, not an observability proof, because the constraint ∥g∥ = g0 may restore observability in some rejected cases. Conservative rejection is inexpensive, since the OpenVINS initializer remains armed. 
+
+Robust estimation. DA3 depth is unreliable at object boundaries, on reflective or textureless surfaces, and on moving objects. Since the outlier fraction is unknown, we use a least-median-of-squares (LMedS) search over 100 hypotheses. Each hypothesis is fitted to two points from every non-reference image. Two points already saturate an image’s rank-three contribution, so this stratified sample is well posed and prevents any single image from dominating. Because the algebraic residual ek scales with s, hypotheses with s > 0 are scored by med k ek/s, which removes the bias toward small scale. A hypothesis is admissible only if at least three images keep a majority of their points within max (2.5 ˆ σ , 0.01 ), where ˆ σ = 1.4826 med k ek.
+
+Acceptance. The best hypothesis is refitted on its inliers. It is accepted only if it is well supported, with an inlier fraction of at least 0.4 and a median residual of at most 0.05. It must also be physically plausible, with ∥v0∥ ≤ 5 m/s and g within 30 ◦ of the mean specific-force direction. These tests convert silent failures into explicit rejections, while the OpenVINS initializer remains armed. The gyroscope bias is initialized by aligning DA3’s relative rotations with RI0Ii , which gives the preintegration a better linearization point than zero bias. 
+
+C. Refinement and filter handoff 
+
+The accepted estimate is refined over θθθ =[η, v⊤ 
+
+> 0
+
+, δ γ γγ⊤, δ b⊤ 
+
+> g
+
+, b⊤ 
+
+> a
+
+]⊤. The softplus parameterization 
+
+s = ε + log (1 + eη ), with ε = 10 −5, keeps the scale strictly positive. The gravity vector is parameterized by two tangent coordinates about the linear-stage direction ˆ g,
+
+g(δ γ γγ) = g0 Exp  Nδ γ γγ ˆg, N ∈ R3×2, N⊤ ˆg = 0. (8) Here δ bg is the gyroscope-bias change relative to the prein-tegration estimate, and ba is the accelerometer bias, with 
+
+δ ba = ba − ¯ba. The preintegrated terms are corrected to first order [31]: 
+
+RIiI0 (θθθ ) ≈ Exp  −JRi δ bg
+
+ ¯RIiI0 ,
+
+∆pi(θθθ ) ≈ ∆ ¯pi + J pg,i δ bg + J pa,i δ ba, (9) and yik (θθθ ) follows from (3) and (4). Let π(y) = [yx, yy]⊤/ max (yz, 10 −6) be the normalized projection, whose clamp only guards the division (a point behind the camera receives a large residual of bounded influence), and slin the linear-stage scale. The stacked residual over the inlier set K
+
+is: 
+
+r(θθθ ) = 
+
+σ −1
+
+> u
+
+ π(yik (θθθ )) − zik 
+
+
+
+> (i,k)∈K
+
+σ −1 
+
+> g
+
+δ bg
+
+σ −1 
+
+> a
+
+ba
+
+σ −1 
+
+> s
+
+log (s/slin )
+
+ , (10) and is minimized under a component-wise Huber loss with unit threshold, using σu = 0.007, σg = 0.05 rad/s, σa =
+
+0.02 m/s 2, and σs = 0.5. The priors are essential: within a sub-second window, the accelerometer bias is only weakly separable from scale and gravity, and the scale prior keeps the refined scale close to the accepted linear estimate. The refined state is propagated to the last image and expressed in a gravity-aligned world frame. It is then writ-ten once, with block-wise covariance floors, into a fresh OpenVINS instance through the unmodified initialization entry point. The new instance replays up to 8 s of buffered measurements and is selected once it has produced five con-secutive states within 0.15 s of the live stream. A candidate that fails to do so within 3 s is abandoned, and at most five candidates are attempted. 
+
+D. Calibration modes 
+
+In the primary mode, intrinsics, distortion, extrinsics, and time offset are taken from the rig calibration. A second mode withholds the extrinsics and time offset. The rotation RIC 
+
+and the gyroscope bias bg are then estimated from several early windows by aligning preintegrated and DA3 relative rotations, i.e., by minimizing the hand–eye residuals 
+
+rhe  
+
+> ii ′
+
+= Log  RIi′ Ii (bg) RIC RCiCi′ RCI 
+
+, (11) which vanish when RIi′ Ii = RIC RCi′ Ci RCI . The estimate is validated on a later window. The lever arm pIC and the time offset are initialized to zero, and OpenVINS [4] refines all three quantities online from priors. V. P OSE -C ONDITIONED DENSE MAPPING 
+
+A. Conditioned submaps and depth-only scale 
+
+For each window, the worker passes DA3 the images, the rectified intrinsics K, and the filter’s metric poses TCiO.A similarity fit between the returned and the VIO camera centers gives an initial depth correction ˆs j. The window is accepted if its metric baseline exceeds 5 cm, the fit RMSE is at most 15 cm, and | log ˆ s j| ≤ 0.3. Since DA3’s default interface returns the input poses, this fit serves as a consistency check rather than as independent evidence of depth accuracy. Let S j denote the camera frame of the center image of submap j. Each submap carries a pose Q j = TMS j ∈ SE (3)
+
+and a residual log-depth scale λ j, while L ji = TS jCi is the fixed metric VIO pose of image i relative to the center. With the corrected depth map d ji = ˆs j s ji dDA3  
+
+> ji
+
+, where s ji is a per-frame scale (Sec. V-B), a homogeneous pixel u is placed in the map at 
+
+pM = TMS j TS jCi
+
+ eλ j d ji (u) K−1u. (12) Scale acts on depth only, so the metric translations of TS jCi
+
+are never rescaled. A similarity applied to the whole window would instead scale the VIO baselines and displace every non-center frame. 
+
+B. Frame scales and shared-image constraints 
+
+XFeat/LighterGlue matches [32], [33] link images one or two positions apart within a window. For match k be-tween images i and i′, with back-projected points pik =
+
+ˆs jdDA3  
+
+> ji
+
+(uik )K−1uik in Ci (and pi′k analogously), the residual 
+
+rii ′k = TS jCi
+
+ s ji pik 
+
+ − TS jCi′
+
+ s ji ′ pi′k
+
+ (13) is affine in the per-frame scales, as in the frame-level refine-ment of ScaRF-SLAM [29]. We run eight rounds of depth-normalized, outlier-reweighted least squares with a weak unit prior. After each round, the scales are projected onto 
+
+∑i log s ji = 0, i.e., normalized to unit geometric mean. The per-frame scales thus redistribute only relative corrections within the window, while the overall scale of the window is estimated by λ j in the submap graph (Sec. V-C). Consecutive submaps a and b share the images Iab , of which there are two unless the queue dropped a window. For each shared image i, the median log-depth ratio over aligned valid pixels is mi = med u log  dbi (u)/dai (u). Consistent cor-rected depths, eλa dai = eλb dbi , imply λb − λa = −mi, which gives the relative-scale residual [23] 
+
+rsab = λb − λa − κab , κab = − 1
+
+|Iab | ∑
+
+> i∈Iab
+
+mi, (14) with σab = max  0.03 , 12 [max i mi − min i mi]. If no shared image remains, κab is obtained from a projected-overlap depth ratio instead. 
+
+C. Submap graph and revisit admission 
+
+Correspondences between center images connect adjacent submaps, as well as revisits retrieved within 8 m and at least 5 s apart. A revisit candidate must pass PnP RANSAC [34] (≥50 matches, ≥30 inliers, inlier fraction ≥0.25, 2 px thresh-old), followed by positive-depth, image-coverage, depth-agreement (median relative error ≤0.2), and 3 σ odometry-innovation tests. Up to 80 verified correspondences then form a point group. PnP serves only for verification; its pose is not added as a second factor, since it derives from the same matches. Let Zab = TSaSb be the VIO pose of center b relative to center a, with translation tab , and let pak and pbk be the corresponding points in Sa and Sb. Since Q−1 
+
+> a
+
+Qb = TSaM TMS b
+
+predicts Zab , the point and odometry residuals are: 
+
+rpabk = TMS a
+
+ eλa pak 
+
+ − TMS b
+
+ eλb pbk 
+
+,
+
+roab = Log  Z−1 
+
+> ab
+
+TSaM TMS b
+
+. (15) The graph minimizes 
+
+E = ∑
+
+> Eo
+
+ρ ∥Woroab ∥ + ∑
+
+> Ep
+
+1
+
+Nab Nab 
+
+# ∑
+
+> k=1
+
+ρ ∥Wabk rpabk ∥
+
++ ∑
+
+> j>0
+
+ρ
+
+ |λ j − λ0|
+
+0.10 
+
+
+
++ ∑
+
+> Es
+
+ρ
+
+ |rsab |
+
+σab 
+
+
+
+, (16) where ρ is the Huber loss with threshold 2, i.e., ρ(r) = r2/2for r ≤ 2 and 2 r − 2 otherwise. The weights encode the following models. Wo
+
+whitens with a prescribed drift model, with standard deviations max (2 cm , 0.005 ∥tab ∥) in translation and max (0.5◦, 0.5◦m−1∥tab ∥) in rotation. Wabk whitens with a ray-aligned covariance, with 10 % of depth along the ray and 1 % across it, both floored at 10 cm. This covariance is frozen within a solve, while the robust weights are updated. The set Es contains the shared-image residuals (14) and the median depth ratios of verified revisits ( σab = 0.03). The first node fixes the gauge. It starts with λ0 = 0, and after eviction the first retained node is fixed at its current state. Every other node optimizes translation, yaw about gravity, and λ j, so the roll and pitch observed by the filter are preserved. Whenever a scale or point constraint is added, up to eight Levenberg–Marquardt iterations are run. Scale and pose constraints are gated separately: every verified revisit adds its median depth ratio to Es, but its point group enters 
+
+Ep, and can move the poses, only if the odometry drift between the two submaps, predicted by the drift model of 
+
+Wo, exceeds the uncertainty of the revisit constraint. Adjacent point groups are always included. 
+
+D. Fusion and live trajectory 
+
+A depth is retained only if another frame of the same window re-observes it within 10 % relative depth. Retained depths are archived in submap coordinates and fused into 4 cm voxels over at most 24 resident submaps. The final export reprojects all archives with the latest graph states. Each commit defines the odometry-to-map correction from its newest node j,
+
+TMO = TMS j T −1  
+
+> OS j
+
+= TMS j TS j O, (17) and live poses are published as T live  
+
+> MI
+
+(t) = TMO TOI (t). If the correction changes by more than 5 cm or 2 ◦, it is interpolated over one sensor second, linearly in translation and along the geodesic on SO (3) in rotation. Each published pose records its correction version and interpolation fraction, and the final export applies the completed corrections to all past poses. VI. E XPERIMENTAL SETUP 
+
+Research questions. We ask whether DAVIO (Q1) pro-vides a metric state earlier than the OpenVINS initializer, (Q2) improves the retrospective trajectory, and at what cost to the causal one, and (Q3) improves dense reconstruction under identical inputs. Native is the trajectory of OpenVINS [4] running alone, with its own initializer and mapping disabled (median of three runs). For a DAVIO run, causal is the published map-frame trajectory, in which each pose uses the latest map correction available at publication time, and final 
+
+the trajectory re-exported with all corrections after the last graph update. 
+
+Data and platform. EuRoC [35] provides eleven se-quences in a Machine Hall (MH) and two Vicon rooms, with OpenVINS reference trajectories, including the corrected V1 01 reference [35], and Leica scans of the six Vicon-room sequences. ORI [29] provides five building-scale sequences (R01–R05) with survey-grade LiDAR references. DAVIO runs on an i7-12700H laptop with an RTX 3060 Laptop GPU (6 GB) and DA3-Base at 504 px, paced at sensor rate on EuRoC and on ORI (with resizing and rectification, as DA3 [12] operates on undistorted images). 
+
+Comparison categories. Tables label three categories. 
+
+Matched-pose comparisons isolate the mapping layer: ScaRF-SLAM’s released mapper [29] runs offline on DAVIO’s OpenVINS poses with the same DA3-Base check-point. End-to-end comparisons use each system’s own tracker: ORB-SLAM3 [5] (monocular–inertial, stock EuRoC configuration, three runs), MASt3R-Fusion [27] (EuRoC monocular–inertial configuration, every second image), and VGGT-SLAM2 [22] (default parameters, keyframes, and one global Sim (3) fit to the reference, which favors it); the latter two run offline from released code with their own confidence filters, on MH 01, MH 03, MH 05, and ORI. 
+
+Metrics. Start-up follows [13]: 132 ten-second windows per initializer (one start every 10 s; 67 in the Machine Hall, 65 in the Vicon rooms). A window succeeds if a trajectory published within it has an ATE below 0.5 m; Tf is the sensor time of the first published state (10 s if none), and the quality-penalized time Tq also charges 10 s to every failure. ATE is the translational RMSE after one rigid alignment without scale [36]. Coverage is the fraction of the sequence covered by published poses, crediting at most 0.1 s per pose (for baselines, the fraction of frames with a scored pose). Surface metrics score reference points visible from the reference camera path; precision, recall, and F@10 use a 10 cm threshold [37]. Maps are exported at 2 cm on ORI and 4 cm on EuRoC, with ScaRF’s EuRoC clouds voxelized to match; the released ScaRF chunk evaluator uses 10 m chunks and a 3 cm threshold. 
+
+TABLE I: Reconstruction accuracy on ORI (medians). Global : 2 cm export, rigid trajectory alignment; mean distance (m) and F-score at 10 cm. 10 m chunks : ScaRF evaluator, per-chunk Sim (3)+ICP; mean error (m), precision and recall (%) at 3 cm. Poses : VIO = DAVIO’s OpenVINS trajectory, Own = own trajectory, GT = reference. Top: comparable methods (DA3-Base); best , second best. Bottom: not directly comparable, namely DAVIO with DA3-Large and the offline DAVIO and ScaRF mappers with GT poses ( bold :better of the two). DAVIO rows shaded. †Global Sim (3) fit to the reference.                                                        
+
+> Global 10 m chunks Method Poses Mean ↓F@10 ↑Err. ↓P@3 ↑R@3 ↑
+> Comparable: estimated poses, rerun (conditioned maps use DA3-Base)
+> Unconditioned reference VIO 0.219 0.38 0.157 20.1 13.9 DAVIO online VIO 0.080 0.75 0.044 60.8 38.8 ScaRF mapper (offline) VIO 0.084 0.69 0.043 61.6 43.9 MASt3R-Fusion Own 0.194 0.67 0.123 49.6 61.4
+> VGGT-SLAM2 †Own 0.161 0.50 0.110 34.0 14.3
+> Not directly comparable
+> DAVIO online, DA3-Large VIO 0.061 0.81 0.033 71.9 38.3 DAVIO mapper (offline) GT 0.069 0.88 0.041 67.8 54.7
+> ScaRF mapper (offline) GT 0.040 0.89 0.029 70.6 47.7
+
+VII. R ESULTS 
+
+A. Q1: Earlier metric start-up 
+
+In Table IIa, DAVIO publishes its first state at a median of 2.43 s against 3.65 s and lowers the median Tq from 3.87 to 2.66 s. The gain is largest where the OpenVINS initializer must wait for parallax: in the Machine Hall (Table IIb), DAVIO halves Tq (2.30 against 4.68 s), qualifies 56/67 win-dows against 54/67, and is faster on every sequence by 0.9– 2.9 s. The overall success rate stays comparable (109/132 against 111/132. 
+
+B. Q2: Causal and final trajectories 
+
+All eleven DAVIO runs complete (Table III), and DAVIO’s initializer publishes first on MH 01–04 (2.2–2.8 s). The final trajectory lowers ATE by 29–45 % relative to the native trajectory on all five Machine Hall sequences. 
+
+TABLE II: Start-up on 132 ten-second EuRoC windows. Success: published trajectory with ATE below 0.5 m. Tf , Tq: median first-state and quality-penalized times. Grav., Vel., ATE: median gravity-direction, velocity, and trajectory errors of the published states.                                      
+
+> Initializer Success Tf(s) Tq(s) Grav. ( ◦)Vel. (m/s) ATE (m) (a) OpenVINS 111/132 3.65 3.87 0.85 0.07 0.042 DAVIO 109/132 2.43 2.66 0.99 0.07 0.044 Machine Hall Vicon rooms (b) Initializer Success Tq(s) Success Tq(s) OpenVINS 54/67 4.68 57/65 3.15 DAVIO 56/67 2.30 53/65 4.50
+
+TABLE III: EuRoC ATE (m). Native: OpenVINS [4] alone, median of three mapping-disabled runs. Causal and final: map-frame output and final trajectory of one DAVIO run. Cov., Tf : DAVIO’s sequence coverage and first-state time.                                
+
+> ATE (m) Seq. Native Causal Final Cov. Tf(s) MH 01 0.099 0.119 0.065 0.99 2.2 MH 02 0.092 0.098 0.062 0.99 2.3 MH 03 0.158 0.143 0.101 0.98 2.5 MH 04 0.278 0.212 0.153 0.97 2.8 MH 05 0.281 0.254 0.200 0.97 3.9
+
+End-to-end comparison (Table IV). DAVIO publishes a pose for 97–99 % of each sequence, whereas ORB-SLAM3 scores 74–82 % of the frames. Against the learned dense systems, the native OpenVINS trajectory on which DAVIO builds has 2.0–4.2 times lower ATE than MASt3R-Fusion’s real-time output, and DAVIO’s final trajectory has 2.6– 5.3 and 2.9–4.9 times lower ATE than the keyframes of MASt3R-Fusion and scale-corrected VGGT-SLAM2. 
+
+C. Q3: Dense reconstruction 
+
+EuRoC (Table V). On identical poses, DA3-Base check-point, and density, DAVIO online has a lower mean error than the released ScaRF mapper (offline) on all six Vicon-room sequences and a higher F@10 on five (on V2 03, the F-scores differ by 0.01). The median F@10 rises from 0.45 to 0.58 and the median error falls from 0.227 to 0.172 m; Fig. 3(a) shows the gap on V1 02 and V2 02. This comparison isolates the mapping layer. 
+
+ORI (Table I). On DAVIO’s trajectory, pose conditioning reduces the median global error from 0.219 to 0.080 m, with a lower error on every sequence (Fig. 1), and raises F@10 from 0.38 to 0.75 and chunk precision from 20.1 to 60.8 %. Running online, DAVIO outperforms ScaRF’s offline mapper on the same trajectory in global error and F@10 (0.080 vs. 0.084 m; 0.75 vs. 0.69) at a comparable chunk error (0.044 vs. 0.043 m), while ScaRF attains a higher recall. The end-to-end systems are less accurate: MASt3R-Fusion has 2.4 and 2.8 times DAVIO’s global and chunk errors, and VGGT-SLAM2 reaches an F@10 of only 0.50 despite a global Sim (3) fit (Fig. 3b). With reference poses, ScaRF’s mapper is more accurate than DAVIO’s offline mapper (0.040 vs. 0.069 m global; 0.029 vs. 0.041 m chunk), whereas DAVIO retains the higher recall. Moving both offline mappers from reference to Open-VINS poses, however, increases DAVIO’s global error by 26 % (0.069 to 0.080 m) but ScaRF’s by 110 % (0.040 to 0 5 10 15 20 25 ≥30                       
+
+> (a) EuRoC, Leica reference
+> V1_02 V2_02 DAVIO 11.5 cm, F@10 0.68 ScaRF mapper 20.4 cm, F@10 0.50 DAVIO 17.7 cm, F@10 0.55 ScaRF mapper 27.6 cm, F@10 0.35
+> (b) ORI, survey reference
+> DAVIO ScaRF mapper MASt3R-Fusion VGGT-SLAM2† 7.4 cm, F@10 0.75 11.6 cm, F@10 0.54 11.1 cm, F@10 0.71 21.9 cm, F@10 0.33
+> R01
+> 8.6 cm, F@10 0.81 7.6 cm, F@10 0.75 24.4 cm, F@10 0.67 11.1 cm, F@10 0.56
+> R03
+> distance to reference (cm)
+
+Fig. 3: Map-to-reference distance on (a) EuRoC V1 02 and V2 02 (Leica scans) and (b) ORI R01 and R03 (survey reference), with rigid trajectory alignment and no surface ICP. DAVIO and ScaRF’s released mapper use the same OpenVINS trajectory and DA3-Base (matched poses); MASt3R-Fusion and VGGT-SLAM2 use their own trajectories, and VGGT-SLAM2 ( †) is scaled by a global Sim (3) fit to the reference. Titles: mean distance and F@10. TABLE IV: End-to-end comparison on the EuRoC Machine Hall: ATE (m), rigid SE(3) alignment. OpenVINS: native trajectory (Table III); DAVIO: final trajectory; mono-in.: monocular–inertial, 74–82 % of the frames scored (largest map); rt: real-time output; kf: keyframes. †Global Sim(3) fit to the reference.                         
+
+> OpenVINS DAVIO ORB-SLAM3 MASt3R-Fusion VGGT-SLAM2 †
+> Seq. native final mono-in. rt kf kf MH 01 0.099 0.065 0.058 0.419 0.344 0.188 MH 03 0.158 0.101 0.053 0.447 0.424 0.337 MH 05 0.281 0.200 0.060 0.555 0.513 0.989
+
+0.084 m). DAVIO’s advantage on estimated trajectories thus stems from its tolerance to odometry drift, to which the submap graph contributes: with the graph poses fixed, the error on OpenVINS poses rises to 0.105 m. Finally, DA3-Large lowers DAVIO’s online errors to 0.061 and 0.033 m and raises F@10 to 0.81; in the offline arm on identical fixed OpenVINS poses, it lowers the global error from 0.105 to 0.093 m and raises chunk precision from 62.3 to 73.0 %. Depth quality is therefore a major remaining error source, alongside pose accuracy. 
+
+D. Ablations 
+
+Check Table VI. Pose conditioning is the main source of surface quality. The complete system improves F@10 over the unconditioned reference by 0.06–0.17 and completeness by 7–23 mm. Removing conditioning alone returns F@10 to 
+
+TABLE V: Map accuracy in the EuRoC Vicon rooms, evaluated against the Leica scans with matched poses. DAVIO online and ScaRF’s released mapper (offline) use the same OpenVINS trajec-tory, DA3-Base, and 4 cm density. F@10: F-score at 10 cm; Mean: mean distance in metres. Best per sequence in bold. 
+
+F@10 ↑ Mean [m] ↓
+
+Seq. DAVIO ScaRF DAVIO ScaRF V1 01 0.64 0.42 0.125 0.242 V1 02 0.68 0.50 0.115 0.204 V1 03 0.52 0.41 0.205 0.288 V2 01 0.61 0.48 0.167 0.210 V2 02 0.55 0.35 0.177 0.276 V2 03 0.48 0.49 0.188 0.211 Median 0.58 0.45 0.172 0.227 
+
+within 0.03 of the reference. The graph, in contrast, mainly affects the trajectory. Fixing its poses changes F@10 by at most 0.003, but it raises the final MH 03 ATE from 0.101 to 0.158 m, the value of the uncorrected odometry. Removing revisits yields the same 0.158 m, so revisits provide the entire correction. Their effect on surfaces depends on the sequence. They add 0.11 F@10 on V1 02, but removing them slightly improves V1 03 and V2 02 (by 0.009 and 0.049), possibly because some admitted revisits impose imprecise scale con-straints. On MH 03, removing the drift gate raises the final ATE to 0.116 m. TABLE VI: Mapping ablations on EuRoC. F@10: F-score at 10 cm; Compl.: median completeness distance (mm); ATE: final absolute trajectory error on MH 03 (m). Rows marked † replay the cached observations of the complete system with the graph altered. Best per column in bold ; the complete system is shaded.                                             
+
+> F@10 ↑Compl. [mm] ↓ATE [m] ↓
+> Variant V1 02 V1 03 V2 02 V1 02 V1 03 V2 02 MH 03 Unconditioned reference 0.514 0.432 0.493 42 67 38 0.158 DAVIO (complete) 0.685 0.520 0.550 30 44 31 0.101
+> w/o pose conditioning 0.539 0.423 0.469 41 65 37 0.139 graph poses fixed †0.682 0.519 0.547 30 44 31 0.158 w/o revisits †0.575 0.529 0.599 31 40 28 0.158
+
+VIII. C ONCLUSION 
+
+DAVIO uses one feed-forward geometry model to start a classical VIO filter early and to build dense metric maps conditioned on its poses. It shortens Machine Hall start-up, lowers the final trajectory error, maps with lower error than ScaRF-SLAM’s released mapper on identical EuRoC poses, and outperforms MASt3R-Fusion and VGGT-SLAM2 in EuRoC trajectory accuracy and ORI surface error. REFERENCES [1] A. Martinelli, “Closed-form solution of visual-inertial structure from motion,” International Journal of Computer Vision , vol. 106, no. 2, pp. 138–152, 2014. [2] A. I. Mourikis and S. I. Roumeliotis, “A multi-state constraint kalman filter for vision-aided inertial navigation,” in Proceedings 2007 IEEE International Conference on Robotics and Automation , 2007, pp. 3565–3572. [3] T. Qin, P. Li, and S. Shen, “Vins-mono: A robust and versatile monoc-ular visual-inertial state estimator,” IEEE Transactions on Robotics ,vol. 34, no. 4, pp. 1004–1020, 2018. [4] P. Geneva, K. Eckenhoff, W. Lee, Y. Yang, and G. Huang, “Openvins: A research platform for visual-inertial estimation,” in 2020 IEEE International Conference on Robotics and Automation (ICRA) , 2020, pp. 4666–4672. [5] C. Campos, R. Elvira, J. J. G. Rodr´ ıguez, J. M. M. Montiel, and J. D. Tard´ os, “Orb-slam3: An accurate open-source library for visual, visual–inertial, and multimap slam,” IEEE Transactions on Robotics ,vol. 37, no. 6, pp. 1874–1890, 2021. [6] Y. Peng, C. Chen, and G. Huang, “Ultrafast square-root filter-based vins,” in 2024 IEEE International Conference on Robotics and Au-tomation (ICRA) , 2024, pp. 6966–6972. [7] S. Wang, V. Leroy, Y. Cabon, B. Chidlovskii, and J. Revaud, “Dust3r: Geometric 3d vision made easy,” in 2024 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , 2024, pp. 20 697– 20 709. [8] V. Leroy, Y. Cabon, and J. Revaud, “Grounding image matching in 3d with mast3r,” in Computer Vision – ECCV 2024 , A. Leonardis, E. Ricci, S. Roth, O. Russakovsky, T. Sattler, and G. Varol, Eds. Cham: Springer Nature Switzerland, 2025, pp. 71–91. [9] J. Wang, M. Chen, N. Karaev, A. Vedaldi, C. Rupprecht, and D. Novotny, “Vggt: Visual geometry grounded transformer,” in 2025 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , 2025, pp. 5294–5306. [10] Y. Wang, J. Zhou, H. Zhu et al. , “Pi3: Permutation-equivariant visual geometry learning,” arXiv preprint arXiv:2507.13347 , 2025. [11] N. Keetha, N. M¨ uller, J. Sch¨ onberger et al. , “MapAnything: Universal feed-forward metric 3D reconstruction,” in International Conference on 3D Vision (3DV) . IEEE, 2026. [12] H. Lin, S. Chen, J. H. Liew et al. , “Depth anything 3: recovering the visual space from any views,” arXiv preprint arXiv:2511.10647 , 2025. [13] Y. Zhang, J. Yang, H. Zeng et al. , “Efficient feature-free initialization for monocular visual-inertial systems using a feed-forward 3d model,” 2026. [14] C. Campos, J. M. Montiel, and J. D. Tard´ os, “Inertial-only opti-mization for visual-inertial initialization,” in 2020 IEEE International Conference on Robotics and Automation (ICRA) , 2020, pp. 51–57. [15] Y. He, B. Xu, Z. Ouyang, and H. Li, “A rotation-translation-decoupled solution for robust and efficient visual-inertial initialization,” in 2023 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , 2023, pp. 739–748. [16] S. Cerezo, S. H. Lee, and J. Civera, “An efficient closed-form solution to full visual-inertial state initialization,” 2026. [17] Y. Zhou, A. Kar, E. Turner et al. , “Learned monocular depth priors in visual-inertial initialization,” in Computer Vision – ECCV 2022 ,S. Avidan, G. Brostow, M. Ciss´ e, G. M. Farinella, and T. Hassner, Eds. Cham: Springer Nature Switzerland, 2022, pp. 552–570. [18] Y. Yang, P. Geneva, X. Zuo, and G. Huang, “Online self-calibration for visual-inertial navigation: Models, analysis, and degeneracy,” IEEE Transactions on Robotics , vol. 39, no. 5, pp. 3479–3498, 2023. [19] Z. Teed and J. Deng, “DROID-SLAM: Deep Visual SLAM for Monoc-ular, Stereo, and RGB-D Cameras,” Advances in neural information processing systems , 2021. [20] R. Murai, E. Dexheimer, and A. J. Davison, “MASt3R-SLAM: Real-time dense SLAM with 3D reconstruction priors,” in Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recogni-tion , 2025. [21] D. Maggio, H. Lim, and L. Carlone, “VGGT-SLAM: Dense rgb slam optimized on the sl (4) manifold,” Advances in Neural Information Processing Systems , vol. 39, 2025. [22] D. Maggio and L. Carlone, “VGGT-SLAM 2.0: Real-time dense feed-forward scene reconstruction,” Robotics: Science and Systems , 2026. [23] I. Lee, D. Jeong, J. Lee, and K. Joo, “Unisim-slam: Feed-forward slam with unified sim(3) optimization,” 2026. [24] L. Hu, N. A. Oufroukh, F. Bonardi, and R. Ghandour, “Ec3r-slam: Efficient and consistent monocular dense slam with feed-forward 3d reconstruction,” 2025. [25] Y. Xin, X. Zuo, D. Lu, and S. Leutenegger, “SimpleMapping: Real-Time Visual-Inertial Dense Mapping with Deep Multi-View Stereo,” Oct 2023. [26] A. Rosinol, M. Abate, Y. Chang, and L. Carlone, “Kimera: an open-source library for real-time metric-semantic localization and mapping,” in 2020 IEEE International Conference on Robotics and Automation (ICRA) , 2020, pp. 1689–1696. [27] Y. Zhou, X. Li, S. Li, Z. Yan, C. Xia, and S. Feng, “Mast3r-fusion: Integrating feed-forward visual model with imu, gnss for high-functionality slam,” 2025. [28] D. M. Salih, L. Hu, N. AitOufroukh-Mammar, and F. Bonardi, “Vidar: Visual-inertial dense alignment and reconstruction via a geometric foundation model,” 2026. [29] Y. Zhang, Y. Tao, F. Dellaert, and M. Fallon, “ScaRF-SLAM: Scale-consistent reconstruction with feed-forward models and classical vi-sual SLAM,” arXiv preprint arXiv:2606.00307 , 2026. [30] T.-C. Dong-Si and A. I. Mourikis, “Estimator initialization in vision-aided inertial navigation with unknown camera-imu calibration,” in 
+
+2012 IEEE/RSJ International Conference on Intelligent Robots and Systems , 2012, pp. 1064–1071. [31] C. Forster, L. Carlone, F. Dellaert, and D. Scaramuzza, “On-manifold preintegration for real-time visual–inertial odometry,” IEEE Transac-tions on Robotics , vol. 33, no. 1, pp. 1–21, 2017. [32] G. Potje, F. Cadar, A. Araujo, R. Martins, and E. R. Nascimento, “Xfeat: Accelerated features for lightweight image matching,” in 2024 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , 2024, pp. 2682–2691. [33] P. Lindenberger, P.-E. Sarlin, and M. Pollefeys, “Lightglue: Local feature matching at light speed,” in Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV) , October 2023, pp. 17 627–17 638. [34] V. Lepetit, F. Moreno-Noguer, and P. Fua, “EPnP: An accurate O(n) solution to the PnP problem,” International Journal of Computer Vision , vol. 81, no. 2, pp. 155–166, 2009. [35] M. Burri, J. Nikolic, P. Gohl et al. , “The euroc micro aerial vehicle datasets,” The International Journal of Robotics Research , 2016. [36] Z. Zhang and D. Scaramuzza, “A tutorial on quantitative trajectory evaluation for visual(-inertial) odometry,” in 2018 IEEE/RSJ Interna-tional Conference on Intelligent Robots and Systems (IROS) , 2018, pp. 7244–7251. [37] A. Knapitsch, J. Park, Q.-Y. Zhou, and V. Koltun, “Tanks and temples: benchmarking large-scale scene reconstruction,” ACM Trans. Graph. , vol. 36, no. 4, Jul. 2017. [Online]. Available: https://doi.org/10.1145/3072959.3073599

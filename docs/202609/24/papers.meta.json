@@ -1,0 +1,24 @@
+{
+  "label": "2026-09-24",
+  "date": "2026-09-24",
+  "generated_at": "2026-09-24T22:13:55",
+  "count": 1,
+  "papers": [
+    {
+      "paper_id": "202609/24/2609.27702v1-davio-dense-monocular-inertial-slam-with-feed-forward-initialization-and-pose-conditioned-mapping",
+      "section": "quick",
+      "title_en": "DAVIO: Dense Monocular-Inertial SLAM with Feed-Forward Initialization and Pose-Conditioned Mapping",
+      "authors": "Jaafar Mahmoud, Arthur Movsesyan, Mikhail Iumanov, Sergey Kolyubin",
+      "date": "2026-09-23",
+      "pdf": "https://arxiv.org/pdf/2609.27702v1",
+      "score": "7.0",
+      "evidence": "使用Depth Anything 3单目深度模型进行稠密建图与度量SLAM",
+      "tldr": "相机与IMU是度量定位与稠密建图的最小配置，但传统VIO需等待视差且仅稀疏路标，前馈模型缺度量尺度与重力。DAVIO用Depth Anything 3统一启动与建图：五图像窗口加预积分IMU构成无特征线性系统，鲁棒求解后引导VIO滤波；跟踪时以度量位姿条件化深度模型，沿视线校正残差尺度，并用重力保持子图图优化。在EuRoC上启动更早、定位更准、建图更优；ORI建筑尺度上持平或更优且对真实里程计退化更小。已开源该实时稠密度量SLAM系统。",
+      "tags": "query:mono-depth",
+      "abstract_en": "A camera and an IMU are the minimal sensor setup for metric localization and dense mapping, yet classical visual--inertial filters must wait for parallax before they start and then retain only sparse landmarks. Feed-forward geometry models, in contrast, predict dense structure from a few images but provide neither metric scale nor gravity. We present DAVIO, which uses a single multi-view depth model, Depth Anything~3, for both start-up and mapping. At start-up, a five-image window and preintegrated IMU measurements form a feature-free linear system. Its robust, conditioning-checked solution bootstraps a VIO filter through buffered replay. During tracking, the filter's metric poses condition the depth model. Residual scale is corrected only along viewing rays, which preserves the metric camera baselines, and a gravity-preserving submap graph with drift-gated revisits refines the map. On EuRoC, DAVIO starts markedly earlier, reduces the localization error, and maps more accurately than SOTA feed-forward mappers given identical poses. On building-scale ORI sequences, DAVIO is on bar or better than SOTA mappers on the same odometry, and degrades far less when GT poses are replaced by real odometry. We release the code of DAVIO, a real-time dense metric SLAM system, to the community.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    }
+  ],
+  "errors": []
+}
