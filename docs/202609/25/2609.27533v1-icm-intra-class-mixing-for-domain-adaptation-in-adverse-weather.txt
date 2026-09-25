@@ -1,0 +1,325 @@
+Title: ICM: Intra-class Mixing for Domain Adaptation in Adverse Weather
+
+URL Source: https://arxiv.org/pdf/2609.27533v1
+
+Published Time: Thu, 24 Sep 2026 00:52:57 GMT
+
+Number of Pages: 10
+
+Markdown Content:
+> 1
+
+# ICM: Intra-class Mixing for Domain Adaptation in Adverse Weather 
+
+Boying Li, Chang Liu, Britta Ayano Wilde, Gy¨ orgy Kov´ acs, Tosin Adewumi, Bj¨ orn Backe, and Hamam Mokayed 
+
+Abstract —Unsupervised domain adaptation (UDA) for seman-tic segmentation remains challenging under adverse weather conditions because severe appearance changes enlarge the domain gap and degrade the reliability of pseudo labels in the target domain. To address this problem, we propose an Intra-Class Mixing Consistency (ICM) framework that enforces prediction consistency between an intra-class mixed image and its original counterpart. Unlike previous mixing-based consistency methods that combine regions across different images or domains and may introduce unrealistic semantic inconsistencies, ICM performs mixing within the same image and semantic class, preserving realistic semantic layout for consistency regularization. With ICM, we establish a new state-of-the-art performance for clear-to-adverse-weather unsupervised domain adaptation (UDA) in semantic segmentation. On the Cityscapes → ACDC benchmark, our method achieves 75.7% mIoU, outperforming the previous state of the art by +1.9 pp, demonstrating its effectiveness in mitigating class confusion under challenging environmental conditions. The code is provided in the supplementary material. 
+
+I. I NTRODUCTION 
+
+Most large-scale Autonomous Driving (AD) datasets, such as NuScenes [1], KITTI[10], and Waymo [40], are predom-inantly collected under clear weather conditions. Moreover, commonly used off-the-shelf pretrained backbones, such as DINOv3[39], are also trained primarily on datasets that inher-ently contain far fewer adverse-weather samples. As a result, many models often struggle to generalize to adverse-weather conditions. Despite their low frequency, these adverse-weather conditions pose significant safety risks. Thus reliable semantic understanding under such conditions is critical for real-world deployment. A promising step towards this reliable under-standing is provided by Unsupervised Domain Adaptation (UDA). UDA uses labeled data from a source domain (e.g., clear weather) and unlabeled data from a target domain (e.g., adverse weather) to improve performance on the target domain without requiring manual annotations. However, in the context of AD, the substantial domain gap in semantic segmentation presents serious challenges. Differ-ences in camera setups can introduce viewpoint variations and color tone discrepancies. Furthermore, adverse weather conditions dramatically alter scene appearance: illumination differs significantly between day and night; fog reduces texture contrast and leads to class conflation; raindrops and snowflakes introduce noise and degrade image quality; and snow-covered objects exhibit appearances that deviate considerably from their clear-weather counterparts. Several works attempt to explicitly remove weather induced degradations [16], [3], [21], [23], [32], [33], [34], [51], [52]. Other studies mitigate class confusion through cross-domain sample mixing [42] or incorporate masked image modeling to enhance spatial context reasoning [15]. Although UDA methods have made remarkable progress in recent years, a noticeable performance gap compared to fully supervised training still remains. As highlighted in [15], a common issue in UDA is the confusion between visually similar classes in the target domain (e.g., road vs. sidewalk, pedestrian vs. rider), where the absence of ground-truth supervision prevents learning subtle appearance differences. This challenge becomes more pro-nounced under adverse weather because weather-induced ap-pearance distortions increase the domain gap between source and target images. As observed in MIC[15], many existing UDA methods[13], [14], including MIC, fail to segment snow-covered sidewalk, distinguish sky/vegetation/building in dark nights. Notably, this performance gap remains even when employing state-of-the-art backbones such as DINOv3 [39], which are pretrained using large-scale self-supervised learning on web-scale data. To specifically address this challenge, we enforce consis-tency between predictions on the intra-class mixed image and the clean image, under the assumption that the model’s prediction should remain invariant to within-class appearance permutations. This consistency regularization encourages pre-diction consistency with intra-class appearance variations. Implementation-wise, we propose a method that regularizes prediction consistency between intra-class–perturbed images and their clean counterparts. In particular, we introduce an Intra-Class Mixing consistency module (ICM), designed as a plug-in component for UDA-based semantic segmentation. ICM selects confident regions and mixes their pixels into un-confident regions belonging to the same class according to the pseudo-labels generated by an Exponential Moving Average (EMA) teacher[41] from the original (i.e., unperturbed) image. ICM is a simple consistency module that is easily integrated into existing UDA frameworks. We validate its effectiveness by incorporating it into both MIC [15] and DAFormer [13]. Our method establishes new SOTA (state-of-the-art) per-formance on clear-to-adverse-weather adaptation benchmarks, as shown in Table I. Specifically, we set the new SOTA by +1.9 pp compared to the previous SOTA[38], and outperforms the proposed baseline by 1.3 - 2 pp (Table VI) mean IoU on Cityscapes (CS) →ACDC unsupervised domain adaptation task. arXiv:2609.27533v1 [cs.CV] 23 Sep 2026 2
+
+II. R ELATED WORK 
+
+A. Unsupervised Domain Adaptation 
+
+Unsupervised domain adaptation (UDA) aims to transfer knowledge from a labeled source domain to an unlabeled target domain by mitigating distribution shifts. For semantic segmentation in autonomous driving, this remains particularly challenging due to variations in weather, illumination, sensor characteristics, and scene layouts, which significantly degrade dense pixel-level predictions [42]. Early UDA methods reduce the domain gap by aligning source and target distributions in feature space [9], [12], [24], [43], [36], output space [35], [43], [44], [26], or through channel-wise feature adaptation [46] and image-level trans-lation [50], [19], [5]. Although these approaches effectively reduce global distribution discrepancies, alignment alone is often insufficient under large appearance shifts, where pseudo-label quality becomes the main limiting factor. Self-training has therefore become the dominant paradigm for UDA se-mantic segmentation. Pseudo-labels [20] generated on target images can be refined using confidence filtering [28], [54], [56], EMA teacher–student frameworks [41], rare-class sam-pling [13], masked consistency learning [15], and uncertainty-aware denoising [6]. Adapting from clear-weather domains to adverse-weather domains presents additional challenges, as weather degra-dations reduce texture information, alter illumination statis-tics, and increase ambiguity between semantically similar classes. Recent approaches address these issues through masked consistency learning [15], weather-invariant feature alignment [36], diffusion-based image translation [38], and restoration-guided adaptation [49]. Our proposed Intra-Class Mixing consistency (ICM) is built upon the standard teacher– student self-training framework by improving pseudo-label robustness through intra-class consistency, and is demonstrated on both DAFormer [13] and MIC [15]. 
+
+B. Mixing and Consistency Regularization 
+
+Data mixing and consistency regularization have become increasingly important in semantic segmentation and UDA. Based on the region-selection strategy, mixing methods can be categorized into geometric-based approaches[53], which em-ploy predefined spatial patterns (e.g., rectangular cutouts), and semantic-aware approaches[30], [42], where mixing regions are determined according to semantic class boundaries. From a domain-level perspective, mixing strategies can further be divided into naive mixing[30], which combines samples within the unlabeled dataset to generate augmented images, and cross-domain mixing[42], which integrates samples from different domains. At the image level, mixing can be classified into cross-image mixing[53], [30], [42], where regions from differ-ent images are combined, and intra-image mixing[17], where regions within the same image are rearranged or recomposed. Early mixing strategies such as CutMix [53] perform rect-angular region replacement between two images, where a randomly sampled rectangular patch from one image is pasted into another. While effective as a regularizer, CutMix is agnos-tic to semantic boundaries and may disrupt object structure, as mixed regions do not necessarily align with class seman-tics. To better preserve semantic consistency, ClassMix [30] proposes copying class-specific regions based on predicted segmentation masks, ensuring that pasted areas correspond to coherent semantic objects. By preserving class boundaries, ClassMix improves training stability and segmentation perfor-mance compared to purely geometric mixing strategies. Cross-domain mixing, such as DACS [42] and UPC [6], combines labeled source images with pseudo-labeled target images to generate hybrid samples. To mitigate pseudo-label noise, UPC identifies uncertain target patches and re-places them with corresponding source patches annotated with ground-truth labels. However, UPC employs CutMix [53] for patch replacement, where rectangular regions are selected without considering semantic boundaries, potentially disrupt-ing scene semantics and introducing contextual inconsisten-cies. In contrast, our proposed Intra-Class Mixing (ICM) also performs uncertainty-aware patch-wise mixing but restricts the perturbation to semantically consistent regions within the same target image. This class-preserving strategy regularizes struc-tured pseudo-label errors while maintaining the spatial and semantic coherence of the original scene. DACS is built upon semantic-aware mixing, which mixes source and target images using class masks derived from pseudo-labels, enabling joint supervision from ground-truth source labels and target pseudo-labels. This cross-domain mixing encourages the model to learn from spatially diverse and domain-composed inputs, improving robustness under domain shift. While these methods demonstrate that mixing-based perturbations are effective for regularization and domain adaptation, they operate across different images and often across domains. Consequently, they may introduce contextual inconsistencies, such as vehicles appearing in the sky region in the mixed image. Furthermore, DACS still encounters severe class conflation issues when adapting to adverse-weather target domains. This problem extends beyond commonly confused object classes (e.g., road vs. sidewalk, rider vs. pedestrian, motorcycle vs. bicycle) to background “stuff” classes such as road, sidewalk, and sky. These classes typically lack distinctive geometric structures and rely heavily on texture cues, which are substantially degraded or altered under adverse weather. For example, snow-covered terrain and sidewalks are difficult to tell apart, and sidewalks wet by rain can be easily confused with roads. Beyond cross-image mixing, intra-image perturbations such as PatchShuffle [17] and jigsaw-style permutation tasks [29] have been explored to improve generalization and represen-tation learning. More recent works employ patch-level trans-formations to enhance robustness or enforce teacher–student consistency [2]. These approaches demonstrate that perturbing spatial configuration within an image can encourage invariance to local arrangement and reduce over-reliance on fragile cues. Nevertheless, existing intra-image permutation methods are typically class-agnostic and do not explicitly account for structured pseudo-label noise in UDA segmentation. 3
+
+III. M ETHOD 
+
+A. Intra-class mixing 
+
+To address the increased confusion of stuff classes [45] in bad weather conditions, we propose Intra-Class Mixing consistency module (ICM) (see Fig.1). ICM mixes regions only within the same image and the same semantic class. Unlike previous cross-image mixing methods that combine different images [8], [18], [30], [53], ICM perturbs intra-class local patches while preserving the scenes’ semantic layout after mixing. This helps the model stay robust to visual changes caused by different weather conditions. The illustration comparing cross-image mixing and ICM is shown in Fig.2. The algorithm of the intra-class mixing process is shown in Algorithm. 1 
+
+a) Stuff classes: Following[45], 8 classes out of 19 Cityscapes classes are classified as stuff classes: road, side-walk, building, vegetation, terrain, wall, fence, and sky. In this work, we perform the intra-class mixing on the set of stuff classes Cstuff . There are two reasons: (1) in our experiments, we noticed that the conflation under adverse weather is par-ticularly severe for stuff classes (see Fig. 3); (2) compared to object (thing) classes such as people or vehicles, stuff classes generally lack distinctive geometric structures. As a result, disrupting geometric structure is likely less detrimental for stuff classes than for thing classes. Formally, let x ∈ R3×H×W denote an input image and 
+
+y∗ ∈ {0, . . . , K − 1}H×W the corresponding pixel labels (ground truth y for source, pseudo-label ˆy for target). Follow-ing standard UDA practice, a mini-batch is formed by a source image and a target image. For source images, ground truth y
+
+is utilized to provide semantic class information. For target images, pseudo-labels ˆy are produced by an EMA teacher to provide semantic information. We define a stuff mask: 
+
+Mstuff (u) = 
+
+(
+
+1 if y∗(u) ∈ C stuff ,
+
+0 otherwise . (1) Here, u is the coordinate of an arbitrary pixel, whereas y∗(u)
+
+extracts the label value at the corresponding location. For pixels that do not belong to stuff, they will not be permuted. 
+
+b) Patch collection: The intra-class mixing is performed on the patch level. Concretely, we partition the image into an 
+
+n × n grid of patches. For each class c ∈ C stuff , we collect eligible patches whose class occupancy in the patch exceeds a threshold: 
+
+Pc =
+
+(
+
+p : 1
+
+|p|
+
+X
+
+> u∈p
+
+1{y(u)= c} ≥ τpatch 
+
+)
+
+. (2) 
+
+c) Confusion-guided mix.: To target “stuff” regions where the model is uncertain (such as foggy sky, rain-wetted sidewalks, snow-covered terrain), we use the teacher’s pre-diction confidence on the clean image x to guide the mixing direction. Let pθ (· | x) denote the softmax output from the teacher network on the clean view. For each eligible patch 
+
+p ∈ P c, we compute a confusion score: 
+
+s(p, c ) = 1
+
+|Ωp,c |
+
+X
+
+> u∈Ωp,c
+
+ 1−(q1(u)−q2(u)) , Ωp,c = {u ∈ p : y(u) = c},
+
+(3) 
+
+Algorithm 1 Intra-Class Patch Mixing 
+
+Require: Input image x, stuff class set C, threshold τ
+
+Ensure: Intra-mixed sample and training loss  
+
+> 1:
+
+Divide x into n × n grid patches  
+
+> 2:
+
+for each class c ∈ C do  
+
+> 3:
+
+Collect patches with class ratio ≥ τ 
+
+> 4:
+
+Compute confusion score for each patch (margin between top-2 predicted probabilities)  
+
+> 5:
+
+Select origin patches (low confusion)  
+
+> 6:
+
+Select destination patches (high confusion)  
+
+> 7:
+
+Overwrite destination pixels with origin pixels only where both regions belong to class c 
+
+> 8:
+
+end for  
+
+> 9:
+
+Compute Intra mix loss: 
+
+LIntra mix = λKL LKL + λsup Lsup 
+
+where q1(u) and q2(u) are the top-2 predicted probabilities at coordinate u. We then select high-confusion (“hard”) patches and pair them with low-confusion (“easy”) patches to perform the intra-mixing. Among eligible patches s(p, c ), the top 50% with the highest confusion scores are selected as high-confusion patches, and the other 50% of eligible patches are considered as low-confusion patches. The low-confusion patches act as the origin, while the high-confusion patches act as the destination. The pixels from high-confusion pixels will be overwritten by the low-confusion pixels. The overwrite only happens at pixels labeled as class c in both origin and destination locations: 
+
+˜x(u) ← x(π(u)) for u ∈ pd such that y(u) = c ∧ y(π(u)) = c, 
+
+(4) where π(·) maps destination pixels to origin pixels at the same relative coordinates inside the paired patches. This produces an image ˜x that changes texture/illumination/style within class c while preserving its semantic boundary. The overwritten pixels are recorded in a binary mixing-region mask 
+
+Mmix ∈ { 0, 1}H×W , where Mmix (u) = 1 indicates that pixel 
+
+u has been replaced by intra-mix. Mmix will be used in the ablative study (Tab. IV). 
+
+B. Intra-Class Mix (ICM) Loss 
+
+We train the segmentation network using an intra-class mixed image ˜x together with its clean counterpart x. The training objective consists of two components: (1) a pixel-wise supervised segmentation loss Lsup , and (2) a KL-based consistency regularization LKL between clean and mixed pre-dictions. Rather than having all the regions of an image included in the ICM loss, we can selectively choose the loss region using the semantic masking Mstuff and mixing-region masking Mmix .In our framework, we define valid training pixels R as: 
+
+R = {u ∈ { 1, . . . , H } × { 1, . . . , W }| Mstuf f (u) = 1 }. (5) More analysis of the loss region can be seen in Section IV-D3. 4      
+
+> Fig. 1. Overview of UDA with the proposed ICM module: Clean images from the source (Src.) and target (Trg.) domains are processed by the teacher model to obtain teacher predictions. For source images, the ground-truth labels provide the semantic class information, while the teacher predictions are used for target images. The teacher’s predictions also provide the prediction confidence to guide the mixing direction (Confusion guide III-A0c). The consistency between the prediction of the intra-class mixed image and the clean image is enforced by consistency loss and supervision loss.
+> Fig. 2. Mixing strategy comparison between cross-image mixing and ICM. x denotes the image, y denotes the corresponding label. xMand yMdenote the mixed image and the mixed label. ICM performs mixing within the same image and the same class; the label of the intra-class mixed image remains the same as the label of the clean image.
+
+1) Supervised Segmentation Loss: The supervised segmen-tation loss is computed on the intra-mixed image ˜x. For each spatial location u, we define the effective label y∗(u),representing the ground truth of the source image y and the teacher-generated pseudo-label for the target image ˆy.To account for noisy pseudo-labels, we assign pixel weights 
+
+W (u) such that W (u) = 1 for valid source pixels, W (u) = 
+
+w for valid target pseudo-labeled pixels, and W (u) = 0 for ignored pixels. Following [13], [14], [42], [15], w is computed as the proportion of target pixels whose maximum softmax probability exceeds a confidence threshold τ :
+
+w = 1
+
+HW 
+
+> H
+
+X
+
+> i=1
+> W
+
+X
+
+> j=1
+
+1
+
+h
+
+max  
+
+> c
+
+gϕ(xT )ijc > τ 
+
+i
+
+. (6) where gϕ(xT )ijc denotes the teacher’s predicted probability for class c at pixel (i, j ), and τ is the confidence threshold. Let pθ (· | · ) denote the corresponding softmax distribution. The supervised loss is defined as a normalized weighted cross-entropy: 
+
+Lsup (y∗, ˜x, W ) = 1
+
+P 
+
+> u∈R
+
+W (u)
+
+X
+
+> u∈R
+
+W (u) ( − log pθ (y∗(u) | ˜x, u )) .
+
+(7) 
+
+2) Intra-Class Mix Consistency: Beyond supervised learn-ing, ICM enforces prediction consistency between the clean image x and its intra-class swapped version ˜x.Let τtemp denote a temperature parameter and fθ (·) ∈
+
+RK×H×W the segmentation logits, we define the temperature-scaled prediction distribution as 
+
+pτtemp  
+
+> θ
+
+(c | x, u ) = exp( fθ (x)c,u /τ temp )
+
+PKk=1 exp( fθ (x)k,u /τ temp ) . (8) The consistency loss is defined as a pixel-wise KL diver-gence: 
+
+LKL (x, ˜x) = 1
+
+|R| 
+
+X
+
+> u∈R
+
+KL  pτtemp  
+
+> θ
+
+(· | x, u ) pτtemp  
+
+> θ
+
+(· | ˜x, u ) .
+
+(9) 5
+
+The clean prediction pτtemp  
+
+> θ
+
+(· | x) is treated as a fixed tar-get distribution (no gradient), while gradients are propagated only through pτtemp  
+
+> θ
+
+(· | ˜x). This encourages the network to maintain stable semantic predictions under intra-class spatial perturbations. 
+
+3) Optimization Objective: The optimization Objective L
+
+of the proposed method consists of two parts, namely the ICM objective LICM and the baseline loss Lbase that we build upon: 
+
+L = LICM + Lbase . (10) The ICM objective LICM combines supervised segmentation and consistency regularization: 
+
+LICM = λsup Lsup + λKL LKL , (11) where λsup and λKL scale the loss terms. The baseline objective consists of the supervised source segmentation loss Lsrc , the DACS class-mixing loss, and the masking consistency loss, following DACS [42], DAformer[13], HRDA [14], and MIC [15]. 
+
+Lbase = Lsrc + Ldacs + Lmic  (12) IV. E XPERIMENTS 
+
+A. Implementation Details 
+
+We build ICM upon DAFormer [13], adopting the HRDA multi-resolution self-training framework [14] and incorpo-rating the MIC (Masked Image Consistency) module [15]. ConvNeXt-Base-DINOv3-LVD1689M encoder [39] is used as the backbone. To preserve the pretrained representations, the first two stages of the encoder are frozen during UDA train-ing. Our implementation adopts the standard teacher–student self-training framework of DAFormer, including confidence-weighted pseudo-labels, rare-class sampling [13], and target-domain data augmentation following DACS [42]. The EMA teacher is updated with momentum α = 0 .999 , following [13], [14], [15]. We use the AdamW optimizer [25] with a learning rate of 6 × 10 −5 for the encoder and 6 × 10 −4 for the decoder, linear learning-rate warm-up, and a mini-batch size of B = 2 . For intra-class mixing, each image is divided into a grid n × n with n = 8 , resulting in 64 patches per image. The KL divergence uses a temperature of 1.0. ICM loss scale 
+
+λsup and λKL are set to 0.5. All experiments were conducted on a server equipped with four NVIDIA A100-SXM4-80GB GPUs (80 GB memory each). Training was performed using a single GPU per experiment. 
+
+B. Datasets 
+
+In our experiments, we focus on the setting of domain adaptation and generalization from normal to adverse weather conditions, as our method particularly tackles the class confla-tion challenge under adverse weather. We use Cityscapes[4] as the labeled source-domain set in our experiments. It contains 2,975 training images, 500 validation images, and 1,525 test images collected during clear weather conditions. In our UDA experiments, source-domain samples are from the Cityscapes training split. As the target domain with adverse conditions, we adopt the ACDC dataset [37], which is designed to valuate capabilities on adapting from normal to challenging weather scenarios. ACDC includes 4,006 street-scene images evenly distributed across four adverse conditions: night, fog, rain, and snow. The dataset is divided into 1,600 training images, 406 validation images, and 2,000 test images. In our setup, we use the ACDC training split as the unlabeled target data and evaluate the validation split for ablation studies and hyperparameter tuning. 
+
+C. Comparison to the State of the Art in UDA 
+
+MIC[15] with MiT-B5 backbone[48] has served as a strong baseline in unsupervised domain adaptation (UDA) for se-mantic segmentation. However, recent advances in large-scale pretrained vision backbones, such as DINOv3[39], have sub-stantially improved representation learning capabilities. By integrating a DINOv3 backbone into the MIC framework, we establish a significantly stronger baseline (denoted as MIC-DINO). Building upon this enhanced foundation, our proposed ICM further improves adaptation performance by a substantial margin. Tab. I presents the comparison between ICM and existing state-of-the-art UDA methods on the Cityscapes → ACDC test benchmark. ICM consistently outperforms all competing methods in terms of mean IoU, achieving a performance gain exceeding 1.9 pp over previous approaches. Across individual categories, ICM achieves the best or second-best IoU in 14 out of 19 classes, including those critical for autonomous driving perception, such as sidewalk, traffic light, traffic sign, person, and various vehicle classes. 
+
+D. Analysis and Ablative Study 
+
+We perform in-depth analysis and ablate the components of ICM. The analysis is performed with DAFormer[13], without HRDA [14] and MIC [15], on Cityscapes(CS) →ACDC. This setting not only enables faster training but also demonstrates that ICM provides consistent and robust improvements on its own, independent of the MIC module [15]. Each experiment in the ablative study is trained for 20k iterations and repeated over three independent runs. 
+
+1) Apply ICM to source or target: Table II presents the performance of applying the ICM module to images from different domains: (1) source only, (2) target only, and (3) both source and target. Applying ICM solely to the source domain yields a modest improvement of +0.4 pp. In contrast, applying ICM to the target domain results in a larger gain of +1.6 pp. Incorporating ICM into both the source and target domains achieves the best performance, with an improvement of +1.9 pp. 
+
+2) Ablation of components: To gain a deeper understanding of the ICM module, the core components of ICM are ablated in Tab.III. First, we examine the importance of preserving semantic layout of the scene. Row 3 corresponds to inter-class mixing, where the mixing still happens within the same image, but the mixing is across different classes. In this setting, the labels of inter-class mixed images are updated accordingly, 6
+
+TABLE I COMPARISON OF STATE -OF -THE -ART UNSUPERVISED DOMAIN ADAPTATION METHODS ON CITYSCAPES →ACDC(T EST ). T HE FIRST , SECOND AND THIRD GROUPS OF ROWS PRESENT DEEP LABV 2-BASED UDA, S EG FORMER -BASED UDA AND DIFFUSION -BASED UDA, RESPECTIVELY .Method road sidew. build. wall fence pole light sign veget. terrain sky person rider car truck bus train motorc. bicycle mIoU AdaptSegNet[43] 69.4 34.0 52.8 13.5 18.0 4.3 14.9 9.7 64.0 23.1 38.2 38.6 20.1 59.3 35.6 30.6 53.9 19.8 33.9 33.4 BDL[22] 56.0 32.5 68.1 20.1 17.4 15.8 30.2 28.7 59.9 25.3 37.7 28.7 25.5 70.2 39.6 40.5 52.7 29.2 38.4 37.7 CLAN[27] 79.1 29.5 45.9 18.1 21.3 22.1 35.3 40.7 67.4 29.4 32.8 42.7 18.5 73.6 42.0 31.6 55.7 25.4 30.7 39.0 CRST[57] 51.7 24.4 67.8 13.3 9.7 30.2 38.2 34.1 58.0 25.2 76.8 39.9 17.1 65.4 3.7 6.6 39.6 11.8 8.6 32.8 FDA[50] 73.2 34.7 59.0 24.8 29.5 28.6 43.3 44.9 70.1 28.2 54.7 47.0 28.5 74.6 44.8 52.3 63.3 28.3 39.5 45.7 SIM[45] 53.8 6.8 75.5 11.6 22.3 11.7 23.4 25.7 66.1 8.3 80.6 41.8 24.8 49.7 38.6 21.0 41.8 25.1 29.6 34.6 MRNet[55] 72.2 8.2 36.4 13.7 18.5 20.4 38.7 45.4 70.2 35.7 5.0 47.8 19.1 73.6 42.1 36.0 47.4 17.7 37.4 36.1 DACS[42] 58.5 34.7 76.4 20.9 22.6 31.7 32.7 46.8 58.7 39.0 36.3 43.7 20.5 72.3 39.6 34.8 51.1 24.6 38.2 41.2 DAFormer[13] 58.4 51.3 84.0 42.7 35.1 50.7 30.0 57.0 74.8 52.8 51.3 58.2 32.6 82.7 58.3 54.9 82.4 44.1 50.7 55.4 SePiCo[47] 61.3 48.6 84.9 39.6 40.3 54.2 48.9 60.6 74.8 54.3 57.2 65.2 38.3 84.8 66.2 60.4 85.5 44.5 53.1 59.1 HRDA[14] 88.3 57.9 88.1 55.2 36.7 56.3 62.9 65.3 74.2 57.7 85.9 68.8 45.6 88.5 76.4 82.4 87.7 52.7 60.4 68.0 MIC[15] 90.8 67.1 89.2 54.5 40.5 57.2 62.0 68.4 76.3 61.8 87.0 71.3 49.4 89.7 75.7 86.8 89.1 56.9 63.0 70.4 CISS[36] 92.0 69.6 89.2 57.3 40.5 55.8 67.1 67.3 75.3 59.7 86.4 70.0 47.5 88.9 73.1 77.5 87.0 55.6 61.7 69.6 HALO[7] 94.2 79.8 88.2 60.2 51.1 64.1 78.2 65.6 87.9 55.7 95.5 66.3 20.7 88.9 82.2 89.3 87.9 50.4 59.0 71.9 CoDA[11] 93.1 72.7 90.7 57.3 47.4 56.8 69.9 70.0 87.3 59.8 95.4 71.4 47.6 90.3 77.1 83.8 89.1 54.7 64.1 72.6 WA2Net[31] 94.5 77.1 91.6 61.9 47.6 57.5 68.5 70.4 79.2 64.0 95.6 72.8 50.2 90.5 75.5 88.7 90.9 57.5 62.6 73.8 W-ControlUDA[38] 94.5 77.5 90.6 59.1 44.6 59.8 69.8 61.2 86.1 61.7 94.1 70.5 49.9 90.1 75.0 87.8 89.3 51.4 59.6 72.8 ICM (ours) 90.2 83.5 86.9 68.1 54.3 63.2 73.5 74.1 78.1 70.4 77.4 77.2 60.4 92.3 78.4 87.5 93.0 62.0 67.2 75.7 
+
+TABLE II ICM WITH DA FORMER [13] FOR IMAGES FROM DIFFERENT DOMAIN . CS → ACDC (V AL )ICM Domain mIoU std – 62.6 0.6 Source 63.0 0.9 Target 64.2 0.6 Source+Target 64.5 0.7 TABLE III ICM ABLATION STUDY WITH DAF ORMER [13] ON CS →ACDC(V AL ). Exp. Mixing. LSup LKL Conf-guide mIoU std 1 – – – – 62.6 0.6 2 ✓ ✓ ✓ ✓ 64.5 0.7 3 Inter-class ✓ – – 60.5 0.2 4 ✓ ✓ ✓ – 63.9 1.2 5 ✓ – ✓ ✓ 63.4 1.3 6 ✓ ✓ – ✓ 64.3 1.1 
+
+meaning that overwritten destination pixels are assigned the source class ID. Since our KL loss assumes that the mixed image should match the clean prediction within the same semantic region, it is not applicable to inter-class mixing where the semantics change. Therefore, only the supervised loss is used in this case. We observe a significant performance drop compared to baseline (-2.1 pp) with inter-class mixing, indicating that preserving semantic identity is crucial for effective training. Compared to random mixing, Confusion-guided mixing in-creases the mIoU performance by 0.6 pp (Rows 2 and 4). The supervised loss is a crucial objective for training ICM. Using only the KL loss results in a +0.8 pp improvement over the baseline (Rows 1 and 5), whereas using only the supervised loss achieves a larger gain of +1.7 pp (Rows 1 and 6). With the complete ICM, the mIoU is increased by +1.9 pp (Rows 1 and 2). 
+
+3) Loss region: We further ablate the effect of restricting the intra-mix loss to different regions of the image in Tab.IV. The image can be defined as three regions: non-mixed-stuff represents pixels whose semantic class belongs to stuff classes and were not changed by the mix; mixed-stuff means the stuff class pixels that were overwritten by the mix; and thing means pixels whose semantic class is not stuff classes. We observe that the performance does not change much as long as the ICM losses are applied within the stuff classes regions (row 3-5). However, when the losses are applied to thing region only, the performance is even lower than the baseline (row 1 and row 2). This degradation suggests that intra-mix consistency is more suitable for stuff regions, while applying it exclusively to thing regions may introduce harmful perturbations, possibly because object regions are less stable under mixing and more sensitive to pseudo-label noise. 
+
+4) Patch size: In Tab.V, we analyze the effect of the grid patch size n. Large patches overly disturb the global layout within stuff regions, while very small patches only affect local texture and provide weak appearance variation. The 8×8 grid balances structural coherence and effective intra-class invariance. Performance remains stable across 4–16 grids, indicating ICM is not overly sensitive to this hyperparameter. 
+
+E. Effectiveness of ICM 
+
+In this section, we compare the performance with and without the ICM module using the Cityscapes → ACDC UDA benchmark, with two different base models (MIC-DINO and MIC–Reproduced). In MIC-DINO, we replace the MIC backbone with DINOv3, due to its strong representation learning capabilities. This improves performance across most semantic classes. However, it exhibits notable class confusion between stuff classes under adverse weather conditions, such as the conflation between sky and road in foggy and snowy weather conditions. In-corporating ICM effectively mitigates this issue, surpassing the baseline MIC-DINO baseline mIoU by 1.3-2.0 pp, with particularly significant gains on road and sky (see Tab. VI). The qualitative visualization is shown in Fig. 3. We further verify that ICM is not specific to DINO backbone by using the MIC-Reproduced baseline. Due to the unavail-ability of the official MiT-B5 pretrained checkpoint, we could not exactly reproduce reported MIC results[15]. Instead, we re-trained MIC under the same setup with MiT-B5 as MIC-Reproduce. The model achieves 65.0 mIoU, while ICM (MiT-7                                   
+
+> TABLE IV ICM LOSS REGION STUDY WITH DAF ORMER [13] ON CS →ACDC(V AL ). Exp. Non-Mixed-stuff Mixed-stuff Thing mIoU CS →ACDC (V al )std 1–––62.6 0.6 2✓––64.5 0.7 3–✓–64.4 0.9 4✓✓–64.5 0.7 5––✓62.1 0.4
+
+Image MIC-DINO ICM(ours) Ground Truth                   
+
+> Fig. 3. Qualitative comparison of ICM with MIC-DINO baseline on CS →ACDC (row 1: snow, row 2: fog, row 3: night, row 4: rain). ICM improves the road segmentation significantly. The class conflation of foggy sky/building, snowy sky/road is mitigated. ICM also segments better with difficult classes, such as sidewalk and traffic light. Better viewed in color and zoomed in. TABLE V ICM PATCH SIZE STUDY WITH DAF ORMER [13] ON CS →ACDC(V AL ). n(Grid size) –4816 mIoU CS →ACDC (V al )62.6 63.8 64.5 63.5 std 0.6 1.4 0.7 1.1
+
+B5) achieves 66.5 mIoU. ICM consistently outperforms MIC-Reproduce by +1.5 pp under the MiT-B5 backbone, supporting that gains are method-driven rather than backbone-dependent. V. D ISCUSSION 
+
+To better understand how ICM affects the performance of individual semantic classes, we analyze the class-wise results in detail. Figure 4 illustrates the per-class IoU improvement (∆IoU = ICM − MIC) on the Cityscapes →ACDC benchmark under the three experimental settings reported in Table VI. As shown in Fig. 4, the largest performance gains are ob-served for stuff classes, particularly Road, Sky, and Sidewalk. However, Vegetation exhibits a notable IoU drop in the DINO Test setting, which is discussed in Section VI. Interestingly, despite ICM being applied only to stuff regions, several thing classes also show improved IoU, especially large vehicles such as Truck, Train, and Bus. One possible explanation is that accurate vehicle segmentation benefits from contextual information provided by the surrounding stuff regions. There-fore, improvements in the representation of classes such as roads may indirectly enhance the segmentation performance of nearby vehicles. VI. L IMITATION 
+
+The interpretation of the stuff and thing IoU behavior in the loss-region analysis (Tab. IV) remains preliminary; a representation-level analysis of ICM across different class groups could provide deeper insights into the observed trends(Fig. 4). Although ICM achieves the highest mIoU on Cityscapes → ACDC, we suspect that ICM is less effective in severe night conditions, where class confusion (e.g., sky vs. vegetation) becomes highly ambiguous. This performance degradation pattern is observed on both the ACDC night subset and the Cityscapes → DarkZurich benchmark. In contrast, improvements on ACDC mainly arise from fog and snow 8
+
+TABLE VI COMPARISON OF MIC AND ICM ON CITYSCAPES →ACDC. Method road sidew. build. wall fence pole light sign veget. terrain sky person rider car truck bus train motorc. bicycle mIoU MiT-B5 backbone Cityscapes →ACDC (Val) MIC-Reproduce 67.7 62.3 80.8 54.0 44.3 61.1 64.6 62.3 75.8 41.1 60.7 67.7 45.6 88.6 80.0 87.6 86.7 48.4 56.2 65.0 ICM(MiT-B5) 87.7 72.9 78.8 52.2 47.3 54.0 68.4 57.3 76.2 41.0 78.2 60.3 43.8 88.3 80.6 88.7 90.5 45.1 51.0 66.5                                                                                 
+
+> DINO backbone Cityscapes →ACDC (Val) MIC(DINO) 85.0 84.6 89.3 66.0 56.1 69.8 80.3 69.8 84.1 53.5 82.8 75.1 54.8 91.9 85.1 92.1 93.7 62.3 62.6 75.7 ICM(DINO) 93.4 85.8 88.9 65.9 55.9 68.4 81.2 70.0 83.7 55.7 87.7 74.2 56.9 92.2 89.5 94.7 93.1 62.1 64.6 77.0
+> DINO backbone Cityscapes →ACDC (Test) MIC(DINO) 69.3 82.2 84.1 68.4 52.1 63.7 74.3 73.0 86.6 66.4 60.4 76.3 60.8 92.5 78.9 88.9 93.5 62.7 65.6 73.7 ICM(DINO) 90.2 83.5 86.9 68.1 54.3 63.2 73.5 74.1 78.1 70.4 77.4 77.2 60.4 92.3 78.4 87.5 93.0 62.0 67.2 75.7
+
+Fig. 4. Per-class IoU improvement ( ∆IoU = ICM - MIC) on Cityscapes →ACDC for three experimental settings (MiT-B5 Val: Tab.VI group 1, DINO Val: Tab.VI group 2, and DINO Test: Tab.VI group 3). Classes are grouped into stuff and thing. Within each group, classes are sorted by the average improvement across the three settings. 
+
+conditions, where intra-class consistency is more reliable. Finally, the robustness against different choices of weighting scales ( λsup and λKL ) remains to be tested. VII. C ONCLUSION 
+
+We presented Intra-Class Mixing consistency (ICM), a mod-ule for unsupervised domain adaptation in semantic segmen-tation. It explicitly addresses class conflation under adverse weather. Unlike prior cross-image mixing strategies, ICM performs confusion-guided intra-class patch mixing within the same image, perturbing appearance while preserving semantic identity. With ICM, we establish a new state-of-the-art on Cityscapes → ACDC, achieving 75.7% mIoU and improving upon the previous best result by +1.9 pp. Due to its com-patibility with existing UDA frameworks, we hope ICM can contribute to robust adaptation under severe domain shifts. A deeper analysis of how it influences feature representations across stuff and thing classes remains an interesting direction for future work. REFERENCES [1] Caesar, H., Bankiti, V., Lang, A.H., Vora, S., Liong, V.E., Xu, Q., Krishnan, A., Pan, Y., Baldan, G., Beijbom, O.: nuscenes: A multimodal dataset for autonomous driving. In: Proceedings of the IEEE/CVF conference on computer vision and pattern recognition. pp. 11621– 11631 (2020) 1 [2] Cai, C., He, J., Zhang, M., Hu, Y., Li, Q., Ma, A.J.: Patch shuffle and pixel contrast: Dual consistency learning for semi-supervised lung tumor segmentation. In: Chinese Conference on Pattern Recognition and Computer Vision (PRCV). pp. 504–516. Springer (2023) 2 [3] Chen, W.T., Fang, H.Y., Ding, J.J., Tsai, C.C., Kuo, S.Y.: Jstasr: Joint size and transparency-aware snow removal algorithm based on modified partial convolution and veiling effect removal. In: European conference on computer vision. pp. 754–770. Springer (2020) 1 [4] Cordts, M., Omran, M., Ramos, S., Rehfeld, T., Enzweiler, M., Be-nenson, R., Franke, U., Roth, S., Schiele, B.: The cityscapes dataset for semantic urban scene understanding. In: Proceedings of the IEEE conference on computer vision and pattern recognition. pp. 3213–3223 (2016) 5 [5] Dundar, A., Liu, M.Y., Wang, T.C., Zedlewski, J., Kautz, J.: Domain stylization: A strong, simple baseline for synthetic to real image domain adaptation. arXiv preprint arXiv:1807.09384 (2018) 2 [6] Fang, Y., Zhu, F., Cheng, B., Liu, L., Zhao, Y., Wei, Y.: Locating noise is halfway denoising for semi-supervised segmentation. In: Proceedings of the IEEE/CVF International Conference on Computer Vision. pp. 16612–16622 (2023) 2 [7] Franco, L., Mandica, P., Kallidromitis, K., Guillory, D., Li, Y.T., Darrell, T., Galasso, F.: Hyperbolic active learning for semantic segmentation under domain shift. arXiv preprint arXiv:2306.11180 (2023) 6 [8] French, G., Laine, S., Aila, T., Mackiewicz, M., Finlayson, G.: Semi-supervised semantic segmentation needs strong, varied perturbations. arXiv preprint arXiv:1906.01916 (2019) 3 [9] Ganin, Y., Ustinova, E., Ajakan, H., Germain, P., Larochelle, H., Laviolette, F., March, M., Lempitsky, V.: Domain-adversarial training of neural networks. Journal of machine learning research 17 (59), 1–35 (2016) 2 [10] Geiger, A., Lenz, P., Stiller, C., Urtasun, R.: Vision meets robotics: The kitti dataset. The international journal of robotics research 32 (11), 1231– 1237 (2013) 1 [11] Gong, Z., Li, F., Deng, Y., Bhattacharjee, D., Ma, X., Zhu, X., Ji, Z.: Coda: Instructive chain-of-domain adaptation with severity-aware visual prompt tuning. In: European Conference on Computer Vision. pp. 130– 148. Springer (2024) 6 [12] Hoffman, J., Wang, D., Yu, F., Darrell, T.: Fcns in the wild: Pixel-level adversarial and constraint-based adaptation. arXiv preprint arXiv:1612.02649 (2016) 2 [13] Hoyer, L., Dai, D., Van Gool, L.: Daformer: Improving network architec-tures and training strategies for domain-adaptive semantic segmentation. In: Proceedings of the IEEE/CVF conference on computer vision and pattern recognition. pp. 9924–9935 (2022) 1, 2, 4, 5, 6, 7 9
+
+[14] Hoyer, L., Dai, D., Van Gool, L.: Hrda: Context-aware high-resolution domain-adaptive semantic segmentation. In: European conference on computer vision. pp. 372–391. Springer (2022) 1, 4, 5, 6 [15] Hoyer, L., Dai, D., Wang, H., Van Gool, L.: Mic: Masked image consistency for context-enhanced domain adaptation. In: Proceedings of the IEEE/CVF conference on computer vision and pattern recognition. pp. 11721–11732 (2023) 1, 2, 4, 5, 6 [16] Jeong, Y., Yang, Y., Yoon, Y., Yoon, K.J.: Robust adverse weather removal via spectral-based spatial grouping. In: Proceedings of the IEEE/CVF International Conference on Computer Vision. pp. 11872– 11883 (2025) 1 [17] Kang, G., Dong, X., Zheng, L., Yang, Y.: Patchshuffle regularization. arXiv preprint arXiv:1707.07103 (2017) 2 [18] Kim, J., Jang, J., Park, H., Jeong, S.: Structured consistency loss for semi-supervised semantic segmentation. arXiv preprint arXiv:2001.04647 (2020) 3 [19] Kim, M., Byun, H.: Learning texture invariant representation for domain adaptation of semantic segmentation. In: Proceedings of the IEEE/CVF conference on computer vision and pattern recognition. pp. 12975– 12984 (2020) 2 [20] Lee, D.H., et al.: Pseudo-label: The simple and efficient semi-supervised learning method for deep neural networks. In: Workshop on challenges in representation learning, ICML. vol. 3, p. 896. Atlanta (2013) 2 [21] Li, R., Cheong, L.F., Tan, R.T.: Heavy rain image restoration: Integrating physics model and conditional adversarial learning. In: Proceedings of the IEEE/CVF conference on computer vision and pattern recognition. pp. 1633–1642 (2019) 1 [22] Li, Y., Yuan, L., Vasconcelos, N.: Bidirectional learning for domain adaptation of semantic segmentation. In: Proceedings of the IEEE/CVF conference on computer vision and pattern recognition. pp. 6936–6945 (2019) 6 [23] Liu, Y.F., Jaw, D.W., Huang, S.C., Hwang, J.N.: Desnownet: Context-aware deep network for snow removal. IEEE Transactions on Image Processing 27 (6), 3064–3073 (2018) 1 [24] Long, M., Cao, Z., Wang, J., Jordan, M.I.: Conditional adversarial domain adaptation. Advances in neural information processing systems 
+
+31 (2018) 2 [25] Loshchilov, I., Hutter, F.: Decoupled weight decay regularization. arXiv preprint arXiv:1711.05101 (2017) 5 [26] Luo, Y., Liu, P., Zheng, L., Guan, T., Yu, J., Yang, Y.: Category-level adversarial adaptation for semantic segmentation using purified features. IEEE Transactions on Pattern Analysis and Machine Intelligence 44 (8), 3940–3956 (2021) 2 [27] Luo, Y., Zheng, L., Guan, T., Yu, J., Yang, Y.: Taking a closer look at domain shift: Category-level adversaries for semantics consistent domain adaptation. In: Proceedings of the IEEE/CVF conference on computer vision and pattern recognition. pp. 2507–2516 (2019) 6 [28] Mei, K., Zhu, C., Zou, J., Zhang, S.: Instance adaptive self-training for unsupervised domain adaptation. In: European conference on computer vision. pp. 415–430. Springer (2020) 2 [29] Noroozi, M., Favaro, P.: Unsupervised learning of visual representations by solving jigsaw puzzles. In: European conference on computer vision. pp. 69–84. Springer (2016) 2 [30] Olsson, V., Tranheden, W., Pinto, J., Svensson, L.: Classmix: Segmentation-based data augmentation for semi-supervised learning. In: Proceedings of the IEEE/CVF winter conference on applications of computer vision. pp. 1369–1378 (2021) 2, 3 [31] Pan, Y., Sun, R., Li, W., Zhang, T.: Exploring weather-aware aggregation and adaptation for semantic segmentation under adverse conditions. In: Proceedings of the IEEE/CVF international conference on computer vision. pp. 13952–13962 (2025) 6 [32] Qian, R., Tan, R.T., Yang, W., Su, J., Liu, J.: Attentive generative adversarial network for raindrop removal from a single image. In: Proceedings of the IEEE conference on computer vision and pattern recognition. pp. 2482–2491 (2018) 1 [33] Qu, Y., Chen, Y., Huang, J., Xie, Y.: Enhanced pix2pix dehazing network. In: Proceedings of the IEEE/CVF conference on computer vision and pattern recognition. pp. 8160–8168 (2019) 1 [34] Quan, Y., Deng, S., Chen, Y., Ji, H.: Deep learning for seeing through window with raindrops. In: Proceedings of the IEEE/CVF international conference on computer vision. pp. 2463–2471 (2019) 1 [35] Saito, K., Watanabe, K., Ushiku, Y., Harada, T.: Maximum classifier discrepancy for unsupervised domain adaptation. In: Proceedings of the IEEE conference on computer vision and pattern recognition. pp. 3723– 3732 (2018) 2 [36] Sakaridis, C., Bruggemann, D., Yu, F., Van Gool, L.: Condition-invariant semantic segmentation. IEEE Transactions on Pattern Analysis and Machine Intelligence 47 (4), 3111–3125 (2025) 2, 6 [37] Sakaridis, C., Dai, D., Van Gool, L.: Acdc: The adverse conditions dataset with correspondences for semantic driving scene understanding. In: Proceedings of the IEEE/CVF international conference on computer vision. pp. 10765–10775 (2021) 5 [38] Shen, F., Zhou, L., Kuecuekaytekin, K., Eskandar, G.B.F., Liu, Z., Wang, H., Knoll, A.: W-controluda: Weather-controllable diffusion-assisted unsupervised domain adaptation for semantic segmentation. IEEE Robotics and Automation Letters (2025) 1, 2, 6 [39] Sim´ eoni, O., Vo, H.V., Seitzer, M., Baldassarre, F., Oquab, M., Jose, C., Khalidov, V., Szafraniec, M., Yi, S., Ramamonjisoa, M., et al.: Dinov3. arXiv preprint arXiv:2508.10104 (2025) 1, 5 [40] Sun, P., Kretzschmar, H., Dotiwalla, X., Chouard, A., Patnaik, V., Tsui, P., Guo, J., Zhou, Y., Chai, Y., Caine, B., et al.: Scalability in perception for autonomous driving: Waymo open dataset. In: Proceedings of the IEEE/CVF conference on computer vision and pattern recognition. pp. 2446–2454 (2020) 1 [41] Tarvainen, A., Valpola, H.: Mean teachers are better role models: Weight-averaged consistency targets improve semi-supervised deep learning results. Advances in neural information processing systems 30 
+
+(2017) 1, 2 [42] Tranheden, W., Olsson, V., Pinto, J., Svensson, L.: Dacs: Domain adaptation via cross-domain mixed sampling. In: Proceedings of the IEEE/CVF winter conference on applications of computer vision. pp. 1379–1389 (2021) 1, 2, 4, 5, 6 [43] Tsai, Y.H., Hung, W.C., Schulter, S., Sohn, K., Yang, M.H., Chandraker, M.: Learning to adapt structured output space for semantic segmentation. In: Proceedings of the IEEE conference on computer vision and pattern recognition. pp. 7472–7481 (2018) 2, 6 [44] Vu, T.H., Jain, H., Bucher, M., Cord, M., P´ erez, P.: Advent: Adversarial entropy minimization for domain adaptation in semantic segmentation. In: Proceedings of the IEEE/CVF conference on computer vision and pattern recognition. pp. 2517–2526 (2019) 2 [45] Wang, Z., Yu, M., Wei, Y., Feris, R., Xiong, J., Hwu, W.m., Huang, T.S., Shi, H.: Differential treatment for stuff and things: A simple unsupervised domain adaptation method for semantic segmentation. In: Proceedings of the IEEE/CVF conference on computer vision and pattern recognition. pp. 12635–12644 (2020) 3, 6 [46] Wu, Z., Han, X., Lin, Y.L., Uzunbas, M.G., Goldstein, T., Lim, S.N., Davis, L.S.: Dcan: Dual channel-wise alignment networks for unsuper-vised scene adaptation. In: Proceedings of the European Conference on Computer Vision (ECCV). pp. 518–534 (2018) 2 [47] Xie, B., Li, S., Li, M., Liu, C.H., Huang, G., Wang, G.: Sepico: Semantic-guided pixel contrast for domain adaptive semantic segmen-tation. IEEE Transactions on Pattern Analysis and Machine Intelligence 
+
+45 (7), 9004–9021 (2023) 6 [48] Xie, E., Wang, W., Yu, Z., Anandkumar, A., Alvarez, J.M., Luo, P.: Segformer: Simple and efficient design for semantic segmentation with transformers. Advances in neural information processing systems 34 ,12077–12090 (2021) 5 [49] Yang, X., Yan, W., Yuan, Y., Mi, M.B., Tan, R.T.: Semantic segmentation on raindrop degraded images using two-stage dual teacher-student learn-ing. In: Proceedings of the AAAI Conference on Artificial Intelligence. vol. 39, pp. 9292–9300 (2025) 2 [50] Yang, Y., Soatto, S.: Fda: Fourier domain adaptation for semantic segmentation. In: Proceedings of the IEEE/CVF conference on computer vision and pattern recognition. pp. 4085–4095 (2020) 2, 6 [51] Yang, Y., Lu, H.: Single image deraining using a recurrent multi-scale aggregation and enhancement network. In: 2019 IEEE International Conference on Multimedia and Expo (ICME). pp. 1378–1383. IEEE (2019) 1 [52] Yasarla, R., Patel, V.M.: Uncertainty guided multi-scale residual learning-using a cycle spinning cnn for single image de-raining. In: Proceedings of the IEEE/CVF conference on computer vision and pattern recognition. pp. 8405–8414 (2019) 1 [53] Yun, S., Han, D., Oh, S.J., Chun, S., Choe, J., Yoo, Y.: Cutmix: Reg-ularization strategy to train strong classifiers with localizable features. In: Proceedings of the IEEE/CVF international conference on computer vision. pp. 6023–6032 (2019) 2, 3 [54] Zhang, W., Ouyang, W., Li, W., Xu, D.: Collaborative and adversarial network for unsupervised domain adaptation. In: Proceedings of the IEEE conference on computer vision and pattern recognition. pp. 3801– 3809 (2018) 2 10 
+
+[55] Zheng, Z., Yang, Y.: Rectifying pseudo label learning via uncertainty estimation for domain adaptive semantic segmentation. International Journal of Computer Vision 129 (4), 1106–1120 (2021) 6 [56] Zou, Y., Yu, Z., Kumar, B., Wang, J.: Unsupervised domain adaptation for semantic segmentation via class-balanced self-training. In: Proceed-ings of the European conference on computer vision (ECCV). pp. 289– 305 (2018) 2 [57] Zou, Y., Yu, Z., Liu, X., Kumar, B., Wang, J.: Confidence regularized self-training. In: Proceedings of the IEEE/CVF international conference on computer vision. pp. 5982–5991 (2019) 6

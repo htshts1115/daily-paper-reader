@@ -1,0 +1,69 @@
+{
+  "label": "2026-09-25",
+  "date": "2026-09-25",
+  "generated_at": "2026-09-25T22:53:32",
+  "count": 4,
+  "papers": [
+    {
+      "paper_id": "202609/25/2609.29224v1-founref-robust-structure-preserving-and-fast-metric-refinement-of-frozen-monocular-foundation-priors-with-sparse-anchors",
+      "section": "deep",
+      "title_en": "FounRef: Robust, Structure-Preserving, and Fast Metric Refinement of Frozen Monocular Foundation Priors with Sparse Anchors",
+      "authors": "Dan Halperin, Mirko Mählisch",
+      "date": "2026-09-24",
+      "pdf": "https://arxiv.org/pdf/2609.29224v1",
+      "score": "8.0",
+      "evidence": "用稀疏锚点将冻结单目基础先验细化为稠密度量深度",
+      "tldr": "单目基础模型几何先验丰富却缺乏可靠度量尺度，而深度补全网络常牺牲几何保真、跨域鲁棒性或速度。FounRef提出免训练方法，以稀疏度量锚点对齐冻结单目先验，先验证锚点并拒绝跨传感器错配，再通过保结构求解器做全局与局部度量校正。在域外数据上，它比DMD3C深度误差低24%、表面法向噪声低92%，推理快近15倍。该方法解耦度量对齐与几何预测，兼顾准确、结构保真与高效。",
+      "tags": "query:mono-depth",
+      "abstract_en": "Dense metric depth from cameras is essential to real-world 3D applications, yet achieving accuracy, faithful surface geometry, and fast inference simultaneously remains challenging. Monocular foundation models provide rich, transferable geometric priors but lack reliable metric scale, while depth-completion networks recover metric depth at the cost of geometric fidelity, cross-domain robustness, or speed. We present FounRef, a training-free method that aligns a frozen monocular foundation prior with sparse metric anchors to produce dense metric depth. FounRef is modular by design: its depth prior, anchor source, and refinement solver can each be replaced independently. We instantiate FounRef with MoGe-2 and LiDAR anchors. FounRef validates each anchor against the prior's dense depth prediction, rejecting inconsistencies caused by cross-sensor misalignment that geometry-only filters cannot detect. It then applies global and local metric corrections through a structure-preserving solver, retaining the prior's fine-grained geometry. FounRef requires no task-specific training and operates out of the box across unfamiliar cameras and scenes. On out-of-domain data, it delivers up to 24% lower depth error, 92% lower surface-normal noise, and almost 15x faster inference than DMD3C, a state-of-the-art depth-completion network. By decoupling metric alignment from geometry prediction, FounRef provides an accurate, geometrically faithful, and efficient approach to dense metric depth that can directly benefit from future advances in foundation models and metric sensors.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202609/25/2609.22687v1-panoseg3r-feed-forward-3d-semantic-segmentation-for-panoramic-images-with-an-automatic-data-curation-pipeline",
+      "section": "quick",
+      "title_en": "PanoSeg3R: Feed-Forward 3D Semantic Segmentation for Panoramic Images with an Automatic Data Curation Pipeline",
+      "authors": "Heechan Yoon, Dongki Jung, Phuc Nguyen, Ming Lin, Dinesh Manocha",
+      "date": "2026-09-19",
+      "pdf": "https://arxiv.org/pdf/2609.22687v1",
+      "score": "6.0",
+      "evidence": "前馈式三维全景语义分割，具备零样本泛化",
+      "tldr": "现有3D语义分割多针对透视图像，难以直接用于全景输入。PanoSeg3R提出前馈框架，基于支持全景的预训练重建主干，联合预测3D几何与多视图语义分割，并引入查询式掩码解码器。作者还设计自动全景数据整理流程，利用基础模型生成可靠伪标签，扩充训练数据。在ScanNet++上3D mIoU最高提升16.02，零样本在Stanford2D3D和ToF-360上分别提升4.26和43.28。",
+      "tags": "query:seg",
+      "abstract_en": "We present PanoSeg3R, a feed-forward framework for 3D panoramic semantic segmentation. Unlike existing methods designed for perspective inputs, PanoSeg3R jointly predicts 3D geometry and multi-view semantic segmentation in one single forward pass. Built upon a pretrained reconstruction backbone that supports panoramic images, our approach extends feed-forward 3D reconstruction with a query-based mask decoder. Furthermore, we introduce an automatic panorama data curation pipeline that leverages the complementary strengths of off-the-shelf foundation models to generate reliable pseudo semantic annotations, substantially expanding the training data and improving zero-shot generalization. PanoSeg3R achieves state-of-the-art performance on panoramic 3D semantic segmentation, improving 3D mIoU by up to 16.02 on ScanNet++, while the curated training data further improves zero-shot performance by up to 4.26 and 43.28 mIoU on Stanford2D3D and ToF-360, respectively. Website: https://harryyoon777.github.io/PanoSeg3R/",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202609/25/2609.24850v1-revisiting-multi-view-stereo-a-sequence-to-sequence-formulation",
+      "section": "quick",
+      "title_en": "Revisiting Multi-View Stereo: A Sequence-to-Sequence Formulation",
+      "authors": "Aoxiang Fan, Corentin Dumery, Nicolas Talabot, Pascal Fua",
+      "date": "2026-09-21",
+      "pdf": "https://arxiv.org/pdf/2609.24850v1",
+      "score": "6.0",
+      "evidence": "多视图立体深度几何，序列到序列建模",
+      "tldr": "多视图立体（MVS）在已知相机参数下仍面临重建歧义导致的几何失真，现有前馈方法亦然。本文将MVS从序列到单视图深度的映射改为序列到序列任务，像前馈模型一样联合预测所有输入视图的几何。方法采用全局Transformer，通过射线图嵌入注入相机参数使模型相机感知，并用统一全局代价体替代逐视图代价体，跨视图联合捕捉3D结构。多个公开基准实验表明，该方法达到最先进性能，超越传统MVS和前馈重建基线，桥接了传统MVS与前馈方法。",
+      "tags": "query:stereo-depth",
+      "abstract_en": "Computing accurate geometry from multi-view images is a fundamental problem in computer vision. Recent feed-forward (FF) models jointly estimate 3D geometry and camera parameters, but they typically suffer from geometry distortion caused by reconstruction ambiguity, even when ground-truth camera parameters are supplied. In this paper, we study the multi-view stereo (MVS) problem with known camera parameters and propose a novel approach that bridges conventional MVS and FF methods. Rather than casting MVS as a sequence-to-one mapping that predicts depth only for a single reference view, we reformulate it as a sequence-to-sequence task, akin to FF models, that jointly predicts geometry for all input views. We introduce a global transformer-based architecture with two components that explicitly exploit camera-induced priors: ray-map embeddings that inject camera parameters into image patch tokens, making the transformer camera-aware, and a unified global cost volume that replaces conventional per-view cost volumes to jointly capture 3D structure across all views. Extensive experiments on multiple public benchmarks show our approach achieves state-of-the-art performance, surpassing both MVS and FF reconstruction baselines.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202609/25/2609.27533v1-icm-intra-class-mixing-for-domain-adaptation-in-adverse-weather",
+      "section": "quick",
+      "title_en": "ICM: Intra-class Mixing for Domain Adaptation in Adverse Weather",
+      "authors": "Boying Li, Chang Liu, Britta Ayano Wilde, György Kovács, Tosin Adewumi, Björn Backe, Hamam Mokayed",
+      "date": "2026-09-23",
+      "pdf": "https://arxiv.org/pdf/2609.27533v1",
+      "score": "6.0",
+      "evidence": "面向语义分割的无监督域适应",
+      "tldr": "恶劣天气下语义分割的无监督域适应（UDA）因外观剧变导致域间差异扩大，目标域伪标签可靠性下降。本文提出类内混合一致性（ICM）框架，通过在同一图像、同一语义类内进行混合，并约束混合图与原图的预测一致性，避免跨图/跨域混合带来的语义不一致。在Cityscapes→ACDC基准上达到75.7% mIoU，较此前最优提升1.9个百分点，并缓解类别混淆。该工作为清晰到恶劣天气UDA提供了更符合真实语义布局的一致性正则思路。",
+      "tags": "query:seg",
+      "abstract_en": "Unsupervised domain adaptation (UDA) for semantic segmentation remains challenging under adverse weather conditions because severe appearance changes enlarge the domain gap and degrade the reliability of pseudo labels in the target domain. To address this problem, we propose an Intra-Class Mixing Consistency (ICM) framework that enforces prediction consistency between an intra-class mixed image and its original counterpart. Unlike previous mixing-based consistency methods that combine regions across different images or domains and may introduce unrealistic semantic inconsistencies, ICM performs mixing within the same image and semantic class, preserving realistic semantic layout for consistency regularization. With ICM, we establish a new state-of-the-art performance for clear-to-adverse-weather unsupervised domain adaptation (UDA) in semantic segmentation. On the Cityscapes $\\rightarrow$ ACDC benchmark, our method achieves 75.7\\% mIoU, outperforming the previous state of the art by +1.9 pp, demonstrating its effectiveness in mitigating class confusion under challenging environmental conditions. The code is provided in the supplementary material.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    }
+  ],
+  "errors": []
+}
