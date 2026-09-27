@@ -48,17 +48,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-09-26</span>
+      <span class="dpr-home-dashboard-kicker">2026-09-27</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 2 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 1 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>0</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>2</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>1</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-09-26 21:46:45 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-09-27 22:00:21 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -69,9 +69,7 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日速读2篇6.0分论文，主线落在多视角实例分割与RGB-D语义分割。</p>
-<p>最值得看的是《SAM-V》的几何感知多视角实例分割，以及《RGBD20K》的大规模RGB-D语义分割基准。</p>
-<p>普通读者可先看这两篇的摘要与任务设定，再顺着“多视角+几何”“RGB-D+大规模基准”两个关键词追踪后续工作。</p>
+<p>今日日报共筛出 1 篇论文，全部为速读，无精读入选。 唯一值得翻看的是《Revisiting Multi-View Stereo: A Sequence-to-Sequence Formulation》，它把多视角立体视觉重新表述为序列到序列的问题，评分 6.0/10，属中等偏上。 建议普通读者先花几分钟看摘要和图示确认思路是否对胃口，若与你的方向相关再决定是否深入全文。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -93,12 +91,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">2 篇</strong>
+    <strong class="dpr-home-dashboard-count">1 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="SAM-V: Geometry-Aware Segment Anything for Multi-View Instance Segmentation">SAM-V: Geometry-Aware Segment Anything for Multi-View Instance Segmentation</span></li><li><span class="dpr-home-dashboard-paper-title" title="RGBD20K: A Large-Scale Benchmark for RGB-D Semantic Segmentation">RGBD20K: A Large-Scale Benchmark for RGB-D Semantic Segmentation</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Revisiting Multi-View Stereo: A Sequence-to-Sequence Formulation">Revisiting Multi-View Stereo: A Sequence-to-Sequence Formulation</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">seg <strong>2</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">stereo-depth <strong>1</strong></span></div>
 </section>
 </div>
 
