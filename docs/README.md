@@ -51,14 +51,14 @@
       <span class="dpr-home-dashboard-kicker">2026-09-29</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 5 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 11 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
-    <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>2</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>3</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>2 次</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>4</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>7</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-09-29 00:16:54 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-09-29 23:17:17 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -69,7 +69,9 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日精读2篇、速读3篇，聚焦单目深度估计与多模态深度推理。最值得看的是两篇8分精读：自监督可感知解释的单目深度估计，以及统一度量深度预测与几何推理的DepthEvidence。建议普通读者优先从这两篇入手，再按兴趣浏览3D生成、双摄变焦和少样本分割速读。</p>
+<p>2026-09-29 日报共收录 11 篇论文（精读 4 篇、速读 7 篇），主线集中在单目深度估计与视觉-语言模型的空间/几何推理。</p>
+<p>最值得看的是精读中评分 9.0 的《Self-Supervised Perceptually Interpretable Monocular Depth Estimation》，以及 8.0 的《DepthEvidence：把度量深度预测与几何推理统一进多模态语言模型》；速读里的 FoundDSR（深度超分基础模型+2D 高斯泼溅）和“工具增强的度量空间推理”也属同一脉络。</p>
+<p>普通读者若时间有限，建议先读那篇 9.0 的自监督可解释深度估计，再顺着“深度+多模态几何推理”这条线看 DepthEvidence。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -78,12 +80,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">2 篇</strong>
+    <strong class="dpr-home-dashboard-count">4 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Self-Supervised Perceptually Interpretable Monocular Depth Estimation">Self-Supervised Perceptually Interpretable Monocular Depth Estimation</span></li><li><span class="dpr-home-dashboard-paper-title" title="DepthEvidence: Unifying Metric Depth Prediction and Geometric Reasoning in Multimodal Language Models">DepthEvidence: Unifying Metric Depth Prediction and Geometric Reasoning in Multimodal Language Models</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Self-Supervised Perceptually Interpretable Monocular Depth Estimation">Self-Supervised Perceptually Interpretable Monocular Depth Estimation</span></li><li><span class="dpr-home-dashboard-paper-title" title="DepthEvidence: Unifying Metric Depth Prediction and Geometric Reasoning in Multimodal Language Models">DepthEvidence: Unifying Metric Depth Prediction and Geometric Reasoning in Multimodal Language Models</span></li><li><span class="dpr-home-dashboard-paper-title" title="Depth Any Seen: Which Surfaces and How Far?">Depth Any Seen: Which Surfaces and How Far?</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">mono-depth <strong>2</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">mono-depth <strong>3</strong></span><span class="dpr-home-dashboard-tag">seg <strong>1</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -91,12 +93,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">3 篇</strong>
+    <strong class="dpr-home-dashboard-count">7 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="GAE: Learning a Geometry-Native Latent Space for 3D-Consistent World Generation">GAE: Learning a Geometry-Native Latent Space for 3D-Consistent World Generation</span></li><li><span class="dpr-home-dashboard-paper-title" title="ZoomDiff: A High-Fidelity Diffusion Model for Dual-Camera Smooth Zooming">ZoomDiff: A High-Fidelity Diffusion Model for Dual-Camera Smooth Zooming</span></li><li><span class="dpr-home-dashboard-paper-title" title="Exploiting Target Knowledge from MLLMs for Robust Few-Shot Segmentation">Exploiting Target Knowledge from MLLMs for Robust Few-Shot Segmentation</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="FoundDSR: A Generalizable Foundation Model with Guided 2D Gaussian Splatting for Depth Super-Resolution">FoundDSR: A Generalizable Foundation Model with Guided 2D Gaussian Splatting for Depth Super-Resolution</span></li><li><span class="dpr-home-dashboard-paper-title" title="Preference-Guided Adaptation for Open-Vocabulary Semantic Segmentation via Prompt Disagreement">Preference-Guided Adaptation for Open-Vocabulary Semantic Segmentation via Prompt Disagreement</span></li><li><span class="dpr-home-dashboard-paper-title" title="Seeing Is Not Measuring: Tool-Augmented Metric Spatial Reasoning for Vision-Language Models">Seeing Is Not Measuring: Tool-Augmented Metric Spatial Reasoning for Vision-Language Models</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">mono-depth <strong>1</strong></span><span class="dpr-home-dashboard-tag">seg <strong>1</strong></span><span class="dpr-home-dashboard-tag">stereo-depth <strong>1</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">mono-depth <strong>4</strong></span><span class="dpr-home-dashboard-tag">seg <strong>2</strong></span><span class="dpr-home-dashboard-tag">stereo-depth <strong>1</strong></span></div>
 </section>
 </div>
 

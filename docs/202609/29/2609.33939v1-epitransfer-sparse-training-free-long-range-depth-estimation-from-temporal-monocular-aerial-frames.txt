@@ -1,0 +1,871 @@
+EpiTransfer: Sparse, Training-Free Long-Range Depth Estimation from
+Temporal Monocular Aerial Frames
+Diksha Aggarwal1,†, Rutvik Dagadkhair1, Sanjana Srivastava2,
+Bradley Denby2 and Kevin Kochersberger1
+Abstract— Reliable 3D spatial understanding is essential
+for autonomous navigation, obstacle avoidance, and scene
+reconstruction. While state-of-the-art learned depth estimation
+techniques achieve high accuracy in-distribution, they often
+generalize poorly to novel viewpoints and altitudes. This paper
+presents a geometrically derived, training-free depth estimation
+method using epipolar transfer with only two monocular images
+and camera pose estimates. By leveraging camera motion to
+synthesize a virtual stereo pair with a freely chosen baseline,
+our approach transforms temporal correspondence into a stereo
+triangulation task while mitigating geometric degeneracies in-
+herent to direct two-view triangulation. Validated across out-
+door drone flights (to a maximum range of approximately 90 m)
+and indoor OptiTrack environments against LiDAR ground
+truth, the method achieves an indoor AbsRel of 0.092 and
+δ < 1.25 of 0.940, comparable to direct triangulation (AbsRel
+0.073) while retaining valid depth over a larger fraction of
+challenging scenes, and substantially outperforms off-the-shelf
+learning-based baselines such as ZoeDepth (AbsRel 0.225) and
+Depth Anything V2 (AbsRel 0.570), which are not trained or
+fine-tuned for this domain, with no training data required.
+I. INTRODUCTION
+Spatial perception provides essential geometric context
+for mobile robots, supporting fundamental tasks such as
+mapping, local navigation, and collision avoidance for better
+robot control. For platforms such as aerial vehicles, where
+size, weight, power, and cost constraints prevent the use of
+heavy active sensors like LiDAR, radar, and multi-camera
+rigs, passive stereo vision provides an attractive alternative by
+estimating depth through triangulation of corresponding fea-
+tures in synchronized, calibrated camera views [1]. However,
+the fixed physical baseline imposes a fundamental trade-off
+between compact sensor packaging and long-range depth
+accuracy. Short-baseline systems produce small disparities
+and increasingly uncertain depth estimates at long range,
+while wider baselines increase platform footprint, calibration
+demands, and occlusion-related correspondence failures [2].
+Monocular cameras are advantageous for such platforms
+because they are lightweight, low-power, inexpensive, and
+information-rich. However, their use for geometric percep-
+tion remains challenging: a single image does not, by itself,
+determine metric range due to the inherent scale ambiguity
+of monocular projection [1], [3]. Moreover, reliable depth
+recovery in robotic environments must account for image
+*This work was not supported by any organization
+1Department of Mechanical Engineering, Virginia Tech, Blacksburg,
+Virginia, USA.
+2Department of Aerospace and Ocean Engineering, Virginia Tech,
+Blacksburg, Virginia.
+†Corresponding Author: diksha@vt.edu
+Fig. 1: We use temporal monocular images and relative pose
+of cameras, perform sparse feature matching using XFeat,
+synthesize a virtual stereo pair via epipolar transfer, and
+triangulate to obtain sparse depth.
+noise, imperfect camera-pose estimates, limited computa-
+tional resources, and changes in scene or imaging conditions.
+A practical depth-sensing approach should therefore provide
+metric estimates efficiently while also quantifying the relia-
+bility of individual measurements [4], [5].
+For aerial approach and navigation, camera orientation
+influences the scene geometry available for perception.
+Nadir-looking cameras are effective for inspecting horizontal
+ground or rooftop surfaces near a landing location, but
+provide limited visibility of the forward approach corridor
+and vertical structures. In contrast, oblique-looking cameras
+instead observe both ground context and elevated scene
+elements, including fac¸ades, roof edges, walls, poles, towers,
+and cranes [6], [7]. Such views are particularly informative
+in urban environments, where vertical and inclined surfaces
+not adequately represented in nadir imagery alone. However,
+the large depth variation, viewpoint-dependent occlusion, and
+changing scale in oblique imagery make reliable metric depth
+estimation challenging [8], [9].
+Monocular depth estimation is commonly addressed
+through multi-view geometric reconstruction, model-based
+state estimation and sensor fusion, or learning-based depth
+prediction. Multi-view methods exploit observations from
+distinct viewpoints and calibrated camera geometry to re-
+cover scene structure through feature-based, direct, or hy-
+brid image alignment [1], [10]–[12]. Model-based estima-
+tion frameworks combine visual observations with motion,
+inertial, or other sensor measurements to estimate states and
+maintain geometric representations under uncertainty [13]–
+[15]. Learning-based approaches instead train neural net-
+works, using supervised, self-supervised, or a combination
+arXiv:2609.33939v1  [cs.RO]  27 Sep 2026
+
+
+of objectives, to predict dense depth directly from a monoc-
+ular image, video sequence, or sparse-depth input
+[16]–
+[19]. More recently, transformer- and foundation-model-
+based methods leverage large-scale pretrained visual pri-
+ors to achieve strong zero-shot, cross-scene generalization,
+optionally exploiting sparse depth measurements for dense
+completion [20]–[22]. These methods provide complemen-
+tary capabilities, but their reliability depends on how well
+the deployment environment matches the visual, geometric,
+and sensor characteristics represented during training, and,
+being limited by their training data, they may produce
+unbounded results under distribution shift [23], [24] A sparse
+geometric measurement source with physically-interpretable
+error characteristics can therefore complement learned depth,
+either as input to depth completion [19], a fusion cue, a
+validation signal, or a source of uncertainty-aware constraints
+for downstream planning.
+In this paper, we propose a geometrically derived sparse
+depth estimation method — obtained via epipolar transfer
+using only two images and available pose estimates from
+sensors like GPS, IMU, or wheel odometry as shown in Fig.
+1. Our key insight is that camera motion can be leveraged
+to synthesize a virtual stereo pair through epipolar transfer,
+enabling depth triangulation without a physical stereo rig
+or multi-frame optimization. Unlike direct per-pixel epipolar
+search on the real second view [11] or dense learned rec-
+tification into a synthetic view [25], our approach transfers
+sparse feature correspondences into a synthetic third view via
+closed-form trifocal intersection, with a baseline decoupled
+from the real inter-frame motion. This method can serve as
+a viable and lightweight alternative source of sparse depth
+for such pipelines.
+The proposed method, EpiTransfer, is implemented on the
+images collected in the outdoor and indoor environments.
+Validation is performed on the indoor images using a LiDAR.
+Experimental results demonstrate competitive accuracy with
+significantly lower errors in comparison to the state-of-the-
+art depth estimation methods.
+The main contributions of this paper are:
+• A novel two-frame depth estimation formulation that
+synthesizes a virtual stereo pair via epipolar transfer
+using only camera motion, validated to a maximum
+range of approximately 90 m outdoors — roughly 3×
+the range reported by prior geometric approaches to
+aerial approach and landing.
+• A hybrid pipeline combining deep learning-based fea-
+ture correspondences with training-free geometric trian-
+gulation for robust depth estimation.
+• An explicit, geometrically derived characterization of
+the method’s failure mode near the trifocal plane,
+enabling principled masking of ill-conditioned depth
+estimates without empirical thresholding.
+The remainder of this paper is organized as follows: Sec-
+tion II reviews related work in geometric, learning-based, and
+visual-inertial depth estimation. Section III details the pro-
+posed depth estimation methodology. Section IV describes
+the experimental setup, including the hardware platform,
+datasets, and evaluation protocol. Section V presents the ex-
+perimental results and comparative analysis, and Section VI
+concludes the paper.
+II. RELATED WORK
+Depth estimation from RGB cameras has been stud-
+ied along stereo, multi-view geometric, and learning-based
+monocular lines. This section situates EpiTransfer among
+these, and in particular among prior methods that turn two
+frames of a single moving camera into a stereo-like pair.
+A. Geometric Two- and Multi-View Depth from Monocular
+Motion
+Classical stereo recovers depth from disparities between
+calibrated, fixed-baseline views using block matching or
+Semi-Global Matching, and recent deep stereo networks such
+as PSMNet [26] and RAFT-Stereo [27] improve matching
+robustness in low-texture regions; however, all of these
+methods require a physical rig, and their achievable depth
+range and precision are fundamentally limited by the fixed
+physical baseline [2]. Multi-view SfM pipelines such as
+COLMAP [28] jointly recover poses and structure through
+global bundle adjustment, yielding geometrically consistent
+but computationally expensive, typically offline reconstruc-
+tions from many views. Visual SLAM systems such as ORB-
+SLAM3 [15] instead estimate pose and map incrementally in
+real time, but likewise triangulate over an extended trajectory
+rather than a single designated pair. EpiTransfer instead uses
+only two frames and an externally supplied pose, avoiding
+both a fixed baseline and iterative multi-frame optimization.
+B. Virtual and Temporal Stereo from Monocular Motion
+A separate line of work turns two frames of a single
+moving camera into a stereo-like pair once camera motion
+is known, rather than triangulating across many frames. This
+idea dates at least to Nevatia’s motion stereo [29], which
+used closely spaced monocular views along a vehicle’s path
+in place of a physical stereo baseline. In direct monoc-
+ular SLAM, LSD-SLAM’s temporal stereo [11] searches
+for pixel correspondences along the epipolar line induced
+by the estimated relative pose between the current and a
+reference keyframe, then triangulates directly from the two
+real camera centers – the same computation as our own
+Triangulation baseline (DLT) (Fig. 3), rather than the virtual-
+view construction we propose. More recently, deep-learning
+methods have revisited monocular-video-as-stereo directly
+for depth: Brousseau and Roy [25] introduce a differentiable
+spherical epipolar rectification that warps a monocular pair,
+under arbitrary known motion, into a rectified configuration
+on which a self-supervised deep stereo matcher computes
+disparity and absolute depth; VISTA [30] similarly forms
+virtual stereo pairs – in their case from two vehicles’
+monocular views of the same scene – to supply stereo-style
+supervision for training a monocular depth network, rather
+than to produce depth directly at inference.
+EpiTransfer differs from this line along two axes. First,
+correspondence and view synthesis are sparse and feature-
+based (XFeat) rather than dense: instead of a per-pixel
+
+
+rectifying warp of the real images, we transfer sparse point
+correspondences into a synthetic third view via closed-
+form trifocal intersection, so no dense matching network
+or rectification stage is required. Second, the virtual view’s
+baseline is a free parameter decoupled from the real inter-
+frame motion, which the dense-rectification methods above
+do not exploit. This training-free, sparse formulation enables
+real-time operation on embedded hardware, an explicit, ge-
+ometrically derived characterization of the method’s failure
+mode near the trifocal plane – a degeneracy not characterized
+in the temporal- or virtual-stereo methods above.
+C. Learning-Based Monocular Depth for Aerial Imagery
+Learning-based monocular methods predict dense depth
+from a single image or short video using visual priors,
+including self-supervised approaches such as Monodepth2
+[31] and PackNet-SfM [23] and general-purpose metric-
+depth foundation models such as ZoeDepth [32] and Depth
+Anything V2 [33]. Their reliability depends on the match be-
+tween deployment and training conditions, and UAV-specific
+benchmarks show that altitude, viewing angle, and camera
+characteristics induce substantial domain shift.
+For oblique aerial imagery specifically, Madhuanand et
+al. [34] train self-supervised depth and pose networks from
+temporal UAV video using view reconstruction as super-
+vision, demonstrating depth prediction across large scene
+depths but, like other learned methods, remaining tied to
+the training distribution’s scale and geometry. Geometric
+approaches have also targeted this setting at shorter range:
+Chatzikalymnios and Moustakas [35] use downward-looking
+physical stereo for landing-site detection, and Yang et al.
+[36] use ORB-SLAM triangulation with barometer-scaled
+depth for autonomous landing, both evaluated up to roughly
+20–30 m. EpiTransfer targets this regime at longer range
+(approximately 90 m, Section V-A), using known pose rather
+than a physical baseline or barometric scale.
+D. Visual-Inertial Estimation and Aerial Navigation
+Visual-inertial odometry and SLAM systems such as
+VINS-Mono and ORB-SLAM3 estimate vehicle motion and
+maintain sparse feature maps for state estimation and map
+consistency, rather than per-feature range estimation for a
+designated image pair. EpiTransfer is complementary: it
+consumes an externally supplied pose estimate from such a
+system (or from GNSS/IMU) and focuses on the latter task.
+III. METHOD
+This section presents the proposed two-frame depth esti-
+mation framework. Given two temporally separated monoc-
+ular images It and It−1 with known relative pose, we
+synthesize a virtual stereo pair through epipolar transfer and
+recover depth using geometric triangulation. An overview
+of the pipeline is shown in Fig. 2, and virtual stereo frame
+synthesis is shown in Fig. 3.
+Fig. 2: Flow chart of the proposed method, EpiTransfer
+A. Problem Formulation
+Let It and It−1 denote two RGB images captured by a
+calibrated monocular camera at different time instants. The
+relative camera motion between the frames is represented by
+rotation R and translation t. The camera intrinsic matrix is
+denoted by K.
+Our objective is to estimate a dense depth map for It using
+only (It, It−1) and the known camera motion.
+B. Feature Correspondence
+Reliable feature correspondences are essential to establish
+geometric constraints between views. Instead of traditional
+handcrafted algorithms like SIFT or ORB, we employ XFeat
+[37] on It and It−1. This yields robust sparse feature
+matches, even in low-texture regions, without requiring man-
+ual parameter tuning.
+Since XFeat’s sparse output rarely coincides with LiDAR-
+projected pixels, we instead use the dense RAFT feature
+matching algorithm [38] to obtain correspondences at every
+LiDAR-projected point for evaluation. Reported accuracy
+therefore reflects the triangulation geometry under dense
+correspondence, not the deployed sparse XFeat pipeline
+directly.
+C. Virtual Stereo frame using Epipolar transfer
+The key idea of our approach is to convert the two
+temporal views into a virtual stereo configuration.
+Using the known intrinsics and relative pose, the funda-
+mental matrix between two image frames can be computed
+as
+F = K−T [t]×RK−1,
+Fig. 3: Virtual Stereo Frame synthesis using It and It−1
+
+
+where [t]× denotes the skew-symmetric matrix of t.
+For each point xt in It and its correspondence xt−1 in
+It−1, the associated epipolar lines in a virtual view V are
+given by
+lt,V = Ft,V xt,
+lt−1,V = Ft−1,V xt−1.
+where Ft,V and Ft−1,V are the fundamental matrix be-
+tween It and V, and It−1 and V, respectively. The intersection
+of these epipolar lines determines the transferred location xv
+in the virtual image:
+xv = lt,V × lt−1,V .
+This operation effectively synthesizes a new viewpoint, form-
+ing a virtual stereo pair (It, V ) with a controllable baseline.
+Unlike physical stereo systems with a fixed baseline, the vir-
+tual baseline can be freely chosen according to the observed
+camera motion.
+D. Depth Triangulation
+Once the virtual correspondences (xt, xv) are obtained,
+depth is recovered using standard stereo triangulation. Let b
+denote the virtual baseline and f the focal length. The depth
+d of each pixel is computed from disparity ∆x as
+d = fb
+∆x.
+This produces a depth map for It.
+E. Computational Complexity
+The proposed method requires only two frames and avoids
+bundle adjustment, global optimization, or training. The
+dominant cost arises from feature extraction and matching,
+enabling real-time performance on embedded robotic plat-
+forms. With XFeat features, the algorithm works at around
+10 Hz on an Intel Core i7-12700H CPU.
+IV. EXPERIMENTAL SETUP
+This section describes the hardware platform, datasets,
+baselines, and evaluation metrics used to assess the proposed
+method.
+A. Hardware Platform
+Two experiments were conducted to evaluate the algorithm
+across different operating scenarios. The first was performed
+in an OptiTrack motion capture environment, in a room con-
+taining several objects of varying texture and structure. This
+controlled experiment used a tripod-mounted rig equipped
+with a Velodyne LiDAR and an Intel RealSense RGB-D
+camera as shown in Fig. 4. This indoor environment serves
+as a controlled proxy for the oblique, non-forward camera
+motion characteristic of aerial approach trajectories.
+The second experiment was conducted outdoors at an
+outdoor test facility using a DJI Mavic Air 2 [39] drone
+equipped with an RGB camera. Images were collected at 5-
+meter intervals and processed offline for the results reported
+in this paper. The camera was mounted at a fixed 20°
+downward pitch, with yaw matched to the drone’s heading.
+Fig. 4: Experiment setup with camera and LiDAR mounted
+on the tripod in the indoor OptiTrack motion capture envi-
+ronment
+In addition to the offline outdoor evaluation, we bench-
+marked real-time onboard performance of the pipeline on
+an NVIDIA AGX Orin, the compute platform for our hexa-
+copter test bed, with the camera configured for the gimbal-
+stabilized 20° downward pitch used in our outdoor flights.
+Using live camera input on the ground, the full pipeline runs
+onboard at 10 Hz on this hardware. Flight testing on this
+platform is in progress at the time of writing; a demonstration
+video will be included as supplementary material.
+B. Data Collection
+We collected indoor and outdoor sequences containing
+forward motion, rotations, and varying scene structure, in-
+cluding low-texture regions. The camera was operated in
+monocular mode, and only two consecutive RGB frames
+were used for depth estimation at each timestep.
+For the outdoor dataset, 8 images were used for quantita-
+tive evaluation, of which 5 are shown in Fig. 5 for qualitative
+comparison. The camera pitch was held constant at 20 deg
+below the horizon throughout data collection.
+For the indoor dataset, 7 images were used for evaluation.
+Two camera orientations were tested: forward-facing (pitch
+level with the horizon) and downward-pitched (30 deg below
+the horizon). In both cases, camera motion between frames
+included lateral and rotational components rather than pure
+forward translation, ensuring the epipole remained outside
+the image region and avoiding the degenerate configuration
+discussed.
+In both the indoor and outdoor datasets, image pairs were
+selected to span a range of approach angles and camera
+rotations.
+C. Pose Estimation
+Our method requires the relative position and orientation
+of the camera between consecutive frames. For the outdoor
+experiment, camera pose was obtained from the Pixhawk
+flight controller’s onboard GPS and IMU. For the indoor
+experiment, camera pose was obtained from the OptiTrack
+motion capture system.
+D. Comparison
+We compare against two baseline classes. First, off-the-
+shelf learning-based monocular depth models, ZoeDepth
+
+
+[32] and Depth Anything V2 [33], which produce metric
+depth from a single RGB image without pose and are used
+here without any fine-tuning on aerial or oblique imagery,
+characterizing the out-of-the-box domain-generalization gap
+of pretrained models rather than a best-case baseline and
+highlighting that EpiTransfer requires no training data. Sec-
+ond, direct two-view triangulation (DLT) [40], which con-
+sumes the same correspondences and pose as EpiTransfer
+but triangulates directly from the two real camera centers
+rather than a synthetic virtual view, isolating the effect of
+our epipolar-transfer formulation from the effect of having
+accurate pose.
+E. Evaluation Metrics
+We report standard depth metrics: AbsRel, SqRel, RMSE,
+RMSElog, MAE, and threshold accuracy δ < 1.25k for
+k = 1, 2, 3, computed identically across methods on matched
+valid-pixel masks.
+F. Ground Truth
+Outdoor. We evaluate outdoor depth estimates against the
+USGS 2017 LiDAR survey [41]. The georeferenced LiDAR
+cloud was converted to a local NED frame centered at the
+camera and projected into each image using the GPS/IMU-
+derived camera pose, gimbal attitude, and calibrated in-
+trinsics. Since the LiDAR cloud and image trajectory are
+independently georeferenced, we did not use ICP; instead, a
+single constant translation, estimated by least squares from
+four manually identified control points, corrected a resid-
+ual global position bias, reducing control-point reprojection
+RMS from 463 px to 32 px (control points were excluded
+from evaluation). Projected points were visibility-filtered via
+a z-buffer retaining the nearest LiDAR return per bin, with
+isolated outliers and edge-adjacent points removed. Depth
+was evaluated up to a maximum ground-truth range of
+100 m; beyond this range, and in regions without a valid
+LiDAR return, no depth estimate was scored for any method.
+The remaining visible LiDAR projections define the outdoor
+reference depths.
+Indoor. Indoor reference depths were obtained from a
+Velodyne VLP-16 Puck [42] rigidly mounted with the Re-
+alSense camera on a tripod. The LiDAR-camera extrinsic
+transform was estimated by planar target-based calibration
+and achieved a mean reprojection error of 3 px [43]. LiDAR
+points were transformed to the camera frame using the
+synchronized OptiTrack pose of the sensor rig and then
+projected into the camera image.
+For both datasets, evaluation was restricted to projected
+LiDAR returns within the shared LiDAR–camera field of
+view and the specified valid-depth range.
+V. RESULTS
+A. Outdoor
+Fig. 5 shows qualitative depth results on the outdoor
+dataset. Notably, the method accurately estimates depth up
+to a maximum range of 90 m in this scene, a range at
+which many existing monocular depth estimation approaches
+struggle to produce reliable metric predictions. A band
+of high-error pixels is visible near the top of the image,
+corresponding to points whose 3D location lies close to the
+plane containing the three camera centers (the trifocal plane).
+Our method recovers a point’s location in the virtual stereo
+frame as the intersection of two epipolar lines: one induced
+by the front-to-virtual camera relation, and one induced
+by the second-image-to-virtual relation. For points near the
+trifocal plane, these two epipolar lines become nearly parallel
+rather than crossing at a well-conditioned angle, so a small
+correspondence error in either input image produces a large
+shift in the computed intersection point along the shared line
+direction. This ill-conditioned intersection is the source of
+the high-error band. It is a known, geometrically predictable
+failure mode of trifocal point transfer.
+This points to a broader limitation: accurate depth es-
+timation requires the epipole to fall outside the region of
+interest. Our 20° downward gimbal pitch keeps the epipole
+near the sky/horizon, above the ground-level content of
+practical interest. This relies on oblique viewing geometry; a
+forward-facing camera under primarily translational motion,
+as in KITTI, would place the epipole near the image center,
+directly overlapping the region needed for depth estimation.
+Our method is thus best suited to oblique or downward-
+looking configurations, and all evaluation sequences here
+were correspondingly curated to avoid near-degenerate for-
+ward motion; performance under such motion is left to future
+work.
+Table I reports depth accuracy on the outdoor dataset,
+evaluated against the USGS LiDAR ground truth described
+in Section IV. Our method (EpiTransfer) substantially out-
+performs both learning-based baselines across all metrics,
+achieving an AbsRel of 0.138 compared to 0.719 and 0.744
+for ZoeDepth and Depth Anything V2, respectively, with
+a corresponding 3.2× reduction in RMSE (10.255 m vs.
+approximately 32 m). Notably, both baselines achieve δ <
+1.25 accuracy of 0.000, indicating that neither method’s
+absolute depth predictions fall within 25% of the LiDAR
+ground truth for any evaluated pixel. We attribute this to
+the domain gap between our aerial, oblique imagery and
+the ground-level, forward-facing imagery on which these
+models are primarily trained: their predicted metric scale
+does not generalize to this altitude and viewing geometry,
+which AbsRel, RMSE, and δ directly penalize. EpiTransfer
+computes metric depth from known pose and geometry rather
+than learned priors, and is unaffected by this shift.
+Table I also reports a Triangulation (DLT) baseline, which
+consumes the same sparse correspondences as EpiTransfer
+but triangulates directly from the two real camera centers
+rather than through a synthetic virtual view. On the pixels
+retained by both methods, DLT achieves marginally better
+aggregate accuracy (AbsRel 0.124 vs. 0.138). However,
+black regions in Fig.5 arise from two distinct causes: depth
+beyond the 100 m LiDAR ground-truth range is not evaluated
+regardless of method (e.g. the second row of Fig.5, where
+valid depth ends at the foreground structure), and, separately,
+points near the trifocal plane are masked as geometrically
+
+
+Input Image
+EpiTransfer (Ours)
+Triangulation
+ZoeDepth
+Depth Anything
+Fig. 5: Qualitative comparison of depth estimation results on 5 of the 8 outdoor images used for evaluation. Black regions
+in EpiTransfer and Triangulation indicate pixels without a valid depth estimate, either beyond the 100 m ground-truth range,
+unmatched in sparse correspondence, or masked as geometrically ill-conditioned for triangulation.
+TABLE I: Depth estimation accuracy evaluated against Li-
+DAR ground truth on 8 images of our outdoor dataset.
+Metric
+EpiTransfer
+(Ours)
+Triangulation
+(DLT)
+ZoeDepth Depth Anything
+V2
+AbsRel ↓
+0.138
+0.124
+0.719
+0.744
+RMSE (m) ↓
+10.255
+8.731
+32.610
+32.959
+RMSElog ↓
+0.199
+0.174
+1.279
+1.381
+MAE (m) ↓
+6.649
+5.656
+29.750
+30.423
+SqRel ↓
+1.694
+1.350
+21.560
+22.579
+δ < 1.25 ↑
+0.755
+0.817
+0.000
+0.000
+δ < 1.252 ↑
+0.961
+0.978
+0.000
+0.000
+δ < 1.253 ↑
+0.998
+0.998
+0.001
+0.000
+ill-conditioned for triangulation. It is this second, method-
+dependent cause that differs between EpiTransfer and DLT:
+in the two low-texture scenes shown in the fourth and
+fifth rows of Fig.5, EpiTransfer retained 753 and 1147
+valid points, respectively, compared to 715 and 1103 for
+DLT (increases of 5.3% and 4.0%). This suggests that
+EpiTransfer’s controllable virtual baseline achieves accuracy
+comparable to direct triangulation while retaining usable
+depth over a modestly larger portion of the scene in geometri-
+cally challenging conditions, particularly under the imperfect
+GPS/IMU pose available outdoors. Indoors, where OptiTrack
+pose is far more accurate, the two methods produce nearly
+indistinguishable masks and depth maps (Fig.6).
+B. Indoor
+Table II reports results on 7 representative indoor frames,
+evaluated against the Velodyne LiDAR ground truth. Epi-
+Transfer achieves an AbsRel of 0.092 and δ < 1.25 of
+0.940, comparable to DLT, which achieves a marginally
+better AbsRel of 0.073 and δ < 1.25 of 0.943 under
+the accurate OptiTrack pose available indoors. Both geo-
+metric methods substantially outperform the learning-based
+baselines: ZoeDepth achieves a more competitive but still
+considerably worse AbsRel of 0.225 (δ < 1.25 = 0.601),
+while Depth Anything V2 degrades further, with an AbsRel
+of 0.570 and δ < 1.25 of only 0.223. This indicates that even
+in a domain closer to these models’ training distribution than
+our outdoor sequences, learning-based metric depth remains
+less reliable than geometry-based estimation when accurate
+relative pose is available, consistent with the domain-shift
+
+
+Input Image
+EpiTransfer (Ours)
+Triangulation
+ZoeDepth
+Depth Anything
+Fig. 6: Qualitative comparison of depth estimation results on the indoor dataset. Black regions in EpiTransfer and
+Triangulation indicate pixels without a valid depth estimate, either unmatched in sparse correspondence or masked as
+geometrically ill-conditioned for triangulation.
+limitations discussed in Section II-C, even in scenes with
+the low-texture regions described in Section IV-B.
+TABLE II: Depth estimation accuracy evaluated against
+LiDAR ground truth on 7 images of our indoor dataset.
+Metric
+EpiTransfer
+(Ours)
+Triangulation
+(DLT)
+ZoeDepth
+Depth
+Anything V2
+AbsRel ↓
+0.092
+0.073
+0.225
+0.570
+RMSE (m) ↓
+0.469
+0.401
+0.980
+2.964
+RMSElog ↓
+0.118
+0.102
+0.235
+0.482
+MAE (m) ↓
+0.371
+0.303
+0.841
+2.520
+SqRel ↓
+0.052
+0.037
+0.266
+1.859
+δ < 1.25 ↑
+0.940
+0.943
+0.601
+0.223
+δ < 1.252 ↑
+0.998
+0.998
+0.971
+0.337
+δ < 1.253 ↑
+1.000
+1.000
+1.000
+0.995
+C. Sensitivity Analysis
+Fig. 7 reports AbsRel vs. injected translation, yaw, roll,
+and pitch error on 7 indoor takes, using OptiTrack pose
+as a clean zero-noise reference. Five takes show bounded,
+roughly symmetric degradation around zero injected error.
+Takes 2-1 and 5-4 instead show substantially larger, near-
+monotonic error; in both cases, several tested perturbations
+place the epipole inside the image, reproducing the trifocal-
+plane degeneracy of Section V-A. This confirms that pose-
+error sensitivity is governed less by a uniform error bound
+than by proximity to this geometric degeneracy, which can
+be checked directly from the candidate pose to flag unreliable
+estimates in practice.
+VI. CONCLUSION
+In this paper, we presented EpiTransfer, a training-free
+geometric method for monocular sparse depth estimation
+via epipolar transfer. By synthesizing a virtual stereo pair
+with a freely chosen baseline from known camera poses, our
+approach avoids dedicated stereo hardware and multi-frame
+optimization while achieving accuracy comparable to di-
+rect two-view triangulation and substantially better accuracy
+than off-the-shelf, pretrained learning-based monocular depth
+(a) Translation error
+(b) Yaw error
+Fig. 7: AbsRel vs. injected pose error across 7 indoor takes.
+Takes 2-1 and 5-4 (which include perturbations placing
+the epipole inside the image) show markedly larger, non-
+symmetric error, consistent with the trifocal-plane degener-
+acy of Section V-A; the remaining 5 takes show bounded,
+approximately symmetric degradation around zero injected
+error.
+baselines not trained for this domain, across both indoor Op-
+tiTrack and outdoor drone-flight evaluations against LiDAR
+ground truth, with a validated range of approximately 90 m
+outdoors. Qualitative results further suggest that EpiTransfer
+retains valid depth over a larger portion of challenging, low-
+texture scenes than direct triangulation, particularly under
+the imperfect pose available outdoors. With its minimal
+computational overhead (10 Hz on embedded hardware), this
+framework provides an efficient, training-free sparse prior for
+depth completion, obstacle avoidance, and real-time robotic
+navigation. Future work will complete flight testing of the
+onboard XFeat-based pipeline against LiDAR ground truth
+on the hexacopter platform and extend evaluation across a
+broader range of scenes and flight conditions.
+
+
+ACKNOWLEDGMENT
+Generative AI (Claude, Anthropic) assisted in drafting
+and revising the Introduction, Related Work, Abstract, and
+Conclusion, and in regenerating Figs. 1–2 for legibility; all
+content was reviewed and verified by the authors.
+REFERENCES
+[1] R. Hartley and A. Zisserman, Multiple View Geometry in Computer
+Vision, 2nd ed.
+Cambridge, UK: Cambridge University Press, 2003.
+[2] P. Pinggera, D. Pfeiffer, U. Franke, and R. Mester, “Know your
+limits: Accuracy of long range stereoscopic object measurements in
+practice,” in Computer Vision – ECCV 2014, ser. Lecture Notes in
+Computer Science, vol. 8690.
+Springer, 2014, pp. 96–111. [Online].
+Available: https://doi.org/10.1007/978-3-319-10605-2 7
+[3] A. Saxena, M. Sun, and A. Y. Ng, “Make3d: Learning 3d scene
+structure from a single still image,” in IEEE Transactions on Pattern
+Analysis and Machine Intelligence, vol. 31, no. 5, 2009, pp. 824–840.
+[4] M. Poggi, E. Pallotti, F. Tosi, and S. Mattoccia, “On the uncertainty
+of self-supervised monocular depth estimation,” in Proceedings of the
+IEEE/CVF Conference on Computer Vision and Pattern Recognition,
+2020, pp. 3227–3237.
+[5] A. Kendall and Y. Gal, “What uncertainties do we need in bayesian
+deep learning for computer vision?” in Advances in Neural Informa-
+tion Processing Systems, vol. 30, 2017.
+[6] G. Vacca, A. Dess`ı, and A. Sacco, “The use of nadir and oblique
+uav images for building knowledge,” ISPRS International Journal of
+Geo-Information, vol. 6, no. 12, p. 393, 2017.
+[7] P. Rossi et al., “Combining nadir and oblique uav imagery to re-
+construct quasi-vertical surfaces,” The International Archives of the
+Photogrammetry, Remote Sensing and Spatial Information Sciences,
+2017.
+[8] R. Qin, “Building fac¸ade recognition using oblique aerial images,”
+Remote Sensing, vol. 7, no. 8, pp. 10 562–10 588, 2015.
+[9] X. Zhang et al., “Integration of aerial oblique imagery and terrestrial
+imagery for optimized 3d modeling in urban areas,” ISPRS Journal of
+Photogrammetry and Remote Sensing, vol. 142, pp. 102–114, 2018.
+[10] R. Mur-Artal, J. M. M. Montiel, and J. D. Tardos, “Orb-slam: A
+versatile and accurate monocular slam system,” IEEE transactions on
+robotics, vol. 31, no. 5, pp. 1147–1163, 2015.
+[11] J. Engel, T. Sch¨ops, and D. Cremers, “Lsd-slam: Large-scale di-
+rect monocular slam,” in European conference on computer vision.
+Springer, 2014, pp. 834–849.
+[12] C. Forster, M. Pizzoli, and D. Scaramuzza, “Svo: Semi-direct visual
+odometry for monocular and multi-camera systems,” in IEEE Interna-
+tional Conference on Robotics and Automation, 2017, pp. 15–22.
+[13] M. Bloesch, S. Omari, M. Hutter, and R. Siegwart, “Robocentric
+visual-inertial odometry using error-state kalman filtering,” IEEE Inter-
+national Conference on Robotics and Automation, pp. 634–640, 2015.
+[14] S. Leutenegger, S. Lynen, M. Bosse, R. Siegwart, and P. Furgale,
+“Keyframe-based visual–inertial odometry using nonlinear optimiza-
+tion,” International Journal of Robotics Research, vol. 34, no. 3, pp.
+314–334, 2015.
+[15] C. Campos, R. Elvira, J. J. G. Rodr´ıguez, J. M. M. Montiel, and
+J. D. Tard´os, “Orb-slam3: An accurate open-source library for visual,
+visual-inertial, and multimap slam,” IEEE Transactions on Robotics,
+vol. 37, no. 6, pp. 1874–1890, 2021.
+[16] D. Eigen, C. Puhrsch, and R. Fergus, “Depth map prediction from a
+single image using a multi-scale deep network,” in Advances in Neural
+Information Processing Systems, vol. 27, 2014.
+[17] C. Godard, O. Mac Aodha, M. Firman, and G. J. Brostow, “Digging
+into self-supervised monocular depth estimation,” in Proceedings of
+the IEEE/CVF International Conference on Computer Vision, 2019,
+pp. 3828–3838.
+[18] R. Ranftl, A. Bochkovskiy, and V. Koltun, “Vision transformers for
+dense prediction,” in Proceedings of the IEEE/CVF International
+Conference on Computer Vision, 2021, pp. 12 179–12 188.
+[19] F. Ma, G. V. Cavalheiro, and S. Karaman, “Self-supervised sparse-
+to-dense: Self-supervised depth completion from lidar and monocular
+camera,” in IEEE International Conference on Robotics and Automa-
+tion, 2019, pp. 3288–3295.
+[20] S. Chen, X. Ma, H. Zhang, H. Li, and Z. Wang, “Propagating
+sparse depth via depth foundation model for out-of-distribution
+depth completion,” arXiv preprint arXiv:2508.04984, 2025. [Online].
+Available: https://arxiv.org/abs/2508.04984
+[21] X. Cheng, P. Wang, and R. Yang, “Depth estimation via affinity
+learned with convolutional spatial propagation network,” in Computer
+Vision – ECCV 2018.
+Springer, 2018, pp. 103–119. [Online].
+Available: https://doi.org/10.1007/978-3-030-01270-0 7
+[22] Z. Yan, K. Wang, X. Li, Z. Zhang, J. Li, and J. Yang, “RigNet:
+Repetitive image guided network for depth completion,” in Computer
+Vision – ECCV 2022.
+Springer, 2022, pp. 214–230. [Online].
+Available: https://doi.org/10.1007/978-3-031-19812-0 13
+[23] V. Guizilini, R. Ambrus, S. Pillai, A. Raventos, and A. Gaidon,
+“3d packing for self-supervised monocular depth estimation,” 2020.
+[Online]. Available: https://arxiv.org/abs/1905.02693
+[24] S. Yu, Y. Wang, Y. Zhuge, L. Wang, and H. Lu, “DME: Unveiling
+the bias for better generalized monocular depth estimation,” in
+Proceedings of the AAAI Conference on Artificial Intelligence,
+vol. 38, no. 7, Mar. 2024, pp. 6817–6825. [Online]. Available:
+https://doi.org/10.1609/aaai.v38i7.28506
+[25] P.-A. Brousseau and S. Roy, “Spherical epipolar rectification for deep
+two-view absolute depth estimation,” in 2025 IEEE/CVF International
+Conference on Computer Vision (ICCV).
+IEEE, 2025, pp. 28 925–
+28 934.
+[26] J. Chang and Y. Chen, “Pyramid stereo matching network,” CoRR,
+vol. abs/1803.08669, 2018. [Online]. Available: http://arxiv.org/abs/
+1803.08669
+[27] L. Lipson, Z. Teed, and J. Deng, “Raft-stereo: Multilevel recurrent
+field transforms for stereo matching,” CoRR, vol. abs/2109.07547,
+2021. [Online]. Available: https://arxiv.org/abs/2109.07547
+[28] J. L. Sch¨onberger and J.-M. Frahm, “Structure-from-Motion Revis-
+ited,” in Conference on Computer Vision and Pattern Recognition
+(CVPR), 2016.
+[29] R. Nevatia, “Depth measurement by motion stereo,” Computer Graph-
+ics and Image Processing, vol. 5, no. 2, pp. 203–214, 1976.
+[30] B. Cheng, K. Bansal, M. Agarwal, G. Bansal, and D. Bharadia, “Vista:
+Virtual stereo based augmentation for depth estimation in automated
+driving.”
+[31] C. Godard, O. M. Aodha, M. Firman, and G. Brostow, “Digging
+into self-supervised monocular depth estimation,” 2019. [Online].
+Available: https://arxiv.org/abs/1806.01260
+[32] S. F. Bhat, R. Birkl, D. Wofk, P. Wonka, and M. M¨uller, “Zoedepth:
+Zero-shot transfer by combining relative and metric depth,” 2023.
+[Online]. Available: https://arxiv.org/abs/2302.12288
+[33] L.
+Yang,
+B.
+Kang,
+Z.
+Huang,
+Z.
+Zhao,
+X.
+Xu,
+J.
+Feng,
+and H. Zhao, “Depth anything v2,” 2024. [Online]. Available:
+https://arxiv.org/abs/2406.09414
+[34] L. Madhuanand, F. Nex, and M. Y. Yang, “Self-supervised monocular
+depth estimation from oblique uav videos,” ISPRS journal of pho-
+togrammetry and remote sensing, vol. 176, pp. 1–14, 2021.
+[35] E. Chatzikalymnios and K. Moustakas, “Landing site detection
+for
+autonomous
+rotor
+wing
+uavs
+using
+visual
+and
+structural
+information,” Journal of Intelligent & Robotic Systems, vol. 104,
+no. 2, p. 27, jan 2022. [Online]. Available: https://doi.org/10.1007/
+s10846-021-01544-6
+[36] T. Yang, P. Li, H. Zhang, J. Li, and Z. Li, “Monocular vision
+slam-based uav autonomous landing in emergencies and unknown
+environments,” Electronics, vol. 7, no. 5, p. 73, 2018.
+[37] G. Potje, F. Cadar, A. Araujo, R. Martins, and E. R. Nascimento,
+“Xfeat: Accelerated features for lightweight image matching,” in 2024
+IEEE/CVF Conference on Computer Vision and Pattern Recognition
+(CVPR), 2024, pp. 2682–2691.
+[38] Z. Teed and J. Deng, “Raft: Recurrent all-pairs field transforms for
+optical flow,” 2020. [Online]. Available: https://arxiv.org/abs/2003.
+12039
+[39] DJI, “Mavic Air 2 Support,” https://www.dji.com/support/product/
+mavic-air-2, accessed: 2026-08-10.
+[40] DLT,
+“DLT
+Triangulation,”
+https://docs.opencv.org/4.1.1/d0/dbd/
+group triangulation.html, accessed: 2026-08-10.
+[41] USGS VGIN, “VGIN: Virginia LiDAR data,” https://vgin.vdem.
+virginia.gov/apps/VGIN::virginia-lidar-download-application/explore,
+accessed: 2026-09-10.
+[42] Velodyne, “Velodyne VLP-16 Puck Lidar Sensor,” https://ouster.com/
+products/hardware/vlp-16/, accessed: 2026-08-10.
+
+
+[43] S. Verma, J. S. Berrio, S. Worrall, and E. Nebot, “Automatic
+extrinsic calibration between a camera and a 3d lidar using
+3d point and plane correspondences,” 2019. [Online]. Available:
+https://arxiv.org/abs/1904.12433
