@@ -1,0 +1,420 @@
+Title: 2609.30987v1.pdf
+
+URL Source: https://arxiv.org/pdf/2609.30987v1
+
+Published Time: Mon, 28 Sep 2026 00:46:06 GMT
+
+Number of Pages: 6
+
+Markdown Content:
+SELF-SUPERVISED PERCEPTUALLY INTERPRETABLE MONOCULAR DEPTH ESTIMATION 
+
+## Zain Ul Abidin, George Dimas, and Dimitris K. Iakovidis 
+
+## Department of Computer Science and Biomedical Informatics, School of Science, University of Thessaly, Lamia, Greece 
+
+## ABSTRACT 
+
+Self-supervised monocular depth estimation (MDE) enables depth prediction from monocular images without requiring ground-truth supervision, making it attractive for large-scale and real-world applications. Despite steady improvements in accuracy, most existing methods remain difficult to interpret, as depth is inferred from RGB representations that obscure the impact of individual perceptual image components. This lack of transparency limits systematic analysis of failure cases and reduces confidence in safety-critical settings. This paper presents a self-supervised framework for perceptually interpretable monocular depth estimation (PIMDE), designed to associate depth predictions with distinct perceptual components of the input image. Rather than operating directly on RGB inputs, the proposed method decomposes each image into a set of perceptual feature maps (PFMs), each encoding a specific visual cue. Distinct depth estimation branches process these PFMs independently to produce depth estimates (PIDEs), which are subsequently combined through an explicit fusion strategy. This formulation allows us to examine directly the contribution of each perceptual cue to the final depth prediction. Experiments conducted on the KITTI benchmark dataset demonstrate that PIMDE achieves performance comparable to established self-supervised MDE methods while providing additional insight into how different perceptual cues influence depth estimation. These results indicate that perceptual decomposition can support interpretability without sacrificing depth estimation accuracy. 
+
+Index Terms —Visual measurements, monocular depth estimation, perceptual features, self-supervised, interpretability 
+
+## 1.  INTRODUCTION 
+
+Reliable depth estimation is vital for many real-world systems, including autonomous driving, robotics, and biomedical applications [1], [2]. To this end, various  depth estimation methods have been proposed, many of them based on binocular/stereo vision and active sensing, e.g., time-of-flight (ToF) measurements and laser imaging detection and ranging (LIDAR). Predicting depth with a single camera, known as  monocular depth estimation (MDE), is a lower-cost alternative to other methods, with recent advances indicating its increasing competitiveness [3] .
+
+Recent  advances in deep learning (DL) have enabled  self-supervised  MDE  approaches that exploit geometric and photometric relationships between consecutive frames, eliminating the need for training sets with ground truth depth information [5] - [7] . Although these methods are becoming more effective, their internal decision processes remain largely opaque, in the sense that they produce depth maps without explaining which image features influence the prediction, e.g. , when depth estimation fails, it remains unclear whether the error arises from missing texture, misleading color cues, or illumination changes. This lack of transparency limits user trust and can become critical in safety-sensitive applications, e.g. , vision tools for robot-assisted treatment. 
+
+Existing attempts to address this issue rely mainly on post-hoc tools, which can highlight influential image regions but do not explain how specific visual cues contribute to depth prediction [9] -[11]. Perceptually, depth is inherently multi-cue; humans rely on a combination of texture gradients, color relationships, shading, and structural boundaries to infer spatial layout from a single view. In contrast, conventional RGB-based networks entangle these cues within a single latent space. Separating perceptual image components before depth estimation would offer a more transparent alternative, enabling individual visual signals to be analyzed independently. 
+
+Motivated by the growing demand for interpretability, especially in high-risk domains, this work introduces a self-supervised framework for perceptually interpretable monocular depth estimation (PIMDE). The proposed approach is inspired by the interpretation mechanism of Additive Convolutional Neural Networks (ACNNs) and extends it to the problem of depth prediction [10], [11]. To the best of our knowledge, PIMDE is the first framework that inherently interprets MDE in accord with human perception. 
+
+The proposed model begins by decomposing the RGB input image into a set of perceptual components, referred to as Perceptual Feature Maps (PFMs). Each PFM is designed to represent ameaningful perceptual quantity for inferring depth. These perceptual components are processed by parallel inverse depth estimation branches; the resulting branch-wise predictions are then fused to produce the final inverse depth map. The final prediction is determined by a known combination of the perceptual branches; hence, it is possible to assess how each PFM contributes to the final estimate. The main contributions of the paper are summarized as follows: 
+
+(1)  We propose a self-supervised perceptually interpretable framework for MDE that decomposes RGB images into perceptual feature maps to separate chromatic, structural, and luminance visual cues inspired by human visual perception. 
+
+(2)  We estimate depth from each perceptual cue using our proposed framework, which helps understand how each visual cue affects the final depth prediction. 
+
+(3)  We use a subtraction-based analysis to show how much each perceptual branch influences the final depth prediction, making the model easier to interpret, and validate the proposed framework on the KITTI benchmark. 
+
+The remainder of the paper is organized as follows: section 2 details the methodology, section 3 presents the experimental setup along with quantitative and qualitative results, and section 4concludes the findings of the paper.                 
+
+> Author version of the paper published in the 2026 IEEE International Conference on Image Processing (ICIP). DOI:
+> https://doi.org/10.1109/ICIP61757.2026.11630094
+> © 2026 IEEE. Personal use of this material is permitted. Permission from IEEE must be obtained for all other uses, in any current or future media, including reprinting/republishing this material for advertising or promotional purposes, creating new collective works, for resale or redistribution to servers or lists, or reuse of any copyrighted component of this work in other works.
+
+## 2.  METHODOLOGY 
+
+## 2.1. Framework Overview 
+
+The proposed PIMDE framework is schematically illustrated in Figure 1.  The model builds upon the Recurrent Multi-Scale Feature Modulation (R-MSFM) mechanism, which enables progressive depth refinement through iterative modulation of multi-scale feature representations  [12] . This mechanism is integrated with the parallel multi-branch design of ACNN, resulting in multiple CNN-based depth estimation subnetworks operating in parallel . Each sub-network operates on a distinct perceptual representation of the input image rather than processing the RGB image directly. This design follows the ACNN principle, in which different perceptual interpretations are handled independently and later combined to produce the final prediction. The input image is decomposed into a set of PFMs, each encoding a specific visual component.  These PFMs are fed into parallel depth estimation branches that share the same CNN architecture. Each branch produces a complete inverse depth map, referred to as a perceptual inverse depth estimate (PIDE) .The branch-wise PIDEs are fused to obtain the final inverse depth prediction. The inverse depth is defined as the reciprocal of metric depth, i.e.,  𝑑 −1 = 1/𝑑 , which is commonly used in self-supervised monocular depth estimation for stable and efficient optimization [6], [12]. For numerical evaluation, the predicted inverse depth is converted back to metric depth .
+
+## 2.2. Perceptual Feature Map Decomposition 
+
+In MDE, depth is inferred from a single image by exploiting visual components that encode scene geometry and spatial layout [13]. Color contrasts, illumination variations, and structural patterns provide complementary information about surface orientation, object boundaries, and relative depth ordering in a scene. Decomposing the input image into PFMs allows these visual cues to be represented explicitly and processed independently, enabling the model to associate different perceptual components with their respective contributions to depth inference. However, these PFMs are not intended to represent complete geometric depth cues: instead, they provide separate perceptual components that can be analyzed to assess their effect on the final depth prediction. 
+
+This work adopts an opponent-based perceptual representation of the input image, focusing on color and texture , motivated by the role of color and texture components in human shape and scene perception  [14] . Opponent color spaces address limitations of the RGB representation, such as strong channel correlation and poor perceptual alignment. Among them, the perceptually uniform CIE-Lab color space has been widely used in computer vision. CIE-Lab 
+
+is employed due to the approximate orthogonality of its components. The a and b channels encode red –green (RG) and blue –yellow (BY) chromatic opponency, respectively, while the L channel represents perceptual lightness and contains rich structural and textural information  [15] . To further capture texture, the luminance component is analyzed using the 2D Discrete Wavelet Transform (2D-DWT), which provides a multi-resolution representation consistent with human visual perception [16] .
+
+The low-frequency approximation of the luminance signal represents light-dark (LD) antagonism, while the highest-frequency band of the first level of the 2D-DWT encodes coarse-fine (CF) texture, which is closely related to edge density and fine structural detail. Consequently, the input to the model is formed as four PFMs, 
+
+corresponding to RG, BY, CF, and LD, as illustrated in Figure 2. 
+
+Figure 1: Outline of the PIMDE framework 
+
+Figure  2: Visual representation of PFMs. (a) blue-yellow, (b) red-green, (c) coarse-fine, and (d) light-dark. 
+
+## 2.3. Monocular Depth Estimation Model 
+
+Given the set of PFMs obtained from the PFM decomposition, MDE is performed using a set of parallel perceptual branches. Each branch is responsible for estimating inverse depth from a single image component, enabling explicit analysis of how individual visual components contribute to depth inference. All perceptual branches employ an identical CNN architecture; this design reflects a core ACNN interpretability framework. So, the variations in the resulting depth estimates are primarily due to differences in perceptual inputs rather than architectural discrepancies. 
+
+Let  𝑃 = {𝑃 1, 𝑃 2, … , 𝑃 𝑁 } denote the set of PFMs, where each 
+
+𝑃 𝑖 ∈ ℝ 𝐻×𝑊  corresponds to a specific perceptual component derived from the input image. For each perceptual input  𝑃 𝑖 , a dedicated subnetwork predicts PIDE through a recurrent refinement process, in which an initial inverse depth prediction is repeatedly updated over multiple iterations  𝑠 ; each iteration corresponds to one refinement step that improves the prediction by incorporating multi-scale information, as introduced in R-MSFM [12].  The branch-wise PIDE at iteration  𝑠  is defined as: 
+
+𝑑̂ 𝑖 (𝑠) = 𝑓 𝜃 (𝑃 𝑖 ) 𝑖 = 1, … , 𝑁  (1) 
+
+where  𝑓 𝜃 (⋅)  denotes a convolutional depth estimation network. All branches use the same architecture, while their inputs are different PFMs. Each  𝑑̂ 𝑖 (𝑠)  constitutes a PIDE, representing a valid inverse depth map derived solely from the corresponding image component. Importantly, these PIDEs are depth approximations rather than intermediate feature maps, which is essential for enabling branch-level interpretability. 
+
+At each iteration s, the final inverse depth is obtained through an explicit aggregation of the branch-wise PIDEs computed as: 
+
+𝑑̂ (𝑠) = ∑ 𝜔̃ 𝑖 𝑑̂ 𝑖 (𝑠) 𝑁 𝑖=1 
+
+(2) 
+
+where  𝜔̃ 𝑖  denotes a non-negative normalized fusion weight ,associated with the  𝑖 -th perceptual branch, satisfying ∑ 𝜔̃ 𝑖 𝑖 = 1 .
+
+The fusion weights  𝜔̃ 𝑖  are estimated from branch-influence statistics obtained through a subtraction-based analysis.  This procedure quantifies how strongly each perceptual branch influences the final prediction, enabling fusion weights to reflect empirical contribution rather than arbitrary design choices. 
+
+Specifically, in the first stage, an initial model configuration with uniform weights  ω = ΙN is used to generate the fused inverse depth prediction.  Then, the influence of each perceptual branch is quantified by measuring the change in the final fused depth map when that branch is removed from the model. From this analysis, the relative difference metric is computed for each branch,  providing a scalar measure of the contribution of each branch to the final prediction .
+
+Let  𝝎 = 𝜔 1, 𝜔 2, … , 𝜔 𝑁  denote the vector of relative difference values across branches. The final fusion weights are obtained via softmax normalization, ensuring non-negativity and unit-sum constraints as: 
+
+𝝎̃ = 𝑠𝑜𝑓𝑡𝑚𝑎𝑥(𝝎)  (3) 
+
+These weights are computed once from the subtraction-based analysis and are kept fixed during the final training . Thus, the overall fusion weights process follows a two-stage strategy: the model is first trained with uniform weights, and this trained model is then used to estimate the influence of each perceptual branch through subtraction-based analysis. The estimated branch influences are then normalized using Eq. (3) to obtain final fixed fusion weights. 
+
+The model is trained in a fully self-supervised manner using monocular image sequences. During training, a pose estimation network predicts the relative camera transformation  𝑇 𝑡→𝑠  between a target frame  𝐼 𝑡  and adjacent source frames  𝐼 𝑡 ′ , where  𝑡 ′ ∈(𝑡 − 1, 𝑡 + 1) , defined as: 
+
+𝑇 𝑡→𝑡 ′ = 𝑃𝑜𝑠𝑒𝑁𝑒𝑡(𝐼 𝑡 , 𝐼 𝑡 ′ ) (4) 
+
+Given the predicted inverse depth at refinement iteration s, a synthesized target view is generated via differentiable view synthesis as given by: 
+
+𝐼 𝑡 ′→𝑡 𝑠 = 𝐼 𝑡 ′ (𝑝𝑟𝑜𝑗(𝑇 𝑡→𝑡 ′ , 𝐷 𝑡 𝑠 , 𝐾))  (5) 
+
+where K denotes the camera intrinsic matrix, which is identical for all images,  𝑝𝑟𝑜𝑗(∙)  denotes the projection operator  that maps the 3D points obtained from the inverse depth map  𝐷 𝑡 𝑠  at iteration  𝑠 , after transformation by  𝑇 𝑡→𝑡 ′ , onto 2D pixel coordinates in the source image  𝐼 𝑡 ′ , using the pinhole camera model [12]. 
+
+To keep our training process robust against occlusion, the masked photometric reprojection loss is used, following the self-supervised view-synthesis formulation and auto-masking strategy commonly used in MDE [3], formulated as follows: 
+
+𝐿 𝑝 = ∑ 𝛽 𝑁−𝑠 𝑁 𝑠=1 
+
+⋅ min  
+
+> 𝑡 ′
+
+𝜇(𝐼 𝑡 , 𝐼 𝑡 ′ , 𝐼 𝑡 ′→𝑡 𝑠 ) ⊙ 𝑝𝑒(𝐼 𝑡 , 𝐼 𝑡 ′→𝑡 𝑠 ) (6) 
+
+where  𝛽  emphasizes later refinements and  ⊙ denotes element-wise multiplication. The auto-mask  𝜇(∙)  removes pixels violating the motion as defined in (7).  𝑝𝑒(∙)  denotes the minimum per-pixel photometric reprojection loss using SmoothL1 and the structural similarity index measure (SSIM), defined as follows: 
+
+μ = [min  
+
+> 𝑡 ′
+
+𝑝𝑒 (𝐼 𝑡 , 𝐼 𝑡 ′→𝑡 𝑠 ) < min  
+
+> 𝑡 ′
+
+𝑝𝑒 (𝐼 𝑡 , 𝐼 𝑡 ′ )]  (7) 
+
+𝑝𝑒(𝐼 𝑡 , 𝐼 𝑡 ′→𝑡 𝑠 ) = 𝛼 
+
+2 (1 − SSIM (𝐼 𝑡 , 𝐼 𝑡 ′→𝑡 𝑠 )) + (1 − 𝛼)𝑆𝑚𝑜𝑜𝑡ℎ𝐿1(𝐼 𝑡 , 𝐼 𝑡 ′→𝑡 𝑠 )
+
+(8) 
+
+where  𝛼  is a weighting coefficient. Additionally, an edge-aware smoothness regularizer is applied to the mean-normalized inverse depth, defined as: 
+
+L𝑠 = ∑ 𝛽 𝑁−𝑠 𝑁 𝑠=1 
+
+|𝜕 𝑥 𝑑 𝑡 𝑠∗ |𝑒 −𝜕 𝑥 𝐼 𝑡 + |𝜕 𝑦 𝑑 𝑡 𝑠∗ |𝑒 −𝜕 𝑦 𝐼 𝑡  (9) 
+
+where  𝑑 𝑡 𝑠∗ = 𝑑 𝑡 𝑠 
+
+𝑑̅ 𝑡 𝑠 ⁄ at iteration  𝑠 , which prevents the inverse depth from approaching zero. So, the final self-supervised loss is formulated as follows: 
+
+𝐿 𝑓𝑖𝑛𝑎𝑙 = 𝐿 𝑝 + 𝜆𝐿 𝑠  (10) 
+
+where  𝜆  controls the smoothness regularizer , which helps smooth depth variations in homogeneous regions while preserving depth changes at image boundaries  [3] .
+
+In the PIMDE framework, the self-supervised loss in (10) is applied primarily to the final fused inverse depth prediction, which represents the final model output. To ensure that each perceptual branch acquires coherent depth, the same loss formulation is additionally applied as auxiliary supervision to each branch's output. So, the overall training objective, which combines the fused loss and the auxiliary branch losses, is formulated as follows: 
+
+𝐿 = 𝐿 𝑓𝑖𝑛𝑎𝑙 + 𝜆 𝑏 ∑ 𝐿 𝑏𝑟𝑎𝑛𝑐ℎ 𝑖 𝑁 𝑖=1 
+
+(11) 
+
+where  𝐿 𝑓𝑖𝑛𝑎𝑙  is the self-supervised loss applied to the fused prediction, and  𝐿 𝑏𝑟𝑎𝑛𝑐ℎ  
+
+> 𝑖
+
+is the same loss as the final loss, applied to the  𝑖 𝑡ℎ  branch prediction.  𝜆 𝑏  controls the contribution of branch-level supervision. 
+
+## 2.4.  Interpretability 
+
+The PIMDE framework is designed to be interpretable, as depth estimation is performed through multiple perceptual branches with a known and fixed fusion mechanism. Each branch processes a single perceptual feature map and produces a corresponding inverse depth estimate that explicitly contributes to the final fused prediction. Let  𝐷 𝑓𝑢𝑙𝑙 ∈ 𝑅 𝐻×𝑊  denote the fused inverse depth prediction obtained using all perceptual branches. To assess the contribution of a specific branch  𝑏 , a second fused prediction  𝐷 −𝑏 ∈𝑅 𝐻×𝑊  is obtained by removing the branch  𝑏  while keeping all remaining branches unchanged. The contribution of the branch  𝑏  is then defined through a subtraction-based formulation as 
+
+∆𝐷 = 𝐷 𝑓𝑢𝑙𝑙 − 𝐷 −𝑏  (12) 
+
+This formulation provides a branch-specific contribution map that quantifies how the presence of the branch  𝑏  affects the final inverse depth prediction. Since the fusion operation is fixed and identical in both cases, the differences between  𝐷 full  and  𝐷 −𝑏  can be attributed directly to the contribution of the removed perceptual branch. This subtraction-based analysis forms the methodological basis for the interpretability results presented in the subsequent section. 
+
+## 3.  EXPERIMENTS AND RESULTS 
+
+## 3.1. Experimental Setup and Dataset 
+
+All experiments were conducted on the KITTI dataset [17], using the standard Eigen split [18]. Following widespread practice in self-supervised monocular depth estimation, static image sequences are removed from the training set to ensure valid photometric supervision [19]. After filtering, the training data consists of 39,810, while the validation set contains 4,424 sequences. The resolution of the input/output is resized to  640 × 192  by default. Table 1: Quantitative comparison on the KITTI benchmark dataset. The best and second results for each metric are shown in bold and underlined, respectively. 
+
+Models  Train  Depth Errors  Depth Accuracies 
+
+AbsRel ↓  SqRel ↓  RMSE ↓  RMSE-log ↓  𝛿 < 1.25  ↑ 𝛿 < 1.25 2 ↑ 𝛿 < 1.25 3 ↑
+
+DF-Net  [20]  M 0.150  1.124  5.507  0.223  0.806  0.933  0.973 
+
+Ranjan  [21]  M 0.148  1.149  5.464  0.226  0.815  0.935  0.973 
+
+Monodepth  [22]  M 0.148  1.344  5.972  0.216  0.816  0.941  0.976 
+
+Monodepth2  [3]  M 0.115  0.903  4.863  0.193  0.877  0.959  0.981 
+
+EPC++  [23]  M 0.141  1.029  5.350  0.216  0.816  0.941  0.976 
+
+Struct2depth  [24]  M 0.141  1.026  5.291  0.215  0.816  0.945  0.979 
+
+SGDepth  [25]  M 0.117  0.907  4.844  0.196  0.875  0.958  0.980 
+
+PIMDE-3 (Our)  M 0.123  0.831  2.418  0.126  0.853  0.952  0.980 
+
+PIMDE-6 (Our)  M 0.121  0.841  2.408  0.124  0.857  0.956  0.981 
+
+↓ indicates lower is better, and ↑ indicates higher is better. PI MDE-3/6 denotes the proposed model with 3/6 refinement iterations, respectively. M means the model is trained with self-supervised mono supervision with input resolution 640×192. 
+
+Additionally, the smoothness regularization term  𝜆 , the update term  𝛽 , the weighting coefficient  𝛼 , and the branch contribution  𝜆 𝑏 
+
+are set to 0.001, 0.9, 0.85, and 0.1, respectively  [12] . The model is trained in a fully self-supervised manner using monocular video sequences, without access to ground-truth depth. Adjacent frames are used together with the estimated camera pose to enforce photometric consistency through differentiable view synthesis. During inference, depth is predicted from a single input image, and per-image median scaling is applied during evaluation. 
+
+Performance is evaluated using standard depth estimation metrics proposed in [26], including Absolute Relative Error (Abs Rel) , Squared Relative Error (Sq Rel) , Root Mean Squared Error (RMSE) , RMSE in log space (RMSE- log) , and the threshold accuracies, whereas accuracies are formulated as: 
+
+𝐴𝑐𝑐𝑢𝑟𝑎𝑐𝑖𝑒𝑠 = 𝑚𝑎𝑥 ( 𝑑 𝑝𝑟𝑒𝑑 
+
+𝑑 𝑔𝑡 
+
+, 𝑑 𝑔𝑡 
+
+𝑑 𝑝𝑟𝑒𝑑 
+
+) =  𝛿 < 𝑡ℎ𝑟𝑒𝑠ℎ𝑜𝑙𝑑  (13) 
+
+where M is the total number of pixels,  𝑑 𝑝𝑟𝑒𝑑  and  𝑑 𝑔𝑡  denotes the predicted and ground truth depth values at pixel p, respectively. Additionally, the threshold controls the percentage of correct pixels in the estimated depth, which is taken as  1.25, 1.25 2, 1.25 3.
+
+## 3.2.  Quantitative Results 
+
+The quantitative performance of the PIMDE framework is evaluated on the KITTI Eigen split and compared with the baseline self-supervised MDE methods, including DF-Net [20] , Ranjan [21] ,
+
+Monodepth [22], Monodepth2 [3], EPC++ [23], Struct2depth [24], and SGDepth [25]. Two variants of the proposed approach are considered, corresponding to 3/6 refinement iterations .
+
+As shown in Table 1, both variants achieve competitive performance across all metrics, with the six-iteration model consistently outperforming the three-iteration version. This indicates that additional refinement stages improve depth accuracy while maintaining stable threshold performance. In terms of computational complexity, PIMDE-3 has 14.08M/131.66B, and PIMDE-6 has 15.26M/248.94B parameters/FLOPs, respectively, at the input resolution of  640 × 192 .
+
+To analyze the role of perceptual cues, single-branch models are trained using one PFM at a time. The full PIMDE configuration, reported in the last row of Table 2, achieves the best overall performance. While the CF branch performs strongly on its own, the complete model consistently outperforms all single-branch settings, highlighting the benefit of combining complementary perceptual information. 
+
+Table 2: Quantitative evaluation of single-branch PIMDE-6 models trained in individual PFMs. The best and second results for each metric are shown in bold and underlined, respectively. 
+
+PFMs  Performance Metrics 
+
+RG  BY  CF  LD  AbsRel ↓  RMSE ↓  𝛿 < 1.25  ↑
+
+✓ × × × 0.134  2.594  0.842 
+
+× ✓ × × 0.128  2.512  0.847 
+
+× × ✓ × 0.126  2.482  0.854 
+
+× × × ✓ 0.139  2.754  0.828 
+
+✓ ✓ ✓ ✓ 0.121  2.408  0.857 
+
+## 3.3.  Qualitative Results 
+
+Qualitative results provide additional insight into the behavior of PIMDE and complement the quantitative analysis by illustrating how different perceptual cues influence depth estimation.  Figure 3 compares qualitative results obtained with three and six refinement iterations. The six-iteration model produces smooth and spatially consistent depth maps, particularly in planar regions, indicating that successive refinement stages progressively correct coarse predictions .
+
+Moreover, Figure 4 visualizes branch-wise PIDEs  alongside the fused prediction for the road scene. The CF PIDE produces clearer depth changes along the wall and building in the image. The RG and BY PIDE mainly affect the road surface, where depth changes appear smoother. The LD branch gives the smoothest depth map, especially over the road and distant background, but with fewer visible details. The fused result combines these effects, keeping clear depth changes at scene structures while maintaining smooth depth variation across the image .
+
+3.4.  Interpretability Analysis 
+
+To better understand how different perceptual cues influence the final depth prediction, branch contributions are analyzed using the subtraction-based analysis discussed in the methodology section. Figure 4 illustrates the final depth map, PIDE from each branch, and subtraction-based maps.  Each  ∆𝐷  map visualizes the change in the fused depth prediction when a specific branch is removed. These maps do not represent depth; instead, they highlight where and how strongly each branch contributes to the final prediction,  where lighter colors (e.g., white) indicate smaller differences and darker colors (e.g., red) indicate larger differences Figure 3: Qualitative comparison of PIMDE predictions showing the effect of refinement iterations 
+
+Figure 4: Visualization of the final fused inverse depth prediction, branch-wise perceptual inverse depth estimates (PIDEs), and  ∆𝐷 . (a) Input RGB image, (b) final fused inverse depth map, (c) - (f) PIDEs produced by the BY, RG, CF, and LD branches, respectively, and (g) - (j)  ∆𝐷  obtained by removing the BY, RG, CF, and LD branches from the fusion, respectively, where lighter and darker colors indicate smaller and larger differences in the fused prediction, respectively. 
+
+The  ∆𝐷  maps show that removing the CF branch produces the largest changes (appearing as darker red regions in the respective 
+
+∆𝐷 ), particularly around object boundaries, while removing the LD branch mainly affects broader, smoother regions. The chromatic branches (RG and BY) introduce more localized changes. These observations are consistent with the quantitative branch influence statistics reported in Table 3, where the CF branch exhibits the highest relative difference values, confirming its stronger contribution to the final prediction. This analysis can also be validated from Table 2, where the CF branch has better performance than all other individual branches. Therefore, the proposed framework provides a practical diagnostic view of the model by showing whether the final depth prediction is mainly influenced by structural, luminance, or chromatic information, rather than only visualizing the final depth map. 
+
+Table 3: Quantitative branch contribution analysis using subtraction-based evaluation. 
+
+Branch  MAD  RMSD  RelDiff 
+
+RG  1.401 ± 0.344  1.862 ± 0.557  0.225 ± 0.018 
+
+BY  2.295 ± 0.676  3.081 ± 1.101  0.352 ± 0.036 
+
+CF  2.242 ± 0.452  2.896 ± 0.638  0.379 ± 0.047 
+
+LD  1.683 ± 0.457  2.389 ± 0.244  0.244 ± 0.026 
+
+Branch column indicates when a certain branch is removed during  ∆𝐷 . MAD: mean absolute difference, RMSD: root mean square difference, RelDiff: relative difference 
+
+## 4.  CONCLUSION 
+
+This work presented PIMDE, a self-supervised MDE framework that introduces PFM decomposition to improve interpretability. By separating chromatic, luminance, and structural cues and processing them through parallel depth estimation branches with a fixed fusion mechanism, the proposed approach  allows depth predictions to be examined at the individual perceptual components rather than as black-box outputs. Experimental results on the KITTI dataset show that the PIMDE framework achieves competitive performance compared to various baselines, while providing a clearer interpretation of how different visual components influence the final prediction. Future work will explore additional and automatic selection of PFMs, branch-combination analysis, stronger and domain-specific MDE backbones, and extend the evaluation to additional datasets and domains to further assess the generalization and interpretability of the proposed framework. 
+
+## 5.  ACKNOWLEDGEMENTS 
+
+This project has received funding from the European Union ’s 
+
+HORIZON TMA MSCA Doctoral Networks (HORIZON-MSCA-2023-DN-01) under Grant Agreement n°101169012 (Intelli-Ingest Project  https://www.intelli-ingest.com/ ). 
+
+6.  REFERENCES 
+
+[1] K. Chitta, A. Prakash, B. Jaeger, Z. Yu, K. Renz, and A. 
+
+Geiger, “TransFuser: Imitation With Transformer -Based 
+
+Sensor Fusion for Autonomous Driving,” IEEE Trans. Pattern Anal. Mach. Intell. , vol. 45, no. 11, pp. 12878 –
+
+12895, Nov. 2023, doi: 10.1109/TPAMI.2022.3200245. 
+
+[2] W. Yuan, X. Gu, Z. Dai, S. Zhu, P. Tan, and A. Group, 
+
+“Neural Window Fully -Connected CRFs for Monocular 
+
+Depth Estimation,” in Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , Jun. 2022, pp. 3916 –3925. doi: 10.1109/CVPR52688.2022.00389. 
+
+[3] C. Godard, O. Mac Aodha, M. Firman, and G. J. Brostow, 
+
+“Digging Into Self -Supervised Monocular Depth 
+
+Estimation,” in Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV) , Oct. 2019, pp. 3828 –3838. doi: 10.1109/ICCV.2019.00393. 
+
+[4] Y. Wang, Y. Liang, H. Xu, S. Jiao, and H. Yu, “SQLdepth: 
+
+Generalizable Self-Supervised Fine-Structured Monocular 
+
+Depth Estimation,” Proceedings of the AAAI Conference on Artificial Intelligence , vol. 38, no. 6, pp. 5713 –5721, Mar. 2024, doi: 10.1609/aaai.v38i6.28383. 
+
+[5] M. Poggi, F. Tosi, K. Batsos, P. Mordohai, and S. 
+
+Mattoccia, “On the Synergies between Machine Learning and Binocular Stereo for Depth Estimation from Images: A 
+
+Survey,” IEEE Trans. Pattern Anal. Mach. Intell. , vol. 44, no. 9, pp. 5314 –5334, Sep. 2022, doi: 10.1109/TPAMI.2021.3070917. 
+
+[6] N. Zhang, F. Nex, G. Vosselman, and N. Kerle, “Lite -Mono: A Lightweight CNN and Transformer Architecture for Self-Supervised Monocular Depth Estimation,” in 
+
+Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , Jun. 2023, pp. 18537 –18546. doi: 10.1109/CVPR52729.2023.01778. 
+
+[7] M. Xiang, J. Zhang, N. Barnes, and Y. Dai, “Measuring and 
+
+Modeling Uncertainty Degree for Monocular Depth 
+
+Estimation,” IEEE Transactions on Circuits and Systems for Video Technology , vol. 34, no. 7, pp. 5716 –5727, Feb. 2024, doi: 10.1109/TCSVT.2024.3362357. 
+
+[8] R. Marsal, F. Chabot, A. Loesch, W. Grolleau, and H. 
+
+Sahbi, “MonoProb: Self -Supervised Monocular Depth 
+
+Estimation with Interpretable Uncertainty,” in IEEE/CVF Winter Conference on Applications of Computer Vision (WACV) , IEEE, Jan. 2024. doi: https://doi.org/10.1109/WACV57701.2024.00360. 
+
+[9] M. Poggi, F. Aleotti, F. Tosi, and S. Mattoccia, “On the 
+
+uncertainty of self-supervised monocular depth 
+
+estimation,” in IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , IEEE, Aug. 2020. doi: 10.1109/CVPR42600.2020.00329. 
+
+[10] G. Dimas, E. Cholopoulou, and D. K. Iakovidis, “E 
+
+pluribus unum interpretable convolutional neural 
+
+networks,” Sci. Rep. , vol. 13, no. 1, Jul. 2023, doi: 10.1038/s41598-023-38459-1. 
+
+[11] G. Dimas, P. G. Kalozoumis, P. Vartholomeos, and D. K. 
+
+Iakovidis, “ArachNet: Interpretable Sub -Arachnoid Space Segmentation Using an Additive Convolutional Neural 
+
+Network,” in Proceedings - International Symposium on Biomedical Imaging , IEEE Computer Society, May 2024. doi: 10.1109/ISBI56570.2024.10635787. 
+
+[12] Z. Zhou, X. Fan, P. Shi, and Y. Xin, “R -MSFM: Recurrent Multi-Scale Feature Modulation for Monocular Depth 
+
+Estimating,” in Proceedings of the IEEE International Conference on Computer Vision , Oct. 2021, pp. 12757 –
+
+12766. doi: 10.1109/ICCV48922.2021.01254. 
+
+[13] A. Criminisi, I. Reid, and A. Zisserman, “Single view metrology,” Int. J. Comput. Vis. , vol. 40, no. 2, pp. 123 –
+
+148, Nov. 2000, doi: 10.1023/A:1026598000963. 
+
+[14] H. Greisdorf and B. O’Connor, “Modelling what users see when they look at images: a cognitive viewpoint,” Journal of Documentation , vol. 58, no. 1, pp. 6 –29, Feb. 2002, doi: 10.1108/00220410210425386. 
+
+[15] T. Mäenpää and M. Pietikäinen, “Classification with color and texture: jointly or separately?,” Pattern Recognit. , vol. 37, no. 8, pp. 1629 –1640, Aug. 2004, doi: 10.1016/j.patcog.2003.11.011. 
+
+[16] S. G. Mallat, “A Theory for Multiresolution Signal Decomposition: The Wavelet Representation,” IEEE Trans. Pattern Anal. Mach. Intell. , vol. 11, no. 7, pp. 674 –
+
+693, Jul. 1989, doi: 10.1109/34.192463. 
+
+[17] A. Geiger, P. Lenz, C. Stiller, and R. Urtasun, “Vision meets robotics: The KITTI dataset,” International Journal of Robotics Research , vol. 32, no. 11, pp. 1231 –1237, Sep. 2013, doi: 10.1177/0278364913491297. 
+
+[18] D. Eigen and R. Fergus, “Predicting Depth, Surface 
+
+Normals and Semantic Labels With a Common Multi-Scale 
+
+Convolutional Architecture,” in IEEE International Conference on Computer Vision (ICCV) , Dec. 2015, pp. 2650 –2658. doi: 10.1109/ICCV.2015.304. 
+
+[19] C. Zhou, H. Zhang, X. Shen, and J. Jia, “Unsupervised Learning of Stereo Matching,” in IEEE International Conference on Computer Vision (ICCV) , Oct. 2017, pp. 1567 –1575. doi: 10.1109/ICCV.2017.174. 
+
+[20] Y. Zou, Z. Luo, and J.-B. Huang, “DF -Net: Unsupervised Joint Learning of Depth and Flow using Cross-Task 
+
+Consistency,” in Proceedings of the European Conference on Computer Vision (ECCV) , Springer, Oct. 2018, pp. 36 –
+
+53. doi: doi.org/10.1007/978-3-030-01228-1_3. 
+
+[21] A. Ranjan et al. , “Competitive Collaboration: Joint 
+
+Unsupervised Learning of Depth, Camera Motion, Optical 
+
+Flow and Motion Segmentation,” in IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , Jun. 2019, pp. 12240 –12249. doi: 10.1109/CVPR.2019.01252. 
+
+[22] C. Godard, O. Mac, A. Gabriel, and J. Brostow, 
+
+“Unsupervised Monocular Depth Estimation With Left -
+
+Right Consistency,” in Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition (CVPR) , Jul. 2017, pp. 270 –279. doi: 10.1109/CVPR.2017.699. 
+
+[23] C. Luo et al. , “Every Pixel Counts ++: Joint Learning of Geometry and Motion with 3D Holistic Understanding,” 
+
+IEEE Trans. Pattern Anal. Mach. Intell. , vol. 42, no. 10, pp. 2624 –2641, Jul. 2019, doi: 10.1109/TPAMI.2019.2930258. 
+
+[24] V. Casser, S. Pirk, R. Mahjourian, and A. Angelova, 
+
+“Depth Prediction without the Sensors: Leveraging 
+
+Structure for Unsupervised Learning from Monocular 
+
+Videos,” in Proceedings of the AAAI Conference on Artificial Intelligence , Jul. 2019, pp. 8001 –8008. doi: 10.1609/aaai.v33i01.33018001. 
+
+[25] M. Klingner, J. A. Termöhlen, J. Mikolajczyk, and T. 
+
+Fingscheidt, “Self -supervised Monocular Depth Estimation: Solving the Dynamic Object Problem by 
+
+Semantic Guidance,” in Computer Vision – ECCV 2020 ,Springer, Nov. 2020, pp. 582 –600. doi: 10.1007/978-3-030-58565-5_35. 
+
+[26] D. Eigen, C. Puhrsch, and R. Fergus, “Depth Map 
+
+Prediction from a Single Image using a Multi-Scale Deep 
+
+Network,” in Proceedings of the 28th International Conference on Neural Information Processing Systems ,Dec. 2014, pp. 2366 –2374. doi: 10.5555/2969033.2969091.

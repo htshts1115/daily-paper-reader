@@ -1,0 +1,2241 @@
+DEPTHEVIDENCE: UNIFYING METRIC DEPTH PREDIC-
+TION AND GEOMETRIC REASONING IN MULTIMODAL
+LANGUAGE MODELS
+Jiangning Wei1,2
+Yuan Yao1
+Miaomiao Cui1
+Mingsheng Li1
+Humen Zhong1
+Shuai Bai1
+Zhibo Yang1
+1Alibaba Token Hub, Alibaba Group
+2Beijing University of Posts and Telecommunications
+ABSTRACT
+Spatial reasoning with metric constraints requires linking objects to geometric
+measurements and preserving their numerical content during language reasoning.
+We present DepthEvidence, a 4B model that uses its own dense metric predictions
+as object-grounded evidence for language generation. A camera-conditioned de-
+coder predicts full-resolution metric depth using multi-scale visual features and
+high-resolution RGB refinement. A dense-to-language interface converts predicted
+depths and decoder features into object-aligned continuous geometry tokens an-
+chored to object identifiers. Geometric supervision encourages metric information
+to remain recoverable before and after language-context interaction, while in-
+struction tuning supports object measurement and compositional reasoning. We
+introduce a Depth-VQA benchmark evaluating object-depth queries, relative com-
+parisons, and decisions combining spatial and numerical constraints. Across nine
+datasets, DepthEvidence achieves the highest average dense δ1 among evaluated
+methods, competitive with specialized estimators. It also leads the evaluated meth-
+ods in instance-level metric depth estimation and overall accuracy on both relative
+and metric reasoning tracks, while broadly preserving general VQA performance
+and improving spatial understanding relative to the base model.
+1
+INTRODUCTION
+Answering spatial questions with metric constraints requires connecting object semantics to geometric
+measurements. Knowing which object is closer establishes a relative relation, but selecting objects
+within a depth interval requires absolute scale and the correct association between each object and
+its measured depth. Consider the question in Figure 1(a): which referenced objects to the right of
+a wooden cabinet have an average camera depth between 1.30 m and 1.33 m? The answer must
+satisfy both the spatial filter and the numerical interval. Dense metric estimators provide pixel-level
+measurements (Yin et al., 2023; Piccinelli et al., 2024), while spatially aware multimodal large
+language models (MLLMs) connect objects with language (Chen et al., 2024a; Cheng et al., 2024).
+This question requires bringing those capabilities together at the level of individual objects.
+Recent depth-aware VLMs have substantially advanced geometric prediction. DepthLM (Cai et al.,
+2026) demonstrates accurate pixel-level metric estimation through language modeling, using visual
+prompting and intrinsic-conditioned augmentation without a dedicated depth head. DepthVLM (Yu
+et al., 2026) extends this capability to full-resolution dense prediction through a lightweight head
+and joint depth–text training, while retaining general multimodal capability and improving spatial
+reasoning. G2VLM also couples geometric reconstruction with spatial reasoning (Hu et al., 2026).
+Building on these advances, we ask: how can a VLM use its own dense metric predictions as object-
+grounded evidence for language reasoning? We focus on explicitly linking the predicted metric field
+to the referenced objects and preserving its numerical content as the language model processes the
+question.
+Using predicted geometry as language evidence requires both object alignment and metric information
+preservation. Measurements must come from the appropriate image regions and remain associated
+1
+arXiv:2609.31103v1  [cs.CV]  25 Sep 2026
+
+
+(a) Metric-spatial reasoning
+Select objects by location and metric depth
+Which objects right of the cabinet have
+mean camera depth in [1.30, 1.33] m?
+8 Rug
+4 Cabinet
+6 Picture
+7 Stairs
+1 Chaise
+3 White pillow
+2 Grey pillow
+5 Picture
+GT mean depth: chaise 1.30 m; picture 1.31 m.
+DepthEvidence · correct
+White chaise (1) + framed picture (5)
+Without interface · incorrect
+Also selects pillows outside the range:
+grey (1.35 m) and white (1.48 m).
+(b) Dense Metric Depth
+δ₁ (%) ↑  ·  4 datasets + 9-dataset average
+9-set Avg.
+SUN RGB-D
+Taskonomy
+Waymo
+Argoverse2
+0.0
+25.0
+50.0
+75.0
+100.0
+77.0
+57.1
+87.9
+87.6
+59.2
+77.3
+61.4
+91.9
+84.8
+80.5
+79.5
+39.7
+86.3
+85.0
+86.2
+79.7
+84.2
+90.7
+82.7
+79.5
+DepthEvidence
+UniDepth V2
+Depth Anything V3
+MetricAnything
+9-set Avg. is over all nine evaluated datasets.
+(c) Depth VQA
+Level-1: δ₁ (%) ↑  ·  Level-2: accuracy (%) ↑
+Level-2 Metric
+Overall Acc
+Level-2 Metric
+Set Decision
+Level-2 Metric
+Spatial Group
+Level-2 Relative
+Overall Acc
+Level-2 Relative
+Ordering
+Level-1 δ₁
+0.0
+25.0
+50.0
+75.0
+100.0
+46.2
+52.1
+34.0
+29.2
+18.4
+65.9
+45.7
+46.8
+35.1
+48.4
+38.3
+7.7
+76.9
+76.6
+74.5
+58.4
+54.1
+86.5
+85.0
+85.1
+81.9
+62.7
+58.7
+86.7
+DepthEvidence
+DepthEvidence w/o interface
+Qwen3.7-plus
+DepthVLM-4B
+Overall Acc: Relative n = 370; Metric n = 234.
+(d) General VQA
+Benchmark score (%) ↑
+Ego3D
+OCRBench
+MMBench
+MMMU
+0.0
+25.0
+50.0
+75.0
+100.0
+56.9
+84.2
+85.8
+68.0
+45.6
+81.3
+83.9
+61.1
+62.8
+85.0
+89.4
+77.6
+68.0
+84.6
+89.5
+78.7
+DepthEvidence
+Qwen3.5-4B
+Youtu-VL-4B
+GLM-4.1V-9B
+Figure 1: Overview of DepthEvidence’s capabilities. (a) A metric-spatial question requires selecting
+objects by image location and mean camera depth; the dense-to-language interface rejects out-
+of-range distractors. (b) Dense metric depth results (δ1) on four representative datasets and the
+nine-dataset average, compared with specialized estimators. (c) Level 1 metric estimation and Level 2
+relative and metric reasoning, compared with general-purpose and depth-aware VLMs as well as the
+no-interface variant. (d) General VQA retention on MMMU, MMBench, and OCRBench, and spatial
+understanding on Ego3D. All scores are percentages and higher is better.
+with the correct references as the model processes multiple objects. Their numerical content must also
+survive projection into language tokens and interaction with the question. Answer supervision targets
+the final response without directly constraining the metric content of intermediate geometry tokens.
+This motivates explicit geometric supervision to keep object-level depth information recoverable
+before and after interaction with the language context.
+We present DepthEvidence, a 4B model that turns its own dense predictions into object-aligned evi-
+dence for language generation. Given an image and camera intrinsics, a camera-conditioned decoder
+combines multi-scale visual features with high-resolution RGB refinement to produce metric depth
+and preserve local structure. The dense-to-language interface pools predicted depths and decoder
+features within each referenced region, then encodes them as object-aligned continuous geometry
+tokens anchored to object identifiers. Auxiliary depth objectives supervise metric information in
+these tokens before and after language-context interaction, while a ranking objective supervises
+object ordering. The tokens enter answer generation through cached continuation, avoiding repeated
+encoding of the image and question. In the cabinet example, this interface supplies the candidate
+objects’ geometry for spatial filtering and metric-range selection.
+To evaluate how geometric prediction translates into language answers, we organize depth understand-
+ing into dense metric depth prediction (Level 0), instance-level metric depth estimation (Level 1), and
+compositional depth reasoning (Level 2). Instance-level instruction tuning and the interface support
+both measurement and reasoning. Our Depth-VQA benchmark evaluates whether models can turn
+object-level depth measurements into compositional answers, covering relative comparisons and deci-
+sions that jointly depend on spatial relations and metric gaps, ranges, or thresholds. DepthEvidence
+achieves the highest average dense δ1 across nine datasets among the evaluated methods and the
+highest overall accuracy on both reasoning tracks, while general VQA performance remains broadly
+stable relative to the base model (Figure 1).
+Our contributions are:
+• An object-aligned dense-to-language interface with geometric supervision before and after
+contextualization, enabling language generation to condition on the model’s own metric
+predictions.
+• DepthEvidence, a unified 4B model combining camera-conditioned dense prediction with
+instance-level depth instruction tuning, together with a Depth-VQA benchmark that distin-
+guishes object measurement, relative reasoning, and metric-constrained reasoning.
+• DepthEvidence leads the evaluated methods in nine-dataset average dense δ1, instance-
+level metric estimation, and overall compositional reasoning, while retaining general VQA
+performance and improving spatial understanding over the base model.
+2
+
+
+Qwen3.5 Language Model
+Vision Encoder
+Depth Decoder
+Dense-to-Language 
+Interface
+Text token
+Visual token
+Response
+Reference objects:
+- obj_1: black SUV [bbox_2d]
+- obj_2: gray car [bbox_2d]
+......
+- obj_10: pole [bbox_2d]
+Among the objects to the right of gray 
+car obj_4, which have an average 
+camera depth between 6.3m and 7.5m
+Text Tokenizer
+<answer> obj_1: black SUV </answer> 
+Geometry token
+Training Stage 1
+Training Stage 2
++
+ℒ!"#
+ℒ$"%&"
+ℒ'%&
+"
+Figure 2: Overview of DepthEvidence. The dense decoder supplies metric predictions and features
+to the dense-to-language interface, which converts them into object-aligned geometry tokens for
+answer generation. This path connects Level-0 dense prediction to Level-1 instance measurement
+and Level-2 compositional reasoning within a shared VLM.
+2
+RELATED WORK
+Monocular Metric Depth Estimation.
+Monocular depth estimation has progressed from multi-
+scale convolutional models with scale-invariant supervision (Eigen et al., 2014) to transformer
+decoders using multi-level visual tokens (Ranftl et al., 2021). Depth Anything and Depth Anything
+V2 scale transferable representations with unlabeled or pseudo-labeled data (Yang et al., 2024a;b),
+whereas Metric3D and UniDepth address camera variation through canonicalization or camera-
+conditioned features (Yin et al., 2023; Piccinelli et al., 2024). These methods primarily treat geometry
+as a dense output; DepthEvidence additionally uses metric predictions as object-grounded evidence
+for measurement and reasoning.
+Geometry-Aware Vision–Language Models.
+Prior work uses geometry either to support spatial
+reasoning or as an explicit model output. SpatialVLM constructs metric spatial question–answer
+data through automatic 3D annotation (Chen et al., 2024a), and SpatialRGPT combines 3D scene-
+graph regions with a depth-aware visual plugin (Cheng et al., 2024); G2VLM, Vid-LLM, and
+SpatialStack more directly couple reconstruction, 3D tokens, or geometry-encoder features with
+language reasoning (Hu et al., 2026; Chen et al., 2026; Zhang et al., 2026). AURORA and Perceptio
+emit discrete depth-related tokens before text (Bigverdi et al., 2025; Li et al., 2026), DepthLM predicts
+metric depth at prompted pixels (Cai et al., 2026), and DepthVLM jointly outputs full-resolution
+depth and text (Yu et al., 2026). However, explicit or parallel depth prediction does not necessarily
+condition answers on the predicted metric field. DepthEvidence bridges prediction and reasoning by
+converting its single-image dense outputs into object-aligned continuous geometry tokens, supervised
+before and after language-context interaction, for object-level measurement and relative or metric
+compositional reasoning.
+3
+METHOD
+3.1
+FRAMEWORK OVERVIEW
+As illustrated in Figure 2, DepthEvidence conditions object-level answers on geometric evidence
+predicted from the same image. A camera-conditioned dense decoder supplies a metric depth map
+and spatial features. The dense-to-language interface extracts evidence for objects specified by
+boxes or referring prompts and binds their geometry tokens to explicit object identifiers. Auxiliary
+objectives supervise metric-depth prediction from these tokens before and after language-context
+interaction. Instance-level instruction tuning trains the VLM to use this context for measurement and
+compositional reasoning.
+3
+
+
+3.2
+LEVEL-0 DENSE METRIC DEPTH PREDICTION
+Camera-conditioned decoder.
+The Level-0 branch follows a coarse-to-fine DPT design (Ranftl
+et al., 2021), fusing intermediate vision-encoder features with the spatially reshaped final visual
+hidden states. To recover metric scale, it converts the supplied camera intrinsics κ into a compact
+descriptor containing normalized calibration, field-of-view, and aspect-ratio information. An MLP
+maps this descriptor to FiLM parameters (Perez et al., 2018) that condition every decoder scale. A
+lightweight high-resolution RGB pathway supplies finer appearance cues during upsampling, and the
+resulting full-resolution representation predicts both the metric depth map and the dense features used
+by the dense-to-language interface. This numerical camera encoding is specific to the dense branch;
+Depth-VQA instead receives the raw intrinsic values in its instruction. Appendix A.1.1 provides the
+feature dimensions, camera parameterization, and decoder details.
+High-resolution RGB refinement.
+Spatially compressed visual tokens can lose thin structures and
+sharp depth discontinuities. The RGB pathway therefore injects high-resolution features through
+learned residual gates, preserving the transformer representation as the main path while restoring
+local boundary cues. The refined spatial features also provide local appearance and boundary cues
+for object-level pooling in the interface. Architectural details are given in Appendix A.1.2.
+Training objective.
+We train the dense branch with
+Ldense = 0.8Labs + 0.2Lsilog + 0.1Lder + 0.03Llap + Lssi.
+(1)
+The first two terms supervise metric depth, the derivative and Laplacian terms preserve multi-scale
+structure, and the edge-guided stable local scale-and-shift invariant term Lssi emphasizes object
+boundaries. Appendix A.1.3 provides the detailed definitions and implementation.
+3.3
+INSTANCE-LEVEL DEPTH INSTRUCTION TUNING
+Instance-level measurement and reasoning tasks.
+We extend dense prediction with two object-
+grounded instruction levels. Level 1 asks for a specified object’s center, mean, median, nearest,
+or farthest metric depth. Level 2 combines measurements across objects: relative tasks cover
+near–far and front–behind comparisons, closest/farthest selection, and subset or full depth ordering;
+metric tasks cover numerical mean-depth gaps, thresholds, ranges, and margin-based decisions.
+Compositional questions first resolve image-space references or filter candidates, then apply relative
+comparisons or metric constraints. These instructions teach object-level measurement and its use in
+spatially and numerically constrained answers.
+Unified object grounding.
+We support two ways to specify an object. A box prompt provides
+its category and bounding box, with coordinates normalized to a 0–1000 image coordinate system.
+A referring prompt instead identifies it through a natural-language description enclosed by object-
+reference tokens. For multi-object questions, each instance receives a stable identifier such as obj 1,
+and the prompt lists its identifier, category, and grounding cue before the question. This common
+serialization supports both grounding modes and disambiguates repeated object categories without
+assuming any interface-specific processing.
+Structured supervision.
+Each instruction supplies the raw camera intrinsics as <focal> fx fy
+cx cy </focal>, independently of the dense decoder’s numerical camera encoding. The VLM
+reads this block together with the image and question. We train both instruction levels with the
+next-token cross-entropy loss Lans on the final answer. The answer is a metric depth value for
+Level 1, or a numerical depth gap, an object or set selection, an ordering, or a discrete comparison
+or constraint decision for Level 2. Margin-based decisions include an ambiguous answer when the
+closest object does not satisfy the required depth margin. Appendix A.2 provides the detailed targets,
+prompt serialization, and output formats.
+3.4
+DENSE-TO-LANGUAGE INTERFACE
+Object-aligned dense geometry.
+For both Level 1 and Level 2 instructions, the interface receives a
+metric depth map bD and a full-resolution feature map Fd from the dense decoder. For a box prompt,
+we use the supplied region directly; for a referring prompt, a lightweight grounding head predicts its
+4
+
+
+box. For object i, pooling Fd yields a regional feature ri, while summarizing the predicted depths
+yields metric statistics si. Together with the normalized box bi, these form an object descriptor that
+associates local geometry with the referenced instance. Appendix A.3.1 gives the pooling statistics
+and grounding-head implementation.
+Continuous geometry tokens.
+A two-layer projector Pg maps each object descriptor to K = 2
+continuous tokens,
+gi,k = Pg([ri; bi; si])k + pi + tk,
+k ∈{1, 2},
+(2)
+where pi is a learned object-index embedding and tk distinguishes the two token slots. We organize
+the resulting tokens as an input-only geometry bank in which each pair follows its textual anchor
+obj i:. Geometry-bank positions are excluded as language-modeling targets, but answer tokens
+attend to them and the answer loss backpropagates through them to the projector. Appendix A.3.1
+details the bank construction, and Appendix A.3.2 discusses the choice of K = 2.
+Geometric supervision.
+To encourage metric-depth recoverability, we supervise the geometry
+representations at both instance levels with
+Lgeo = 0.2Lraw + 0.2Lctx + 0.1Lrank,
+(3)
+The raw-depth and contextual-depth losses train auxiliary heads to predict five ground-truth object-
+depth statistics (center, mean, median, nearest, and farthest) in log space, from the projected tokens
+and their contextualized states, respectively. These objectives encourage metric-depth recoverability
+before and after interaction with the image and question. For multi-object examples, Lrank supervises
+relative ordering using the contextual mean-depth predictions. Appendix A.3.4 specifies the heads,
+targets, and gradient routing.
+Single-prefill cached continuation.
+The geometry bank becomes available after the image and
+question have been encoded. We retain the prefix cache, append the bank as a causal continuation,
+and generate the answer from the extended context. Geometry tokens can attend to the cached prefix,
+and answer tokens can attend to both the prefix and geometry. This execution scheme incorporates
+predicted evidence without re-encoding the multimodal prefix. Appendix A.3.3 gives implementation
+details, and Appendix E compares no-interface, two-pass, and single-prefill inference.
+4
+INSTANCE-LEVEL DEPTH-VQA BENCHMARK
+Depth-VQA evaluates object-level metric estimation (Level 1) and multi-object compositional rea-
+soning (Level 2), including relative comparisons, ordering, numerical gaps, and spatially conditioned
+metric decisions. Each question provides an image, camera intrinsics, and object references specified
+by normalized category–box prompts or natural-language referring prompts.
+Construction and quality control.
+We first complete sparse outdoor depth so every source image
+has a dense depth map. Qwen3.7-plus (Qwen Team, 2026b) and Seed-2.1-Turbo (ByteDance Seed
+Team, 2026) independently identify major objects and propose their categories and grounding boxes,
+reducing dependence on the output distribution of a single generator. We pool their candidates, remove
+boxes covering less than 1% of the image or lying near image boundaries, prompt SAM 3 (Carion
+et al., 2026) with the remaining categories and boxes, and apply a second quality filter to the resulting
+masks. Each retained mask and dense depth map yield the Level 1 center, mean, median, nearest, and
+farthest targets, with the latter two defined by the 5th and 95th depth percentiles. The two generators
+then produce Level 2 questions and answers from these instance records, with each candidate verified
+by the model that did not generate it. We manually audit 1% of training samples across all three
+levels to derive targeted filters, manually check every benchmark example, and limit reuse of the
+same instance across task types within a video scene. Appendix C.1 provides full details.
+Level-1: Instance-Level Metric Depth Estimation.
+Level 1 contains 757 grounded instances
+from six indoor and outdoor datasets: Waymo (Sun et al., 2020), Argoverse 2 (Wilson et al., 2021),
+Taskonomy (Zamir et al., 2018), LingBot-Depth (Tan et al., 2026), DDAD (Guizilini et al., 2020),
+and nuScenes (Caesar et al., 2020). Each query requests the object-center, nearest, farthest, mean, or
+median valid depth within the referenced mask and expects a scalar answer in meters. We report δ1
+(higher is better), RMSE, and AbsRel (lower is better).
+5
+
+
+Table 1: Level-2 tracks and subbench goals. Appendix Table 7 provides all question types and
+reasoning requirements.
+Track
+Subbench
+Question summary
+Relative Depth
+Spatial Pair
+Compare two objects, optionally after resolving a spatial reference.
+Spatial Group
+Spatially filter candidates, then select the nearest or farthest.
+Depth Ordering
+Select an extreme or order a subset or all referenced objects.
+Metric Depth
+Metric Pair
+Predict a mean-depth gap or compare it with a threshold.
+Spatial Metric Pair
+Resolve a spatial reference, then predict an absolute mean-depth gap.
+Spatial Metric Group
+Spatially filter candidates, then apply range or bound constraints.
+Metric Set Decision
+Test a safety band or a margin-constrained closest-object decision.
+Level-2: Compositional Depth Reasoning.
+Depth-VQA contains 1,503 questions in total: 757
+Level 1 questions, 370 Level 2 Relative questions, and 376 Level 2 Metric questions. Level 2 uses
+grounded instances as reasoning operands, assigning each a stable identifier such as obj 1. Table 1
+groups seven subbenches into the two tracks; Appendix Table 7 defines all question types. The
+Relative track uses exact-match accuracy: selections require the target identifier, and orderings require
+the full identifier sequence. Relative Overall Acc pools the 370 questions from the three reported
+subbenches. The Metric track uses accuracy for discrete answers and δ1 for numerical gaps; Metric
+Overall Acc excludes δ1-scored questions. Appendix C provides question counts and scoring details.
+5
+EXPERIMENTAL SETUP
+5.1
+TRAINING PIPELINE
+Training proceeds in two stages. Stage 1 freezes the vision-language backbone and trains the Level-0
+decoder and high-resolution RGB branch for 80K steps. Stage 2 initializes from this checkpoint and
+jointly trains Level-1/Level-2 Depth-VQA and general VQA for 18K steps, with about 60K dense
+replay examples preserving Level-0 prediction. The dense-to-language interface is active for both
+instance levels. Because dense predictions and decoder features are detached before geometry-token
+construction, QA losses update the LoRA-adapted language modules and interface, while dense
+replay updates the decoder. We use Qwen3.5-4B (Qwen Team, 2026a); Appendix B provides data
+composition, preprocessing, optimization, and runtime settings.
+5.2
+EVALUATION SETUP
+For Level 0, we evaluate metric depth on four outdoor datasets (Argoverse 2 (Wilson et al., 2021),
+Waymo (Sun et al., 2020), nuScenes (Caesar et al., 2020), and DDAD (Guizilini et al., 2020))
+and five indoor datasets (Taskonomy (Zamir et al., 2018), ScanNet++ (Yeshwanth et al., 2023),
+HyperSim (Roberts et al., 2021), SUN RGB-D (Song et al., 2015), and Booster (Ramirez et al.,
+2022)). Predictions use ground-truth intrinsics and are scored in metric scale without post-hoc
+alignment; δ1 is the primary metric, and the overall score averages the nine dataset-level results.
+Depth-VQA follows the tasks and metrics defined in Section 4. Level-0 baselines include specialized
+metric-depth models and depth-aware VLMs; Depth-VQA baselines include general-purpose and
+depth-aware VLMs. All models use the same prompts and answer protocol. A matched DepthEvi-
+dence variant disables the dense-to-language interface at both instance levels to isolate geometry-token
+conditioning. Appendix C provides the complete baselines, sampling, and scoring protocols.
+6
+MAIN RESULTS
+6.1
+LEVEL-0 DENSE METRIC DEPTH PREDICTION
+Because general-purpose VLMs lack dense metric-depth outputs, Table 2 compares DepthEvidence
+with depth-aware VLMs and specialized estimators. DepthEvidence achieves the highest nine-
+dataset average δ1 of 0.7972, slightly above UniDepth V2 (0.7945) and 0.1033 above the strongest
+depth-aware baseline, DepthLM-12B. It exceeds DepthLM on eight datasets and leads on SUN
+RGB-D (0.8420). Its outdoor and indoor averages of 0.7970 and 0.7974 indicate balanced aggregate
+performance, although specialized models remain stronger on several individual datasets. Figure 3
+complements Table 2 with two outdoor and two indoor examples; additional visualizations for the
+remaining five datasets are provided in Appendix Figure 5. DepthEvidence preserves fine structures
+and depth discontinuities more consistently than DepthVLM-4B and Youtu-VL-4B-Instruct while
+6
+
+
+Table 2: Level-0 dense metric depth comparison across outdoor and indoor benchmarks. We report
+δ1 ↑and its unweighted average over all nine datasets. The best and second-best results in each
+column are shown in bold and underlined, respectively. Rankings are determined using the unrounded
+values. †DepthLM-12B follows its original sparse point-query protocol (Cai et al., 2026), using 8,192
+randomly sampled pixels per dataset.
+Method
+Outdoor
+Indoor
+Avg.
+Argoverse2 Waymo NuScenes DDAD Taskonomy ScanNet++ HyperSim SUN RGB-D Booster
+VLMs Trained on Metric Depth Estimation
+Youtu-VL-4B-Instruct
+0.6290
+0.5121
+0.6443
+0.2995
+0.7561
+0.6006
+0.4285
+0.3525
+0.3471
+0.5077
+DepthVLM-4B
+0.7696
+0.8056
+0.8433
+0.8232
+0.6992
+0.8568
+0.4536
+0.5089
+0.2452
+0.6673
+DepthLM-12B†
+0.7768
+0.7758
+0.8310
+0.6638
+0.8218
+0.7962
+0.4358
+0.5508
+0.5934
+0.6939
+Specialized Vision Models
+Depth Anything V2 outdoor
+0.1304
+0.7122
+0.1701
+0.1446
+0.0008
+0.0002
+0.0415
+0.0000
+0.0000
+0.1333
+Depth Anything V1 outdoor
+0.2182
+0.6564
+0.3338
+0.1779
+0.0026
+0.0001
+0.0743
+0.0001
+0.0000
+0.1626
+Depth Anything V1 indoor
+0.0018
+0.0019
+0.0009
+0.0015
+0.4706
+0.7604
+0.2504
+0.6427
+0.5225
+0.2947
+Depth Anything V2 indoor
+0.1343
+0.0188
+0.1773
+0.2891
+0.2397
+0.2322
+0.8652
+0.1651
+0.6007
+0.3025
+Metric3D
+0.7801
+0.8287
+0.7691
+0.8136
+0.9467
+0.0734
+0.4745
+0.0582
+0.0434
+0.5320
+Metric3D v2
+0.8589
+0.8774
+0.8555
+0.8700
+0.9389
+0.8809
+0.7311
+0.6980
+0.1374
+0.7609
+MetricAnything
+0.5920
+0.8758
+0.8067
+0.8736
+0.8794
+0.8966
+0.8440
+0.5713
+0.5943
+0.7704
+Depth Anything V3 metric-large
+0.8051
+0.8483
+0.7996
+0.7825
+0.9189
+0.8906
+0.5800
+0.6141
+0.7175
+0.7730
+UniDepth V2
+0.8619
+0.8502
+0.8811
+0.8719
+0.8629
+0.8602
+0.8648
+0.3969
+0.7004
+0.7945
+DepthEvidence-4B (Ours)
+0.7948
+0.8266
+0.8122
+0.7543
+0.9072
+0.8197
+0.8213
+0.8420
+0.5970
+0.7972
+RGB
+GT
+DepthVLM-4B
+Youtu-VL-4B
+Metric Anything
+UniDepth V2
+DepthEvidence
+Argoverse2
+Waymo
+ScanNet++
+HyperSim
+Figure 3: Qualitative dense depth on Argoverse2, Waymo, ScanNet++, and HyperSim. Columns
+show RGB, ground truth (GT), DepthVLM-4B, Youtu-VL-4B-Instruct, MetricAnything, UniDepth
+V2, and DepthEvidence. Outdoor GT is densified only for visualization; Table 2 uses the original
+sparse sensor GT. Each row shares one color scale; Figure 5 shows the other five datasets.
+retaining the global layout. MetricAnything and UniDepth V2 sometimes produce smoother planes,
+whereas DepthEvidence remains competitive in boundary localization across both domains.
+6.2
+INSTANCE-LEVEL DEPTH ESTIMATION AND REASONING
+Table 3: Instance-level depth estimation and reasoning results. The interface is enabled or disabled
+at both instance levels. Relative Overall Acc is computed over 370 questions, and Metric Overall
+Acc includes the 234 questions scored by accuracy. Bold and underlined entries denote the best and
+second-best results in each column.
+Method
+Level-1: Instance Metric Depth
+Level-2: Compositional Depth Reasoning
+Relative
+Metric
+δ1 ↑
+RMSE↓
+AbsRel↓
+Spatial
+Pair
+Spatial
+Group Ordering
+Overall
+Acc
+Metric Pair
+Acc
+Metric Pair
+δ1 ↑
+Spatial Pair
+δ1 ↑
+Spatial
+Group
+Set
+Decision
+Overall
+Acc
+General-Purpose VLMs
+Qwen3.5-4B
+0.0159 206.1221
+9.5185
+0.0930 0.0568
+0.0102
+0.0405
+0.6304
+0.2500
+0.2234
+0.3085
+0.5532
+0.4701
+Gemini-3.1-Pro-Preview
+0.4108 52.4680
+2.0927
+0.6395 0.5795
+0.3724
+0.4838
+0.6304
+0.2292
+0.2340
+0.3085
+0.5957
+0.4872
+Qwen3.7-plus
+0.0766 107.2556
+3.0477
+0.5814 0.6136
+0.3827
+0.4838
+0.6522
+0.2917
+0.1489
+0.3511
+0.4681
+0.4573
+Seed-2.1-Turbo
+0.2048 107.9360
+2.7470
+0.6977 0.6250
+0.4133
+0.5297
+0.6304
+0.1042
+0.1596
+0.3617
+0.4362
+0.4444
+VLMs Trained on Metric Depth Estimation
+DepthLM-12B
+0.7781 10.7460
+0.1839
+0.0000 0.0000
+0.0000
+0.0000
+0.0000
+0.1458
+0.0532
+0.0000
+0.0000
+0.0000
+Youtu-VL-4B-Instruct
+0.0264 22.1562
+1.0852
+0.1744 0.2955
+0.1224
+0.1757
+0.2826
+0.0417
+0.1064
+0.1915
+0.3404
+0.2692
+DepthVLM-4B
+0.6592 11.9164
+0.2613
+0.5000 0.3295
+0.1837
+0.2919
+0.5870
+0.0833
+0.0957
+0.3404
+0.5213
+0.4615
+Agent Pipeline
+MetricAnything + Qwen3.5-4B
+0.7318 11.9224
+0.2363
+0.3372 0.6136
+0.4184
+0.4459
+0.5870
+0.2917
+0.2340
+0.4149
+0.6489
+0.5427
+MetricAnything + Qwen3.7-plus 0.7543 14.2529
+0.2407
+0.3140 0.7273
+0.4541
+0.4865
+0.8478
+0.4167
+0.2979
+0.4468
+0.6596
+0.6111
+DepthEvidence w/o interface
+0.8653 11.2159
+0.2351
+0.7442 0.5227
+0.5408
+0.5838
+0.8261
+0.4375
+0.3511
+0.7447
+0.7660
+0.7692
+DepthEvidence (Ours)
+0.8666
+8.6062
+0.1629
+0.7907 0.5568
+0.5867
+0.6270
+0.9130
+0.5833
+0.4043
+0.8191
+0.8511
+0.8504
+7
+
+
+Depth Ordering
+Question
+Rank all referenced objects from nearest to
+farthest.
+Without interface  ✗
+... shopping cart_1 obj_2 → shopping
+cart_2 obj_3 ...
+With interface  ✓
+... shopping cart_2 obj_3 → shopping
+cart_1 obj_2 ...
+Spatial Metric Group
+Question
+Which objects right of cabinet obj_4 lie
+within 1.30-1.33 m?
+Without interface  ✗
+white chaise obj_1; grey pillow obj_2;
+white pillow obj_3
+With interface  ✓
+white chaise obj_1; framed pictures
+obj_5
+Metric Set Decision
+Question
+Select the closest only if its margin is at
+least 0.60 m; otherwise ambiguous.
+Without interface  ✗
+dining table obj_1
+With interface  ✓
+ambiguous
+Figure 4: Representative Level-2 cases corrected by the dense-to-language interface. The three panels
+test complete depth ordering, spatially filtered metric-range selection, and margin-aware ambiguity
+decisions, respectively. Each panel contrasts matched variants without and with the interface; green
+answers match the ground truth. Aggregate results are reported in Table 3.
+Table 4: General and spatial capability evaluation. Metrics follow their native scales; all are higher-is-
+better except Ego3D RMSE. Bold marks the best result, and “–” denotes unavailable results.
+Method
+STEM
+General VQA
+MathVision
+MathVista
+MMMU
+MMMU-Pro
+RealWorldQA
+MMStar
+MMBench
+HallusionBench
+Youtu-VL-4B-Instruct
+–
+76.50
+61.10
+43.00
+74.60
+71.10
+83.90
+59.10
+GLM-4.1V-9B-Thinking
+54.40
+80.70
+68.00
+57.10
+–
+72.90
+85.80
+63.20
+Qwen3.5-4B
+74.60
+85.10
+77.60
+66.30
+79.50
+78.30
+89.40
+65.00
+DepthEvidence (Ours)
+74.10
+84.90
+78.71
+64.05
+78.06
+78.30
+89.52
+68.21
+Method
+Text Recognition and Document Understanding
+Spatial Intelligence
+AI2D
+CC-OCR
+OCRBench
+CharXiv (RQ)
+ERQA
+EmbSpatialBench
+Ego3D Acc.
+Ego3D RMSE↓
+Youtu-VL-4B-Instruct
+85.60
+–
+81.30
+43.80
+–
+–
+45.63
+19.27
+GLM-4.1V-9B-Thinking
+87.90
+–
+84.20
+–
+45.80
+–
+56.93
+12.79
+Qwen3.5-4B
+89.60
+76.70
+85.00
+70.80
+54.00
+81.30
+62.82
+13.17
+DepthEvidence (Ours)
+90.67
+77.34
+84.60
+69.00
+57.25
+83.14
+67.99
+6.83
+Table 3 evaluates instance-level metric estimation and compositional reasoning. Among the depth-
+aware baselines, DepthLM-12B (Cai et al., 2026) performs best on Level 1 (δ1 = 0.7781), whereas
+DepthVLM-4B (Yu et al., 2026) performs best on both Level 2 tracks (0.2919 Relative and 0.4615
+Metric Overall Acc). DepthEvidence leads all evaluated methods on Level 1, with δ1 = 0.8666,
+RMSE = 8.6062, and AbsRel = 0.1629. It also achieves 0.6270 Relative and 0.8504 Metric Overall
+Acc, exceeding Seed-2.1-Turbo and Gemini-3.1-Pro-Preview by 9.73 and 36.32 percentage points,
+respectively, and DepthVLM-4B by 33.51 and 38.89 points. DepthEvidence further obtains the
+highest reported numerical-gap δ1 on Metric Pair (0.5833) and Spatial Metric Pair (0.4043).
+6.3
+EFFECT OF THE DENSE-TO-LANGUAGE INTERFACE
+Matched ablations in Table 3 isolate the interface effect. On Level 1, δ1 is nearly unchanged
+(0.8653→0.8666), while RMSE and AbsRel decrease from 11.2159 to 8.6062 and from 0.2351 to
+0.1629, suggesting fewer large metric errors. On Level 2, Overall Acc increases by 4.32 points on
+Relative and 8.12 points on Metric. The largest categorical gain is on Metric Pair (+8.69 points), while
+numerical-gap δ1 rises from 0.4375 to 0.5833 on Metric Pair and from 0.3511 to 0.4043 on Spatial
+Metric Pair. Although MetricAnything + Qwen3.7-plus leads Relative Spatial Group (0.7273), its
+Relative and Metric Overall scores (0.4865/0.6111) trail DepthEvidence by 14.05/23.93 points, and
+both agent pipelines remain below DepthEvidence without the interface (Appendix C.6). Overall, the
+agent pipelines lag the full DepthEvidence system, indicating that external estimator–VLM coupling
+is less effective than our integrated design. Figure 4 visualizes representative corrections in depth
+ordering, spatially filtered metric-range selection, and margin-aware ambiguity decisions.
+6.4
+GENERAL VQA RETENTION AND SPATIAL UNDERSTANDING
+Table 4 shows that DepthEvidence improves spatial reasoning while largely retaining the general
+capabilities of its Qwen3.5-4B initialization. Non-spatial scores change modestly: MMMU, MM-
+Bench, HallusionBench, AI2D, and CC-OCR improve, while the largest regression is 2.25 points on
+MMMU-Pro. All four spatial metrics improve: ERQA rises from 54.00 to 57.25, EmbSpatialBench
+8
+
+
+Table 5: Dense-decoder ablation on outdoor and
+indoor datasets (δ1 ↑).
+SSI
+HR branch
+Outdoor
+Indoor
+Argoverse2 Waymo
+Taskonomy
+ScanNet++
+–
+–
+0.7313
+0.7505
+0.7852
+0.7349
+✓
+–
+0.7547
+0.7736
+0.8175
+0.7511
+–
+✓
+0.7824
+0.8129
+0.8804
+0.8081
+✓
+✓
+0.7948
+0.8266
+0.9072
+0.8197
+Table 6: Geometry-interface ablation on Level-2
+Relative and Metric Overall Acc.
+Variant
+Lans Lraw Lctx Lrank Relative Overall Metric Overall
+w/o interface
+–
+–
+–
+–
+0.5838
+0.7692
+Interface
+✓
+–
+–
+–
+0.5838
+0.7735
+✓
+✓
+–
+–
+0.5946
+0.8120
+✓
+✓
+✓
+–
+0.6135
+0.8419
+✓
+✓
+✓
+✓
+0.6270
+0.8504
+from 81.30 to 83.14, and Ego3D accuracy from 62.82 to 67.99, while RMSE falls from 13.17 to
+6.83 (−48.1%). DepthEvidence also outperforms Youtu-VL-4B-Instruct (Wei et al., 2026) and
+GLM-4.1V-9B-Thinking (GLM-V Team, 2025) on their commonly reported higher-is-better metrics
+and Ego3D RMSE.
+7
+ANALYSIS AND DISCUSSION
+7.1
+DENSE DECODER ABLATION
+Table 5 shows that both the SSI objective and high-resolution branch increase δ1 on each evaluated
+dataset, with their combination obtaining the highest values among the ablated variants. The HR
+branch has a larger measured effect indoors: used alone, it raises mean δ1 by 0.0842 on the two
+indoor datasets versus 0.0568 outdoors. One possible explanation is the sparse evaluation coverage
+of outdoor datasets: their ground truth contains fewer evaluated pixels near object boundaries, so
+improvements in boundary prediction contribute less to the measured δ1 than under denser indoor
+annotations.
+7.2
+GEOMETRIC SUPERVISION ABLATION
+The interface is used at both instance levels; Table 6 focuses on its supervision design using the
+two Level-2 accuracy aggregates. Training the interface with only Lans leaves Relative Overall Acc
+unchanged at 0.5838 and raises Metric Overall Acc from 0.7692 to 0.7735. Adding Lraw improves
+the two aggregates by 1.08 and 3.85 percentage points, respectively; Lctx adds a further 1.89 and 2.99
+points, and Lrank adds 1.35 and 0.85 points. The complete objective reaches 0.6270 Relative Overall
+Acc and 0.8504 Metric Overall Acc, improving over the model without the interface by 4.32 and 8.12
+percentage points. These results support the utility of auxiliary geometric supervision, with a larger
+measured gain on the accuracy-based Metric tasks. A separate no-interface control with direct metric
+supervision remains clearly below the full interface, indicating that the main performance gain arises
+from the interface itself rather than numerical supervision alone; Appendix D.1 provides the detailed
+disentanglement analysis.
+7.3
+LIMITATIONS
+The current setting assumes access to camera intrinsics and explicit object references. Its geometric
+evidence is therefore sensitive to errors in calibration, object grounding, and dense-depth prediction,
+particularly when depth ranges or decision margins are narrow. In addition, although cached continu-
+ation avoids repeated prefix computation, conditioning on geometry tokens incurs additional latency
+and memory relative to inference without the interface (Appendix E).
+8
+CONCLUSION
+DepthEvidence connects dense metric depth prediction, instance-level metric depth estimation, and
+compositional depth reasoning within a shared MLLM. Its dense-to-language interface supplies
+object-aligned continuous geometry tokens, with geometric supervision encouraging metric-depth
+recoverability during language-context interaction. Experiments show competitive dense prediction
+and gains in object measurement, numerical depth gaps, and metric-constrained decisions. General
+VQA remains broadly stable relative to the base model, while spatial understanding improves on
+the evaluated benchmarks. These findings support dense prediction as both a supervised output
+and internal evidence for language reasoning. Future work can assess robustness to noisier camera
+intrinsics and object references, reduce inference cost as the object count grows, and extend the
+interface to other geometric evidence.
+9
+
+
+AI USE STATEMENT
+We used Qwen3.7-plus and Seed-2.1-Turbo to propose object annotations and to generate and cross-
+verify synthetic Depth-VQA questions and answers, as described in Section 4 and Appendix C.1. We
+additionally used generative AI tools to improve manuscript readability. All benchmark examples
+were manually verified, and the authors reviewed all AI-assisted outputs and take responsibility for
+the final content.
+REPRODUCIBILITY STATEMENT
+Section 3 and Appendix A describe the model architecture and training objectives, while Section 5
+and Appendix B provide the training pipeline, data composition, preprocessing, and optimization
+settings. Section 4 and Appendix C document benchmark construction, data partitioning, evaluation
+protocols, and metric definitions.
+REFERENCES
+Mahtab Bigverdi, Zelun Luo, Cheng-Yu Hsieh, Ethan Shen, Dongping Chen, Linda G. Shapiro, and
+Ranjay Krishna. Perception tokens enhance visual reasoning in multimodal language models.
+In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition, pp.
+3836–3845, 2025.
+ByteDance Seed Team. Seed2.1: A next-generation agent for real-world productivity. Official model
+page, 2026. URL https://seed.bytedance.com/en/seed2_1.
+Holger Caesar, Varun Bankiti, Alex H. Lang, Sourabh Vora, Venice Erin Liong, Qiang Xu, Anush
+Krishnan, Yu Pan, Giancarlo Baldan, and Oscar Beijbom. nuScenes: A multimodal dataset for
+autonomous driving. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern
+Recognition, pp. 11621–11631, 2020.
+Zhipeng Cai, Ching-Feng Yeh, Xu Hu, Zhuang Liu, Gregory P. Meyer, Xinjie Lei, Changsheng Zhao,
+Shang-Wen Li, Vikas Chandra, and Yangyang Shi. DepthLM: Metric depth from vision language
+models. In International Conference on Learning Representations, 2026.
+Nicolas Carion, Laura Gustafson, Yuan-Ting Hu, Shoubhik Debnath, Ronghang Hu, Di-
+dac Suris Coll-Vinent, Chaitanya Ryali, Kalyan Vasudev Alwala, Haitham Khedr, Andrew
+Huang, Jie Lei, Tengyu Ma, Baishan Guo, Arpit Kalla, Markus Marks, Joseph Greer,
+Meng Wang, Peize Sun, Roman R¨adle, Triantafyllos Afouras, Effrosyni Mavroudi, Kather-
+ine Xu, Tsung-Han Wu, Yu Zhou, Liliane Momeni, Rishi Hazra, Shuangrui Ding, Sagar
+Vaze, Francois Porcher, Feng Li, Siyuan Li, Aishwarya Kamath, Ho Kei Cheng, Piotr Doll´ar,
+Nikhila Ravi, Kate Saenko, Pengchuan Zhang, and Christoph Feichtenhofer. SAM 3: Seg-
+ment anything with concepts.
+In International Conference on Learning Representations,
+2026. URL https://proceedings.iclr.cc/paper_files/paper/2026/hash/
+e0982cbc81401df3430ee1ff780dc7a2-Abstract-Conference.html.
+Boyuan Chen, Zhuo Xu, Sean Kirmani, Brian Ichter, Dorsa Sadigh, Leonidas Guibas, and Fei Xia.
+SpatialVLM: Endowing vision-language models with spatial reasoning capabilities. In Proceedings
+of the IEEE/CVF Conference on Computer Vision and Pattern Recognition, pp. 14455–14465,
+2024a.
+Haijier Chen, Bo Xu, Shoujian Zhang, Haoze Liu, Jiaxuan Lin, and Jingrong Wang. Vid-LLM: A
+compact video-based 3D multimodal LLM with reconstruction–reasoning synergy. In International
+Conference on Learning Representations, 2026.
+Lin Chen, Jinsong Li, Xiaoyi Dong, Pan Zhang, Yuhang Zang, Zehui Chen, Haodong Duan, Jiaqi
+Wang, Yu Qiao, Dahua Lin, and Feng Zhao. Are we on the right way for evaluating large
+vision-language models? In Advances in Neural Information Processing Systems, volume 37,
+2024b.
+An-Chieh Cheng, Hongxu Yin, Yang Fu, Qiushan Guo, Ruihan Yang, Jan Kautz, Xiaolong Wang,
+and Sifei Liu. SpatialRGPT: Grounded spatial reasoning in vision-language models. In Advances
+in Neural Information Processing Systems, volume 37, 2024.
+10
+
+
+Mengfei Du, Binhao Wu, Zejun Li, Xuanjing Huang, and Zhongyu Wei.
+EmbSpatial-Bench:
+Benchmarking spatial understanding for embodied tasks with large vision-language models. In
+Proceedings of the 62nd Annual Meeting of the Association for Computational Linguistics (Volume
+2: Short Papers), pp. 346–355, 2024. doi: 10.18653/v1/2024.acl-short.33.
+David Eigen, Christian Puhrsch, and Rob Fergus. Depth map prediction from a single image using
+a multi-scale deep network. In Advances in Neural Information Processing Systems, volume 27,
+2014.
+Mohsen Gholami, Ahmad Rezaei, Zhou Weimin, Sitong Mao, Shunbo Zhou, Yong Zhang, and
+Mohammad Akbari. Spatial reasoning with vision-language models in ego-centric multi-view
+scenes. In International Conference on Learning Representations, 2026.
+GLM-V Team. GLM-4.1V-Thinking and GLM-4.5V: Towards versatile multimodal reasoning with
+scalable reinforcement learning. arXiv preprint arXiv:2507.01006, 2025.
+Google DeepMind. Embodied reasoning question answer (ERQA) benchmark. Official benchmark
+repository, 2025. URL https://github.com/embodiedreasoning/ERQA.
+Google DeepMind. Gemini 3.1 Pro model card. Google DeepMind, 2026. URL https://
+deepmind.google/models/model-cards/gemini-3-1-pro/.
+Tianrui Guan, Fuxiao Liu, Xiyang Wu, Ruiqi Xian, Zongxia Li, Xiaoyu Liu, Xijun Wang, Lichang
+Chen, Furong Huang, Yaser Yacoob, Dinesh Manocha, and Tianyi Zhou. HallusionBench: An
+advanced diagnostic suite for entangled language hallucination and visual illusion in large vision-
+language models. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern
+Recognition, pp. 14375–14385, 2024.
+Vitor Guizilini, Rares Ambrus, Sudeep Pillai, Allan Raventos, and Adrien Gaidon. 3D packing for
+self-supervised monocular depth estimation. In Proceedings of the IEEE/CVF Conference on
+Computer Vision and Pattern Recognition, pp. 2485–2494, 2020.
+Mu Hu, Wei Yin, Chi Zhang, Zhipeng Cai, Xiaoxiao Long, Kaixuan Wang, Hao Chen, Gang Yu,
+Chunhua Shen, and Shaojie Shen. Metric3D v2: A versatile monocular geometric foundation
+model for zero-shot metric depth and surface normal estimation. IEEE Transactions on Pattern
+Analysis and Machine Intelligence, 46(12), 2024.
+Wenbo Hu, Jingli Lin, Yilin Long, Yunlong Ran, Lihan Jiang, Yifan Wang, Chenming Zhu, Runsen
+Xu, Tai Wang, and Jiangmiao Pang. G2VLM: Geometry grounded vision language model with
+unified 3D reconstruction and spatial reasoning. In Proceedings of the IEEE/CVF Conference on
+Computer Vision and Pattern Recognition, pp. 9535–9546, 2026.
+Aniruddha Kembhavi, Mike Salvato, Eric Kolve, Minjoon Seo, Hannaneh Hajishirzi, and Ali Farhadi.
+A diagram is worth a dozen images. In Proceedings of the European Conference on Computer
+Vision, 2016.
+Yuchen Li, Amanmeet Garg, Shalini Chaudhuri, Rui Zhao, and Garin Kessler. Perceptio: Perception
+enhanced vision language models via spatial token generation. arXiv preprint arXiv:2603.18795,
+2026.
+Haotong Lin, Sili Chen, Jun Hao Liew, Donny Y. Chen, Zhenyu Li, Yang Zhao, Sida Peng, Hengkai
+Guo, Xiaowei Zhou, Guang Shi, Jiashi Feng, and Bingyi Kang. Depth anything 3: Recovering
+the visual space from any views. In International Conference on Learning Representations,
+2026. URL https://proceedings.iclr.cc/paper_files/paper/2026/hash/
+e4cd50120b6d7e8daff1749d6bbaa889-Abstract-Conference.html.
+Yuan Liu, Haodong Duan, Yuanhan Zhang, Bo Li, Songyang Zhang, Wangbo Zhao, Yike Yuan, Jiaqi
+Wang, Conghui He, Ziwei Liu, Kai Chen, and Dahua Lin. MMBench: Is your multi-modal model
+an all-around player? In Proceedings of the European Conference on Computer Vision, 2024.
+Yuliang Liu, Zhang Li, Mingxin Huang, Biao Yang, Wenwen Yu, Chunyuan Li, Xucheng Yin,
+Cheng-Lin Liu, Lianwen Jin, and Xiang Bai. OCRBench: On the hidden mystery of OCR in large
+multimodal models. arXiv preprint arXiv:2305.07895, 2023.
+11
+
+
+Pan Lu, Hritik Bansal, Tony Xia, Jiacheng Liu, Chunyuan Li, Hannaneh Hajishirzi, Hao Cheng,
+Kai-Wei Chang, Michel Galley, and Jianfeng Gao. MathVista: Evaluating mathematical reasoning
+of foundation models in visual contexts. In International Conference on Learning Representations,
+2024.
+Baorui Ma, Jiahui Yang, Donglin Di, Xuancheng Zhang, Jianxun Cui, Hao Li, Yan Xie, and Wei
+Chen. MetricAnything: Scaling metric depth pretraining with noisy heterogeneous sources. In
+Proceedings of the European Conference on Computer Vision, 2026.
+Ethan Perez, Florian Strub, Harm de Vries, Vincent Dumoulin, and Aaron Courville. FiLM: Visual
+reasoning with a general conditioning layer. In Proceedings of the AAAI Conference on Artificial
+Intelligence, volume 32, 2018. doi: 10.1609/aaai.v32i1.11671.
+Luigi Piccinelli, Yung-Hsu Yang, Christos Sakaridis, Mattia Segu, Siyuan Li, Luc Van Gool, and
+Fisher Yu. UniDepth: Universal monocular metric depth estimation. In Proceedings of the
+IEEE/CVF Conference on Computer Vision and Pattern Recognition, pp. 10106–10116, 2024.
+Luigi Piccinelli, Christos Sakaridis, Yung-Hsu Yang, Mattia Segu, Siyuan Li, Wim Abbeloos, and
+Luc Van Gool. UniDepthV2: Universal monocular metric depth estimation made simpler. IEEE
+Transactions on Pattern Analysis and Machine Intelligence, 48(3):2354–2367, 2026. doi: 10.1109/
+TPAMI.2025.3628473. URL https://doi.org/10.1109/TPAMI.2025.3628473.
+Qwen Team. Qwen3.5-4B model card. Hugging Face, 2026a. URL https://huggingface.
+co/Qwen/Qwen3.5-4B.
+Qwen Team.
+Qwen3.7-Plus.
+Alibaba Cloud Model Studio, 2026b.
+URL https:
+//docs.modelstudio.console.alibabacloud.com/en/model-studio/
+qwen3-7-plus.
+Pierluigi Zama Ramirez, Fabio Tosi, Matteo Poggi, Samuele Salti, Stefano Mattoccia, and Luigi Di
+Stefano. Open challenges in deep stereo: The booster dataset. In Proceedings of the IEEE/CVF
+Conference on Computer Vision and Pattern Recognition, pp. 21168–21178, 2022.
+Ren´e Ranftl, Alexey Bochkovskiy, and Vladlen Koltun. Vision transformers for dense prediction. In
+Proceedings of the IEEE/CVF International Conference on Computer Vision, pp. 12179–12188,
+2021.
+Mike Roberts, Jason Ramapuram, Anurag Ranjan, Atulit Kumar, Miguel Angel Bautista, Nathan
+Paczan, Russ Webb, and Joshua M. Susskind. Hypersim: A photorealistic synthetic dataset for
+holistic indoor scene understanding. In Proceedings of the IEEE/CVF International Conference on
+Computer Vision, pp. 10912–10922, 2021.
+Shuran Song, Samuel P. Lichtenberg, and Jianxiong Xiao. SUN RGB-D: A RGB-D scene under-
+standing benchmark suite. In Proceedings of the IEEE Conference on Computer Vision and Pattern
+Recognition, pp. 567–576, 2015.
+Pei Sun, Henrik Kretzschmar, Xerxes Dotiwalla, Aurelien Chouard, Vijaysai Patnaik, Paul Tsui,
+James Guo, Yin Zhou, Yuning Chai, Benjamin Caine, Vijay Vasudevan, Wei Han, Jiquan Ngiam,
+Hang Zhao, Aleksei Timofeev, Scott Ettinger, Maxim Krivokon, Amy Gao, Aditya Joshi, Yu Zhang,
+Jonathon Shlens, Zhifeng Chen, and Dragomir Anguelov. Scalability in perception for autonomous
+driving: Waymo open dataset. In Proceedings of the IEEE/CVF Conference on Computer Vision
+and Pattern Recognition, pp. 2446–2454, 2020.
+Bin Tan, Changjiang Sun, Xiage Qin, Hanat Adai, Zelin Fu, Tianxiang Zhou, Han Zhang, Yinghao
+Xu, Xing Zhu, Yujun Shen, and Nan Xue. Masked depth modeling for spatial perception. arXiv
+preprint arXiv:2601.17895, 2026.
+Ke Wang, Junting Pan, Weikang Shi, Zimu Lu, Mingjie Zhan, and Hongsheng Li. Measuring
+multimodal mathematical reasoning with the MATH-Vision dataset. In Advances in Neural
+Information Processing Systems, volume 37, 2024a.
+12
+
+
+Zirui Wang, Mengzhou Xia, Luxi He, Howard Chen, Yitao Liu, Richard Zhu, Kaiqu Liang, Xindi
+Wu, Haotian Liu, Sadhika Malladi, Alexis Chevalier, Sanjeev Arora, and Danqi Chen. CharXiv:
+Charting gaps in realistic chart understanding in multimodal LLMs. In Advances in Neural
+Information Processing Systems, volume 37, 2024b.
+Zhixiang Wei, Yi Li, Zhehan Kan, Xinghua Jiang, Zuwei Long, Shifeng Liu, Hongze Shen, Wei
+Liu, Xiaoyu Tan, Haojia Lin, Yubo Zhu, Qianyu Li, Di Yin, Haoyu Cao, Weibo Gu, Xin Li,
+Yinsong Liu, Deqiang Jiang, Xing Sun, Yunsheng Wu, Mingkong Tang, Shuangyin Liu, Lexiang
+Tang, Haodong Lin, Junru Lu, Jiarui Qin, Lingfeng Qiao, Ruizhi Qiao, Bo Ke, Jianfeng He,
+Ke Li, Yangning Li, Yunhang Shen, Mengdan Zhang, Peixian Chen, Kun Yin, Bing Liu, Yunfei
+Wu, Huang Chen, Zhongpeng Cai, and Xiaotian Li. Youtu-VL: Unleashing visual potential via
+unified vision-language supervision. arXiv preprint arXiv:2601.19798, 2026. URL https:
+//arxiv.org/abs/2601.19798.
+Benjamin Wilson, William Qi, Tanmay Agarwal, John Lambert, Jagjeet Singh, Siddhesh Khandelwal,
+Bowen Pan, Ratnesh Kumar, Andrew Hartnett, Jhony Kaesemodel Pontes, Deva Ramanan, Peter
+Carr, and James Hays. Argoverse 2: Next generation datasets for self-driving perception and
+forecasting. In Proceedings of the Neural Information Processing Systems Track on Datasets and
+Benchmarks, 2021.
+xAI.
+RealWorldQA.
+Hugging Face dataset, 2024.
+URL https://huggingface.co/
+datasets/xai-org/RealworldQA.
+Lihe Yang, Bingyi Kang, Zilong Huang, Xiaogang Xu, Jiashi Feng, and Hengshuang Zhao. Depth
+anything: Unleashing the power of large-scale unlabeled data. In Proceedings of the IEEE/CVF
+Conference on Computer Vision and Pattern Recognition, pp. 10371–10381, 2024a.
+Lihe Yang, Bingyi Kang, Zilong Huang, Zhen Zhao, Xiaogang Xu, Jiashi Feng, and Hengshuang
+Zhao. Depth anything V2. In Advances in Neural Information Processing Systems, volume 37,
+2024b.
+Zhibo Yang, Jun Tang, Zhaohai Li, Pengfei Wang, Jianqiang Wan, Humen Zhong, Xuejing Liu,
+Mingkun Yang, Peng Wang, Shuai Bai, Lianwen Jin, and Junyang Lin. CC-OCR: A comprehensive
+and challenging OCR benchmark for evaluating large multimodal models in literacy. In Proceedings
+of the IEEE/CVF International Conference on Computer Vision, pp. 21744–21754, 2025.
+Chandan Yeshwanth, Yueh-Cheng Liu, Matthias Nießner, and Angela Dai. ScanNet++: A high-
+fidelity dataset of 3D indoor scenes. In Proceedings of the IEEE/CVF International Conference on
+Computer Vision, pp. 12–22, 2023.
+Wei Yin, Chi Zhang, Hao Chen, Zhipeng Cai, Gang Yu, Kaixuan Wang, Xiaozhi Chen, and Chunhua
+Shen. Metric3D: Towards zero-shot metric 3d prediction from a single image. In Proceedings of
+the IEEE/CVF International Conference on Computer Vision, pp. 9043–9053, 2023.
+Hanxun Yu, Xuan Qu, Yuxin Wang, Jianke Zhu, and Lei Ke. Unlocking dense metric depth estimation
+in VLMs. arXiv preprint arXiv:2605.15876, 2026.
+Xiang Yue, Yuansheng Ni, Kai Zhang, Tianyu Zheng, Ruoqi Liu, Ge Zhang, Samuel Stevens, Dongfu
+Jiang, Weiming Ren, Yuxuan Sun, Cong Wei, Botao Yu, Ruibin Yuan, Renliang Sun, Ming
+Yin, Boyuan Zheng, Zhenzhu Yang, Yibo Liu, Wenhao Huang, Huan Sun, Yu Su, and Wenhu
+Chen. MMMU: A massive multi-discipline multimodal understanding and reasoning benchmark
+for expert AGI. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern
+Recognition, pp. 9556–9567, 2024a.
+Xiang Yue, Tianyu Zheng, Yuansheng Ni, Yubo Wang, Kai Zhang, Shengbang Tong, Yuxuan Sun,
+Botao Yu, Ge Zhang, Huan Sun, Yu Su, Wenhu Chen, and Graham Neubig. MMMU-Pro: A more
+robust multi-discipline multimodal understanding benchmark. arXiv preprint arXiv:2409.02813,
+2024b.
+Amir R. Zamir, Alexander Sax, William Shen, Leonidas J. Guibas, Jitendra Malik, and Silvio Savarese.
+Taskonomy: Disentangling task transfer learning. In Proceedings of the IEEE Conference on
+Computer Vision and Pattern Recognition, pp. 3712–3722, 2018.
+13
+
+
+Jian Zhang, Shijie Zhou, Bangya Liu, Achuta Kadambi, and Zhiwen Fan. SpatialStack: Layered
+geometry–language fusion for 3D VLM spatial reasoning. In Proceedings of the IEEE/CVF
+Conference on Computer Vision and Pattern Recognition, pp. 38678–38688, 2026.
+14
+
+
+PAPER AND APPENDIX CONTENTS
+MAIN PAPER
+1
+Introduction
+. . . . . . . . . . . . . . .
+1
+2
+Related Work . . . . . . . . . . . . . . .
+3
+3
+Method . . . . . . . . . . . . . . . . . .
+3
+3.1
+Framework Overview . . . . . . . .
+3
+3.2
+Level-0 Dense Metric Depth Prediction
+4
+3.3
+Instance-Level Depth Instruction
+Tuning . . . . . . . . . . . . . . . .
+4
+3.4
+Dense-to-Language Interface . . . .
+4
+4
+Instance-Level Depth-VQA Benchmark
+5
+5
+Experimental Setup
+. . . . . . . . . . .
+6
+5.1
+Training Pipeline
+. . . . . . . . . .
+6
+5.2
+Evaluation Setup
+. . . . . . . . . .
+6
+6
+Main Results . . . . . . . . . . . . . . .
+6
+6.1
+Level-0 Dense Metric Depth Prediction
+6
+6.2
+Instance-Level Depth Estimation and
+Reasoning . . . . . . . . . . . . . .
+7
+6.3
+Effect of the Dense-to-Language In-
+terface . . . . . . . . . . . . . . . .
+8
+6.4
+General VQA Retention and Spatial
+Understanding . . . . . . . . . . . .
+8
+7
+Analysis and Discussion . . . . . . . . .
+9
+7.1
+Dense Decoder Ablation
+. . . . . .
+9
+7.2
+Geometric Supervision Ablation
+. .
+9
+7.3
+Limitations
+. . . . . . . . . . . . .
+9
+8
+Conclusion
+. . . . . . . . . . . . . . . .
+9
+References
+. . . . . . . . . . . . . . . . . .
+10
+APPENDIX
+A Method and Implementation Details
+. .
+15
+A.1
+Dense Depth Branch
+. . . . . . . .
+15
+A.2
+Depth-VQA
+Instructions
+and
+Grounding . . . . . . . . . . . . . .
+16
+A.3
+Dense-to-Language Interface . . . .
+17
+B
+Data and Training Details . . . . . . . .
+18
+B.1
+Data Composition . . . . . . . . . .
+18
+B.2
+Optimization and Runtime
+. . . . .
+19
+C Benchmark Construction and Evalua-
+tion Protocols . . . . . . . . . . . . . . .
+19
+C.1
+Benchmark Construction and Quality
+Control
+. . . . . . . . . . . . . . .
+19
+C.2
+Benchmark Composition and Parti-
+tioning . . . . . . . . . . . . . . . .
+19
+C.3
+Level-0 Dense-Depth Evaluation . .
+20
+C.4
+Depth-VQA Evaluation . . . . . . .
+21
+C.5
+General-Capability Benchmarks and
+Baselines
+. . . . . . . . . . . . . .
+21
+C.6
+Agent-Pipeline Baseline Implemen-
+tation
+. . . . . . . . . . . . . . . .
+21
+D Additional Interface Ablation . . . . . .
+21
+D.1
+Disentangling Interface and Metric
+Supervision . . . . . . . . . . . . .
+21
+E
+Inference Efficiency
+. . . . . . . . . . .
+22
+F
+Additional Qualitative Results . . . . . .
+23
+F.1
+Dense Metric Depth . . . . . . . . .
+23
+F.2
+Instance-Level Depth-VQA . . . . .
+23
+A
+METHOD AND IMPLEMENTATION DETAILS
+A.1
+DENSE DEPTH BRANCH
+A.1.1
+DECODER AND CAMERA CONDITIONING
+Given an RGB image I ∈RH×W ×3, we retain three intermediate feature maps {Vk}3
+k=1 from
+the vision encoder and reshape the final VLM hidden states at image-token positions into a spa-
+tial map M. Following DPT (Ranftl et al., 2021), we normalize and project these four maps to
+{256, 512, 1024, 1024} channels, resample them with strides {8, 4, 2, 1}, and map each level to a
+common width of 512 channels. The camera condition is applied to all four levels before fusion, while
+RGB features are injected into the three higher-resolution levels. Residual fusion blocks propagate
+the coarsest representation upward and merge it with progressively finer conditioned features. The
+resulting full-resolution feature is used both to predict dense metric depth and to construct object-level
+geometry representations.
+Let κ
+=
+(fx, fy, cx, cy) denote the supplied camera intrinsics for an image of original
+size W0 × H0.
+We convert them to image-relative coordinates ¯k
+=
+[ ¯fx, ¯fy, ¯cx, ¯cy]
+=
+15
+
+
+[fx/W0, fy/H0, cx/W0, cy/H0], and define ϕx = 2 arctan(1/(2 ¯fx)), ϕy = 2 arctan(1/(2 ¯fy)),
+and r = W0/H0. The decoder condition is the nine-dimensional vector
+s(κ) = [¯k, log ¯fx, log ¯fy, ϕx, ϕy, r].
+(4)
+An MLP encodes s(κ) as c and modulates each decoder level through FiLM(Fk, c) = Fk ⊙(1 +
+γk(c)) + βk(c).
+A.1.2
+HIGH-RESOLUTION RGB REFINEMENT
+The RGB branch processes the input image with a convolutional stem followed by three stride-2
+stages, producing feature maps {Rk}3
+k=1 at strides {2, 4, 8}. After channel projection and spatial
+alignment, each RGB map is added to its corresponding DPT level through a learned residual spatial
+gate, eFk = Fk + Gk ⊙Rk, where Gk = clip(bk + 1.5 tanh gk([Fk; Rk]), 0, 3). The function gk
+predicts a spatially varying residual from the concatenated DPT and RGB features, and the base
+gate bk is initialized to 0.01. After the final fusion block, a convolution reduces the feature width,
+a second FiLM layer applies the camera condition, and the feature map is bilinearly resized to
+the target resolution. The metric prediction is bD = clip(softplus(h(F)) + dmin, dmin, dmax), with
+dmin = 0.05 m and dmax = 250 m.
+A.1.3
+DENSE OBJECTIVE
+The dense objective combines the absolute relative and scale-invariant log losses (Eigen et al., 2014)
+with structural supervision on inverse depth. Specifically, Lder and Llap match Scharr derivatives
+and Laplacian responses at scales {1, 2, 4, 8}. For the edge-guided stable local scale-and-shift
+invariant term Lssi, we sample regions centered on strong RGB edges and transform depth using
+q(D) = log(1+50/(10−4 +D)). Prediction and target values are robustly normalized and compared
+both within the sampled local regions and over the full image.
+A.2
+DEPTH-VQA INSTRUCTIONS AND GROUNDING
+A Level-1 example contains an image I and a grounded target object oi, and asks for instance-level
+metric depth estimation. The default target di is the mean of valid depths within the object’s instance
+mask; queries can also request center-point, median, nearest, or farthest depth. A Level-2 example
+contains grounded objects O = {oi}N
+i=1 and a question q requiring compositional depth reasoning
+in the Relative or Metric track. Relative questions ask for pairwise comparisons, closest or farthest
+object selection, or depth ordering. Metric questions ask for numerical mean-depth gaps, comparisons
+against a threshold, selection within a depth range or bounds, or decisions under a required depth
+margin. Compositional questions combine these operations with image-space relations to select the
+relevant objects. For a margin-based closest-object decision, the target is ambiguous when the closest
+object fails to meet the specified margin.
+Depth convention and object statistics.
+Camera depth denotes the optical-axis coordinate Z of
+a point in the camera frame, measured in meters, rather than its Euclidean distance to the camera
+center. Object depth denotes the statistic requested for an instance. For Level 1, let Ωi contain the
+pixels inside the ground-truth instance mask with valid camera depth D(p). The mean target is
+dmean
+i
+= |Ωi|−1 P
+p∈Ωi D(p), and the median target is the median over the same set. The nearest
+and farthest targets are the 5th and 95th percentiles of valid mask depths, respectively; center-point
+depth is a point measurement rather than a region aggregate. The mask defines the target statistics,
+while a box or referring prompt identifies the object to the model. The interface pools predicted
+evidence over box regions (Appendix A.3.1). Mean camera-depth gaps compare optical-axis depth
+statistics, not Euclidean distances between objects in 3D.
+A box prompt specifies the object category and bounding box, with coordinates normalized to a
+0–1000 image coordinate system. A referring prompt identifies the object with a natural-language
+description enclosed by object-reference tokens. Each object in a Level-2 prompt receives a stable
+identifier such as obj 1, and the prompt lists its identifier, category, and grounding cue before the
+question.
+Every Depth-VQA instruction embeds the camera intrinsics in the user prompt as <focal> fx
+fy cx cy </focal>. The token name <focal> is retained in the implementation, but the block
+16
+
+
+contains both focal lengths and principal-point coordinates. The language-modeling loss is applied
+only to the final answer: a metric depth value for Level 1, or a numerical depth gap, an object or
+set selection, an ordering, or a discrete comparison or constraint decision for Level 2, including
+ambiguous for an unmet depth-margin requirement. Input positions are excluded as language-
+modeling targets; auxiliary geometric losses supervise the geometry representations as specified in
+Appendix A.3.4.
+A.3
+DENSE-TO-LANGUAGE INTERFACE
+A.3.1
+CONSTRUCTION
+The same dense-to-language interface is used for Level 1 single-object queries and Level 2
+multi-object questions. The dense decoder produces a metric depth map bD and a full-resolution
+fused feature map Fd. For each grounded object oi, let bi = [x1
+i , y1
+i , x2
+i , y2
+i ] be its normalized
+box and let Ri denote the corresponding region. We average-pool Fd inside Ri to obtain an
+appearance-and-shape descriptor ri, and summarize the predicted depths in the same region as
+si = [µi, σi, dmin
+i
+, dmax
+i
+, dctr
+i , log µi, ai, ρi]. These entries denote the mean, standard deviation,
+minimum, maximum, center depth, log-mean depth, box area, and aspect ratio, respectively.
+For a box-grounded object, we directly use the box given in the prompt. For a referring expression
+enclosed by <|object ref start|> and <|object ref end|>, we take the VLM hidden
+state at the closing reference token as an object query. A lightweight box-regression head, imple-
+mented as layer normalization followed by a two-layer MLP, predicts bbi ∈[0, 1]4. The predicted box
+is supervised by the ground-truth region during training and is used for differentiable region pooling
+and inference.
+The projected object tokens are organized as
+BG = [gstart, e(obj 1:), g1,1, g1,2, . . . , e(obj N:), gN,1, gN,2, gend],
+(5)
+where e(obj i:) is the ordinary language-embedding sequence of an object anchor and gstart and
+gend are learned boundary vectors. Placeholder <geometry> embeddings at the dynamic positions
+are replaced by the corresponding object vectors before the continuation enters the language model.
+The bank therefore contains 2N + 2 dynamically generated vectors for N objects, in addition to the
+ordinary textual anchors. Its positions serve as conditioning context and are excluded as language-
+modeling targets. The answer loss nevertheless backpropagates through the geometry representations
+to the projector. The bank contains predicted geometry; ground-truth depth statistics serve as targets
+for the auxiliary representation objectives.
+A.3.2
+TOKEN CAPACITY: WHY TWO PER OBJECT?
+We use K = 2 as a compact multi-token bottleneck for each grounded object. The fused descriptor
+[ri; bi; si] contains decoder features, image location, and several statistics of the predicted metric
+depth. Compressing all of this evidence into a single VLM vector would impose a narrower infor-
+mation bottleneck. Instead, the final layer of Pg produces a 2h-dimensional output that is reshaped
+into two independently parameterized vectors in Rh. Both vectors are computed from the complete
+object descriptor; we do not prescribe one token for appearance and the other for metric depth. A
+shared object-index embedding binds the pair to the same instance, while distinct slot embeddings
+break their symmetry and allow the language model to use the two positions differently. The resulting
+specialization, if any, is therefore learned rather than hand-crafted. This added representational band-
+width requires only one additional dynamic position per object relative to K = 1: for N grounded
+objects, the geometry bank contains 2N object-geometry positions instead of N. Thus, K = 2
+provides a controlled capacity increase while keeping the interface sequence length proportional to
+the number of grounded objects; the subsequent attention cost follows the standard dependence on
+the resulting total sequence length.
+A.3.3
+CACHED GEOMETRY CONTINUATION
+At both instance levels, let P contain the image, camera-intrinsics block, grounded object descriptions,
+and question. Processing this prefix once produces contextualized states HP and a layer-wise cache
+17
+
+
+CP . The dense branch uses the visual positions in HP together with the multi-level vision features to
+construct BG, after which the cache is extended and the answer is generated as
+(HP , CP ) = fθ(P; cache = on),
+CP,G = fθ(BG; CP ),
+Y ∼fθ(·; CP,G).
+(6)
+In a full-attention layer, CP contains the prefix keys and values; queries from the geometry continua-
+tion attend to these cached tensors and to preceding continuation positions. The language backbone
+also contains linear-attention layers, which summarize the prefix with a causal-convolution state
+and a recurrent state rather than a conventional key–value sequence. We clone these differentiable
+prefix states and use them to initialize the chunk kernels that process the multi-token geometry
+continuation. Both attention types therefore process the continuation as if [P; BG; Y] had been
+evaluated as one causal sequence. Caching changes the computation schedule without changing
+causal order or exposing the geometry tokens as visible outputs.
+A.3.4
+REPRESENTATION OBJECTIVES
+For object i, let ¯gi = (gi,1+gi,2)/2 be the raw representation before it enters the language model, and
+let ¯hi = (hi,1 + hi,2)/2 be the final-layer representation at the same geometry positions after cached
+continuation. Let di contain five ground-truth object-depth statistics: center, mean, median, nearest,
+and farthest depth. Two lightweight heads predict their logarithms from the raw and contextualized
+representations:
+bzraw
+i
+= Hraw(¯gi),
+bzctx
+i
+= Hctx(¯hi),
+zi = log di.
+(7)
+The valid-depth ratio wi weights the corresponding smooth-ℓ1 regressions,
+Lraw =
+P
+i wi SmoothL1(bzraw
+i
+, zi)
+P
+i wi
+,
+Lctx =
+P
+i wi SmoothL1(bzctx
+i
+, zi)
+P
+i wi
+.
+(8)
+At both instance levels, we operationalize metric information preservation through the recoverability
+of these ground-truth statistics from both representations. The raw and contextual losses supervise
+the projected tokens and their states after language-context interaction against the same targets,
+encouraging metric content to remain accessible to a prediction head. For multi-object examples, we
+additionally supervise relative depth using
+Lrank =
+1
+|P|
+X
+(i,j)∈P
+softplus(−sij(bzi −bzj)) ,
+sij = sign(log dmean
+i
+−log dmean
+j
+),
+(9)
+where bzi is the contextual prediction of mean log-depth and P contains object pairs whose ground-
+truth log-depth gap exceeds a small ambiguity margin. The differentiable cache allows the answer
+and contextual geometry objectives to update the continuation adapters and trainable prefix-pathway
+parameters. The geometry projector receives gradients from the answer, raw-depth, contextual-depth,
+and ranking losses. We detach bD and Fd before object projection, so these objectives do not perturb
+the pretrained dense decoder, which continues to be optimized by Ldense on dense-prediction batches.
+B
+DATA AND TRAINING DETAILS
+B.1
+DATA COMPOSITION
+The Level-0 corpus combines approximately 6.7M images from LingBot-Depth, Taskonomy, Waymo,
+DDAD, nuScenes, Argoverse 2, and ScanNet++. We apply depth completion to outdoor sources with
+sparse sensor depth so that every source image is paired with a dense depth map, and preserve the
+camera intrinsics associated with each image. The dense branch converts these intrinsics into its
+numerical camera condition, whereas Depth-VQA prompts provide the raw (fx, fy, cx, cy) values
+in a textual camera-intrinsics block. All dense-benchmark frames are excluded from training. The
+instance-level corpus contains approximately 1.5M Level-1 and Level-2 examples sampled from
+LingBot-Depth, Waymo, DDAD, Argoverse 2, nuScenes, and Taskonomy. Stage 2 combines these
+examples with roughly 771K general visual-instruction examples and about 60K Level-0 replay
+samples, with stream frequencies proportional to corpus size.
+18
+
+
+B.2
+OPTIMIZATION AND RUNTIME
+Optimization.
+We use Qwen3.5-4B as the vision-language backbone and AdamW with weight
+decay 0.01 and a 3% warmup ratio. During Stage 1, the vision encoder and language model are frozen,
+and the dense branch is trained with a learning rate of 10−3. During Stage 2, decoder-side modules
+and LoRA-adapted language parameters use a learning rate of 10−4, while the vision encoder uses
+10−7. LoRA is applied to attention and feed-forward projections with rank 32, scaling factor 64, and
+dropout 0.05.
+Runtime settings.
+Dense inputs are resized to 448 × 448. Instruction-tuning sequences contain at
+most 4,096 tokens, including up to 2,048 visual tokens. We train in bfloat16 with FlashAttention-2
+and an effective global batch size of 256 for both dense and VQA updates. Stage 2 runs on four nodes
+with 32 NVIDIA A100 GPUs in total.
+C
+BENCHMARK CONSTRUCTION AND EVALUATION PROTOCOLS
+C.1
+BENCHMARK CONSTRUCTION AND QUALITY CONTROL
+Dense depth preparation.
+Outdoor datasets provide sparse sensor measurements, so we first apply
+depth completion to obtain a dense depth map for every source image. These image–depth pairs form
+the Level-0 pool and provide the metric field from which instance-level targets are derived.
+Level-1 instance construction.
+For each image, Qwen3.7-plus (Qwen Team, 2026b) and Seed-2.1-
+Turbo (ByteDance Seed Team, 2026) independently identify the major objects and propose a category
+and grounding box for each one. We pool their candidates and discard boxes covering less than
+1% of the image or lying too close to image boundaries. The remaining category–box pairs prompt
+SAM 3 (Carion et al., 2026) to produce instance masks, which pass a second mask-quality filter.
+For each retained mask, we combine its label, box, and dense depth values to compute center-point,
+mean, median, nearest, and farthest targets; the latter two are the 5th and 95th percentiles of valid
+mask depths, respectively. The resulting grounded instance records constitute the Level-1 data. Using
+two proposal models reduces dependence on model-specific object and category preferences during
+automatic construction.
+Level-2 question construction.
+We sample multiple Level-1 instance records from an image
+according to the Relative and Metric task taxonomy in Table 7. Given the selected object labels,
+boxes, and depth statistics, either Qwen3.7-plus or Seed-2.1-Turbo generates a candidate question and
+answer. The other model then checks question validity and answer correctness, and invalid examples
+are removed. This cross-model generation–verification protocol reduces reliance on the phrasing and
+reasoning patterns of a single generator.
+Human review and distribution control.
+We manually inspect 1% of the training samples across
+Levels 0–2, aggregate recurring failure cases, and translate them into targeted filters applied to the
+training corpus. Every benchmark example undergoes manual verification. For video data, we favor
+different objects when constructing Level-1 and Level-2 questions within the same scene and limit
+reuse of the same instance across task types, reducing repeated-instance bias.
+C.2
+BENCHMARK COMPOSITION AND PARTITIONING
+19
+
+
+Table 7: Detailed composition of the Relative Depth and Metric Depth tracks in the Level-2 bench-
+mark. “Subset” orders a specified subset of objects, whereas “all” orders every referenced object.
+Track
+Subbench
+Raw question type
+Required reasoning
+Relative
+Depth
+Spatial Pair
+closer_farther
+Decide which of two objects is closer to or farther from
+the camera.
+front_behind
+Decide which of two objects is in front of or behind the
+other.
+spatial_depth
+Resolve a left/right reference, then compare the selected
+object with another object in depth.
+Spatial Group
+spatial_depth_group
+Filter objects by a spatial relation, then select the nearest
+or farthest member.
+Depth Ordering
+depth_ordering_closest
+Select the closest object from all candidates.
+depth_ordering_farthest
+Select the farthest object from all candidates.
+depth_ordering_subset
+Order a specified subset of objects by depth.
+depth_ordering_all
+Order all referenced objects by depth.
+Metric
+Depth
+Metric Pair
+metric_depth_gap
+Compute the numerical difference in mean camera depth
+between two objects.
+metric_gap_threshold
+Determine whether the mean-depth gap between two ob-
+jects reaches a specified metric threshold.
+Spatial Metric Pair
+spatial_metric_gap
+Resolve a 2D spatial reference, then compute the absolute
+mean-depth difference to another object.
+Spatial Metric Group
+spatial_range_filter
+Apply a spatial filter, then select objects whose mean
+depths fall inside a specified metric range.
+compositional_metric_
+constraint
+Combine a spatial condition, a metric lower bound, and
+an object-referenced upper-depth bound.
+Metric Set Decision
+camera_safety_band
+Determine whether any referenced object lies within a
+specified mean-depth range from the camera.
+metric_margin_decision
+Select the closest object only when its depth advantage
+exceeds a metric margin; otherwise answer ambiguous.
+Benchmark partitioning.
+For datasets with official partitions, benchmark examples are sampled
+exclusively from their official validation or test splits. For datasets without an official evaluation
+partition, we randomly hold out complete scenes using a fixed seed and sample benchmark examples
+only from these held-out scenes. No held-out scene appears in either the dense-depth or instruction-
+tuning corpora.
+Table 8: Compact statistics for the dense and instance-level depth benchmarks. Depth-VQA contains
+1,503 questions in total.
+Component
+Sampling unit
+Scale or coverage
+Task composition
+Level-0 dense depth
+Image
+4,228 images from nine
+datasets
+500 images from each of eight datasets and all 228
+Booster images
+Level-1 instance depth
+Grounded-object query
+757 queries from seven
+datasets
+Center, nearest, farthest, mean, and median metric depth;
+box or referring prompts
+Level-2 Relative
+Multi-object question
+370 questions
+Spatial Pair (86), Spatial Group (88), and Depth Order-
+ing (196)
+Level-2 Metric
+Multi-object question
+376 questions
+Metric Pair (46 threshold + 48 numerical gap), Spatial
+Metric Pair (94), Spatial Metric Group (94), and Metric
+Set Decision (94)
+C.3
+LEVEL-0 DENSE-DEPTH EVALUATION
+Sampling and ground truth.
+We select 500 frames from each of Argoverse 2, Waymo, nuScenes,
+DDAD, Taskonomy, ScanNet++, HyperSim, and SUN RGB-D using a fixed random seed, and use
+all 228 Booster images spanning 38 scenes and six exposure settings. All selected frame identities
+are removed from the dense training manifest. The automotive datasets are evaluated against their
+original sensor-derived metric ground truth rather than depth-completion outputs. Booster disparity is
+converted to metric depth using its official calibration and evaluated with the official validity mask.
+Scoring.
+Ground-truth camera intrinsics are supplied to every method evaluated in Table 2. Predic-
+tions are compared directly in metric scale without median scaling or scale-and-shift alignment. For
+the first eight datasets, valid pixels must be finite and lie within [0.05, 250] meters; Booster follows
+its official mask and [0.001, 10] meter range. We compute AbsRel, RMSE, log RMSE, SILog, and δ1,
+δ2, and δ3 over valid pixels. The main comparison reports δ1, with the cross-dataset score computed
+as the unweighted mean of the nine dataset-level results.
+20
+
+
+C.4
+DEPTH-VQA EVALUATION
+Level 1 metrics are computed over the requested instance-depth values after parsing the numerical
+answer in meters. For the Level 2 Relative track, a selection answer is correct only if it contains
+the target identifier, and an ordering answer is correct only if the full predicted identifier sequence
+matches the reference. Relative Overall Acc is computed over the 86 Spatial Pair, 88 Spatial
+Group, and 196 Depth Ordering questions (370 in total). In the Metric track, Metric Pair separates
+46 metric_gap_threshold questions scored by accuracy from 48 metric_depth_gap
+questions scored by δ1. Spatial Metric Pair reports δ1 on its 94 spatial_metric_gap questions.
+Metric Overall Acc divides the total correct answers on the threshold, Spatial Metric Group, and
+Metric Set Decision questions by 46+94+94 = 234. The 142 numerical gap questions are excluded
+from Overall Acc and evaluated in their respective δ1 columns.
+C.5
+GENERAL-CAPABILITY BENCHMARKS AND BASELINES
+Benchmarks.
+Table 4 covers MathVision (Wang et al., 2024a), MathVista (Lu et al., 2024),
+MMMU (Yue et al., 2024a), MMMU-Pro (Yue et al., 2024b), RealWorldQA (xAI, 2024), MM-
+Star (Chen et al., 2024b), MMBench (Liu et al., 2024), HallusionBench (Guan et al., 2024),
+AI2D (Kembhavi et al., 2016), CC-OCR (Yang et al., 2025), OCRBench (Liu et al., 2023),
+CharXiv (Wang et al., 2024b), ERQA (Google DeepMind, 2025), EmbSpatialBench (Du et al.,
+2024), and Ego3D-Bench (Gholami et al., 2026).
+Baselines.
+For Level-0 dense prediction, the specialized vision models are Metric3D (Yin et al.,
+2023), Metric3D v2 (Hu et al., 2024), UniDepth V2 (Piccinelli et al., 2026), Depth Anything
+V1–V3 (Yang et al., 2024a;b; Lin et al., 2026), and MetricAnything (Ma et al., 2026); the depth-
+aware VLMs are DepthLM (Cai et al., 2026) and DepthVLM (Yu et al., 2026). For instance-
+level Depth-VQA, the general-purpose VLMs are Qwen3.5-4B (Qwen Team, 2026a), Gemini-
+3.1-Pro-Preview (Google DeepMind, 2026), Qwen3.7-plus (Qwen Team, 2026b), and Seed-2.1-
+Turbo (ByteDance Seed Team, 2026), while the metric-depth VLMs are DepthLM-12B, DepthVLM-
+4B, and Youtu-VL-4B-Instruct.
+C.6
+AGENT-PIPELINE BASELINE IMPLEMENTATION
+The agent baselines in Table 3 use a fixed tool-augmented inference pipeline. For each benchmark
+question, MetricAnything receives the original RGB image and the camera intrinsics provided by the
+benchmark and predicts a pixel-level metric depth map in meters. We then crop this prediction with
+each benchmark-provided grounding box and compute a structured set of regional depth statistics
+for the corresponding identifier, such as obj i. The resulting object-indexed depth table is supplied
+together with the original image and question to either Qwen3.5-4B or Qwen3.7-plus. The reasoner
+returns its final response between <answer> and </answer>, and the parsed response is evaluated
+by the original benchmark scorer. The pipeline therefore exposes predicted metric measurements
+through an explicit textual table while preserving the benchmark questions, object grounding, and
+scoring protocol; benchmark boxes are used only to extract regions from the predicted depth map,
+and no ground-truth depth values are given to the reasoner.
+D
+ADDITIONAL INTERFACE ABLATION
+D.1
+DISENTANGLING INTERFACE AND METRIC SUPERVISION
+Table 9 tests whether the gain from the dense-to-language interface can be explained by additional
+supervision on metric values alone. The new No interface + metric supervision control removes the
+interface and adds auxiliary language targets for every instance referenced by a QA example. These
+targets ask the model to predict the instance’s center, mean, median, nearest, and farthest depths (e.g.,
+“Given obj1, predict its center depth”) and are optimized with the language loss. The remaining three
+rows reproduce the corresponding configurations from Table 6.
+21
+
+
+Table 9: Disentangling direct metric supervision from the dense-to-language interface on Level-2
+Relative and Metric Overall Acc.
+Variant
+Relative Overall
+Metric Overall
+No interface
+0.5838
+0.7692
+No interface + metric supervision
+0.5865
+0.7949
+Interface + Lans
+0.5838
+0.7735
+Full interface
+0.6270
+0.8504
+Without the interface, direct metric supervision improves Relative Overall Acc by 0.27 percentage
+points and Metric Overall Acc by 2.56 points. The larger Metric gain confirms that the auxiliary
+language targets provide useful numerical depth supervision. However, the full interface remains
+ahead of this control by 4.05 points on Relative Overall Acc and 5.56 points on Metric Overall Acc.
+Within this comparison, metric supervision therefore explains only part of the improvement: the full
+interface provides an additional benefit beyond exposing the language model to referenced-object
+depth values through auxiliary text targets.
+E
+INFERENCE EFFICIENCY
+We compare three inference modes with end-of-sequence stopping disabled and a fixed output length
+of 64 tokens. No-interface generates answers without geometry tokens. Two-pass first extracts
+geometry and then reprocesses the multimodal prefix with the geometry tokens to generate the answer.
+Single-prefill reuses the prefix cache and processes the geometry tokens as a continuation, as described
+in Appendix A.3.3. Table 10 reports generation latency, end-to-end latency, token throughput, and
+peak allocated GPU memory under this fixed-length setting.
+Table 10: Inference efficiency with a fixed output length of 64 tokens and end-of-sequence stopping
+disabled. Single-prefill is the cached geometry-continuation scheme used by DepthEvidence.
+Mode
+Generation
+latency (s)↓
+End-to-end
+latency (s)↓
+Throughput
+(tokens/s)↑
+Peak allocated
+memory (GiB)↓
+No-interface
+4.174
+4.289
+15.333
+10.36
+Two-pass
+4.535
+4.710
+14.111
+13.56
+Single-prefill
+4.323
+4.491
+14.804
+13.73
+Single-prefill reduces generation latency from 4.535 to 4.323 s and end-to-end latency from 4.710
+to 4.491 s relative to two-pass inference, reductions of 4.67% and 4.65%, respectively. Throughput
+increases by 4.91%, from 14.111 to 14.804 tokens/s. Relative to no-interface inference, the end-to-end
+overhead is 0.202 s (4.71%). These results support reusing the multimodal prefix to limit the runtime
+cost of incorporating dense geometry into language reasoning. The benefit is in latency rather than
+memory: single-prefill uses 13.73 GiB of peak allocated memory, 0.17 GiB more than two-pass and
+3.37 GiB more than no-interface. Thus, cached continuation reduces repeated prefix computation
+while retaining an additional memory cost for geometry-conditioned inference.
+22
+
+
+F
+ADDITIONAL QUALITATIVE RESULTS
+F.1
+DENSE METRIC DEPTH
+Figure 5 extends the qualitative comparison in Section 6.1 to the five remaining dense benchmarks.
+RGB
+GT
+DepthVLM-4B
+Youtu-VL-4B
+Metric Anything
+UniDepth V2
+DepthEvidence
+NuScenes
+DDAD
+Taskonomy
+SUN RGB-D
+Booster
+Figure 5: Additional qualitative dense metric depth comparisons on NuScenes, DDAD, Taskonomy,
+SUN RGB-D, and Booster. Columns show RGB, ground truth (GT), DepthVLM-4B, Youtu-VL-4B-
+Instruct, MetricAnything, UniDepth V2, and DepthEvidence. Outdoor GT is densely completed for
+visualization only; quantitative evaluation uses the original sparse sensor GT. All depth maps within
+a row use the same color scale.
+F.2
+INSTANCE-LEVEL DEPTH-VQA
+We provide selected qualitative cases, including the input image, question, ground-truth answer, and
+the outputs of Gemini-3.1-Pro, DepthEvidence without the interface, and DepthEvidence. A green
+checkmark (✓) denotes a correct benchmark prediction, and a red cross (×) denotes an incorrect
+one. Box-grounded questions are paired with the annotated box image, whereas referring-prompt
+questions retain the original image. Level 1 cases are grouped by dataset; Level 2 cases follow the
+subbench taxonomy of Table 1 and cover every Relative Depth and Metric Depth subbench. Examples
+reproduced in Figure 4 are omitted here, except for the sole selected Depth Ordering example.
+F.2.1
+LEVEL-1 CASES GROUPED BY DATASET
+These examples span center-point, mean, median, nearest, and farthest instance-depth queries. The
+displayed target specification is the semantic reference seen by the model; box coordinates remain in
+the question for box-grounded cases.
+LingBot-Depth
+Mean depth; box prompt
+Question. Given this image and the target object, estimate the
+average depth of the target region from the camera. Target:
+classroom sign with bbox 2d [670, 38, 888, 529]
+Ground truth: 1.25 m
+Gemini-3.1-Pro: 2.11 m ×
+DepthEvidence w/o Interface: 1.31 m ✓
+DepthEvidence: 1.32 m ✓
+Waymo
+23
+
+
+Farthest depth; box prompt
+Question. Given this image and the target object, estimate the
+farthest depth of the target region from the camera. Target:
+silver sedan with bbox 2d [819, 454, 999, 562]
+Ground truth: 27.167 m
+Gemini-3.1-Pro: 41.11 m ×
+DepthEvidence w/o Interface: 26.62 m ✓
+DepthEvidence: 27.3 m ✓
+Median depth; referring prompt
+Question. Given this image and the target object, estimate the
+median depth of the target region from the camera. Target: pole
+referred as ”the tall, dark metal pole on the far left sidewalk
+near the traffic light”
+Ground truth: 16 m
+Gemini-3.1-Pro: 10.11 m ×
+DepthEvidence w/o Interface: 15 m ✓
+DepthEvidence: 15.56 m ✓
+DDAD
+Mean depth; box prompt
+Question. Given this image and the target object, estimate the
+average depth of the target region from the camera. Target:
+green trees with bbox 2d [736, 248, 999, 514]
+Ground truth: 50.94 m
+Gemini-3.1-Pro: 101.12 m ×
+DepthEvidence w/o Interface: 52.4 m ✓
+DepthEvidence: 55.3 m ✓
+Argoverse 2
+Nearest depth; referring prompt
+Question. Given this image and the target object, estimate the
+nearest depth of the target region from the camera. Target:
+white car hood referred as ”the white car hood with ’ARGO
+SELF-DRIVING TEST VEHICLE’ text at the bottom of the
+image”
+Ground truth: 1.15 m
+Gemini-3.1-Pro: 1.8 m ×
+DepthEvidence w/o Interface: 1.06 m ✓
+DepthEvidence: 1.03 m ✓
+24
+
+
+Nearest depth; box prompt
+Question. Given this image and the target object, estimate the
+nearest depth of the target region from the camera. Target:
+large brick building with bbox 2d [458, 230, 797, 495]
+Ground truth: 37.46 m
+Gemini-3.1-Pro: 10.82 m ×
+DepthEvidence w/o Interface: 40.5 m ✓
+DepthEvidence: 36.5 m ✓
+nuScenes
+Median depth; box prompt
+Question. Given this image and the target object, estimate the
+median depth of the target region from the camera. Target:
+road with bbox 2d [2, 530, 999, 998]
+Ground truth: 7.19 m
+Gemini-3.1-Pro: 14.11 m ×
+DepthEvidence w/o Interface: 7.53 m ✓
+DepthEvidence: 7.06 m ✓
+Taskonomy
+Mean depth; box prompt
+Question. Given this image and the target object, estimate the
+average depth of the target region from the camera. Target:
+blue bowl with bbox 2d [734, 713, 992, 828]
+Ground truth: 1.53 m
+Gemini-3.1-Pro: 1.81 m ✓
+DepthEvidence w/o Interface: 1.4 m ✓
+DepthEvidence: 1.48 m ✓
+F.2.2
+LEVEL-2 CASES GROUPED BY TABLE 1 SUBBENCH
+The cases below retain the same Relative Depth and Metric Depth organization used by the benchmark.
+Annotated boxes identify the candidate objects and their stable obj i identifiers.
+Relative Depth
+25
+
+
+Spatial Pair.
+spatial depth; box prompt
+Question. Which is closer to the camera, the object to the left
+of silver pickup truck obj 2 or sidewalk obj 3?
+Ground truth: red sedan obj 1.
+Gemini-3.1-Pro: obj 3 ×
+DepthEvidence w/o Interface: red sedan obj 1. ✓
+DepthEvidence: red sedan obj 1. ✓
+Spatial Group.
+spatial depth group; box prompt
+Question. Among the objects to the left of tree 3 obj 6, which
+is closest to the camera?
+Ground truth: crosswalk marking 1 obj 1.
+Gemini-3.1-Pro: obj 3 ×
+DepthEvidence w/o Interface: crosswalk marking 1 obj 1. ✓
+DepthEvidence: crosswalk marking 1 obj 1. ✓
+Depth Ordering.
+depth ordering all; box prompt
+Question. Rank the main objects in this scene by their distance
+to the camera, starting from the closest.
+Ground truth: traffic light obj 1, person in purple jacket obj 5,
+shopping cart 2 obj 3, shopping cart 1 obj 2, building pillar
+obj 7, red car obj 4, tree obj 6.
+Gemini-3.1-Pro: obj 1, obj 5, obj 7, obj 3, obj 2, obj 4,
+obj 6 ×
+DepthEvidence w/o Interface: traffic light obj 1, person in
+purple jacket obj 5, shopping cart 1 obj 2, shopping cart 2
+obj 3, building pillar obj 7, red car obj 4, tree obj 6. ×
+DepthEvidence: traffic light obj 1, person in purple jacket
+obj 5, shopping cart 2 obj 3, shopping cart 1 obj 2,
+building pillar obj 7, red car obj 4, tree obj 6. ✓
+Metric Depth
+26
+
+
+Metric Pair.
+metric gap threshold; box prompt
+Question. Is the average camera depth of wooden
+entertainment center obj 2 at least 6.60 m greater than that of
+blue sofa obj 1?
+Ground truth: No.
+Gemini-3.1-Pro: yes. ×
+DepthEvidence w/o Interface: no. ✓
+DepthEvidence: No. ✓
+Spatial Metric Pair.
+spatial metric gap; box prompt
+Question. What is the absolute difference in average camera
+depth between the object to the right of black sedan obj 1 and
+building obj 3?
+Ground truth: 38.39 m
+Gemini-3.1-Pro: 10.5 ×
+DepthEvidence w/o Interface: 27.00 ×
+DepthEvidence: 40.00 m ✓
+Spatial Metric Group.
+spatial range filter; box prompt
+Question. Among the referenced objects to the left of building
+obj 4, which have an average camera depth between 55.21 m
+and 79.57 m, inclusive?
+Ground truth: building obj 5.
+Gemini-3.1-Pro: obj 3 ×
+DepthEvidence w/o Interface: building obj 5. ✓
+DepthEvidence: building obj 5. ✓
+compositional metric constraint; box prompt
+Question. Among the referenced objects to the right of green
+bush obj 4, select those with an average camera depth greater
+than 4.50 m but smaller than that of large glass window obj 2.
+Ground truth: silver car obj 1, metal railing obj 5, green bush
+obj 3.
+Gemini-3.1-Pro: obj 3, obj 5 ×
+DepthEvidence w/o Interface: silver car obj 1, green bush
+obj 3, metal railing obj 5. ✓
+DepthEvidence: silver car obj 1, metal railing obj 5, green
+bush obj 3. ✓
+27
+
+
+Metric Set Decision.
+metric margin decision; box prompt
+Question. Select the closest referenced object only if it is at
+least 21.00 m closer in average camera depth than every other
+candidate; otherwise answer ambiguous.
+Ground truth: ambiguous.
+Gemini-3.1-Pro: obj 1 ×
+DepthEvidence w/o Interface: asphalt road obj 1. ×
+DepthEvidence: ambiguous. ✓
+camera safety band; box prompt
+Question. Is any referenced object at an average camera depth
+of no more than 0.80 m?
+Ground truth: No.
+Gemini-3.1-Pro: yes ×
+DepthEvidence w/o Interface: no ✓
+DepthEvidence: No. ✓
+28
