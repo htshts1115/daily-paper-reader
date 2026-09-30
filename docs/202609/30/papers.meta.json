@@ -1,0 +1,54 @@
+{
+  "label": "2026-09-30",
+  "date": "2026-09-30",
+  "generated_at": "2026-09-30T23:20:05",
+  "count": 3,
+  "papers": [
+    {
+      "paper_id": "202609/30/2609.28083v1-zoomdiff-a-high-fidelity-diffusion-model-for-dual-camera-smooth-zooming",
+      "section": "quick",
+      "title_en": "ZoomDiff: A High-Fidelity Diffusion Model for Dual-Camera Smooth Zooming",
+      "authors": "Jiayi Zhang, Renlong Wu, Yukang Ding, Sibin Deng, Wangmeng Zuo",
+      "date": "2026-09-23",
+      "pdf": "https://arxiv.org/pdf/2609.28083v1",
+      "score": "6.0",
+      "evidence": "用于双摄平滑变焦过渡的扩散模型",
+      "tldr": "双摄数码变焦常因跨视角差异大、几何与色彩不一致而出现跳变，影响体验。现有帧插值微调方法难以应对，直接套用扩散模型也受条件引导不足、VAE高频丢失和时序不稳制约。ZoomDiff在潜空间与像素空间利用双摄输入，增强多步去噪条件引导，并将VAE编码器的光流对齐多尺度特征注入解码器，辅以时序一致性监督。在合成与真实数据上，其定量与定性结果均超越现有方法，推动高保真平滑变焦。",
+      "tags": "query:stereo-depth",
+      "abstract_en": "Digital zoom transitions between dual cameras often exhibit conspicuous discontinuities in geometric structure and chromatic consistency, degrading the user experience. While recent dual-camera smooth zoom (DCSZ) methods attempt to mitigate this by fine-tuning frame interpolation (FI) models on DCSZ data, they struggle with the large cross-view disparities and complex geometric transformations. Considering that the generative prior of diffusion models is suitable for addressing this problem, we explore their application to DCSZ. However, naively applying existing diffusion-based FI models still yields low-fidelity transitions due to insufficient conditional guidance, high-frequency information loss during VAE encoding, as well as inadequate temporal consistency. To address this, we propose ZoomDiff, a high-fidelity diffusion model that leverages dual-camera inputs in both latent and pixel spaces for photo-realistic transitions. Specifically, we first strengthen dual-image conditional guidance during the multi-step denoising process to improve geometric consistency. Then we inject flow-aligned multi-scale features from the VAE encoder into the VAE decoder to recover high-frequency details, where flow-guided temporal consistency supervision are introduced to produce more smooth transitions. Extensive experiments on both synthetic and real-world datasets demonstrate that ZoomDiff outperforms state-of-the-art methods quantitatively and qualitatively. Project page: https://jiayi-hit.github.io/ZoomDiff.github.io/.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202609/30/2609.32711v1-prodygs-dynamic-gaussian-splatting-from-a-single-static-monocular-camera",
+      "section": "quick",
+      "title_en": "ProDyGS: Dynamic Gaussian Splatting from a Single Static Monocular Camera",
+      "authors": "Ugo Leone Cavalcanti, Fabio Tosi, Matteo Poggi, Andrea Conti, Vladimir Zlokolica, Valerio Cambareri, Stefano Mattoccia",
+      "date": "2026-09-26",
+      "pdf": "https://arxiv.org/pdf/2609.32711v1",
+      "score": "6.0",
+      "evidence": "使用基础单目深度网络估计时序一致深度图",
+      "tldr": "针对单台静态单目相机拍摄视频难以获得多视角几何约束的问题，ProDyGS提出动态3D高斯泼溅框架。该方法利用单目深度网络估计时序一致深度，并通过深度引导生成合成多视角代理图像，以弥补多视角监督缺失。随后用变形网络对规范高斯进行时序形变，学习动态场景。在DyNeRF数据集上，方法以仅需单目深度作为外部监督达到最优性能，超越依赖场景流等更强先验的方法。",
+      "tags": "query:mono-depth",
+      "abstract_en": "We present ProDyGS, a novel dynamic 3D Gaussian Splatting framework for high-quality novel view synthesis from videos captured by a single static camera. While existing methods rely on multi-view setups or significant camera motion for geometric constraints, our approach addresses the challenging scenario where multi-view supervision is completely absent. We overcome this limitation by generating synthetic multi-view supervision through depth-guided proxy image synthesis. Specifically, we estimate temporally consistent depth maps using foundational monocular depth networks, then construct 3D Gaussian representations that generate proxy images from arbitrary viewpoints. A deformation network learns temporal dynamics by warping canonical Gaussians using this augmented supervision. Experiments on the DyNeRF dataset demonstrate that our method achieves state-of-the-art performance while requiring only monocular depth estimation as external supervision, outperforming approaches that rely on stronger priors such as scene flow.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202609/30/2609.35490v1-ahmad-adaptive-hybrid-multi-task-vision-learning-with-assisted-distillation-for-keypoint-detection",
+      "section": "quick",
+      "title_en": "AHMAD: Adaptive Hybrid Multi-task Vision Learning with Assisted Distillation for Keypoint Detection",
+      "authors": "Mohammad Mahdi, Nedyalko Prisadnikov, Yuqian Fu, Carmelo Scribano, Danda Pani Paudel, Luc Van Gool",
+      "date": "2026-09-28",
+      "pdf": "https://arxiv.org/pdf/2609.35490v1",
+      "score": "6.0",
+      "evidence": "统一语义分割与深度估计的多任务学习",
+      "tldr": "通用多任务视觉模型需统一稠密与稀疏预测任务，但输出结构差异大。AHMAD 用共享编码器-解码器与轻量任务投影器联合语义/实例分割、深度估计、关键点检测和目标检测，并引入知识蒸馏让关键点检测单次前向。COCO-val 上全景分割 PQ 达 53.1、语义分割 mIoU 达 66.5。该框架轻量高效，在五类任务上表现强劲。",
+      "tags": "query:seg",
+      "abstract_en": "Generalist multitasking vision models aim to unify multiple vision tasks within a single framework, enabling more efficient and versatile learning. However, handling diverse vision tasks -- spanning dense and sparse predictions -- remains challenging due to their inherently varying output structures. In this paper, we propose AHMAD, a simple yet effective framework for generalist multitask learning that integrates different key vision tasks: semantic segmentation, instance segmentation, depth estimation, keypoint detection, and object detection. Our approach incorporates these five tasks into a unified structure: a shared encoder-decoder with several lightweight task-specific projectors. Under the multitask learning paradigm, we observed a complementary performance gain, achieving a state-of-the-art PQ of 53.1 and an mIoU of 66.5 for COCO-val panoptic and semantic segmentation, respectively. Additionally, for top-down keypoint detection, which typically incurs high computational overhead due to multiple forward passes, we introduce a knowledge distillation-based method that enables a single forward pass over the entire image, greatly improving efficiency. Ultimately, our model delivers a lightweight yet effective generalist multitask learning framework, demonstrating strong performance across five vision tasks.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    }
+  ],
+  "errors": []
+}
