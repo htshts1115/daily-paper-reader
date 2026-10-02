@@ -1,0 +1,283 @@
+{
+  "mode": "standard",
+  "generated_at": "2026-10-02T23:00:08.164075+00:00",
+  "stats": {
+    "mode": "standard",
+    "tag_count": 4,
+    "deep_divecandidates": 2,
+    "deep_cap": 9,
+    "deep_selected": 2,
+    "quick_candidates": 4,
+    "quick_skim_target": 14,
+    "quick_selected": 4
+  },
+  "deep_dive": [
+    {
+      "id": "2609.36929v1",
+      "source": "arxiv",
+      "title": "SFE-VGGT: Source-Free VGGT Distillation for Event-Based Monocular Depth Estimation",
+      "abstract": "Recent event-based depth estimation methods successfully transfer geometric priors from vision foundation models via cross-modal distillation. However, their reliance on synchronized RGB-event pairs or depth annotations during training severely restricts practical deployment. To overcome this bottleneck, we propose SFE-VGGT, a novel source-free framework that distills the geometric priors of VGGT to the event domain without any paired RGB observations. Our core idea is to reconstruct surrogate frames directly from the target event stream to act as a frozen geometric teacher, entirely eliminating the need for genuine source RGB data. Crucially, as these surrogate frames inherently yield imperfect and spatially varying supervision, directly distilling from them propagates artifacts. To resolve this, we introduce a novel reliability-aware distillation strategy. This includes Density-Aware Feature Distillation to emphasize informative event regions, and Confidence-Weighted Depth Distillation to dynamically regulate supervision based on relative teacher-student prediction confidence. Meanwhile, we propose a Cross-Frame Relational Consistency loss that enforces temporal geometric stability using reliable inter-frame correspondences, bypassing the need for temporally consistent teacher's depth. Extensive experiments demonstrate that, despite source-free, our SFE-VGGT closely matches the accuracy of RGB-dependent baselines under standard conditions and significantly surpasses them in challenging nighttime scenarios. Across MVSEC nighttime sequences, SFE-VGGT reduces the average 10 m depth error by 15.3% compared with EventVGGT. Moreover, our method exhibits robust zero-shot generalization across real-world datasets, proving that highly effective geometric priors can be transferred to event cameras using strictly source-free supervision.",
+      "authors": [
+        "Thai Duy Nguyen",
+        "Addison Lin Wang"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-09-29T07:44:38+00:00",
+      "link": "https://arxiv.org/pdf/2609.36929v1",
+      "tags": [
+        "keyword:matting",
+        "keyword:mono-depth",
+        "keyword:neural-bokeh",
+        "keyword:seg",
+        "query:matting",
+        "query:mono-depth",
+        "query:neural-bokeh",
+        "query:seg"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "monocular depth estimation via distilling geometric priors of a depth foundation model",
+      "llm_evidence_cn": "蒸馏深度基础模型几何先验的单目深度估计",
+      "llm_evidence": "蒸馏深度基础模型几何先验的单目深度估计",
+      "canonical_evidence": "蒸馏深度基础模型几何先验的单目深度估计",
+      "llm_tldr_en": "SFE-VGGT distills geometric priors from VGGT into the event domain without paired RGB data, reconstructing surrogate frames from events as a frozen teacher and handling spatially varying imperfect supervision for monocular depth estimation.",
+      "llm_tldr_cn": "事件相机深度估计通常依赖同步 RGB-事件对或深度标注进行跨模态蒸馏，限制了实际部署。SFE-VGGT 提出无源蒸馏框架，直接从目标事件流重建代理帧作为冻结的几何教师，完全摆脱对真实 RGB 源数据的依赖，并针对代理帧带来的空间变化不完美监督设计训练策略。该工作属于单目深度估计与深度基础模型迁移方向，对零样本泛化深度预测具有参考价值。",
+      "llm_tldr": "事件相机深度估计通常依赖同步 RGB-事件对或深度标注进行跨模态蒸馏，限制了实际部署。SFE-VGGT 提出无源蒸馏框架，直接从目标事件流重建代理帧作为冻结的几何教师，完全摆脱对真实 RGB 源数据的依赖，并针对代理帧带来的空间变化不完美监督设计训练策略。该工作属于单目深度估计与深度基础模型迁移方向，对零样本泛化深度预测具有参考价值。",
+      "llm_tags": [
+        "query:mono-depth"
+      ],
+      "matched_query_tag": "query:mono-depth",
+      "matched_query_text": "monocular depth estimation",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2610.01286v1",
+      "source": "arxiv",
+      "title": "Dyna3: VLM-Guided Training-Free 4D Reconstruction via Depth Foundation Models",
+      "abstract": "Recent depth foundation models like Depth Anything 3 (DA3) achieve remarkable multi-view depth estimation but assume static 3D scenes, limiting their applicability to real-world dynamic environments. Existing training-free 4D methods like Easi3R and VGGT4D rely on correspondence-trained backbones whose attention encodes cross-frame matching, a property absent in depth-only models like DA3. We present Dyna3, a training-free framework that extends DA3 for 4D dynamic scene reconstruction without any fine-tuning. Our key insight is that DA3's cross-view features, though trained only for depth consistency, implicitly encode motion-discriminative signals when combined with best-match feature search across frames. Its static surfaces find consistent matches globally, while dynamic objects cannot. We further adopt vision-language models (VLM) to automatically generate scene-specific semantic prompts for SAM 3, enabling precise instance-level segmentation that distinguishes which objects move from what objects exist. For reconstruction, we decouple the scene into a cross-frame aligned static background and per-frame dynamic point clouds. Experiments on four datasets demonstrate that Dyna3 surpasses correspondence-trained methods with +5.5pp J-Mean over state-of-the-art VGGT4D on dynamic object segmentation, while achieving up to 13x faster pose estimation and 3x faster 4D reconstruction with 4 to 8x lower memory. Dyna3 could therefore enable much denser temporal sampling that prior methods cannot support.",
+      "authors": [
+        "Xinhao Xiang",
+        "Weiyang Li",
+        "Zhijie Zheng",
+        "Abhijeet Rastogi",
+        "Jiawei Zhang"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-10-01T08:24:21+00:00",
+      "link": "https://arxiv.org/pdf/2610.01286v1",
+      "tags": [
+        "keyword:matting",
+        "keyword:mono-depth",
+        "keyword:neural-bokeh",
+        "keyword:seg",
+        "query:matting",
+        "query:mono-depth",
+        "query:neural-bokeh",
+        "query:seg"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "extends Depth Anything 3 depth foundation model to 4D scenes",
+      "llm_evidence_cn": "将Depth Anything 3深度基础模型扩展到四维场景",
+      "llm_evidence": "将Depth Anything 3深度基础模型扩展到四维场景",
+      "canonical_evidence": "将Depth Anything 3深度基础模型扩展到四维场景",
+      "llm_tldr_en": "Depth foundation models like Depth Anything 3 achieve strong multi-view depth but assume static scenes. Dyna3 is a training-free framework that reuses DA3 cross-view features and best-match search to extend it to 4D dynamic reconstruction without fine-tuning.",
+      "llm_tldr_cn": "近期深度基础模型如Depth Anything 3在多视图深度估计上表现优异，但假设三维场景静态，难以适用于真实动态环境。现有免训练四维方法依赖对应关系训练的骨干网络，而纯深度模型缺少跨帧匹配特性。本文提出Dyna3，无需微调即可扩展DA3进行四维动态场景重建，利用其跨视图特征隐含的运动判别信号并结合跨帧最佳匹配特征搜索。实验表明该方法能在保持静态表面一致匹配的同时重建动态场景，展示了深度基础模型向动态重建迁移的潜力。",
+      "llm_tldr": "近期深度基础模型如Depth Anything 3在多视图深度估计上表现优异，但假设三维场景静态，难以适用于真实动态环境。现有免训练四维方法依赖对应关系训练的骨干网络，而纯深度模型缺少跨帧匹配特性。本文提出Dyna3，无需微调即可扩展DA3进行四维动态场景重建，利用其跨视图特征隐含的运动判别信号并结合跨帧最佳匹配特征搜索。实验表明该方法能在保持静态表面一致匹配的同时重建动态场景，展示了深度基础模型向动态重建迁移的潜力。",
+      "llm_tags": [
+        "query:mono-depth"
+      ],
+      "matched_query_tag": "query:mono-depth",
+      "matched_query_text": "depth foundation model",
+      "matched_requirement_id": "req-5",
+      "selection_source": "fresh_fetch"
+    }
+  ],
+  "quick_skim": [
+    {
+      "id": "2609.36168v1",
+      "source": "arxiv",
+      "title": "Boosting Metric Depth Completion via Training-Free Adaptive Response Geometry",
+      "abstract": "Depth completion aims to recover dense metric depth from sparse sensor measurements, increasingly leveraging visual foundation models as geometric priors. However, aligning these priors to true metric scale typically relies on rigid affine assumptions in predefined coordinate systems, leaving systematic calibration errors. Linearity in depth calibration depends on the response coordinate. We introduce adaptive response geometry, which makes the fixed choice of depth, log depth, or disparity an image-level unknown. A continuous response family unifies these coordinates and defines an explicit depth-dependent gain. We derive the response-gradient relation and estimate the response parameters in metric space. Hard-Dirichlet residual reconstruction completes the calibrated prior. Under deliberately incomplete metric observations, the training-free pipeline achieves macro AbsRel 0.0301 and macro NMed 14.04°, improving both aggregate measures over PriorDA, LDCM, and Any2Full. Linearity diagnostics examine how the selected response changes the depth relation and its metric error.",
+      "authors": [
+        "Mia Zhang",
+        "Jizong Peng"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-09-28T19:37:49+00:00",
+      "link": "https://arxiv.org/pdf/2609.36168v1",
+      "tags": [
+        "keyword:matting",
+        "keyword:mono-depth",
+        "keyword:neural-bokeh",
+        "keyword:seg",
+        "query:matting",
+        "query:mono-depth",
+        "query:neural-bokeh",
+        "query:seg"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "metric depth completion aligning foundation priors to true metric scale",
+      "llm_evidence_cn": "将基础模型先验对齐到真实度量尺度的深度补全",
+      "llm_evidence": "将基础模型先验对齐到真实度量尺度的深度补全",
+      "canonical_evidence": "将基础模型先验对齐到真实度量尺度的深度补全",
+      "llm_tldr_en": "Depth completion aligns visual foundation priors to metric scale, but rigid affine assumptions cause systematic calibration errors. This paper introduces adaptive response geometry treating depth, log-depth or disparity choice as an image-level unknown within a continuous response family, improving metric depth completion without training.",
+      "llm_tldr_cn": "深度补全借助视觉基础模型作为几何先验，但将其对齐到真实度量尺度时通常依赖预定义坐标系中的固定仿射假设，导致系统性标定误差。本文提出自适应响应几何，把深度、对数深度或视差的选择视为图像级未知量，并统一为连续响应族，进而推导响应梯度关系并在度量空间中估计响应参数。方法结合硬Dirichlet残差重建，在无需训练的情况下提升度量深度补全精度。该工作为度量深度估计提供了更灵活的标定框架。",
+      "llm_tldr": "深度补全借助视觉基础模型作为几何先验，但将其对齐到真实度量尺度时通常依赖预定义坐标系中的固定仿射假设，导致系统性标定误差。本文提出自适应响应几何，把深度、对数深度或视差的选择视为图像级未知量，并统一为连续响应族，进而推导响应梯度关系并在度量空间中估计响应参数。方法结合硬Dirichlet残差重建，在无需训练的情况下提升度量深度补全精度。该工作为度量深度估计提供了更灵活的标定框架。",
+      "llm_tags": [
+        "query:mono-depth"
+      ],
+      "matched_query_tag": "query:mono-depth",
+      "matched_query_text": "metric depth estimation",
+      "matched_requirement_id": "req-3",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2609.35539v1",
+      "source": "arxiv",
+      "title": "Learning to Reason with Persistent Object States for Video Instance Segmentation",
+      "abstract": "Video segmentation models maintain object identities by carrying instance information across frames. Under prolonged occlusion, reappearance, or interactions between similar instances, however, an unreliable update can overwrite a valid history and cause persistent identity drift. We introduce POSReasoner, a trainable, plug-and-play framework that explicitly decides when an observation should change an object's state. Each persistent state records identity, confidence, and absence history. A sparse state-observation graph supports Propose-Verify reasoning: provisional associations are revisited using object history, predicted presence, and competition among identities. The verified decisions determine whether to retain, update, reactivate, or suppress each state, while a learned gate controls the evidence written back to memory. Only verified transitions update the persistent state used in subsequent frames. POSReasoner uses standard video annotations and keeps the base model frozen, enabling integration with diverse VOS and VIS architectures. Experiments across long-term VOS and VIS benchmarks show consistent improvements over strong baselines, with the largest gains under occlusion and object reappearance.",
+      "authors": [
+        "Yongxue Xu",
+        "Boxue Yang",
+        "Ziqian Liu",
+        "Shaoqiu Zhang",
+        "Rui Qian",
+        "Haopeng Chen"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-09-28T16:19:41+00:00",
+      "link": "https://arxiv.org/pdf/2609.35539v1",
+      "tags": [
+        "keyword:matting",
+        "keyword:mono-depth",
+        "keyword:neural-bokeh",
+        "keyword:seg",
+        "query:matting",
+        "query:mono-depth",
+        "query:neural-bokeh",
+        "query:seg"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "persistent object states for video instance segmentation under occlusion",
+      "llm_evidence_cn": "面向遮挡下视频实例分割的持久对象状态推理",
+      "llm_evidence": "面向遮挡下视频实例分割的持久对象状态推理",
+      "canonical_evidence": "面向遮挡下视频实例分割的持久对象状态推理",
+      "llm_tldr_en": "Video segmentation models suffer identity drift under occlusion and reappearance. POSReasoner is a plug-and-play framework that records persistent object states and uses Propose-Verify reasoning over a sparse state-observation graph to decide when to update identity.",
+      "llm_tldr_cn": "视频分割模型依靠跨帧传递实例信息维持身份，但在长时间遮挡、重现或相似实例交互时，不可靠的更新会覆盖有效历史，造成身份漂移。本文提出POSReasoner，一种可训练、即插即用的框架，显式决定何时更新对象状态，每个持久状态记录身份、置信度与缺失历史，并通过稀疏状态-观测图进行提议-验证推理。该方法在遮挡与重现场景下提升身份稳定性，为视频实例分割的时序一致性提供了通用组件。",
+      "llm_tldr": "视频分割模型依靠跨帧传递实例信息维持身份，但在长时间遮挡、重现或相似实例交互时，不可靠的更新会覆盖有效历史，造成身份漂移。本文提出POSReasoner，一种可训练、即插即用的框架，显式决定何时更新对象状态，每个持久状态记录身份、置信度与缺失历史，并通过稀疏状态-观测图进行提议-验证推理。该方法在遮挡与重现场景下提升身份稳定性，为视频实例分割的时序一致性提供了通用组件。",
+      "llm_tags": [
+        "query:seg"
+      ],
+      "matched_query_tag": "query:seg",
+      "matched_query_text": "instance segmentation",
+      "matched_requirement_id": "req-22",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2609.38592v1",
+      "source": "arxiv",
+      "title": "StereoGaussians: Feed-Forward 3D Gaussian Splatting from Stereo Images",
+      "abstract": "Feed-forward 3D Gaussian Splatting (3DGS) enables reconstruction without per- scene optimisation, but practical stereo-camera applications require nearby-view extrapolation beyond the input views. Stereo depth anchors visible surfaces, yet rendering newly exposed regions also requires learned appearance and additional scene capacity. We introduce StereoGaussians, which predicts a metric 3DGS representation from a single calibrated stereo pair. It reuses intermediate repre- sentations from frozen pretrained stereo networks to predict Gaussian attributes, while calibrated disparity anchors the geometry. A second Gaussian layer and an expanded image canvas provide capacity for disoccluded and outside-field-of- view content. For training, we construct SceneSplat-Stereo from quality-filtered 3DGS teachers, pairing stereo inputs with nearby target views across 803 training scenes. Experiments on unseen real and photorealistic stereo benchmarks demon- strate improvements over strong view-synthesis baselines, while ablation studies support our main design choices.",
+      "authors": [
+        "Boyuan Tian",
+        "Huangying Zhan",
+        "Zhan Li",
+        "Shin-Fang Chng",
+        "Hanwen Yang",
+        "Zirui Wang",
+        "Yi Xu"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-09-29T21:51:37+00:00",
+      "link": "https://arxiv.org/pdf/2609.38592v1",
+      "tags": [
+        "keyword:matting",
+        "keyword:mono-depth",
+        "keyword:neural-bokeh",
+        "keyword:seg",
+        "query:matting",
+        "query:mono-depth",
+        "query:neural-bokeh",
+        "query:seg"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "stereo depth with calibrated disparity anchoring geometry, pretrained stereo networks",
+      "llm_evidence_cn": "双目深度，标定视差锚定几何，复用预训练立体网络",
+      "llm_evidence": "双目深度，标定视差锚定几何，复用预训练立体网络",
+      "canonical_evidence": "双目深度，标定视差锚定几何，复用预训练立体网络",
+      "llm_tldr_en": "StereoGaussians predicts a metric 3D Gaussian representation from a single calibrated stereo pair by reusing frozen pretrained stereo features and disparity anchors, adding capacity for disoccluded and out-of-view regions.",
+      "llm_tldr_cn": "针对立体相机应用中需在输入视角之外进行近邻外推的问题，该文提出StereoGaussians，可从单个已标定立体图像对直接前馈预测度量3D高斯表示。方法复用冻结的预训练立体网络中间表征来预测高斯属性，并以标定视差锚定几何，再借助第二层高斯与扩展画布承载去遮挡与视场外内容。实验表明其能在外推区域保持几何一致与外观质量，为手机双摄等小基线立体系统的三维重建提供高效前馈方案。",
+      "llm_tldr": "针对立体相机应用中需在输入视角之外进行近邻外推的问题，该文提出StereoGaussians，可从单个已标定立体图像对直接前馈预测度量3D高斯表示。方法复用冻结的预训练立体网络中间表征来预测高斯属性，并以标定视差锚定几何，再借助第二层高斯与扩展画布承载去遮挡与视场外内容。实验表明其能在外推区域保持几何一致与外观质量，为手机双摄等小基线立体系统的三维重建提供高效前馈方案。",
+      "llm_tags": [
+        "query:stereo-depth:composite"
+      ],
+      "matched_query_tag": "query:stereo-depth:composite",
+      "matched_query_text": "Papers central to 双目深度估计，重点关注手机双摄、小基线、校正误差和非严格校正双目。, especially work that connects or combines: dual-camera depth; rectification-free stereo; binocular depth estimation for mobile dual cameras; dual camera stereo matching small baseline; uncalibrated stereo depth estimation dual camera; mobile stereo depth estimation smartphone dual camera; stereo depth estimation for occlusion weak texture and portrait bokeh scenes; stereo depth estimation for mobile dual camera and small baseline systems; unrectified stereo matching robust to calibration and rectification errors; lightweight stereo matching for real time depth estimation on mobile devices.",
+      "matched_requirement_id": "req-composite-stereo-depth",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2609.38930v1",
+      "source": "arxiv",
+      "title": "On the Relaxation of Conditional Independence Assumption for Image Segmentation",
+      "abstract": "In semantic segmentation, a recent line of RankSEG methods directly optimizes Dice/IoU scores at inference time, improving alignment with evaluation metrics without modifying model training. Despite its theoretical and empirical success, RankSEG relies on the restrictive Conditional Independence Assumption (CIA), which ignores crucial label correlations and therefore degrades performance in ambiguous or low-contrast scenarios. However, accounting for full label dependence is computationally prohibitive, requiring $\\mathcal{O}(d^3)$ time. To address this, we replace the CIA with a Spatially Localized Dependence (SLD) structure that captures local label correlations while keeping the dependence model tractable. We further overcome the remaining computational bottleneck via a Reciprocal Moment Approximation coupled with a novel fixed-point optimization strategy that eliminates exhaustive search. The proposed algorithm achieves a highly practical $\\mathcal{O}(d \\log d)$ complexity and consistently outperforms conventional argmax and CIA-based RankSEG across diverse segmentation benchmarks. Improvements are significant in low-contrast or small-object scenarios, where label dependence offers valuable signals complementary to image information for accurate segmentation. The code of experiments is available at https://github.com/ZixunWang/RankSEG-DEP.",
+      "authors": [
+        "Zixun Wang",
+        "Ben Dai"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV",
+        "cs.AI",
+        "cs.LG",
+        "stat.ML"
+      ],
+      "published": "2026-09-30T04:10:57+00:00",
+      "link": "https://arxiv.org/pdf/2609.38930v1",
+      "tags": [
+        "keyword:matting",
+        "keyword:mono-depth",
+        "keyword:neural-bokeh",
+        "keyword:seg",
+        "query:matting",
+        "query:mono-depth",
+        "query:neural-bokeh",
+        "query:seg"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "relaxing conditional independence for semantic segmentation",
+      "llm_evidence_cn": "放松条件独立假设以改进语义分割",
+      "llm_evidence": "放松条件独立假设以改进语义分割",
+      "canonical_evidence": "放松条件独立假设以改进语义分割",
+      "llm_tldr_en": "RankSEG optimizes Dice/IoU at inference but assumes conditional independence, hurting low-contrast cases. The authors replace it with a spatially localized dependence structure to capture local label correlations efficiently, improving segmentation accuracy.",
+      "llm_tldr_cn": "语义分割中RankSEG类方法在推理时直接优化Dice/IoU，但依赖过强的条件独立假设，忽略标签相关性，在模糊或低对比场景性能下降。本文用空间局部依赖结构替代该假设，在保持可计算性的同时捕捉局部标签相关性，从而提升分割精度。该工作为分割推理后处理提供了更合理的相关性建模思路，可迁移至人像与前景分割任务。",
+      "llm_tldr": "语义分割中RankSEG类方法在推理时直接优化Dice/IoU，但依赖过强的条件独立假设，忽略标签相关性，在模糊或低对比场景性能下降。本文用空间局部依赖结构替代该假设，在保持可计算性的同时捕捉局部标签相关性，从而提升分割精度。该工作为分割推理后处理提供了更合理的相关性建模思路，可迁移至人像与前景分割任务。",
+      "llm_tags": [
+        "query:seg"
+      ],
+      "matched_query_tag": "query:seg",
+      "matched_query_text": "semantic segmentation",
+      "matched_requirement_id": "req-23",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    }
+  ]
+}
