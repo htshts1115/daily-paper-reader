@@ -1,0 +1,1992 @@
+Published as a conference paper at ICLR 2027
+UNFOLDCRF:
+STRUCTURED
+MASK
+REFINEMENT
+WITH IMAGE-CONDITIONED LATENT REGIONS
+Chunming He1 , Rihan Zhang1 , Lei Xu2 , Guanyi Qin3 ,
+Chengyu Fang4 , Longxiang Tang5 , Fengyang Xiao1,∗, Sina Farsiu1,∗
+1Duke University, 2 EPFL, 3 National University of Singapore,
+4Tsinghua University,
+5Harvard University
+The first two authors contributed equally, ∗Corresponding Author.
+Contact: chunming.he@duke.edu
+ABSTRACT
+Learned mask refiners improve segmentation accuracy, but it is hard to tell how
+much of the improvement comes from explicit structure rather than from extra
+capacity, and whether it holds up when the mask generator or its error distribution
+changes. UnfoldCRF treats refinement as inference in a conditional random field
+over pixel labels and latent region variables. Its energy has a corrected unary term,
+learned local pairwise interactions, and image-conditioned latent-region consis-
+tency, with a null state that lets a region with weak label agreement withdraw from
+the consistency term; inference unrolls damped mean-field updates on this one
+energy. To isolate the effect of structure, we compare against recurrent black-box
+refiners that read the same inputs and receive the same parameter budget, stage
+count, and supervision. On COD10K, UnfoldCRF beats the strongest matched
+control by 1.0 F ω
+β point, improves all four COD metrics, and lowers the fraction
+of images made worse from 11.7% to 8.5%. Under a train-once protocol over
+five datasets and several mask sources, the 2.6M-parameter variant gains 4.2
+mean ∆IoU against 2.0 for its control, and a variant built on frozen DINOv2
+features matches the strongest foundation-model refiner with about a seventh
+of its resident parameters while staying ahead of its own control.
+On mask
+generators never seen in training, the gain is 2.0 F ω
+β points against 0.6 for the
+control. Zeroing individual messages shows where the corrections come from:
+the pairwise messages mostly fix boundaries, the region messages mostly fix
+non-boundary errors. Code and supporting materials will be publicly released.
+1
+INTRODUCTION
+Segmentation networks rarely fail as independent pixel noise. On targets entangled with their con-
+text, such as camouflaged objects, transparent surfaces, clinical structures, and thin or fragmented
+shapes, the failures have structure: interiors are hollowed out, components are dropped or hallu-
+cinated, and boundaries drift coherently along low-contrast contours (Fan et al., 2020; Xie et al.,
+2020; He et al., 2023b). Refinement methods post-process an initial mask to remove such errors,
+from dense CRFs with prescribed affinity functions (Krähenbühl & Koltun, 2011) to learned re-
+finers built on cascades (Cheng et al., 2020), boundary correction (Yuan et al., 2020), diffusion
+(Wang et al., 2023; Shen et al., 2025), and prompted foundation models (Lin et al., 2025; Ke et al.,
+2023; Price et al., 2026). Deep unfolding has also been used for iterative refinement, though recent
+segmentation-oriented unfolding methods derive their updates from reconstruction objectives rather
+than from an energy over the labels themselves (He et al., 2025b; 2026).
+Most learned refiners predict mask updates with generic network modules and no explicit energy
+over the labels. When such a refiner improves on the upstream mask, one cannot tell whether struc-
+ture did the work or whether capacity, iteration, and supervision did, nor whether the improvement
+would survive a different mask generator or a different error distribution. We ask: under care-
+fully matched inputs, parameter count, iteration count, and supervision, does explicit struc-
+tured inference provide more reliable refinement than black-box iterative refinement, both
+in-distribution and under shifts in mask generators and error distributions? By reliable we
+1
+arXiv:2609.33996v1  [cs.CV]  27 Sep 2026
+
+
+Published as a conference paper at ICLR 2027
+(a) Predefined CRF
+Explicit labeling energy
+Predefined affinities
+Predefined affinities
+Optional fixed regions
+Optional fixed regions
+Explicit labeling energy
+Predefined affinities
+Optional fixed regions
+CRF inference
+CRF inference
+(
+)
+Image + initial mask
+,
+init
+I P
+(
+)
+Image + initial mask
+,
+init
+I P
+Refined mask
+Q
+Refined mask
+Q
+(b) Black-box iteration
+(
+)
+Image + initial mask
+,
+init
+I P
+(
+)
+Image + initial mask
+,
+init
+I P
+Learned Update
+Learned Update
+Image
+features
+Current mask
+t
+Q
+Refined mask
+Q
+Refined mask
+Q
+1
+t
+Q +
+Repeat T stages
+(c) Reconstruction-derived unfolding
+(
+)
+Image + initial mask
+,
+init
+I P
+(
+)
+Image + initial mask
+,
+init
+I P
+Refined mask
+Q
+Refined mask
+Q
+Reconstruction objective
+Alternating
+updates
+(d) UnfoldCRF (ours)
+(
+)
+Image + initial mask
+,
+init
+I P
+(
+)
+Image + initial mask
+,
+init
+I P
+Learned energy, explicit structured inference.
+Shared segmentation energy E
+Local
+pairwise
+P
+E
+Local
+pairwise
+P
+E
+Latent 
+regions
+null
+R
+E
++
+Latent 
+regions
+null
+R
+E
++
+Unary
+U
+E
+Unary
+U
+E
+Shared segmentation energy E
+Local
+pairwise
+P
+E
+Latent 
+regions
+null
+R
+E
++
+Unary
+U
+E
+Refined mask
+Q
+Refined mask
+Q
+0
+1
+Damped mean-field inference
+T
+Q
+Q
+Q
+→
+→
+→
+
+0
+1
+Damped mean-field inference
+T
+Q
+Q
+Q
+→
+→
+→
+
+Mask
+update
+Q
+Mask
+update
+Q
+Reconstruction
+variables
+Z
+Reconstruction
+variables
+Z
+Limited by predefined affinities.
+No explicit segmentation energy.
+Masks optimized indirectly.
+Figure 1: Refinement formulations. (a) Predefined CRFs use prescribed affinities and optional
+fixed regions. (b) Black-box refiners learn iterative mask updates without an explicit energy. (c)
+Reconstruction-derived unfolding alternates reconstruction and mask updates. (d) UnfoldCRF per-
+forms damped mean-field inference on a shared, image-conditioned segmentation energy with cor-
+rected unary, local pairwise, and latent-region terms.
+mean a positive average gain, few images made worse, and a gain that survives shift. A second
+question is whether the corrections can be traced to particular energy messages.
+UnfoldCRF is an image-conditioned latent-region CRF for mask refinement. Its energy has a cor-
+rected unary term, a symmetric local pairwise term in a learned feature space, and a mass-normalized
+consistency term over latent region variables. Learned local soft incidences connect pixels to regions
+at several granularities; a region variable takes either a semantic label or a null state, and the null
+state reduces the influence of regions whose members disagree. The construction builds on robust
+P N potentials and associative hierarchical CRFs (Kohli et al., 2009; Ladick`y et al., 2009; Arnab
+et al., 2016), but the pixel–region structure is image-conditioned and learned end to end through
+unrolled inference. For a given input, every stage runs on the same conditional energy; only a
+stage-dependent damping coefficient changes.
+A refiner can raise in-distribution accuracy in two ways: by learning what valid masks look like,
+or by learning the error habits of the generators it was trained on. The pairwise and latent-region
+terms encode the first kind of knowledge, local boundary consistency and regional label agreement,
+and the unary term keeps the upstream prediction as evidence rather than re-predicting it. When the
+generator changes, these relations should be less tied to its particular error patterns than a learned
+update rule is. Section 4.4 tests this with held-out generators and message interventions.
+Our main contributions are:
+(1) Structural model.
+An image-conditioned latent-region CRF for mask refinement with lo-
+cal learnable soft incidences, symmetric pairwise interactions, and a mass-normalized region-
+consistency term whose latent state is semantic or null; its MAP reduction is a truncated region-
+consistency potential with a vote-fraction threshold (Proposition 1).
+(2) Shared-energy unfolding. A damped mean-field refinement process in which all stages share
+one conditional energy and only the damping coefficient varies. Damping preserves the fixed points
+of the shared system (Lemma 1), and the latent-region message passing is sparse, costing O(RNsL)
+per stage for N pixels, R levels, s candidate regions per pixel, and L labels.
+(3) Empirical findings.
+Against parameter-matched recurrent controls, UnfoldCRF improves
+COD10K F ω
+β by 1.0 point and makes fewer images worse; on a five-benchmark train-once suite
+its S and L variants gain 4.2 and 6.3 mean ∆IoU against 2.0 and 4.6 for their controls. On unseen
+mask generators it keeps a 2.0-point F ω
+β gain where the control keeps 0.6, and zeroing messages
+shows that the pairwise messages mainly correct boundary errors while the region messages mainly
+correct non-boundary false negatives and false positives.
+2
+RELATED WORK
+Higher-order and hierarchical CRFs. Robust P N potentials encode segment-level label consis-
+tency with a truncated penalty and admit an exact representation through auxiliary segment variables
+with a free label (Kohli et al., 2009); associative hierarchical CRFs stack such auxiliary variables
+2
+
+
+Published as a conference paper at ICLR 2027
+across segmentation layers (Ladick`y et al., 2009). Filter-based mean-field inference extends dense
+pairwise models to certain higher-order terms (Vineet et al., 2014). We keep the latent-variable
+form of these potentials but make the pixel–region associations soft, local, image-conditioned, and
+trainable through unrolled inference.
+Neural and trainable CRF inference. CRF-as-RNN unrolls parallel mean-field inference for dense
+Gaussian CRFs into a trainable recurrent module (Zheng et al., 2015), while subsequent work re-
+casts CRF message passing using convolutional and pixel-adaptive filtering (Teichmann & Cipolla,
+2018; Su et al., 2019). Higher-order detection and superpixel potentials have also been incorporated
+end to end (Arnab et al., 2016). Exact inference for Gaussian CRFs can instead be obtained by solv-
+ing linear systems (Chandra & Kokkinos, 2016). Parameter learning and convergent inference for
+dense CRFs are studied in (Krähenbühl & Koltun, 2013); principled parallel variational inference
+with convergence guarantees is developed in (Baqué et al., 2016), while Regularized Frank–Wolfe
+provides a broader optimization framework that includes mean field as a special case (Lê-Huu &
+Alahari, 2021). Learnable high-dimensional filtering is explored in (Jampani et al., 2016). Deep un-
+folding has also been applied to segmentation through reconstruction-derived objectives (He et al.,
+2025b; 2026), whereas the unrolled updates here are those of a labeling energy.
+Differentiable region grouping. SLIC provides a classical hard superpixel construction (Achanta
+et al., 2012), while Superpixel Sampling Networks learn task-specific soft superpixels with local
+candidate assignment (Jampani et al., 2018); recent work further studies differentiable superpixel
+formation and connectivity (Juybari et al., 2026). Slot Attention (Locatello et al., 2020) learns soft
+pixel-to-slot associations in the same spirit. Our incidences are computed once from each image–
+mask pair and held fixed; what changes across stages is the label distribution of each region.
+Learned mask refinement.
+CascadePSP combines global and local refinement (Cheng et al.,
+2020), SegFix corrects boundaries (Yuan et al., 2020), and SegRefiner formulates refinement as
+a discrete diffusion process (Wang et al., 2023). For camouflaged object detection, UMBD uses
+uncertainty-guided Bernoulli diffusion to selectively refine uncertain regions while exploiting
+features from the upstream segmenter (Shen et al., 2025).
+Foundation-model-based refinement
+builds on SAM-style promptable segmentation (Kirillov et al., 2023; Ke et al., 2023): SAMRefiner
+derives noise-tolerant prompts from coarse masks (Lin et al., 2025), while PromptMoE uses
+mixture-of-experts prompting for refinement across tasks and domains (Price et al., 2026). Phoenix
+trains on semantically structured mask errors generated by adversarial perturbation and corrects
+them with contrastive refinement learning (Kim & Hwang, 2026). We differ from these refiners in
+the question asked: refinement here is inference in a shared segmentation energy, and the effect of
+that structure is isolated with matched controls.
+3
+METHOD
+3.1
+A CONDITIONAL RANDOM FIELD OVER MASKS AND LATENT REGIONS
+Let I be an image and let G denote the inference grid with N spatial sites (stride 4 in our imple-
+mentation); the initial per-site label distribution P init ∈∆N
+L is the output of an arbitrary upstream
+model over L classes (L=2 for binary tasks), resized to G. All site-indexed quantities below live on
+G. We model refinement as approximate inference in a conditional random field over pixel labels
+x = (x1, . . . , xN) and latent region labels z = {z(r)
+k
+: 1 ≤r ≤R, k ∈K+
+r }, one per active region
+k at each of R granularity levels, where the active-region sets K+
+r are defined in Sec. 3.2:
+E(x, z | I, P init) = EU(x) + EP (x) + ER(x, z),
+(1)
+conditioned jointly on I and P init. A lightweight encoder consumes (I, P init) and predicts the input-
+dependent quantities in Eq. (1): unary corrections, pairwise interaction weights, and pixel–region
+incidences; the global energy parameters, the label compatibility µ and the per-level strengths βr
+and truncations κr, are learned jointly and shared across stages, as is the incidence temperature τr of
+Eq. (5). The damping coefficients αt belong to the inference procedure (Sec. 3.3), not to the energy.
+The input-dependent quantities are computed once and held fixed across inference stages, so every
+stage performs inference on the same conditional energy; they remain differentiable, so gradients
+reach the encoder through the unrolled computation, with the exception of the active-region mask,
+which is fixed and treated as stop-gradient (App. B).
+3
+
+
+Published as a conference paper at ICLR 2027
+...
+Encoder
+Image I
+init
+Initial mask P
+U
+
+  (c) Multi-scale soft incidences A(r)
+  (b) Symmetric local interactions
+d = 1
+d = 2
+d = 4
+self terms excluded
+ij
+ji
+K
+K
+=
+  (b) Symmetric local interactions
+d = 1
+d = 2
+d = 4
+self terms excluded
+ij
+ji
+K
+K
+=
+  (a) Corrected unary
+( )
+( )
+( )
+init
+log
+U
+i
+i
+i
+l
+P
+l
+l
+
+
+= −
++
+r = 1 (fine)
+r = 2 (medium)
+r = R (course)
+,
+K 
+,
+r
+r
+
+(a) Conditional energy construction (compute once)
+Image I
+init
+Initial mask P
+Image I
+init
+Initial mask P
+Unary
+initialization
+(
+)
+0
+softmax
+U
+Q
+
+=
+−
+Unary
+initialization
+(
+)
+0
+softmax
+U
+Q
+
+=
+−
+Shared conditional energy (fixed for all stages)
+( )
+ 
+ , 
+, 
+,
+,
+,
+ 
+r
+r
+r
+U
+A
+K 
+
+
+
+0
+Q
+Stage 0
+a0
+Stage 0
+a0
+T
+QT
+Q
+Stage t
+at
+Stage t
+at
+Stage T-1
+aT-1
+Stage T-1
+aT-1
+Conditional
+Energy
+Constuction
+(computed once)
+Conditional
+Energy
+Constuction
+(computed once)
+1
+Q
+...
+1
+t
+Q +1
+t
+Q +
+Upsample
+(
+)
+T
+U Q
+Refined mask
+(b) Stage t: structured message passing
+Local aggregation K
+( )
+( )
+t
+t
+i
+ij
+j
+j i
+s l
+K Q
+l
+
+= 
+Label compatibility
+(
+) ( )
+(
+)
+( )
+,
+'
+, '
+'
+P t
+t
+i
+i
+l
+E
+l
+l l
+s l
+
+= 
+
+Region-to-pixel message
+(
+) ( )
+( )
+,
+,
+R t
+t
+i
+k
+r k
+k
+r
+ik
+E
+l
+R
+l
+m
+a
+
+= −
+Region-to-pixel message
+(
+) ( )
+( )
+,
+,
+R t
+t
+i
+k
+r k
+k
+r
+ik
+E
+l
+R
+l
+m
+a
+
+= −
+Mass-normalized region vote
+( )
+( )
+1
+t
+t
+k
+ik
+i
+i
+k
+v
+l
+a Q l
+m
+=
+
+Mass-normalized region vote
+( )
+( )
+1
+t
+t
+k
+ik
+i
+i
+k
+v
+l
+a Q l
+m
+=
+
+Region posterior 
+t
+k
+R
+BG
+BG
+FG
+FG 
+BG
+FG 
+Unary (fixed)
+( )
+U
+i
+l
+
+Mean-field target
+( )
+( )
+(
+)( )
+(
+)( )
+(
+)
+1
+,
+,
+softmax
+P t
+R t
+i
+t
+i
+U
+i
+l
+E
+l
+E
+l
+Q
+l
+
++
+−
+−
+−
+=
+
+Natural-parameter damping
+( )
+( )
+(
+)
+( )
+(
+)
+1
+1
+1
+t
+t
+a
+a
+t
+t
+t
+i
+i
+i
+Q
+l
+Q l
+Q
+l
+−
++
++
+
+
+t
+Q
+t
+Q
+1
+t
+Q +
+energy
+(
+)
+(
+)
+(
+)
+(
+)
+softmax
+,
+,
+1
+t
+t
+r
+k
+r
+k
+r
+r
+t
+k
+v
+B
+R
+G
+v
+FG
+
+
+
+
+=
+−
+Figure 2: Framework of UnfoldCRF. Top: I and P init define a conditional segmentation energy
+that is shared by all T stages and initializes Q0; only the damping coefficient αt varies by stage.
+Bottom left: the encoder constructs the corrected unary potential, symmetric local interactions, and
+multi-scale soft pixel–region incidences. Bottom right: stage t forms the region posterior Rt from
+Qt, computes the pairwise and mass-normalized latent-region messages, and combines them with
+the fixed unary term to obtain eQt+1; natural-parameter damping then produces Qt+1.
+Corrected unary. The unary term uses the upstream prediction as its base and adds an image-
+conditioned residual:
+EU(x) =
+X
+i
+ψU
+i (xi),
+ψU
+i (l) = −log P init
+i
+(l) + δθ,i(l),
+(2)
+where P init is clipped to [ϵ0, 1 −ϵ0] and renormalized (ϵ0 = 10−4) so that hard upstream masks
+have finite log-evidence, and δθ is a per-pixel, per-label residual predicted by the encoder.
+Symmetric local pairwise term. For neighboring sites we use a signed, image-conditioned pairwise
+interaction:
+EP (x) =
+X
+i<j
+Kij µ(xi, xj),
+Kij = 1
+2
+  bKij + bKji
+
+1[j ∈Ω(i)] ,
+(3)
+where Ω(i) is the union of 3×3 windows at dilations {1, 2, 4} around pixel i and bKij = gθ(hi, j −
+i) is a signed interaction weight predicted by a 1×1 convolution on the encoder features hi, one
+output per offset j −i ∈Ω. The window relation is symmetric (j ∈Ω(i) iff i ∈Ω(j)) and
+the explicit symmetrization gives Kij = Kji; the learnable label compatibility is symmetric by
+parameterization, µ = 1
+2(ˆµ + ˆµ⊤), so Eq. (3) is a well-defined energy over unordered pixel pairs.
+The pairwise term stays local; longer-range interactions go through the latent regions. Its mean-field
+message excludes the self contribution,
+EP
+i (l) =
+X
+l′
+µ(l, l′)
+X
+j̸=i
+Kij Qj(l′).
+(4)
+3.2
+LATENT-REGION ROBUST CONSISTENCY
+Soft incidences and active regions. All levels share the same inference grid G but use different
+region-center densities. At level r, the encoder yields pixel embeddings e(r)
+i
+∈RC, Kr region
+centers are placed on a regular grid, and the center embedding u(r)
+k
+is the average of the pixel em-
+beddings in grid cell k. Following the local-candidate design of differentiable superpixels (Jampani
+et al., 2018), each pixel is softly assigned only to the s=9 centers of its 3×3 neighboring cells Nr(i):
+a(r)
+ik =
+exp
+ −∥e(r)
+i
+−u(r)
+k ∥2/τr
+
+P
+k′∈Nr(i) exp
+ −∥e(r)
+i
+−u(r)
+k′ ∥2/τr
+ for k ∈Nr(i),
+a(r)
+ik = 0 otherwise,
+(5)
+with a learned per-level temperature τr > 0. Rows of A(r) sum to one, the scheme is the same for
+all tasks and label counts, and across the R levels incidence construction costs O(RNsC). Because
+e(r) is computed from the encoder features of (I, P init), incidences are conditioned on both the
+image and the initial mask. Let m(r)
+k
+= P
+i a(r)
+ik be the region mass and K+
+r = {k : m(r)
+k
+≥mmin}
+4
+
+
+Published as a conference paper at ICLR 2027
+the set of active regions; regions outside K+
+r carry no latent variable and neither enter the energy nor
+send messages. Since incidences are fixed before inference, K+
+r is fixed across stages.
+Robust region energy with a null state. Each active region has a latent state z(r)
+k
+∈{1, . . . , L} ∪
+{∅}, where ∅allows the region to opt out of consistency. With strength βr = softplus(br) > 0 and
+truncation κr = σ(γr) ∈(0, 1), the mass-normalized region energy is
+ER(x, z) =
+R
+X
+r=1
+X
+k∈K+
+r
+βr
+m(r)
+k
+X
+i
+a(r)
+ik cκr
+ xi, z(r)
+k
+
+,
+cκ(xi, zk) =
+(
+1[xi̸ = zk],
+zk̸ = ∅,
+κ,
+zk = ∅.
+(6)
+Mass normalization expresses region disagreement as a weighted label fraction; after eliminating the
+latent state by MAP, the region penalty is capped at βrκr independently of soft mass (Proposition 1).
+Mean-field updates. We use the factorization q(x, z) = Q
+i Qi(xi) Q
+r
+Q
+k∈K+
+r R(r)
+k (z(r)
+k ) and
+suppress the level index (r) when writing the updates of a single level. With the mass-normalized
+vote vk(l) =
+1
+mk
+P
+i aik Qi(l), the exact mean-field updates of Eq. (6) are (derivation in App. A)
+Rk(l) ∝exp
+ βr vk(l)
+
+,
+Rk(∅) ∝exp
+ βr(1 −κr)
+
+,
+(7)
+ER
+i (l) = −
+R
+X
+r=1
+X
+k∈K+
+r
+βr a(r)
+ik
+m(r)
+k
+R(r)
+k (l) + const,
+(8)
+where the constant is independent of l and cancels in the pixel softmax. The region branch there-
+fore consists of mass-normalized sparse pixel–region aggregation, a softmax over region states, and
+mass-normalized sparse backprojection to pixels, at O(RNsL) cost per stage.
+Proposition 1 (MAP reduction to normalized robust truncation). Fix a hard labeling x and an
+active region k at level r, suppressing the level superscript for readability, and let pk(l) =
+1
+mk
+P
+i aik 1[xi = l] denote the mass-weighted fraction of region k carrying label l. Then
+min
+zk ER,k(x, zk) = βr min
+
+κr, 1 −maxl pk(l)
+	
+.
+(9)
+A proof is given in App. A. Eq. (9) is a robust P N-style potential over soft regions (Kohli et al.,
+2009): the penalty grows with label disagreement and is truncated at βrκr through the null state. At
+finite βr the posterior Rk is soft, so 1 −κr is the vote fraction at which a semantic state becomes
+preferred over the null state (vk(l) > 1 −κr), not a deterministic gate.
+3.3
+UNROLLED DAMPED MEAN-FIELD INFERENCE
+Inference initializes Q0
+i = softmax(−ψU
+i ), which differs from P init
+i
+through the learned correction,
+and unrolls T stages indexed t = 0, . . . , T −1. Stage t executes, in order,
+Rt ←Eq. (7) evaluated at Qt for all active regions,
+(10)
+eQt+1
+i
+(l) ∝exp
+
+−ψU
+i (l) −EP,t
+i
+(l) −ER,t
+i
+(l)
+
+,
+(11)
+log Qt+1
+i
+(l) = (1 −αt) log Qt
+i(l) + αt log eQt+1
+i
+(l) −log Zt
+i,
+(12)
+where EP,t and ER,t are the messages of Eqs. (4) and (8) computed from Qt and Rt, and
+αt = σ(ηt) ∈(0, 1) is a per-stage damping coefficient with learnable ηt. All energy parameters,
+embeddings, and incidences are shared across stages; only αt is stage dependent. QT is the final
+grid-level marginal, U(QT ) is the final refined mask, and RT is formed from QT for diagnostics.
+Lemma 1 (Damping preserves fixed points). For every α ∈(0, 1], the damped update in Eq. (12)
+and the undamped mean-field update of the conditional energy in Eq. (1) have the same set of joint
+fixed points (Q∗, R∗), provided that Q∗lies in the interior of the probability simplex.
+App. A proves Lemma 1; the iterates remain in the interior because ψU and all messages are finite.
+Parallel mean field need not monotonically decrease the variational free energy (Baqué et al., 2016;
+Krähenbühl & Koltun, 2013). We therefore report F(Qt, Rt) and the undamped fixed-point residual
+ResFP(t) = 1
+N
+P
+i∥eQt+1
+i
+−Qt
+i∥1 as empirical inference diagnostics (Fig. 5).
+5
+
+
+Published as a conference paper at ICLR 2027
+Method
+Resident params
+BIG
+VOC
+DAVIS585
+ECSSD
+MSRA-B
+Mean
+Unrefined (IoU / BIoU)
+n/a
+78.3/70.1
+66.7/60.1
+80.1/83.0
+81.4/70.2
+75.2/61.9
+76.3/69.1
+CascadePSP (Cheng et al., 2020)
+68M
++5.0/+6.3
++1.7/+0.7
+−1.3/−1.5
++0.6/+1.0
++0.9/+2.7
++1.4/+1.9
+SegRefiner (Wang et al., 2023)
+119M
++9.6/+12.5 −3.9/−3.1 −10.9/−9.1 −15.0/−21.4 −10.7/−16.2 −6.2/−7.4
+DualSight (Price et al., 2025)
+641M
++3.9/+4.6
++3.3/+6.3
++1.5/−0.6
++2.0/+4.5
++2.1/+6.8
++2.6/+4.3
+SAMRefiner (Lin et al., 2025)
+641M
++6.8/+9.5
++7.1/+9.7
++3.3/+2.0
++5.1/+9.7
++4.7/+10.4
++5.4/+8.3
+PromptMoE (Price et al., 2026)
+≥641M
++8.5/+11.0 +7.9/+10.4
++3.6/+2.4
++6.0/+10.7
++5.1/+10.5
++6.2/+9.0
+Attn. recurrent-S (matched)
+2.6M
++2.4/+2.9
++2.7/+3.1
++0.6/+0.2
++2.3/+3.6
++2.1/+3.9
++2.0/+2.7
+UnfoldCRF-S (ours)
+2.6M
++5.1/+6.9
++5.2/+7.1
++2.4/+1.6
++4.3/+7.4
++4.0/+8.1
++4.2/+6.2
+Attn. recurrent-L (matched)
+92M
++6.2/+8.0
++5.9/+7.4
++2.1/+1.2
++4.6/+7.6
++4.2/+7.8
++4.6/+6.4
+UnfoldCRF-L (ours)
+92M
++8.7/+11.4 +8.1/+10.6
++3.4/+2.3
++6.0/+10.8
++5.3/+10.4
++6.3/+9.1
+Table 1: General open refinement on the five-benchmark suite of Price et al. (2026): ∆IoU /
+∆BIoU (%) over the unrefined masks (absolute scores in the first row). Published baselines use the
+reported high-resolution variants under the same coarse-mask protocol. Bold: best per column. The
+last four rows are our runs, reported as means over 5 training seeds.
+CHAMELEON
+CAMO
+COD10K
+NC4K
+Method
+Source
+M / F ω
+β / Eϕ / Sα
+M / F ω
+β / Eϕ / Sα
+M / F ω
+β / Eϕ / Sα
+M / F ω
+β / Eϕ / Sα
+SINet V2
+TPAMI’21
+.029/.792/.922/.890
+.071/.733/.875/.822
+.036/.668/.867/.820
+.048/.769/.898/.848
++SegRefiner
+NeurIPS’23
+.073/.619/.812/.777
+.116/.583/.763/.736
+.079/.487/.764/.714
+.075/.635/.830/.781
++Phoenix
+ECCV’26
+.030/.851/.915/.866
+.079/.768/.834/.781
+.034/.766/.872/.818
+.049/.822/.883/.836
++UMBD
+arXiv’25
+.027/.853/.955/.892
+.067/.774/.885/.829
+.032/.733/.909/.825
+.044/.807/.911/.849
++UnfoldCRF-S
+Ours
+.026/.849/.953/.898
+.066/.775/.890/.834
+.031/.740/.910/.832
+.043/.812/.915/.855
+FEDER
+CVPR’23
+.030/.824/.941/.888
+.073/.740/.866/.799
+.032/.713/.899/.822
+.045/.796/.909/.847
++SegRefiner
+NeurIPS’23
+.041/.751/.908/.850
+.081/.683/.848/.785
+.043/.635/.866/.794
+.050/.742/.896/.832
++Phoenix
+ECCV’26
+.034/.846/.925/.861
+.081/.760/.818/.773
+.032/.779/.884/.824
+.047/.826/.886/.836
++UMBD
+arXiv’25
+.028/.838/.949/.890
+.069/.757/.871/.807
+.030/.732/.905/.827
+.043/.809/.912/.849
++UnfoldCRF-S
+Ours
+.026/.848/.953/.896
+.067/.763/.879/.813
+.029/.745/.910/.834
+.042/.815/.917/.855
+Table 2: Concealed target refinement on COD under the UMBD (Shen et al., 2025) protocol: M ↓
+/ F ω
+β ↑/ Eϕ ↑/ Sα ↑on four test sets with SINetV2 (Fan et al., 2021) and FEDER (He et al.,
+2023a) upstreams. SegRefiner (Wang et al., 2023) and UMBD results are quoted from UMBD;
+Phoenix (Kim & Hwang, 2026) is evaluated zero-shot on the same coarse masks, and our predictions
+use the same metric implementation. UMBD additionally uses upstream features.
+3.4
+TRAINING AND CONFIGURATION
+Let U denote bilinear upsampling from G to the image resolution followed by renormalization, and
+define ℓ(Q, Y ) = LCE(U(Q), Y ) + LDice(U(Q), Y ) for ground truth Y . The refiner is trained with
+L = ℓ(QT , Y ) +
+1
+2(T −1)
+T −1
+X
+t=1
+ℓ(Qt, Y ),
+(13)
+where Q0 is not supervised and P init is resized to G by bilinear interpolation (App. B). Because the
+refiner reads only (I, P init), it applies to any upstream model whose output mask is available.
+4
+EXPERIMENTS
+4.1
+EXPERIMENTAL SETUP
+Settings. General open refinement uses the five-benchmark train-once suite of Price et al. (2026)
+(BIG (Cheng et al., 2020), VOC (Everingham et al., 2010), DAVIS585 (Chen et al., 2022),
+ECSSD (Yan et al., 2013), MSRA-B (Liu et al., 2010)) with its original coarse-mask sources:
+DeepLabV3 (Chen et al., 2017), FCN-R50 (Long et al., 2015), and LR-ASPP-MobileNetV3
+(Howard et al., 2019) for BIG/VOC; RMBG-1.4/2.0 and BiRefNet-matting for ECSSD and MSRA-
+B; and the SP and STM masks of DAVIS585. UnfoldCRF and its matched control are trained
+once on VOC 2012 train (Everingham et al., 2010) and evaluated frozen; we report ∆IoU and
+∆BIoU (Cheng et al., 2021) over the initial masks. Concealed refinement follows UMBD (Shen
+et al., 2025): training uses CAMO (Le et al., 2019) and COD10K (Fan et al., 2020), and evalua-
+tion uses CHAMELEON (Skurowski et al., 2018), CAMO, COD10K, and NC4K (Lv et al., 2021),
+with SINetV2 (Fan et al., 2021) and FEDER (He et al., 2023a) as upstream generators and M, F ω
+β
+(Margolin et al., 2014), Eϕ (Fan et al., 2018), and Sα (Fan et al., 2017) as metrics. Unless other-
+6
+
+
+Published as a conference paper at ICLR 2027
+Figure 3: Qualitative refinement. (a) General open refinement on representative examples. (b)
+Concealed target refinement on representative COD examples. Columns show four examples; rows
+show the image, initial mask, SegRefiner, SAMRefiner/UMBD, UnfoldCRF, and ground truth.
+wise stated, controlled ablations and mechanism analyses use COD10K with FEDER as upstream.
+Further protocol and training details are given in App. B.
+Model variants and controls. UnfoldCRF-S is the standalone model of Sec. 3 (custom encoder,
+2.6M parameters, 3522 input) and is used for all controlled analyses. UnfoldCRF-L keeps the energy
+and inference operator unchanged but uses a frozen DINOv2-B/14 encoder (Oquab et al., 2023)
+whose intermediate features are fused with a local high-resolution branch at 4482 input (∼92M
+resident and ∼6M trainable parameters; App. B). For each variant, the matched attention control
+uses the same encoder and fusion architectures, with weights trained independently, the same stage
+count T, losses, and supervision, and replaces only the structured operator by Qt+1 = Fattn(h, Qt).
+For UnfoldCRF-S, the total parameter budget is matched; for UnfoldCRF-L, the frozen DINOv2
+backbone is shared and the trainable non-backbone budget is matched.
+4.2
+COMPARISON WITH STATE-OF-THE-ART REFINERS
+General open refinement. Table 1 reports the five-benchmark suite. Among the published refiners,
+the SAM-based methods gain most, CascadePSP-Slow gains little, and SegRefiner-HR transfers
+poorly outside BIG. UnfoldCRF-S gains 4.2 mean ∆IoU and 6.2 mean ∆BIoU with 2.6M resident
+parameters, 2.2 points in ∆IoU above its matched control (paired 95% CI [+1.6, +2.8]; App. B).
+With frozen DINOv2-B features, UnfoldCRF-L reaches 6.3 mean ∆IoU and 9.1 mean ∆BIoU,
+comparable to PromptMoE on both averages with about one-seventh of the resident parameters, and
+remains 1.7 ∆IoU points above its matched control (paired 95% CI [+1.1, +2.3]). The 1.7-point
+gap remains when both models use the same frozen DINOv2 backbone, which rules out backbone
+strength as the sole explanation. Both variants gain most on BIG and VOC and least on DAVIS585,
+whose SP and STM initial masks are already accurate.
+Concealed target refinement. Table 2 reports all four COD metrics because they rank the refiners
+differently. Phoenix has the highest weighted F-measure on COD10K and NC4K but lowers Eϕ or
+Sα below the upstream mask in several settings, and SegRefiner lowers all four metrics everywhere.
+UnfoldCRF-S improves all four metrics on all eight upstream–dataset pairs, with the best MAE on
+all eight, the best Eϕ on seven, and the best Sα on all eight. Unlike UMBD, it uses only the image
+and the initial mask rather than upstream hidden features; Fig. 3 shows representative corrections of
+boundary drift, missing structures, and false positives in both settings.
+7
+
+
+Published as a conference paper at ICLR 2027
+Operator
+Params
+M ↓
+F ω
+β ↑
+Eϕ ↑
+Sα ↑
+Harm↓
+Components
+Upstream (FEDER)
+n/a
+.032
+.713
+.899
+.822
+n/a
+Unary only
+2.4M
+.031
+.725 ± .003
+.903
+.826
+15.6 ± 0.6
+Unary + learned pairwise
+2.5M
+.030
+.736 ± .002
+.906
+.829
+11.2 ± 0.5
+Unary + learned latent regions
+2.5M
+.030
+.738 ± .003
+.907
+.830
+10.7 ± 0.5
+Full UnfoldCRF-S (T=5)
+2.6M
+.029
+.745 ± .002
+.910
+.834
+8.5 ± 0.4
+Without null state
+2.6M
+.031
+.737 ± .003
+.906
+.829
+10.1 ± 0.5
+Structure controls
+Unary + fixed pairwise
+2.4M
+.031
+.731 ± .003
+.904
+.827
+13.0 ± 0.6
+Unary + fixed SLIC regions
+2.4M
+.031
+.732 ± .004
+.905
+.828
+13.5 ± 0.7
+Black-box and formulation controls
+Conv recurrent (matched)
+2.6M
+.031
+.733 ± .004
+.905
+.828
+12.3 ± 0.6
+Attention recurrent (matched)
+2.6M
+.030
+.735 ± .003
+.906
+.829
+11.7 ± 0.5
+Reconstruction-unfolding control (RUN-style)
+2.6M
+.032
+.712 ± .005
+.885
+.808
+10.9 ± 0.5
+Table 3: Controlled comparison on COD10K with FEDER upstream (5 seeds; SD for F ω
+β and
+Harm). Component ablations share the encoder and training setting; structure controls use prede-
+fined pairwise or region structure; recurrent controls match the stage count and parameter budget.
+Harm is the percentage of images whose IoU decreases after refinement.
+10
+100
+1000
+0
+2
+4
+6
+8
+resident parameters (M)
+boundary
+non-bnd.
+FN
+non-bnd.
+FP
+0
+10
+20
+30
+40
+50
+correction rate (%)
+ full 
+ zero 
+ zero 
+ 
+ Attn-S
+UnfoldCRF-L
+UnfoldCRF-S
+Attn-S
+Attn-L
+CascadePSP
+DualSight
+SAMRefiner
+PromptMoE
++ 2.2
++ 1.7
+(a) accuracy-size trade-off
+(b) unseen generators
+(c) real-error strata
+FEDER NUN RUN  WSSAM  SEE
+0.0
+0.5
+1.0
+1.5
+2.0
+2.5
+3.0
+ gain (points)
+ UnfoldCRF-S
+ Attn-S
+(CVPR’23) (ECCV’26) (ICML’25) (NeurIPS’23) (TPAMI’25)
+Figure 4: Efficiency, generalization, and mechanism. (a) Mean ∆IoU versus resident parameters;
+arrows indicate gains over matched recurrent controls at both scales. (b) F ω
+β gains on held-out
+generators. (c) Correction rates by error type under message interventions.
+4.3
+ABLATION STUDY
+Table 3 evaluates the contributions of the unary correction, the learned pairwise term, the latent re-
+gions, and the null state, with parameter counts reported for each variant. Structure controls replace
+learned interactions or regions with RGB–XY affinities (Krähenbühl & Koltun, 2011) or SLIC re-
+gions (Achanta et al., 2012; Arnab et al., 2016). Matched recurrent controls replace structured infer-
+ence with generic recurrence under the same parameter budget and stage count; the reconstruction-
+unfolding control alternates reconstruction-state and mask updates in the style of RUN (He et al.,
+2025b) under the same budget (App. B). The full model improves F ω
+β by 1.0 point over the matched
+attention control (95% CI [+0.6, +1.4], App. B) while reducing Harm from 11.7% to 8.5%; replac-
+ing learned structure with fixed structure, or removing the null state, lowers every metric.
+4.4
+FURTHER ANALYSIS
+Generalization and mechanism. Figure 4a plots the accuracy–parameter trade-off of Table 1;
+panels (b,c) turn to generalization across generators and to mechanism. Figure 4b evaluates unseen-
+generator generalization on COD with FEDER, NUN (He et al., 2026), RUN (He et al., 2025b),
+WSSAM (He et al., 2023b), and SEE (He et al., 2025a). For each held-out generator, the refiner is
+trained on the remaining generators and evaluated frozen, comparing the F ω
+β gain of UnfoldCRF-
+S and Attn-S (paired difference 1.3 points, 95% CI [+0.9, +1.9]). Figure 4c partitions initially
+wrong pixels into boundary errors, non-boundary false negatives, and non-boundary false positives
+(definitions in App. B), and reports the fraction corrected after refinement. Zeroing the pairwise
+messages reduces boundary correction by 12 points but changes non-boundary FN/FP correction
+by only 2 points, whereas zeroing the region messages reduces non-boundary FN/FP correction by
+11/10 points but boundary correction by only 3 points; the two branches act on different error types.
+Stage-wise inference dynamics. Figure 5 follows one default checkpoint through Q0, . . . , QT and,
+beyond the trained depth, through test-time extrapolation to Q2T with αt := αT −1. The gap between
+8
+
+
+Published as a conference paper at ICLR 2027
+0
+2
+4
+6
+8
+10
+0.00
+0.05
+0.10
+0.15
+0.20
+0.25
+stage 
+0
+2
+4
+6
+8
+10
+0.71
+0.72
+0.73
+0.74
+0.75
+stage 
+ 
+0
+2
+4
+6
+8
+10
+−1.0
+−0.8
+−0.6
+−0.4
+−0.2
+0.0
+stage 
+(a) task metric
+(b) variational free energy
+(c) undamped residual
+extrapolation
+extrapolation
+extrapolation
+init level
+P
+Figure 5: Stage-wise inference dynamics of one default checkpoint (T=5) on COD10K: (a) F ω
+β of
+intermediate marginals with the initial-mask level as reference, (b) variational free energy relative
+to Q0 (test-set mean of the per-image difference), and (c) undamped fixed-point residual. Vertical
+dashed line: trained depth; shading: test-time extrapolation beyond T with αt := αT −1. Residuals
+are recorded before each update for t = 0, . . . , 2T −1.
+Figure 6: Representative failure cases with FEDER upstream. Columns show the image, initial
+mask, SegRefiner, UMBD, Phoenix, UnfoldCRF-S, and ground truth. Rows show a confidently
+mislabeled region, a missing object part, and a thin structure that remains difficult to recover.
+P init and Q0 = softmax(−ψU) is the learned unary correction, before any structured iteration. The
+task metric peaks near the trained depth and drifts slightly downward under further extrapolation,
+while the free energy and the undamped fixed-point residual keep decreasing beyond it.
+5
+DISCUSSION AND LIMITATIONS
+Structured inference beyond representation strength. The controlled comparisons separate two
+things that a black-box refiner entangles: which pixels and regions interact, which the encoder
+decides, and how labels change under those interactions, which the shared energy decides. A 1.7-
+point gap survives when both models sit on the same frozen DINOv2 backbone, so the backbone
+cannot be the whole story. Zeroing the pairwise or region messages affects different error types.
+For the checkpoint examined in Fig. 5, segmentation accuracy peaks near the trained depth despite
+continued decreases in variational free energy.
+Limitations. UnfoldCRF still depends on the quality of the upstream mask and on the resolution
+of its stride-4 inference grid: confidently wrong regions, missing object parts, and very thin struc-
+tures are often not recovered (Fig. 6). UnfoldCRF-L also inherits the resident parameter cost of its
+DINOv2 backbone. Except for the train-once setting in Sec. 4.2, we train a separate refiner for each
+task, and our experiments are limited to binary masks although the formulation supports L labels;
+multi-class, instance-level, and temporal settings remain future work.
+6
+CONCLUSION
+UnfoldCRF refines masks by unrolling damped mean-field inference in one image-conditioned seg-
+mentation energy. Matched recurrent controls, held-out generators, and message interventions sep-
+arate its gain from parameter count and backbone strength, and they show that the pairwise term
+mostly corrects boundary errors while the region term mostly corrects non-boundary ones.
+9
+
+
+Published as a conference paper at ICLR 2027
+AI USE STATEMENT
+Generative AI tools were used to assist with editing and revising the manuscript. The authors re-
+viewed all AI-assisted changes and take full responsibility for the final content.
+ETHICS STATEMENT
+This work uses publicly available benchmark datasets under their respective terms of use and in-
+volves no human subjects, personal data collection, or annotation by the authors. As a mask refiner,
+UnfoldCRF can inherit errors from the upstream segmenter and may also worsen individual predic-
+tions; we therefore report image-harm rates alongside aggregate accuracy. The method should be
+validated for the target domain before use in safety-relevant applications.
+REPRODUCIBILITY STATEMENT
+The conditional energy, mean-field updates, and damping scheme are specified in Sec. 3, with deriva-
+tions and proofs in App. A. We also provide input provenance, evaluation conventions, implemen-
+tation and training details, and the construction of the matched controls in App. B.
+REFERENCES
+Radhakrishna Achanta, Appu Shaji, Kevin Smith, Aurelien Lucchi, Pascal Fua, and Sabine
+Süsstrunk. Slic superpixels compared to state-of-the-art superpixel methods. IEEE Trans. Pattern
+Anal. Mach. Intell., 34(11):2274–2282, 2012.
+Anurag Arnab, Sadeep Jayasumana, Shuai Zheng, and Philip HS Torr. Higher order conditional
+random fields in deep neural networks. In ECCV, pp. 524–540. Springer, 2016.
+Pierre Baqué, Timur Bagautdinov, François Fleuret, and Pascal Fua. Principled parallel mean-field
+inference for discrete random fields. In CVPR, pp. 5848–5857, 2016.
+Siddhartha Chandra and Iasonas Kokkinos. Fast, exact and multi-scale inference for semantic image
+segmentation with deep gaussian crfs. In ECCV, pp. 402–418. Springer, 2016.
+Liang-Chieh Chen, George Papandreou, Florian Schroff, and Hartwig Adam. Rethinking atrous
+convolution for semantic image segmentation. arXiv preprint arXiv:1706.05587, 2017.
+Xi Chen, Zhiyan Zhao, Yilei Zhang, Manni Duan, Donglian Qi, and Hengshuang Zhao. Focalclick:
+Towards practical interactive image segmentation. In CVPR, pp. 1290–1299. IEEE, 2022.
+Bowen Cheng, Ross Girshick, Piotr Dollár, Alexander C Berg, and Alexander Kirillov. Boundary
+iou: Improving object-centric image segmentation evaluation. In CVPR, pp. 15329–15337. IEEE,
+2021.
+Ho Kei Cheng, Jihoon Chung, Yu-Wing Tai, and Chi-Keung Tang. Cascadepsp: Toward class-
+agnostic and very high-resolution segmentation via global and local refinement. In CVPR, pp.
+8890–8899, 2020.
+Mark Everingham, Luc Van Gool, Christopher KI Williams, John Winn, and Andrew Zisserman.
+The pascal visual object classes (voc) challenge. Int. J. Comput. Vis., 88:303–338, 2010.
+Deng-Ping Fan, Ming-Ming Cheng, Yun Liu, and Tao Li. Structure-measure: A new way to evaluate
+foreground maps. In ICCV, pp. 4548–4557, 2017.
+Deng-Ping Fan, Cheng Gong, Yang Cao, Bo Ren, Ming-Ming Cheng, and Ali Borji. Enhanced-
+alignment measure for binary foreground map evaluation.
+arXiv preprint arXiv:1805.10421,
+2018.
+Deng-Ping Fan, Ge-Peng Ji, Guolei Sun, Ming-Ming Cheng, and Jianbing Shen. Camouflaged
+object detection. In CVPR, pp. 2777–2787, 2020.
+Deng-Ping Fan, Ge-Peng Ji, Ming-Ming Cheng, and Ling Shao. Concealed object detection. IEEE
+transactions on pattern analysis and machine intelligence, 44(10):6024–6042, 2021.
+10
+
+
+Published as a conference paper at ICLR 2027
+Chunming He, Kai Li, Yachao Zhang, Longxiang Tang, Yulun Zhang, Zhenhua Guo, and Xiu Li.
+Camouflaged object detection with feature decomposition and edge reconstruction. In CVPR, pp.
+22046–22055. IEEE, 2023a.
+Chunming He, Kai Li, Yachao Zhang, Guoxia Xu, Longxiang Tang, Yulun Zhang, Zhenhua Guo,
+and Xiu Li. Weakly-supervised concealed object segmentation with sam-based pseudo labeling
+and multi-scale feature grouping. NeurIPS, 36, 2023b.
+Chunming He, Kai Li, Yachao Zhang, Ziyun Yang, Longxiang Tang, Yulun Zhang, Linghe Kong,
+and Sina Farsiu. Segment concealed object with incomplete supervision. IEEE Trans. Pattern
+Anal. Mach. Intell., 2025a.
+Chunming He, Rihan Zhang, Fengyang Xiao, Chengyu Fang, Longxiang Tang, Yulun Zhang,
+Linghe Kong, Deng-Ping Fan, Kai Li, and Sina Farsiu. Run: Reversible unfolding network for
+concealed object segmentation. ICML, 2025b.
+Chunming He, Rihan Zhang, Dingming Zhang, Fengyang Xiao, Deng-Ping Fan, and Sina Farsiu.
+Nested unfolding network for real-world concealed object segmentation. ECCV, 2026.
+Andrew Howard, Mark Sandler, Grace Chu, Liang-Chieh Chen, Bo Chen, Mingxing Tan, Weijun
+Wang, Yukun Zhu, Ruoming Pang, Vijay Vasudevan, et al. Searching for mobilenetv3. In ICCV,
+pp. 1314–1324, 2019.
+Varun Jampani, Martin Kiefel, and Peter V Gehler. Learning sparse high dimensional filters: Image
+filtering, dense crfs and bilateral neural networks. In CVPR, pp. 4452–4461, 2016.
+Varun Jampani, Deqing Sun, Ming-Yu Liu, Ming-Hsuan Yang, and Jan Kautz. Superpixel sampling
+networks. In ECCV, pp. 363–380. Springer, 2018.
+Jeremy Juybari, Josh Hamilton, Shuvra Das, Chaofan Chen, Andre Khalil, and Yifeng Zhu. Differ-
+entiable laplacian matrix guided superpixel segmentation. In CVPR, pp. 36168–36178, 2026.
+Lei Ke, Mingqiao Ye, Martin Danelljan, Yu-Wing Tai, Chi-Keung Tang, Fisher Yu, et al. Segment
+anything in high quality. NeurIPS, 36:29914–29934, 2023.
+Beomyoung Kim and Sung Ju Hwang. Learning from adversity: Semantic-aware mask refinement
+through adversarial perturbation. ECCV, 2026.
+Alexander Kirillov, Eric Mintun, Nikhila Ravi, Hanzi Mao, Chloe Rolland, Laura Gustafson, Tete
+Xiao, Spencer Whitehead, Alexander C Berg, Wan-Yen Lo, et al. Segment anything. In ICCV,
+pp. 3992–4003. IEEE, 2023.
+Pushmeet Kohli, L’ubor Ladick`y, and Philip HS Torr. Robust higher order potentials for enforcing
+label consistency. Int. J. Comput. Vis., 82(3):302–324, 2009.
+Philipp Krähenbühl and Vladlen Koltun. Efficient inference in fully connected crfs with gaussian
+edge potentials. NeurIPS, 24, 2011.
+Philipp Krähenbühl and Vladlen Koltun. Parameter learning and convergent inference for dense
+random fields. In ICML, pp. 513–521. PMLR, 2013.
+L’ubor Ladick`y, Chris Russell, Pushmeet Kohli, and Philip HS Torr. Associative hierarchical crfs
+for object class image segmentation. In ICCV, pp. 739–746. IEEE, 2009.
+Trung-Nghia Le, Tam V Nguyen, Zhongliang Nie, Minh-Triet Tran, and Akihiro Sugimoto.
+Anabranch network for camouflaged object segmentation. Comput. Vis. Image Underst., 184:
+45–56, 2019.
+Ð Khuê Lê-Huu and Karteek Alahari. Regularized frank-wolfe for dense crfs: Generalizing mean
+field and beyond. NeurIPS, 34:1453–1467, 2021.
+Yuqi Lin, Hengjia Li, Wenqi Shao, Zheng Yang, Jun Zhao, Xiaofei He, Ping Luo, and Kaipeng
+Zhang. Samrefiner: Taming segment anything model for universal mask refinement. In ICLR, pp.
+57368–57392, 2025.
+11
+
+
+Published as a conference paper at ICLR 2027
+Tie Liu, Zejian Yuan, Jian Sun, Jingdong Wang, Nanning Zheng, Xiaoou Tang, and Heung-Yeung
+Shum. Learning to detect a salient object. IEEE Trans. Pattern Anal. Mach. Intell., 33(2):353–
+367, 2010.
+Francesco Locatello, Dirk Weissenborn, Thomas Unterthiner, Aravindh Mahendran, Georg Heigold,
+Jakob Uszkoreit, Alexey Dosovitskiy, and Thomas Kipf. Object-centric learning with slot atten-
+tion. NeurIPS, 33:11525–11538, 2020.
+Jonathan Long, Evan Shelhamer, and Trevor Darrell. Fully convolutional networks for semantic
+segmentation. In CVPR, pp. 3431–3440, 2015.
+Yunqiu Lv, Jing Zhang, Yuchao Dai, Aixuan Li, Bowen Liu, Nick Barnes, and Deng-Ping Fan.
+Simultaneously localize, segment and rank the camouflaged objects. In CVPR, pp. 11591–11601,
+2021.
+Ran Margolin, Lihi Zelnik-Manor, and Ayellet Tal. How to evaluate foreground maps? In CVPR,
+pp. 248–255, 2014.
+Maxime Oquab, Timothée Darcet, Théo Moutakanni, Huy Vo, Marc Szafraniec, Vasil Khalidov,
+Pierre Fernandez, Daniel Haziza, Francisco Massa, Alaaeldin El-Nouby, et al. Dinov2: Learning
+robust visual features without supervision. arXiv preprint arXiv:2304.07193, 2023.
+Stephen Price, Kiran Judd, Kyle Tsaknopoulos, Rodica Neamtu, and Danielle L Cote. Dualsight:
+multi-stage instance segmentation framework for improved precision. Sci. Rep., 15(1):27521,
+2025.
+Stephen Price, Danielle L Cote, and Elke A Rundensteiner. Promptmoe: A segmentation refinement
+framework leveraging mixture of experts for improved prompting. In CVPR, pp. 6325–6335,
+2026.
+Yuqi Shen, Fengyang Xiao, Sujie Hu, Youwei Pang, Yifan Pu, Chengyu Fang, Xiu Li, and Chunming
+He. Uncertainty-masked bernoulli diffusion for camouflaged object detection refinement. arXiv
+preprint arXiv:2506.10712, 2025.
+Przemysław Skurowski, Hassan Abdulameer, and J Błaszczyk.
+Animal camouflage analysis:
+Chameleon database. Unpublished manuscript, pp. 7, 2018.
+Hang Su, Varun Jampani, Deqing Sun, Orazio Gallo, Erik Learned-Miller, and Jan Kautz. Pixel-
+adaptive convolutional neural networks. In CVPR, pp. 11158–11167. IEEE, 2019.
+Marvin TT Teichmann and Roberto Cipolla. Convolutional crfs for semantic segmentation. BMVC,
+2018.
+Vibhav Vineet, Jonathan Warrell, and Philip HS Torr. Filter-based mean-field inference for random
+fields with higher-order terms and product label-spaces. Int. J. Comput. Vis, 110(3):290–307,
+2014.
+Mengyu Wang, Henghui Ding, Jun Hao Liew, Jiajun Liu, Yao Zhao, and Yunchao Wei. Segrefiner:
+Towards model-agnostic segmentation refinement with discrete diffusion process. NeurIPS, 36:
+79761–79780, 2023.
+Enze Xie, Wenjia Wang, Wenhai Wang, Mingyu Ding, Chunhua Shen, and Ping Luo. Segmenting
+transparent objects in the wild. In ECCV, pp. 696–711, 2020.
+Qiong Yan, Li Xu, Jianping Shi, and Jiaya Jia. Hierarchical saliency detection. In CVPR, pp.
+1155–1162, 2013.
+Yuhui Yuan, Jingyi Xie, Xilin Chen, and Jingdong Wang. Segfix: Model-agnostic boundary refine-
+ment for segmentation. In ECCV, pp. 489–506, 2020.
+Shuai Zheng, Sadeep Jayasumana, Bernardino Romera-Paredes, Vibhav Vineet, Zhizhong Su, Da-
+long Du, Chang Huang, and Philip HS Torr. Conditional random fields as recurrent neural net-
+works. In ICCV, pp. 1529–1537, 2015.
+12
+
+
+Published as a conference paper at ICLR 2027
+A
+DERIVATIONS
+Notation.
+Throughout, expectations are taken under the mean-field factorization q(x, z) =
+Q
+i Qi(xi) Q
+r
+Q
+k∈K+
+r R(r)
+k (z(r)
+k ). For fixed (I, P init), all quantities defining the conditional en-
+ergy, including the incidences aik, region masses mk, and active-region sets K+
+r , are held fixed
+throughout inference. Since only active regions are considered, mk ≥mmin > 0. The level index
+(r) is suppressed when a single level is considered. For coordinate updates, conditional energies are
+written up to additive constants independent of the conditioned label, which cancel in the softmax;
+the full expectation is retained when evaluating the variational free energy. All derivations use the
+mass-normalized energy of Eq. (6), with vk(l) =
+1
+mk
+P
+i aikQi(l).
+Region update. Conditioning the region energy of an active region k on zk = l for a semantic label
+l gives
+E[ER,k | zk = l] = βr
+mk
+X
+i
+aik
+ 1 −Qi(l)
+
+= βr
+ 1 −vk(l)
+
+,
+(S1)
+while conditioning on zk = ∅gives
+E[ER,k | zk = ∅] = βr
+mk
+κr
+X
+i
+aik = βrκr.
+(S2)
+Thus Rk(·) ∝exp(−E[ER,k | ·]). Removing the common factor exp(−βr) from all unnormalized
+state probabilities yields Rk(l) ∝exp
+ βrvk(l)
+
+and Rk(∅) ∝exp
+ βr(1 −κr)
+
+, which is Eq. (7).
+Pixel message. Conditioning on xi = l and using PL
+s=1 Rk(s)1[l̸ = s] = 1 −Rk(∅) −Rk(l), we
+obtain
+E[ER,k | xi = l] = βraik
+mk
+h
+1 −Rk(∅) −Rk(l) + κrRk(∅)
+i
++ const.
+(S3)
+The only l-dependent term is −βraik
+mk Rk(l); summing over levels and active regions gives Eq. (8).
+The null state’s direct contribution is independent of the pixel label and therefore cancels in the
+pixel softmax. Its effect on the region message is mediated through the semantic probabilities Rk(l),
+whose total mass is 1 −Rk(∅).
+Expected region energy. For one active region,
+Eq[ER,k] = βr
+" L
+X
+l=1
+Rk(l)
+ 1 −vk(l)
+
++ κrRk(∅)
+#
+= βr
+"
+1 −
+L
+X
+l=1
+Rk(l)vk(l) −(1 −κr)Rk(∅)
+#
+.
+(S4)
+Hence, over all levels and active regions,
+Eq[ER] =
+R
+X
+r=1
+X
+k∈K+
+r
+βr
+"
+1 −
+L
+X
+l=1
+R(r)
+k (l)v(r)
+k (l) −(1 −κr)R(r)
+k (∅)
+#
+.
+(S5)
+We retain the full expectation so that the reported free energy corresponds to the conditional energy
+in Eq. (1).
+Expected pairwise energy. The pairwise expectation is
+Eq[EP ] = 1
+2
+X
+i̸=j
+Kij
+X
+l,l′
+Qi(l) µ(l, l′) Qj(l′).
+(S6)
+The factor 1
+2 converts the unordered-pair summation of Eq. (3) into a double sum, while the self
+term is excluded. The symmetries Kij = Kji and µ(l, l′) = µ(l′, l) ensure that the unordered-pair
+energy yields the full-neighborhood message in Eq. (4).
+Proof of Proposition 1. For hard x, ER,k(x, zk=l) =
+βr
+mk
+P
+i aik1[xi̸ = l] = βr
+ 1 −pk(l)
+
+,
+whereas ER,k(x, zk=∅) = βrκr. Minimizing over zk therefore selects the smaller of κr and
+1 −maxl pk(l), scaled by βr, which gives Eq. (9).
+□
+13
+
+
+Published as a conference paper at ICLR 2027
+Proof of Lemma 1. Write one undamped mean-field iteration as R = R(Q), using Eq. (7), followed
+by eQ = T (Q, R). The damped iteration uses the same two maps and then applies Eq. (12). Since
+the region map is identical in both systems, a joint fixed point (Q∗, R∗) satisfies R∗= R(Q∗), so it
+remains to compare the pixel maps at R∗.
+If eQ = Q, then Eq. (12) returns Qt+1 = Q for every α ∈(0, 1]. Conversely, let Q lie in the
+interior of the simplex and fix α ∈(0, 1]. Suppose Eq. (12) returns Qt+1 = Q. Then, for every
+pixel i, α
+ log eQi(l) −log Qi(l)
+
+is constant in l. Hence eQi ∝Qi, and because both are normalized
+distributions, eQi = Qi. The damped and undamped systems therefore have the same interior joint
+fixed points. The argument applies to each stage-specific coefficient αt ∈(0, 1].
+□
+Variational free energy. The variational free energy is
+F(Q, R) = Eq[EU] + Eq[EP ] + Eq[ER]
++
+X
+i
+X
+l
+Qi(l) log Qi(l) +
+R
+X
+r=1
+X
+k∈K+
+r
+X
+u∈{1,...,L,∅}
+R(r)
+k (u) log R(r)
+k (u),
+(S7)
+where Eq[EU] = P
+i
+P
+l Qi(l)ψU
+i (l) and the pairwise and region expectations are given above. For
+the Gibbs distribution P induced by the conditional energy, F(Q, R) = KL(q ∥P) −log Z.
+Inference diagnostics. Because the input-conditioned energy terms, incidences, and active-region
+sets are fixed across stages, F(Qt, Rt) evaluates the same variational objective throughout refine-
+ment and is therefore directly comparable across stages, with Rt = R(Qt). In particular, after
+obtaining the final marginals QT , the diagnostic state RT is recomputed from QT .
+The fixed-point residual ResFP(t) compares the undamped target eQt+1 with the current marginals
+Qt, rather than Qt+1 with Qt. Therefore its magnitude cannot be reduced merely by choosing a
+small damping coefficient.
+B
+PROTOCOLS, IMPLEMENTATION, AND STATISTICS
+Input provenance. Table S1 records, for each setting, the coarse-mask source, the checkpoint
+or prediction provenance, the UnfoldCRF training data, and the source of the baseline numbers.
+Published numbers are quoted when official predictions are available or the corresponding mask-
+generation protocol can be matched; agreement of the aggregate unrefined scores serves only as a
+sanity check. Per-sample quantities are computed only from predictions available to us.
+Setting
+Coarse-mask source
+Checkpoint
+or
+prediction
+source
+UnfoldCRF
+train-
+ing data
+Baseline numbers
+Five-benchmark
+suite
+DeepLabV3,
+FCN-R50,
+LR-ASPP
+(BIG, VOC); RMBG-1.4/2.0, BiRefNet-
+matting (ECSSD, MSRA-B); SP/STM
+(DAVIS585)
+official checkpoints (torchvi-
+sion,
+Hugging
+Face);
+DAVIS585
+masks
+from
+the dataset
+VOC 2012 train
+published
+where
+input
+provenance
+is
+matched;
+otherwise
+rerun
+COD
+SINetV2, FEDER
+predictions regenerated from
+the official upstream check-
+points following the UMBD
+protocol
+CAMO
++
+COD10K train
+published (Shen et al.,
+2025); Phoenix rerun
+zero-shot
+Controlled
+(COD10K,
+FEDER)
+FEDER
+as for COD
+CAMO
++
+COD10K train
+our runs
+Table S1: Provenance of inputs and baseline numbers.
+Evaluation. IoU and boundary IoU on the five-benchmark suite use the boundary-iou-api with
+dilation ratio 0.02 and are averaged per image. COD metrics follow the PySODMetrics implemen-
+tation used by the UMBD protocol, reporting M, F ω
+β , Eϕ, and Sα with the same normalization and
+threshold conventions. All predictions are resized back to the original benchmark resolution before
+evaluation. The harm rate is computed independently of any benchmark-specific normalization, by
+thresholding the initial and refined probability maps at 0.5 and comparing per-image IoU. For the
+error-stratified analysis of Fig. 4c, initially wrong pixels are identified at the original mask resolution
+after thresholding P init at 0.5; boundary errors are those whose Euclidean distance to the ground-
+truth contour is at most 2% of the image diagonal, measured on both sides of the contour, and the
+14
+
+
+Published as a conference paper at ICLR 2027
+remaining errors are divided into non-boundary false negatives and non-boundary false positives, so
+that the three sets partition the initial errors. The relative width matches the bandwidth parameter
+of boundary IoU, although the band here is symmetric around the contour rather than the interior
+strip used by that metric. The correction rate of a set is the fraction of its pixels that are correct after
+thresholding U(QT ) at 0.5, pooled over the test set; the damage rate, the fraction of initially correct
+pixels that become wrong, changes by less than 0.5 points under either intervention. Message in-
+terventions zero EP or ER at every stage of the same trained checkpoint at inference time, without
+retraining.
+Architecture and training.
+Unless otherwise stated, configurations refer to UnfoldCRF-S. A
+lightweight convolutional encoder produces stride-4 features that define the inference grid G. Pair-
+wise interactions use multi-scale local neighborhoods, while latent regions are constructed at mul-
+tiple spatial granularities with learned incidence embeddings and per-level temperatures. We use
+T=5 damped inference stages and train the model end to end with the loss in Eq. (13). Optimization
+uses AdamW with a cosine learning-rate schedule on 3522 inputs, together with standard geometric
+and photometric augmentations and occasional synthetic perturbations of the training masks. Initial
+masks are resized and renormalized as required by the inference grid; refined predictions are mapped
+back to the original mask resolution before evaluation.
+UnfoldCRF-L. UnfoldCRF-L keeps the energy formulation and inference operator unchanged
+while replacing the default encoder with a frozen DINOv2-B/14. Multi-level pretrained features
+are fused with a lightweight high-resolution branch conditioned on [I; P init] to produce the stride-4
+feature map h used by the same unary, pairwise, and region modules as UnfoldCRF-S. The model
+uses a higher input resolution and proportionally adjusted region scales. Only the non-backbone
+modules are trained, while DINOv2-B/14 remains frozen. Additional architectural details are pro-
+vided with the implementation. An S variant trained at 4482 separates the contribution of the input
+resolution from that of the representation: it raises the mean ∆IoU on the five-benchmark suite
+from 4.2 to 4.6 points, against 6.3 for UnfoldCRF-L at the same resolution, so most of the S-to-L
+improvement is associated with the representation change rather than with resolution alone.
+Matched controls. The recurrent controls match the encoder and unary-head architectures, train-
+ing data, stage count T, loss, supervision, optimization protocol, and trainable parameter budget
+of their structured counterparts, while replacing structured inference with a stage-shared recurrent
+update from (h, Qt) to Qt+1. The attention control uses windowed multi-head self-attention on the
+concatenated [h, Qt] with 8×8 windows and four heads for S and six heads for L, whereas the con-
+volutional control uses three 3×3 convolutional layers with GroupNorm and GELU; channel widths
+are chosen to match the trainable parameter budget. All models are trained independently and use
+the same initialization rule Q0 = softmax(−ψU). For the L variants, the same frozen DINOv2-B/14
+checkpoint and the same local-branch and fusion architectures are used, with matched trainable non-
+backbone budgets. The RUN-style control alternates an image-reconstruction state and a mask state
+for the same T stages: the reconstruction state minimizes an ℓ1 reconstruction error of the input
+from foreground and background layers, and the mask is updated from the resulting reconstruction
+state, with encoder architecture, supervision, stage count, and parameter budget matched.
+Statistics. For principal matched comparisons, we use a hierarchical bootstrap with 2,000 repli-
+cates. Static-image benchmarks are resampled at the image level, while DAVIS585 is resampled
+at the video–object-sequence level; all predictions of the compared methods and all upstream out-
+puts associated with a sampled cluster are kept together to preserve test-sample pairing. Clusters
+are resampled separately within each benchmark. Training seeds are additionally resampled when
+multiple independently trained runs are available; unless the runs were explicitly paired during train-
+ing, seeds are resampled independently across methods. Each replicate recomputes the statistic of
+interest: the dataset-level paired difference for COD10K, the macro average of per-benchmark dif-
+ferences for the five-benchmark suite, or the average difference across held-out generators. We
+report percentile 95% confidence intervals. When only one training seed is available, the interval
+reflects test-set resampling only and is reported as such. The COD10K and general-suite matched
+comparisons use 5 training seeds.
+15
+
+
+Published as a conference paper at ICLR 2027
+C
+COMPLETE RESULTS
+Concealed refinement. Table S2 extends the controlled comparison of Table 3 to the remaining
+COD test sets.
+Variant
+CHAMELEON
+CAMO
+NC4K
+Unary only
+.029/.833/.945/.891
+.071/.748/.869/.804
+.044/.803/.911/.850
+Unary + learned pairwise
+.028/.842/.948/.892
+.069/.758/.872/.807
+.043/.810/.913/.851
+Unary + learned latent regions
+.028/.840/.951/.894
+.069/.755/.877/.811
+.043/.808/.915/.853
+Full UnfoldCRF-S
+.026/.848/.953/.896
+.067/.763/.879/.813
+.042/.815/.917/.855
+Without null state
+.027/.841/.949/.892
+.069/.754/.874/.809
+.043/.809/.914/.852
+Unary + fixed pairwise
+.029/.836/.946/.891
+.070/.752/.870/.806
+.044/.806/.912/.851
+Unary + fixed SLIC regions
+.028/.838/.947/.893
+.070/.751/.873/.808
+.044/.805/.914/.852
+Conv recurrent (matched)
+.028/.838/.947/.891
+.070/.754/.872/.807
+.044/.807/.913/.851
+Attention recurrent (matched)
+.027/.839/.949/.893
+.069/.757/.873/.808
+.043/.809/.913/.852
+Reconstruction-unfolding control (RUN-style)
+.028/.841/.950/.893
+.069/.755/.875/.810
+.043/.810/.915/.853
+Table S2: Controlled variants on the other COD test sets (M / F ω
+β / Eϕ / Sα; FEDER upstream;
+mean over 5 seeds). Results on COD10K for the same variants are reported in Table 3.
+16

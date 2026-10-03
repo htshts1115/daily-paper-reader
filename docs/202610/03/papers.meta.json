@@ -1,0 +1,24 @@
+{
+  "label": "2026-10-03",
+  "date": "2026-10-03",
+  "generated_at": "2026-10-03T22:06:15",
+  "count": 1,
+  "papers": [
+    {
+      "paper_id": "202610/03/2609.33996v1-unfoldcrf-structured-mask-refinement-with-image-conditioned-latent-regions",
+      "section": "quick",
+      "title_en": "UnfoldCRF: Structured Mask Refinement with Image-Conditioned Latent Regions",
+      "authors": "Chunming He, Rihan Zhang, Lei Xu, Guanyi Qin, Chengyu Fang, Longxiang Tang, Fengyang Xiao, Sina Farsiu",
+      "date": "2026-09-27",
+      "pdf": "https://arxiv.org/pdf/2609.33996v1",
+      "score": "6.0",
+      "evidence": "基于CRF推理的分割掩码结构化精修",
+      "tldr": "学习式掩码细化器能提升分割精度，但增益来自显式结构还是额外容量难辨，跨掩码生成器鲁棒性也不明。UnfoldCRF将细化视为像素标签与潜在区域变量上的条件随机场，能量含校正一元项、局部成对交互和图像条件区域一致性，并用阻尼平均场展开推理。在COD10K上，它比同参数同监督黑盒控制高1.0 Fωβ，四项COD指标全升，恶化图像比例从11.7%降至8.5%。多数据集与未见掩码源实验验证结构增益，并定位成对消息修边界、区域消息修非边界错误。",
+      "tags": "query:seg",
+      "abstract_en": "Learned mask refiners improve segmentation accuracy, but it is hard to tell how much of the improvement comes from explicit structure rather than from extra capacity, and whether it holds up when the mask generator or its error distribution changes. UnfoldCRF treats refinement as inference in a conditional random field over pixel labels and latent region variables. Its energy has a corrected unary term, learned local pairwise interactions, and image-conditioned latent-region consistency, with a null state that lets a region with weak label agreement withdraw from the consistency term; inference unrolls damped mean-field updates on this one energy. To isolate the effect of structure, we compare against recurrent black-box refiners that read the same inputs and receive the same parameter budget, stage count, and supervision. On COD10K, UnfoldCRF beats the strongest matched control by 1.0 $F^ω_β$ point, improves all four COD metrics, and lowers the fraction of images made worse from 11.7\\% to 8.5\\%. Under a train-once protocol over five datasets and several mask sources, the 2.6M-parameter variant gains 4.2 mean $Δ$IoU against 2.0 for its control, and a variant built on frozen DINOv2 features matches the strongest foundation-model refiner with about a seventh of its resident parameters while staying ahead of its own control. On mask generators never seen in training, the gain is 2.0 $F^ω_β$ points against 0.6 for the control. Zeroing individual messages shows where the corrections come from: the pairwise messages mostly fix boundaries, the region messages mostly fix non-boundary errors. Code and supporting materials will be publicly released.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    }
+  ],
+  "errors": []
+}

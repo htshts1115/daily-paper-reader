@@ -48,17 +48,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-10-02</span>
+      <span class="dpr-home-dashboard-kicker">2026-10-03</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 6 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 1 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>2</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>4</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>0</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>1</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-10-02 23:03:02 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-10-03 22:06:10 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -69,10 +69,9 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日共生成 6 篇推荐（精读 2 篇，速读 4 篇）</p>
-<p>精读：《SFE-VGGT: Source-Free VGGT Distillation for Event-Based Monocular Depth Estimation》（8.0/10）, 《Dyna3: VLM-Guided Training-Free 4D Reconstruction via Depth Foundation Models》（8.0/10）</p>
-<p>速读：《Boosting Metric Depth Completion via Training-Free Adaptive Response Geometry》（7.0/10）, 《Learning to Reason with Persistent Object States for Video Instance Segmentation》（6.0/10）, 《StereoGaussians: Feed-Forward 3D Gaussian Splatting from Stereo Images》（6.0/10）</p>
-<p>这些结果覆盖了当下较热的方向，建议先看精读区论文的关键问题与方法。</p>
+<p>今日完成1篇速读、0篇精读，UnfoldCRF用图像条件潜在区域做结构化掩码精修，评分6.0/10。</p>
+<p>最值得看的是它把图像条件潜在区域引入结构化掩码精修，适合关注掩码精修与区域建模的人快速扫一眼。</p>
+<p>普通读者建议先看摘要、方法图和效果对比，判断是否与你的需求相关，再决定要不要精读。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -81,12 +80,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">2 篇</strong>
+    <strong class="dpr-home-dashboard-count">0 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="SFE-VGGT: Source-Free VGGT Distillation for Event-Based Monocular Depth Estimation">SFE-VGGT: Source-Free VGGT Distillation for Event-Based Monocular Depth Estimation</span></li><li><span class="dpr-home-dashboard-paper-title" title="Dyna3: VLM-Guided Training-Free 4D Reconstruction via Depth Foundation Models">Dyna3: VLM-Guided Training-Free 4D Reconstruction via Depth Foundation Models</span></li></ul>
+<p class="dpr-home-dashboard-empty">今日暂无推荐。</p>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">mono-depth <strong>2</strong></span></div>
+
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -94,12 +93,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">4 篇</strong>
+    <strong class="dpr-home-dashboard-count">1 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Boosting Metric Depth Completion via Training-Free Adaptive Response Geometry">Boosting Metric Depth Completion via Training-Free Adaptive Response Geometry</span></li><li><span class="dpr-home-dashboard-paper-title" title="Learning to Reason with Persistent Object States for Video Instance Segmentation">Learning to Reason with Persistent Object States for Video Instance Segmentation</span></li><li><span class="dpr-home-dashboard-paper-title" title="StereoGaussians: Feed-Forward 3D Gaussian Splatting from Stereo Images">StereoGaussians: Feed-Forward 3D Gaussian Splatting from Stereo Images</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="UnfoldCRF: Structured Mask Refinement with Image-Conditioned Latent Regions">UnfoldCRF: Structured Mask Refinement with Image-Conditioned Latent Regions</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">seg <strong>2</strong></span><span class="dpr-home-dashboard-tag">mono-depth <strong>1</strong></span><span class="dpr-home-dashboard-tag">stereo-depth <strong>1</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">seg <strong>1</strong></span></div>
 </section>
 </div>
 
