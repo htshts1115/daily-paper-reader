@@ -48,17 +48,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-10-03</span>
+      <span class="dpr-home-dashboard-kicker">2026-10-04</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 1 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 3 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>0</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>1</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>3</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-10-03 22:06:10 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-10-04 22:06:40 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -69,9 +69,7 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日完成1篇速读、0篇精读，UnfoldCRF用图像条件潜在区域做结构化掩码精修，评分6.0/10。</p>
-<p>最值得看的是它把图像条件潜在区域引入结构化掩码精修，适合关注掩码精修与区域建模的人快速扫一眼。</p>
-<p>普通读者建议先看摘要、方法图和效果对比，判断是否与你的需求相关，再决定要不要精读。</p>
+<p>今日速读3篇，聚焦3D高斯泼溅、长时视频分割与域自适应全景分割。最值得关注的是用立体图像实现前馈3D高斯泼溅的StereoGaussians（7.0/10），其次是面向长时视频分割的LVMT（6.0/10）。普通读者可优先看StereoGaussians了解立体视觉如何高效生成3D场景，再按兴趣跟进视频分割方向。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -93,12 +91,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">1 篇</strong>
+    <strong class="dpr-home-dashboard-count">3 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="UnfoldCRF: Structured Mask Refinement with Image-Conditioned Latent Regions">UnfoldCRF: Structured Mask Refinement with Image-Conditioned Latent Regions</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="StereoGaussians: Feed-Forward 3D Gaussian Splatting from Stereo Images">StereoGaussians: Feed-Forward 3D Gaussian Splatting from Stereo Images</span></li><li><span class="dpr-home-dashboard-paper-title" title="LVMT: Video Mask Transformer for Long-term Video Segmentation">LVMT: Video Mask Transformer for Long-term Video Segmentation</span></li><li><span class="dpr-home-dashboard-paper-title" title="MC-PanDA++: Simpler, Stronger, and More Robust Domain-Adaptive Panoptic Segmentation">MC-PanDA++: Simpler, Stronger, and More Robust Domain-Adaptive Panoptic Segmentation</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">seg <strong>1</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">seg <strong>2</strong></span><span class="dpr-home-dashboard-tag">stereo-depth <strong>1</strong></span></div>
 </section>
 </div>
 

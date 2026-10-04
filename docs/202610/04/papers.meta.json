@@ -1,0 +1,54 @@
+{
+  "label": "2026-10-04",
+  "date": "2026-10-04",
+  "generated_at": "2026-10-04T22:06:41",
+  "count": 3,
+  "papers": [
+    {
+      "paper_id": "202610/04/2609.38592v1-stereogaussians-feed-forward-3d-gaussian-splatting-from-stereo-images",
+      "section": "quick",
+      "title_en": "StereoGaussians: Feed-Forward 3D Gaussian Splatting from Stereo Images",
+      "authors": "Boyuan Tian, Huangying Zhan, Zhan Li, Shin-Fang Chng, Hanwen Yang, Zirui Wang, Yi Xu",
+      "date": "2026-09-29",
+      "pdf": "https://arxiv.org/pdf/2609.38592v1",
+      "score": "7.0",
+      "evidence": "标定立体对预测度量三维高斯",
+      "tldr": "前馈3DGS免逐场景优化，但立体相机应用需在输入视角外做邻近视角外推并补全新暴露区域。StereoGaussians从单对校准立体图预测度量3DGS：复用冻结立体网络中间表示预测高斯属性，用标定视差锚定几何，并以第二层高斯与扩展画布增强遮挡和视场外容量。作者构建SceneSplat-Stereo，覆盖803个场景。在真实与逼真立体基准上超越强基线，消融验证设计。",
+      "tags": "query:stereo-depth",
+      "abstract_en": "Feed-forward 3D Gaussian Splatting (3DGS) enables reconstruction without per- scene optimisation, but practical stereo-camera applications require nearby-view extrapolation beyond the input views. Stereo depth anchors visible surfaces, yet rendering newly exposed regions also requires learned appearance and additional scene capacity. We introduce StereoGaussians, which predicts a metric 3DGS representation from a single calibrated stereo pair. It reuses intermediate repre- sentations from frozen pretrained stereo networks to predict Gaussian attributes, while calibrated disparity anchors the geometry. A second Gaussian layer and an expanded image canvas provide capacity for disoccluded and outside-field-of- view content. For training, we construct SceneSplat-Stereo from quality-filtered 3DGS teachers, pairing stereo inputs with nearby target views across 803 training scenes. Experiments on unseen real and photorealistic stereo benchmarks demon- strate improvements over strong view-synthesis baselines, while ablation studies support our main design choices.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202610/04/2609.34895v1-lvmt-video-mask-transformer-for-long-term-video-segmentation",
+      "section": "quick",
+      "title_en": "LVMT: Video Mask Transformer for Long-term Video Segmentation",
+      "authors": "Narges Norouzi, Niccol`o Cavagnero, Idil Esen Zulfikar, Bastian Leibe, Gijs Dubbelman, Daan de Geus",
+      "date": "2026-09-28",
+      "pdf": "https://arxiv.org/pdf/2609.34895v1",
+      "score": "6.0",
+      "evidence": "长时视频分割与目标跟踪",
+      "tldr": "现有在线视频分割在长视频与长期遮挡下跟踪能力不足，根源是时序传播无法自适应选择跨时间保留的对象信息，且长视频训练受显存与梯度消失限制。LVMT 用轻量 GRU 时序传播模块学习选择性记忆，并引入截断查询传播（TQP）分块训练，块间传递信息、块内反向传播，避免显存溢出与推理开销。在六个基准上，LVMT 刷新多种视频分割任务的 SOTA，保持基础模型速度，且比此前 SOTA 快 10 倍。其贡献在于结合自适应记忆与长视频可训练性，推动长期视频分割实用化。",
+      "tags": "query:seg",
+      "abstract_en": "Existing online video segmentation methods struggle to track objects in long, complex videos with long-term occlusions. We hypothesize that this limitation is caused by (i) the inability of their temporal propagation mechanism to adaptively select the object information that is propagated across time, and (ii) their inability to be trained on long videos due to memory requirements and vanishing gradients. To address the first limitation, we propose to use a lightweight GRU-based temporal propagation module that can learn to select which information it keeps in memory and propagates across time. Second, to allow training on long videos, we introduce Truncated Query Propagation (TQP), a training strategy in which the model processes a video in chunks of frames, where information about tracked objects is propagated between chunks but backpropagation is only conducted in individual chunks, enabling longer temporal supervision without out-of-memory issues, inference overhead, or vanishing gradients. The resulting model is called the Long-term Video Mask Transformer (LVMT). Extensive experiments on six benchmarks show that LVMT sets a new state of the art across a range of video segmentation tasks, while retaining the speed of the highly efficient model it is based on, making it 10X faster than the prior state of the art. Code: https://www.tue-mps.org/lvmt",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202610/04/2609.39681v1-mc-panda-simpler-stronger-and-more-robust-domain-adaptive-panoptic-segmentation",
+      "section": "quick",
+      "title_en": "MC-PanDA++: Simpler, Stronger, and More Robust Domain-Adaptive Panoptic Segmentation",
+      "authors": "Ivan Martinović, Josip Šarić, Yuki M. Asano, Siniša Šegvić",
+      "date": "2026-09-30",
+      "pdf": "https://arxiv.org/pdf/2609.39681v1",
+      "score": "6.0",
+      "evidence": "域自适应全景分割",
+      "tldr": "无监督域自适应全景分割常采用教师-学生一致性学习，但逐像素架构性能受限，掩码Transformer又易受确认偏差影响。MC-PanDA用细粒度置信度估计缓解偏差，却需多阶段训练与繁琐调参。MC-PanDA++引入自监督视觉编码器、逐类别自适应掩码损失缩放和单阶段训练，简化流程并提升性能与鲁棒性，实现更优的域自适应全景分割。",
+      "tags": "query:seg",
+      "abstract_en": "Unsupervised domain adaptation (UDA) reduces the annotation burden in panoptic segmentation by leveraging a cost-effectively labeled source domain (e.g., synthetic) and an unlabeled target domain to bridge the distribution gap. Existing panoptic UDA methods rely on teacher-student consistency learning built upon suboptimal per-pixel segmentation architectures. In contrast, state-of-the-art mask transformers are rarely adopted due to their pronounced vulnerability to confirmation bias in consistency learning, where erroneous teacher predictions are reinforced during training. Our earlier approach, MC-PanDA, mitigates this issue through fine-grained confidence estimation, which suppresses gradients from unreliable masks while sampling informative yet reliable locations for loss computation. However, this method entails a complex multi-stage training and requires careful hyperparameter tuning. This work presents MC-PanDA++, which addresses these limitations by introducing: (i) self-supervised vision encoders that provide a stronger and more robust initialization, further reducing the reliance on human annotations, (ii) per-class, self-adapting mask-wide loss scaling that stabilizes training and enables the usage of a single set of hyperparameters across domains, and (iii) a single-stage training pipeline that decreases overall conceptual complexity. Together, these improvements result in a conceptually simpler, better-performing, and more robust method for domain-adaptive panoptics. Source code: https://github.com/martinovicivan/MC-PanDA",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    }
+  ],
+  "errors": []
+}

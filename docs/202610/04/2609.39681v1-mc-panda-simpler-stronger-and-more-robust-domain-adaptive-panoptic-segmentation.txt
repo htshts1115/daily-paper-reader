@@ -1,0 +1,4304 @@
+MC-PanDA++: Simpler, Stronger, and More Robust
+Domain-Adaptive Panoptic Segmentation
+Ivan Martinovi´c1*, Josip ˇSari´c1,2, Yuki M. Asano3, Siniˇsa ˇSegvi´c1
+1Faculty of Electrical Engineering and Computing, University of Zagreb, Unska 3, 10000
+Zagreb, Croatia.
+2Faculty of Computer and Information Science, University of Ljubljana, Veˇcna Pot 113,
+1000 Ljubljana, Slovenia.
+3Fundamental AI Lab, University of Technology Nuremberg, Dr.-Luise-Herzberg-Straße,
+90461 N¨urnberg, Germany.
+*Corresponding author(s). E-mail(s): ivan.martinovic@fer.hr;
+Contributing authors: josip.saric@fri.uni-lj.si; yuki.asano@utn.de; sinisa.segvic@fer.hr;
+Abstract
+Unsupervised domain adaptation (UDA) reduces the annotation burden in panoptic segmentation by
+leveraging a cost-effectively labeled source domain (e.g., synthetic) and an unlabeled target domain
+to bridge the distribution gap. Existing panoptic UDA methods rely on teacher-student consistency
+learning built upon suboptimal per-pixel segmentation architectures. In contrast, state-of-the-art
+mask transformers are rarely adopted due to their pronounced vulnerability to confirmation bias in
+consistency learning, where erroneous teacher predictions are reinforced during training. Our earlier
+approach, MC-PanDA (Martinovi´c et al. 2024), mitigates this issue through fine-grained confidence
+estimation, which suppresses gradients from unreliable masks while sampling informative yet reliable
+locations for loss computation. However, this method entails a complex multi-stage training and
+requires careful hyperparameter tuning. This work presents MC-PanDA++, which addresses these
+limitations by introducing: (i) self-supervised vision encoders that provide a stronger and more robust
+initialization, further reducing the reliance on human annotations, (ii) per-class, self-adapting mask-
+wide loss scaling that stabilizes training and enables the usage of a single set of hyperparameters
+across domains, and (iii) a single-stage training pipeline that decreases overall conceptual complexity.
+Together, these improvements result in a conceptually simpler, better-performing, and more robust
+method for domain-adaptive panoptics. Source code: github.com/martinovicivan/MC-PanDA.
+Keywords: Panoptic segmentation, Domain adaptation, Confidence estimation, Domain shift
+1 Introduction
+Panoptic segmentation provides comprehensive
+scene understanding by assigning each pixel both
+a semantic category and an instance identity (Kir-
+illov et al. 2019). Recent advances have led to
+consistent performance improvements, bringing
+a wide range of practical applications within
+reach (Cheng et al. 2022; Yu et al. 2022; Li et al.
+2023). However, many important domains require
+application-specific datasets that are very expen-
+sive to annotate (Zlateski et al. 2018; Zendel et al.
+2019), costing up to 5 hours per image for human
+1
+Preprint.
+arXiv:2609.39681v1  [cs.CV]  30 Sep 2026
+
+
+Fig. 1 Validation Panoptic Quality (PQ) during domain adaptation from Cityscapes to ACDC. Baseline consistency
+training collapses due to confirmation bias, producing hallucinated false-positive masks, whereas our MC-PanDA++ mitigates
+this issue through curated consistency learning based on mask confidence estimation.
+experts (Br¨odermann et al. 2024). Furthermore,
+even standard domains such as driving scenes suf-
+fer from the long tail of corner cases that are not
+easily collected (Zendel et al. 2018; Sakaridis et al.
+2021; Uijlings et al. 2022; Zendel et al. 2022), e.g.,
+animals on the road at night.
+Synthetic datasets offer a cost-effective and
+scalable alternative, allowing controlled simula-
+tion of corner cases and yielding extensive labeled
+training data. Yet, the benefits of synthetic data
+can only be fully realized if the domain gap
+between synthetic and real images is properly
+addressed (Ros et al. 2016; Richter et al. 2016;
+Kim et al. 2020). This challenge has established
+unsupervised domain adaptation (UDA) as a crit-
+ical research direction (Ben-David et al. 2010;
+Ganin and Lempitsky 2015; Sun and Saenko
+2016), as it aims to reduce the domain gap
+using only unlabeled images from the target
+domain. Currently, the dominant UDA paradigm
+is teacher–student consistency learning (Tarvainen
+and Valpola 2017), effective across numerous
+downstream tasks (Hoyer et al. 2023; Li et al.
+2022), including panoptic segmentation (Mansour
+et al. 2025). In particular, significant progress
+has been achieved through various extensions
+of this paradigm, including auxiliary consistency
+terms (Huang et al. 2021; Mansour et al. 2025),
+loss modulation (Saha et al. 2023), and teacher
+prediction calibration (Zhang et al. 2023).
+However, the performance of panoptic UDA
+methods remains limited by their reliance on
+suboptimal per-pixel segmentation architectures
+with separate things and stuff decoders, requiring
+heuristic post-processing. In contrast, supervised
+panoptic segmentation is dominated by mask
+transformers (Cheng et al. 2022; Jain et al. 2023;
+Wang et al. 2023), which provide a unified solu-
+tion for both semantic and instance prediction.
+The limited adoption of mask transformers in
+UDA context stems from difficult and unstable
+consistency training as observed by Zhang et al.
+(2023) and our baseline experiments. We believe
+that the high capacity of mask transformers makes
+them particularly susceptible to confirmation bias,
+which commonly arises in self-training frame-
+works like consistency learning (Arazo et al. 2020).
+Therefore, a novel training strategy is essential to
+unlock the potential of mask transformers in UDA.
+To address this challenge, we propose MC-
+PanDA++,
+which
+uses
+Mask
+Confidence
+to
+guide consistency training in Panoptic Domain
+Adaptation. In particular, our method associates
+each teacher-predicted mask with a mask-level
+confidence measure. Additionally, for every mask,
+we derive the dense sampling affinity map by
+blending fine-grained teacher confidence with stu-
+dent uncertainty. Together, these mask-wide con-
+fidences and sampling affinities allow us to dis-
+courage self-learning in uncertain masks and at
+locations with inappropriate pixel-level uncer-
+tainty. This mechanism is crucial for mitigating
+confirmation bias, as illustrated in Figure 1. We
+observe that the validation panoptic quality (PQ)
+of a standard consistency baseline collapses mid-
+training, whereas our method maintains a stable
+learning trajectory. The collapse arises from naive
+2
+
+
+self-training amplifying noise, evident in the base-
+line predictions (Fig. 1, orange) where the number
+of hallucinated false-positive masks increases dras-
+tically over the course of training. On the other
+hand, our method (Fig. 1, blue) successfully miti-
+gates this issue through guided self-training based
+on mask confidence estimation.
+In summary, we contribute two novel tech-
+niques for domain adaptive panoptic segmen-
+tation: mask-wide loss scaling (MLS), which
+utilizes aggregated region-wide confidence, and
+confidence-based point filtering (CBPF), which
+prioritizes
+learning
+in
+points
+with
+confident
+teacher and uncertain student predictions. Exper-
+iments on standard benchmarks reveal substantial
+improvements in the generalization performance.
+Our method outperforms the state of the art by a
+large margin, advancing the viability of synthetic
+data for real-world applications.
+MC-PanDA++ is an extension of our ear-
+lier
+ECCV’24
+work,
+MC-PanDA
+(Martinovi´c
+et al. 2024), introducing several key contribu-
+tions: (1) We analyze the robustness of strong
+self-supervised vision encoders under domain shift
+and demonstrate their suitability for domain-
+adaptive panoptic segmentation. (2) We signifi-
+cantly streamline the preliminary three-stage MC-
+PanDA training pipeline into a single-stage design
+by leveraging robust self-supervised initialization.
+This simplification reduces the number of hyper-
+parameters and the overall conceptual complexity.
+(3) We improve mask-wide loss scaling (MLS)
+by introducing class-dependent and self-adapting
+confidence thresholding, enabling the use of the
+same initialization-independent hyperparameters
+across all experiments. This substantially reduces
+variance and increases robustness, addressing a
+key limitation of MC-PanDA. (4) We provide
+a notably extended experimental study, detailing
+the evolution from MC-PanDA to MC-PanDA++.
+Specifically, we present: i) a detailed ablation
+study showing that our contributions remain effec-
+tive even with stronger vision encoders, ii) results
+on two new synthetic-to-real and two new clear-to-
+adverse benchmarks, accompanied by correspond-
+ing ablations, iii) analysis of key design choices of
+our new class-dependent adaptive MLS, demon-
+strating its effectiveness in increasing stability and
+reducing sensitivity to the initial hyperparameter
+value, iv) robustness analysis of CBPF, and v)
+impact of scaling the vision encoder.
+2 Related work
+Panoptic
+segmentation.
+While many real-
+world applications require both semantic and
+instance-level segmentation, early research treated
+these tasks separately. The introduction of panop-
+tic segmentation as a unified formulation (Kir-
+illov et al. 2019) sparked considerable interest
+in jointly modeling things and stuff classes. Ini-
+tial approaches extended Mask R-CNN (He et al.
+2017) with an additional semantic segmentation
+branch and explored various fusion strategies for
+combining the two prediction streams (Kirillov
+et al. 2019; Li et al. 2018; Xiong et al. 2019; Kir-
+illov et al. 2019). Panoptic-DeepLab (Cheng et al.
+2020) advanced this direction by building on a
+semantic segmentation architecture and introduc-
+ing class-agnostic instance predictions via center
+and offset regression.
+Unified panoptic segmentation with Mask
+Transformers.
+Recent
+work
+has
+introduced
+unified transformer-based architectures that rep-
+resent both things and stuff regions using dense
+sigmoidal maps called masks (Yu et al. 2022;
+Cheng et al. 2022; Li et al. 2023). These masks
+are recovered by scoring dense features with
+the associated embeddings (Cheng et al. 2021).
+Mask embeddings are obtained through direct
+set prediction with an appropriate transformer
+module (Carion et al. 2020). Beyond simplify-
+ing inference, these models currently achieve the
+state of the art on panoptic segmentation bench-
+marks (Zhou et al. 2017; Lin et al. 2014). More-
+over, recent studies highlight the strong ability
+of mask transformers to estimate their own pre-
+diction uncertainty (Grcic et al. 2023), utilized
+by several leading methods in dense anomaly
+detection
+(Rai et al. 2023; Nayal et al. 2023;
+Ackermann et al. 2023; Deli´c et al. 2024).
+Self-supervised
+representation
+learning.
+Self-supervised learning (SSL) is a pre-training
+paradigm in which models optimize a pretext
+task on unlabeled data. Since such data can be
+collected at scale and without manual labeling,
+self-supervised models offer robust and general-
+izable representations while avoiding the cost,
+bias, and ambiguity of human annotations. A
+major line of SSL research includes clustering-
+based methods such as DeepCluster (Caron et al.
+2018), SeLa (Asano et al. 2020), SwAV (Caron
+3
+
+
+et al. 2020), and DINO (Caron et al. 2021).
+Extending DINO with masked image model-
+ing (Zhou et al. 2022) and large-scale curated
+pre-training yields DINOv2 (Oquab et al. 2024),
+proven to be effective across many downstream
+tasks (Tolan et al. 2024; Xu et al. 2024). Beyond
+that, self-supervised foundation models showed
+great robustness to domain shift (H¨ummer et al.
+2024; Wei et al. 2024; Yun et al. 2025). Hence,
+we initialize our backbone with self-supervised
+DINOv2, which stabilizes training and enables us
+to streamline the pipeline from three stages to a
+single stage. Beyond standard transformers, recent
+state-space models such as Mamba (Gu and Dao
+2024) have been adapted to vision tasks (Zhu
+et al. 2024; Jiang et al. 2026). Related progress
+in self-supervised and multimodal visual learn-
+ing includes remote-sensing super-resolution (Xiao
+et al. 2023) and multimodal feature fusion (Sheng
+et al. 2026), which are complementary to our focus
+on domain-adaptive panoptic segmentation.
+Unsupervised domain adaptation for seg-
+mentation.
+Unsupervised domain adaptation
+(UDA) considers a labeled source domain Dsrc and
+an unlabeled target domain Dtgt, assuming access
+to target-domain images during training. Since
+the two domains typically exhibit a substantial
+distribution shift, models trained solely on Dsrc
+often generalize poorly to Dtgt (Zendel et al. 2018;
+Sakaridis et al. 2021). UDA addresses this by opti-
+mizing a joint objective over labeled source data
+and unlabeled target data (Ben-David et al. 2010;
+Sun and Saenko 2016):
+Luda = Lsrc + Ltgt.
+(1)
+The key challenge is therefore how to construct
+the target-domain loss Ltgt. Recent approaches
+rely heavily on consistency learning and the Mean
+Teacher framework (Tarvainen and Valpola 2017),
+which has shown strong performance in segmenta-
+tion UDA (Hoyer et al. 2023; Saha et al. 2023). A
+number of methods further incorporate pixel-level
+uncertainty to filter or refine pseudo-labels (Zheng
+and Yang 2021; Zhou et al. 2022). In contrast,
+our method aggregates region-wide uncertainties,
+leverages both teacher and student uncertainty,
+and employs sparse point sampling (Kirillov et al.
+2020) rather than per-pixel loss scaling
+(Zheng
+and Yang 2021; Zhou et al. 2022).
+Domain adaptive panoptic segmentation.
+Domain-adaptive panoptic segmentation remains
+far less explored than semantic segmentation, with
+only a few notable methods. EDAPS (Saha et al.
+2023) extends consistency learning with image-
+wide scaling of the self-supervised loss (Hoyer
+et al. 2022a; Tranheden et al. 2021; Hoyer et al.
+2022b), which aims to stabilize training by reduc-
+ing gradient magnitudes in images where the
+teacher is uncertain. However, this strategy can
+be suboptimal because it uniformly down-weights
+all pixels, even when uncertainty varies spatially.
+This issue becomes particularly pronounced when
+using mixing-based augmentations that paste
+source content into target images (French et al.
+2020; Tranheden et al. 2021). LIDAPS (Mansour
+et al. 2025) builds upon EDAPS by additionally
+employing instance mixing from target to source
+and incorporating CLIP textual embeddings to
+regularize the semantic branch.
+Our
+work
+is
+most
+closely
+related
+to
+UniDAformer (Zhang et al. 2023), the only prior
+method exploring domain adaptation with mask
+transformers. However, UniDAformer relies on
+handcrafted refinement of teacher predictions
+and reports its best results using a multi-branch
+per-pixel architecture, while its mask-transformer
+variants underperform (cf. Table 1 and (Zhang
+et al. 2023)). In contrast, we introduce the first
+panoptic adaptation approach based on region-
+wide, fine-grained uncertainty estimation. The
+design is motivated by recent success of mask
+transformers in dense anomaly detection (Rai
+et al. 2023; Grcic et al. 2023; Nayal et al. 2023).
+Our preliminary work, MC-PanDA (Martinovi´c
+et al. 2024), confirmed this potential, showing that
+mask transformers paired with fine-grained uncer-
+tainty estimation can set new state-of-the-art
+performance in panoptic domain adaptation.
+3 MC-PanDA++
+We first recap panoptic segmentation with mask
+transformers in subsection 3.1. Then, we describe
+a baseline domain adaptation with a mask trans-
+former in 3.2. Subsections 3.3 and 3.4 present our
+contributions based on per-mask loss modulation
+and loss subsampling according to pixel-level con-
+fidence. Finally, in subsection 3.5 we describe the
+simplified training pipeline.
+4
+
+
+𝓛mask
+GT 
+Labels
+GT 
+Labels
+Source domain
+Target domain
+Teacher network
+Student network
+Strong 
+Augmentation
+Supervised 
+loss
+Consistency 
+loss
+Pseudo-label
+Pseudo-label
+quality estimate
+Mask-wide Loss Scaling (MLS)
+Conﬁdence-based Point Filtering (CBPF)
+0.5
+0.3
+0.7
+0.1
+0.9
+per-mask 
+quality
+estimation 
+Keep
+Discard
+EMA
+Images
+Images
+scaling 
+factors λi
+compute
+✘
+𝓛mask
+𝓛mask
+low-conﬁdence map
+Fig. 2
+Our UDA baseline jointly optimizes the student with a supervised source-domain loss and a target-domain
+teacher–student consistency loss, thereby exposing it to confirmation bias. MC-PanDA++ mitigates this issue by estimating
+fine-grained teacher confidence, which guides mask-wide loss scaling and point sampling for loss computation.
+3.1 Panoptic segmentation with
+Mask Transformers
+Recent methods for scene understanding (Cheng
+et al. 2022; Li et al. 2023; Yu et al. 2022; Car-
+ion et al. 2020) can handle semantic, instance or
+panoptic segmentation without changing the loss
+function or the model architecture. These models
+directly detect instances and stuff segments, and
+describe them with distinct segmentation masks.
+The dense feature extractor produces pixel embed-
+dings Ep ∈RH×W ×d, where H and W stand
+for height and width. The transformer decoder
+observes the features and classifies each of the N
+mask queries across (C +1) classes. The (C +1)-th
+class (no-object) indicates that the correspond-
+ing mask is unused in this particular image. The
+transformer decoder also produces mask embed-
+dings Em ∈RN×d that identify the corresponding
+pixel embeddings Ep through dot-product sim-
+ilarity. Combining the two embeddings through
+generalized matmul and sigmoid activation pro-
+duces pixel-to-mask assignments σ ∈RN×H×W .
+Thus, each mask is defined with σi ∈RH×W and
+class distribution Pi = (p(1)
+i , p(2)
+i , ..., p(C+1)
+i
+).
+The
+training
+process
+minimizes
+the
+dif-
+ference
+between
+the
+ground
+truth
+masks
+{(σGT
+i
+, yGT
+i
+)}N GT
+i
+and the predictions {(σi, Pi)}N
+i .
+The loss computation requires bipartite match-
+ing M which maps prediction mask index to
+the ground truth mask index while minimizing
+the overall matching cost. Note that the set of
+ground truth masks has to be extended with
+empty masks (σGT
+i
+= 0, yGT
+i
+= C + 1) in order
+to match the number of predictions. Given M,
+we can compute the loss consisting of recognition
+and localization terms:
+LMT =
+N
+X
+i
+Lcls(Pi, yGT
+M(i)) +
+X
+yGT
+M(i)̸=C+1
+Lmask(σi, σGT
+M(i))
+(2)
+The recognition terms Lcls require correct seman-
+tic classification, while the localization terms
+Lmask optimize per-pixel assignments. Note that
+Lmask is computed only for masks matched with
+non-empty ground truth, and that our source
+domain loss Lsrc from (1) corresponds to LMT
+from (2). During inference, each pixel (row,
+column) is assigned the mask M that maximizes
+the pixel-level confidence ρ that is expressed as a
+product of recognition and localization scores:
+M(r, c) = arg max
+i
+ρi,r,c
+ρi,r,c = max
+y̸=C+1 Pi(y) · σi(r, c)
+(3)
+3.2 Baseline consistency learning
+with Mean Teacher
+This
+section
+presents
+our
+baseline
+panoptic
+domain adaptation training of mask transform-
+ers, as illustrated on the left panel of Figure 2.
+Each training iteration takes in an equal num-
+ber of source and target domain images. With
+ground truth available in the source domain, the
+corresponding objective Lsrc follows the standard
+supervised mask transformer loss (Eq. 2). For
+the target domain, we employ Mean Teacher self-
+training, since only unlabeled images are available.
+We feed the teacher with clean images and block
+the gradients through the corresponding branch.
+5
+
+
+We perturb the student images with strong aug-
+mentations consisting of color jitter (Chen et al.
+2020), random application of Gaussian smoothing,
+and SegMix - our panoptic adaptation of Class-
+Mix (Olsson et al. 2021; Tranheden et al. 2021).
+Instead of classes, SegMix samples half of the
+panoptic segments from a random source image
+and pastes them atop the target image. We recover
+the teacher predictions and convert them to hard
+pseudo-labels consisting of N teach masks defined
+with the semantic class yteach
+i
+and dense assign-
+ment map σteach
+i
+. Finally, we obtain the target-
+domain loss Ltgt (Eq. 1) as the teacher-student
+consistency loss, defined identically to the mask
+transformer loss LMT (Eq. 2), except that the
+ground truth masks (σGT
+i
+, yGT
+i
+) are replaced with
+the teacher pseudo-label masks (σteach
+i
+, yteach
+i
+).
+We set the teacher parameters Θt to the tem-
+poral exponential moving average (EMA) of the
+student parameters Θs (Tarvainen and Valpola
+2017). Nevertheless, our baseline students still
+tend to deteriorate due to noisy pseudo-labels.
+Moreover, we notice that our baseline teachers
+produce many false positive masks. Training on
+such pseudo-labels tends to further amplify the
+noise due to the Mean Teacher setup, which intro-
+duces confirmation bias as the model repeatedly
+validates its own erroneous predictions.
+We tackle this problem by guiding the self
+learning according to the estimated quality of
+pseudo-labels, as shown in the right panel of
+Figure 2. Specifically, we use mask confidence
+to identify unreliable masks and point sampling
+locations for loss computation. The following sub-
+sections provide more details of our approach.
+3.3 Mask-wide loss scaling
+Our baseline underperforms due to positive feed-
+back loop between the student and the teacher.
+We propose to alleviate this effect by modulating
+the per-mask localization term Lmask of the stu-
+dent loss Ltgt with mask-wide teacher confidence
+λi. We scale the localization loss as follows:
+LMC
+loc =
+X
+yteach
+M(i)̸=C+1
+λi · Lmask(σi, σteach
+M(i));
+λi =
+P
+(r,c)∈M F
+i Jρi,r,c > τ1K
+|M F
+i |
+.
+(4)
+Note that M F
+i
+represents the foreground loca-
+tions for mask i, J.K – Iverson indicator function,
+and τ1 a threshold. The pixel-level confidence ρ
+is defined in (3). The mask-wide teacher confi-
+dence λi corresponds to the ratio of the fore-
+ground pixels where the pixel-level confidence is
+larger than the threshold. Intuitively, the mask-
+wide coefficient λi estimates the quality of a
+teacher pseudo-mask. Since λi is the fraction of
+predicted foreground pixels whose panoptic con-
+fidence exceeds τ1, coherent and confident masks
+receive larger localization weights. In contrast,
+incomplete or noisy masks typically contain more
+low-confidence foreground regions, resulting in
+smaller λi and a weaker contribution to the target-
+domain consistency loss. Thus, MLS encourages
+learning from reliable pseudo-masks while down-
+weighting uncertain ones that could otherwise
+reinforce confirmation bias.
+3.3.1 Per-class and adaptive
+thresholding
+The previous formulation (4) makes mask-wide
+loss scaling sensitive to the threshold τ1. A high
+threshold can halt learning on the target domain,
+while a low threshold is overly permissive, allowing
+noise amplification. Fig. 3 illustrates this sen-
+sitivity by showing model performance against
+different values of τ1. We observe that lower τ1 val-
+ues lead to substantial drops in PQ and increased
+variance across random seeds, compared to the
+default MC-PanDA setting with τ1 = 0.99.
+0.50
+0.60
+0.70
+0.80
+0.90
+0.99
+τ1
+35
+40
+45
+PQ
+Fig. 3 Panoptic performance (PQ) on Synthia→Vistas as
+a function of the initial threshold τ1. Each point denotes
+the mean PQ over three random seeds, with error bars
+indicating the standard deviation. The orange point marks
+the default MC-PanDA setting with τ1 = 0.99.
+6
+
+
+Furthermore, using a predetermined, fixed and
+uniform threshold τ1 across all classes is subopti-
+mal for multiple reasons. First, model confidence
+is class-dependent. For example, rare and visually
+ambiguous classes tend to exhibit lower confi-
+dence than others, even when their predictions are
+correct. Second, model confidence evolves during
+training, starting low and increasing over time.
+Third, model confidence depends on the degree
+of domain shift between the source and target
+domains. Selecting an appropriate fixed τ1 for dif-
+ferent training and testing domains is nontrivial,
+making deployment across domains challenging.
+Ideally, the training procedure should be robust to
+the initial choice of the threshold τ1. However, this
+is difficult to guarantee if the threshold remains
+static throughout training.
+Hence, we propose to mitigate this instabil-
+ity using adaptive and class-dependent thresholds
+that evolve during training:
+τ n
+1,k = α τ n−1
+1,k
++ (1 −α) δn
+k ,
+δn
+k = max
+i∈In
+k
+f
+ 
+ρi,r,c
+ (r, c) ∈M F
+i
+	
+,
+(5)
+where
+α
+is
+the
+EMA
+momentum
+control-
+ling the smoothness of updates, In
+k
+denotes
+the set of teacher-predicted instances belong-
+ing to class k at the training iteration n, and
+f
+ {ρi,r,c | (r, c) ∈M F
+i }
+
+is an instance-wise aggre-
+gation (e.g., mean, median, or N-th percentile)
+of the pixel-level confidence over the foreground
+region M F
+i of instance i. The update coefficient δn
+k
+is obtained by first aggregating the panoptic score
+ρi,r,c over the foreground pixels of each mask M F
+i
+and then selecting the highest aggregated confi-
+dence among all masks of class k in the batch. If
+In
+k = ∅, i.e., if the teacher predicts no mask of
+class k in the current batch, we skip the update
+and keep the previous value of τ1,k.
+Formulation in Eq. 5 introduces per-class
+thresholds τ n
+1,k that dynamically adapt to the
+evolving teacher confidence distribution, improv-
+ing stability and reducing sensitivity to the initial
+value. The max-over-instances operation maxi∈In
+k
+is an empirical choice aligned with MLS: it anchors
+each class threshold to the most confident teacher
+masks of that class, rather than allowing many
+low-confidence pseudo-masks to lower the thresh-
+old and make MLS overly permissive. Combined
+with the EMA update, this yields class-specific
+thresholds that adapt over time while being less
+sensitive to noisy batch-level fluctuations.
+3.4 Confidence-based point filtering
+Training
+dense
+prediction
+models
+on
+high-
+resolution images can be extremely memory inten-
+sive. This problem can be alleviated by training on
+a carefully chosen sample of Np dense predictions
+instead of on the whole prediction tensor (Kirillov
+et al. 2020). The procedure starts by sampling a
+random oversized set of 3Np floating-point loca-
+tions. The initial set is then subsampled by choos-
+ing β ·Np points with the largest uncertainty (β ∈
+[0, 1]), and random (1 −β) · Np points. However,
+such procedure is inappropriate for consistency
+training. In fact, the teacher and the student will
+often be uncertain at the same locations since
+they are presented with the same image (up to a
+perturbation). Thus, blind favoring of uncertain
+student points would increase the chance of sam-
+pling incorrect pseudo-labels. On the other hand,
+favouring highly confident points would impair the
+learning process by providing uninformative gra-
+dients. Thus, we propose to favour points with low
+student and high teacher confidence by means of
+a dense sampling affinity Ai:
+Ai (r, c) =
+(
+−∞
+Φteach
+r,c
+< τ2,
+−|si,r,c|
+otherwise.
+(6)
+Note that Φteach
+r,c
+denotes the teacher confidence,
+while si,r,c denotes the pre-activation of the stu-
+dent mask-assignment σ. Thus, if the teacher
+confidence in some point (r,c) is lower than the
+threshold τ2, we prevent its sampling by setting
+the sampling affinity to −∞. When the teacher is
+confident, the sampling affinity is defined by the
+negative absolute value of the student pixel-to-
+mask pre-activation, allowing student-uncertain
+points to be safely prioritized. We estimate the
+teacher confidence as follows:
+Φteach
+r,c
+= max
+i
+ρteach
+i,r,c
+(7)
+This assigns the lowest confidence to the locations
+that are not claimed by any of the masks, and to
+7
+
+
+the locations claimed by masks with low classifi-
+cation confidence. This formulation of point sam-
+pling is conservative as it prevents any mask from
+training on low confidence teacher predictions.
+3.5 Simplifying the training pipeline
+Our preliminary method MC-PanDA relied on
+a three-stage training pipeline (Berrada et al.
+2024), as illustrated in Figure 4. The first stage
+initialized the backbone with supervised Ima-
+geNet weights, and pre-trained the teacher on the
+labeled source domain. The second stage applied
+consistency learning with a fixed teacher (burn-
+in stage) (Berrada et al. 2024), while the third
+stage employed consistency learning with a Mean
+Teacher (Tarvainen and Valpola 2017). Beyond
+Teacher
+Teacher
+Student
+1. Teacher Pre-training
+2. Burn-in Stage
+MC-PanDA
+MC-PanDA++
+Teacher
+Student
+3. EMA Stage
+EMA
+Fig. 4 MC-PanDA++ simplifies the MC-PanDA training
+pipeline by removing source-domain pre-training and the
+teacher burn-in stage.
+increasing conceptual complexity, the three-stage
+training pipeline introduces several stage-specific
+hyperparameters, such as the duration of teacher
+pre-training and the length of the burn-in phase.
+These hyperparameters vary across benchmarks,
+which makes the method less robust.
+Hence, in MC-PanDA++, we simplify this
+setup to a single-stage training pipeline based
+on consistency learning with Mean Teacher. To
+maintain a stable learning curve similar to the
+three-stage setup, we introduce a simple modifica-
+tion. We initialize the backbone with large-scale
+self-supervised weights (Oquab et al. 2024), which
+provide greater robustness than supervised Ima-
+geNet pretraining from MC-PanDA. We argue this
+provides sufficient stability to bypass the original
+stabilization phases, whose main purpose was to
+mitigate early pseudo-label noise. Moreover, self-
+supervised backbone initialization further reduces
+the reliance on human annotations. In addition
+to the initialization, when using a single-stage
+pipeline, we observe that doubling the weight of
+the supervised Lmask loss yields a small perfor-
+mance improvement. Overall, single-stage training
+in MC-PanDA++ eliminates both the conceptual
+overhead of a staged procedure and the need to
+tune burn-in hyperparameters, while maintaining
+stable adaptation performance.
+4 Experiments
+We organize our experimental study as follows.
+Section 4.1 provides full implementation details,
+followed by a comparison of MC-PanDA++ against
+the state of the art on standard benchmarks in
+Section 4.2. Subsequently, Section 4.3 consoli-
+dates the contributions of our preliminary method
+MC-PanDA and revisits the key design choices.
+This analysis sets the groundwork for the step-
+by-step transition to the simpler, stronger and
+more robust MC-PanDA++ detailed in Section 4.4.
+Specifically, we: (i) study backbone initialization
+(4.4.1) and demonstrate the effectiveness of MLS
+and CBPF under stronger self-supervised ini-
+tialization (4.4.2–4.4.4); (ii) simplify the original
+three-stage pipeline to a single-stage (4.4.5); (iii)
+analyze the effects of per-class adaptive mask-
+wide loss scaling (4.4.6); and (iv) validate the
+robustness of CBPF (4.4.7). Finally, Section 4.5
+reports the complete results of MC-PanDA++ and
+evaluates the effect of scaling the encoder.
+4.1 Implementation details
+Datasets.
+We
+perform
+experiments
+on
+two
+standard real-world datasets: Cityscapes (Cordts
+et al. 2016) and Mapillary Vistas (Neuhold et al.
+2017). Cityscapes comprises 2975 training and 500
+validation images of European urban scenes cap-
+tured in fair weather and 1024 × 2048 resolution.
+Vistas contains 18,000 training and 2000 valida-
+tion images of worldwide scenes under diverse
+weather and illumination conditions, with a mean
+resolution of 8.4 MPix. Additionally, we evaluate
+MC-PanDA++ on clear-to-adverse domain adapta-
+tion benchmarks by employing two datasets cap-
+tured in challenging conditions: ACDC (Sakaridis
+et al. 2021) and MUSES (Br¨odermann et al. 2024).
+Both datasets are divided into four conditions: fog,
+nighttime, rain, and snow. The ACDC training
+subset comprises 1600 images, while the MUSES
+training subset includes 1500 images. We report
+8
+
+
+performance on the corresponding validation sub-
+sets, which consist of 406 and 250 images, respec-
+tively. Following (Martinovi´c et al. 2024; Saha
+et al. 2023), for synthetic data we consider Syn-
+thia (Ros et al. 2016) with 9400 images at 1280 ×
+760 resolution, and Foggy Cityscapes (Sakaridis
+et al. 2018) with 2975 training and 500 validation
+images at 1024 × 2048 resolution and attenuation
+factor 0.02. Finally, we conduct additional experi-
+ments on the recently introduced synthetic dataset
+UrbanSyn (G´omez et al. 2025), which comprises
+7539 training images and serves as an addi-
+tional source domain. During inspection of Urban-
+Syn (G´omez et al. 2025), we identified a subset of
+images with corrupted ground-truth labels, such
+as regions assigned to clearly incorrect classes. In
+total, we detected 57 such images and removed
+them during training. We provide the details of
+the detection procedure, together with the full list
+of affected samples in the Appendix A. All exper-
+iments that use UrbanSyn as the source domain
+are conducted on this filtered split, including the
+source-only baselines and all MC-PanDA++ vari-
+ants. In Appendix A, we also quantify the impact
+of this filtering step on the final performance.
+Architecture.
+For both MC-PanDA (Marti-
+novi´c et al. 2024) and MC-PanDA++, we employ
+the panoptic Mask2Former (Cheng et al. 2022)
+framework with multi-scale deformable atten-
+tion (Zhu et al. 2021) in the pixel decoder. The
+default backbone in MC-PanDA is Swin-B (Liu
+et al. 2021). In MC-PanDA++, we adopt DINOv2-
+B as the primary backbone initialization for the
+majority of experiments, and DINOv2-Large to
+assess the effectiveness of scaling the encoder.
+We follow ViTDet (Li et al. 2022) to construct
+a ViT feature pyramid, and, following Kerssies
+et al. (2024), resize the patch-embedding kernels
+to 16×16 for all ViT-based experiments.
+Training.
+We train our models for 110k itera-
+tions using batches composed of 2 source and 2
+target-domain images. The teacher is updated as
+the exponential moving average (Tarvainen and
+Valpola 2017) of the student with a decay factor
+α = 0.999, and the same α is used for updating the
+adaptive threshold τ1 (Eq. 5). In contrast to MC-
+PanDA, MC-PanDA++ uses a single shared set of
+hyperparameters across all experiments, further
+demonstrating the robustness of our method. We
+use AdamW (Loshchilov and Hutter 2019) with an
+initial learning rate 0.0001 and weight decay 0.05.
+We apply random scaling, horizontal flipping,
+color jittering, and random 512 × 1024 cropping
+in both domains. The target-domain branch in
+the student receives additional strong augmen-
+tations as described in section 3.2. The teacher
+generates pseudo-labels for the target domain via
+default panoptic inference (Cheng et al. 2022), and
+the student is trained with a consistency objec-
+tive modulated by our mask-wide loss scaling and
+points sampling procedure. See Appendix B for
+additional training and augmentation details.
+All experiments with the base model variant
+are conducted on a single A100–40GB GPU,
+whereas the large variant requires two GPUs. All
+results are reported as the mean over three runs
+with different random seeds.
+Evaluation.
+We evaluate our models according
+to panoptic quality (PQ) (Kirillov et al. 2019) that
+can be factored into segmentation quality (SQ)
+and recognition quality (RQ). We report PQ for
+each category (Appendix J), as well as the mean
+PQ, of the final student model. Synthia (Ros et al.
+2016) comprises 16 annotated classes that corre-
+spond to a subset of the Cityscapes taxonomy.
+Consequently, the experiments on Synthia report
+PQ16 as the mean over the 16 Synthia classes.
+4.2 Comparison with the SotA
+We first compare the results of MC-PanDA++
+with the state of the art on the four bench-
+marks commonly used in the domain-adaptive
+panoptics. Table 1 summarizes the results on
+standard synthetic-to-real benchmarks. Consis-
+tent with our conference findings (Martinovi´c
+et al. 2024), the original MC-PanDA formula-
+tion already surpasses EDAPS (Saha et al. 2023)
+when equipped with either the MiT-B5 (Xie
+et al. 2021) or the comparable Swin-B (Liu et al.
+2021) backbone. MC-PanDA also exceeds the
+performance of LIDAPS (Mansour et al. 2025),
+despite LIDAPS leveraging MiT-B5 combined
+with CLIP-based (Radford et al. 2021) textual
+embeddings. To further assess the effect of the
+backbone, Table 1 also includes our EDAPS and
+LIDAPS reimplementations with the DINOv2-B
+backbone, the same encoder as in MC-PanDA++.
+9
+
+
+Table 1 Comparison with the state of the art on Synthia→Cityscapes and Synthia→Vistas. † indicates our
+reimplementation of EDAPS using the same Swin-B backbone as in MC-PanDA. ‡ indicates our reimplementation with
+the same DINOv2-B backbone as in MC-PanDA++. All experiments for MC-PanDA and MC-PanDA++ are averaged over
+three random seeds.
+Synthia→City
+Synthia→Vistas
+Method
+PQ16
+RQ16
+SQ16
+PQ16
+RQ16
+SQ16
+CVRN (Huang et al. 2021)
+32.1
+40.9
+66.6
+21.3
+28.1
+65.3
+UniDAF-DETR (Zhang et al. 2023)
+33.0
+42.2
+64.7
+–
+–
+–
+UniDAF-PSN (Zhang et al. 2023; Kirillov et al. 2019)
+34.2
+44.3
+66.9
+–
+–
+–
+EDAPS (Saha et al. 2023)
+41.2
+53.6
+72.7
+36.6
+46.1
+71.7
+EDAPS† (Saha et al. 2023)
+39.3
+51.4
+73.1
+–
+–
+–
+LIDAPS (Mansour et al. 2025)
+44.8
+57.6
+74.4
+38.0
+47.7
+73.9
+MC-PanDA (Martinovi´c et al. 2024)
+47.4
+59.3
+76.7
+38.7
+49.8
+71.0
+EDAPS‡ (Saha et al. 2023)
+42.0
+54.7
+73.4
+40.5
+51.7
+74.7
+LIDAPS‡ (Mansour et al. 2025)
+44.7
+57.1
+74.4
+37.0
+48.2
+73.8
+MC-PanDA++
+49.6
+62.2
+77.0
+44.8
+56.6
+76.3
+Table 2 Performance evaluation on Cityscapes→Foggy Cityscapes and Cityscapes→Vistas. All experiments for
+MC-PanDA and MC-PanDA++ are averaged over three random seeds.
+Cityscapes→Foggy
+Cityscapes→Vistas
+Method
+PQ16
+RQ16
+SQ16
+PQ19
+PQ16
+RQ16
+SQ16
+PQ19
+CVRN (Huang et al. 2021)
+35.7
+46.7
+72.7
+–
+33.5
+42.8
+73.8
+–
+UniDAF (Zhang et al. 2023)
+37.6
+49.5
+72.9
+–
+–
+–
+–
+–
+EDAPS (Saha et al. 2023)
+56.7
+70.5
+79.2
+–
+41.2
+53.4
+75.9
+–
+LIDAPS (Mansour et al. 2025)
+59.6
+73.2
+80.2
+42.6
+54.9
+76.6
+MC-PanDA (Martinovi´c et al. 2024)
+63.7
+76.3
+82.5
+62.0
+53.8
+66.6
+79.3
+51.7
+MC-PanDA++
+66.6
+79.2
+83.2
+64.7
+55.9
+68.3
+80.3
+54.3
+This improves some baseline results, but MC-
+PanDA++ remains ahead on both benchmarks.
+Additional details required for these reimplemen-
+tations are provided in Appendix F. Most impor-
+tantly, our extended MC-PanDA++ improves upon
+the original MC-PanDA by 2.2 PQ16 points on
+Synthia→Cityscapes and achieves a substantial
+6.1 PQ16 points gain on the more challenging
+Synthia→Vistas benchmark.
+We provide a detailed compute, memory,
+and inference-time comparison with LIDAPS in
+Appendix G. In summary, LIDAPS uses fewer
+training iterations and therefore requires fewer
+total GPU-hours, while MC-PanDA++ is faster
+at inference (3.4 FPS vs. 2.1–2.4 FPS), uses less
+inference memory (4.0 GiB vs. 6.6–8.2 GiB), and
+achieves higher final performance.
+Table
+2
+further
+compares
+MC-PanDA++
+with the state of the art on real-to-adverse
+(Cityscapes→Foggy
+Cityscapes)
+and
+real-to-
+real (Cityscapes→Vistas) benchmarks. Consistent
+with the observations in Table 1, MC-PanDA sur-
+passes both EDAPS and LIDAPS on these two set-
+tings. Finally, MC-PanDA++ delivers additional
+gains over MC-PanDA, improving performance by
+approximately 2.5 PQ19 points on both bench-
+marks. We provide per-class comparison with the
+state of the art on both synthetic-to-real and
+clear-to-adverse benchmarks in the Appendix J.
+4.3 Ablating MC-PanDA
+Before introducing MC-PanDA++, we ablate MC-
+PanDA (Martinovi´c et al. 2024) and examine
+alternative formulations of its key components,
+laying the foundation for the improvements devel-
+oped in the following sections.
+Table 3 Ablation study on Synthia→Cityscapes and
+Synthia→Vistas with the Swin-B backbone, as originally
+reported for MC-PanDA (Martinovi´c et al. 2024). Top
+row corresponds to supervised training on Synthia. We
+report mean±std over three random seeds. BC: baseline
+consistency (section 3.2).
+SYN→City
+SYN→Vistas
+BC
+MLS.99
+CBPF
+PQ16
+PQ16
+–
+–
+–
+30.8
+↱
+25.2
+↱
+✓
+–
+–
+39.6±1.5 +8.8
+32.2±0.9 +7.0
+✓
+✓
+–
+44.6±0.7 +13.8
+37.1±1.0 +11.9
+✓
+–
+✓
+44.1±0.2 +13.3
+35.1±1.3 +9.9
+✓
+✓
+✓
+47.4±0.8 +16.6
+38.7±1.0 +13.5
+10
+
+
+Table 3 quantifies the contributions of the
+proposed Mask-wide Loss Scaling (MLS) and
+Confidence-based
+Point
+Filtering
+(CBPF)
+to
+the panoptic performance (PQ16) of adapted
+models
+on
+two
+synthetic-to-real
+benchmarks:
+Synthia→Cityscapes and Synthia→Vistas. The
+first row reports the domain generalization perfor-
+mance of a supervised model trained on Synthia.
+Our consistency baseline (see 3.2) improves super-
+vised baseline by 8.8 and 7.0 PQ16 points on
+Synthia→Cityscapes and Synthia→Vistas, respec-
+tively. Self-training with MLS provides an addi-
+tional gain of roughly 5 points on both bench-
+marks, amounting to improvements of approxi-
+mately 14.0 and 12.0 PQ16 points over the super-
+vised baseline. Similarly, CBPF yields gains of
+about 5.0 and 3.0 PQ16 points over the consis-
+tency baseline. Combining both components, our
+complete method reaches 47.4 and 38.7 PQ16, cor-
+responding to improvements of 16.6 and 13.5 PQ16
+points over the supervised, and 7.8 and 6.5 PQ16
+points over the consistency baseline (BC).
+We next investigate alternative formulations
+of our proposed contributions. Table 4 compares
+our mask-wide loss scaling (MLS) with image-wide
+loss scaling (ILS), which assigns all masks in an
+image a single global scaling factor (Saha et al.
+2023). The image-wide loss weight is defined as:
+λi = λILS =
+P
+r,cJΦteach
+r,c
+> τILSK
+HW
+.
+(8)
+We
+evaluate
+three
+ILS
+thresholds
+τILS
+∈
+{0.95, 0.968, 0.99} and report the best-performing
+configuration τILS = 0.968 (Saha et al. 2023) as an
+optimistic baseline. The top section of the table
+compares ILS and MLS without confidence-based
+point filtering (CBPF), while the bottom section
+includes CBPF. We observe a clear advantage of
+mask-wide loss scaling in both cases. We argue
+that this happens since ILS down-scales the loss
+gradients for many valid masks.
+Table 5 validates our proposed loss subsam-
+pling strategy based on CBPF (cf. 3.4). The
+baseline point-sampling approach (Kirillov et al.
+2020) prioritizes points with high student uncer-
+tainty, which increases the likelihood of selecting
+incorrect pseudo-labels. CBPF mitigates this issue
+by suppressing training on pixels for which the
+Table 4 Comparison of image-wide (ILS) and
+mask-wide loss scaling (MLS) on Synthia→Cityscapes,
+as originally reported for MC-PanDA (Martinovi´c et al.
+2024). We report an optimistic ILS performance as the
+maximum across three different τILS thresholds.
+ILS
+MLS
+CBPF
+SQ16
+RQ16
+PQ16
+✓
+–
+–
+73.7±0.5
+50.5±1.1
+39.7±0.8
+–
+✓
+–
+75.3±0.2
+56.5±1.0
+44.7±0.7
+✓
+–
+✓
+74.8±0.4
+53.4±0.2
+42.1±0.5
+–
+✓
+✓
+76.7±0.4
+59.3±1.0
+47.4±0.8
+teacher exhibits low confidence. We further eval-
+uate an alternative formulation of teacher confi-
+dence, Φteach
+i,r,c = σ(|steach
+i
+|)r,c, where steach
+i
+denotes
+the teacher pre-activation for mask i. This vari-
+ant produces a per-mask confidence estimate, in
+contrast to our default all-mask formulation (see
+Eq. 7). We also include a random point-sampling
+baseline (random sampling, β = 0.0). Our for-
+mulation, which aggregates confidence over all
+masks, outperforms the per-mask variant by 2.7
+PQ points. We believe that per-mask underperfor-
+mance occurs due to over-confident negative mask
+assignments where many pixels get incorrectly
+predicted as not belonging to the corresponding
+mask. See Appendix C for a visual comparison of
+the all-mask and per-mask strategies.
+Table 5 Validation of loss subsampling with
+confidence-based point filtering (CBPF) on
+Synthia→Cityscapes, as originally reported for
+MC-PanDA (Martinovi´c et al. 2024). The random
+sampling baseline applies the loss to a random
+subset of image points.
+CBPF (τ2 = 0.8)
+filtering method
+SQ16
+RQ16
+PQ16
+random sampling
+74.9±0.1
+56.1±1.4
+44.2±1.1
+per-mask
+75.2±0.4
+56.5±0.1
+44.7±0.1
+all-masks (eq. 7)
+76.7±0.4
+59.3±1.0
+47.4±0.8
+4.4 From MC-PanDA to
+MC-PanDA++
+This section presents the evolution from the
+preliminary MC-PanDA to the improved MC-
+PanDA++. We begin by studying backbone initial-
+ization and demonstrating that MLS and CBPF
+remain
+effective
+under
+strong
+self-supervised
+encoders. We then extend the evaluation to
+11
+
+
+30.0
+32.5
+35.0
+37.5
+PQ (%)
+Supervised (IN-1k)
+Supervised (IN-21k)
+Self-supervised (DINO IN-1k)
+31.2
+32.8
+35.3
+SYNTHIA → Cityscapes
+Fig.
+5 Comparison
+of
+initialization
+strategies.
+MC-
+PanDA with a self-supervised ViT-B/16 (DINO, IN-1k)
+yields the best PQ, outperforming supervised ViT-B/16
+models pre-trained on ImageNet-1k and even ImageNet-
+21k. Results are averaged over three seeds.
+additional synthetic-to-real and clear-to-adverse
+benchmarks, further validating the effectiveness of
+these components. Next, we streamline the origi-
+nal three-stage pipeline into a single-stage design
+and introduce per-class adaptive mask-wide loss
+scaling, which stabilizes training and removes sen-
+sitivity to the initial threshold. Finally, we demon-
+strate the robustness of CBPF, completing the
+transition to the final MC-PanDA++ framework.
+4.4.1 On the backbone choice
+We
+first
+validate
+the
+hypothesis
+that
+self-
+supervised initialization offers greater robustness
+to domain shift than supervised pre-training.
+To
+this
+end,
+we
+evaluate
+the
+original
+MC-
+PanDA
+(Martinovi´c
+et
+al.
+2024)
+using
+a
+ViT-B-16 (Dosovitskiy et al. 2021) backbone
+with
+three
+distinct
+initialization
+strate-
+gies:
+supervised
+pre-training
+on
+ImageNet-1k
+(IN-1k) and ImageNet-21k (IN-21k), and self-
+supervised DINO (Caron et al. 2021) trained
+on ImageNet-1k. Figure 5 reports the results
+on
+the
+Synthia→Cityscapes
+benchmark.
+The
+self-supervised DINO initialization outperforms
+the supervised counterparts, exceeding the IN-1k
+baseline by 4.2 PQ and even the IN-21k baseline
+by 2.5 PQ.
+After establishing that self-supervised initial-
+ization benefits UDA, we evaluate several large-
+scale pretrained encoders to identify the most
+suitable initialization. To better contrast dif-
+ferent pretraining strategies, we consider three
+families: reconstruction-based self-supervised pre-
+training,
+represented
+by
+MAE
+(He
+et
+al.
+2022); vision-language pretraining, represented by
+SigLIP2 (Tschannen et al. 2025); and distillation-
+based self-supervised pretraining, represented by
+SYNTHIA→City
+UrbanSyn→City
+30
+40
+50
+PQ
+26.8
+39.8
+29.0
+42.2
+35.4
+43.3
+36.0
+47.7
+36.0
+48.3
+City→ACDC
+City→MUSES
+30
+40
+50
+PQ
+33.7
+31.4
+41.6
+34.3
+45.5
+39.5
+46.7
+37.4
+48.7
+42.0
+MAE-ViT-B-16
+SigLIP2-ViT-B-16
+Franca-ViT-B-14
+DINOv3-ViT-B-16
+DINOv2-ViT-B-14
+Fig. 6
+Selection of the pretrained backbone. We compare
+different pretraining strategies in a domain-generalization
+setting across four benchmarks: reconstruction-based self-
+supervised pretraining (MAE), vision-language pretraining
+(SigLIP2), and distillation-based self-supervised pretrain-
+ing (Franca, DINOv2, and DINOv3).
+Franca-B (Venkataramanan et al. 2026), DINOv2-
+B (Oquab et al. 2024), and DINOv3-B (Sim´eoni
+et al. 2025). To assess their intrinsic robustness, we
+compare all encoders in a domain-generalization
+setting, where models train only on the source
+domain without access to target-domain images.
+All experiments use Mask2Former (Cheng et al.
+2022) with identical hyperparameters to ensure
+a fair comparison. Figure 6 summarizes results
+across four benchmarks: MAE is consistently
+weaker, suggesting that reconstruction-based pre-
+training alone provides less robust cross-domain
+features in our setting. SigLIP2 achieves moder-
+ate performance, indicating that vision-language
+pretraining improves generalization but does not
+match the strongest self-supervised distillation
+models. Among the distillation-based methods,
+DINOv2-B provides the strongest and most con-
+sistent domain-generalization performance. We
+therefore adopt DINOv2-B as the default back-
+bone for all subsequent experiments.
+4.4.2 MC-PanDA with DINOv2
+From this section onwards, all experiments use
+self-supervised DINOv2 (Oquab et al. 2024) as
+the backbone. We begin by directly replacing
+the Swin-B in MC-PanDA with DINOv2-B and
+evaluate whether our contributions, MLS and
+CBPF, remain effective under this substantially
+12
+
+
+stronger initialization. Table 6 reports the abla-
+tion results on two synthetic-to-real benchmarks:
+Synthia→Cityscapes and Synthia→Vistas. The
+first row provides the domain-generalization per-
+formance of a model trained only on Synthia.
+Compared to the supervised Swin-B initialization
+in Table 3, self-supervised DINOv2-B improves
+performance by 5.2 and 8.5 PQ16 points on the
+two benchmarks, respectively.
+The consistency baseline (BC, row 2) further
+adds 3.7 PQ16 points on Synthia →Cityscapes
+and maintains a similar performance level to
+the
+supervised
+baseline
+on
+Synthia
+→
+Vis-
+tas. This behavior on Vistas aligns with the
+self-confirmation and pseudo-label amplification
+effects discussed in our conference version and
+illustrated in Fig. 1, which persist even with a
+stronger backbone.
+However, once MLS is introduced, we observe
+substantial performance gains on both bench-
+marks, including nearly 10 PQ16 points on Synthia
+→Vistas. This demonstrates that MLS provides
+complementary improvements that remain effec-
+tive even under a state-of-the-art self-supervised
+initialization. Finally, adding CBPF on top of
+MLS (last row) yields additional gains of 4.0 and
+1.4 PQ16 points on Synthia→Cityscapes and Syn-
+thia →Vistas, respectively, confirming that both
+MLS and CBPF continue to contribute despite the
+significantly stronger backbone.
+4.4.3 Improving the synthetic source
+domain
+We further validate the effectiveness of our con-
+tributions on benchmarks with a less extreme
+domain shift. Synthia (Ros et al. 2016) has long
+served as the standard synthetic source domain
+in domain adaptive panoptic segmentation, as it
+was for many years the only dataset providing
+Table 6 Ablation study on Synthia→Cityscapes and
+Synthia→Vistas with the self-supervised DINOv2
+initialization. Top row corresponds to supervised training
+on Synthia. We report mean±std over three random seeds.
+Syn→City
+Syn→Vistas
+BC
+MLS.99
+CBPF0.8
+PQ16
+PQ16
+–
+–
+–
+36.0
+↱
+33.7
+↱
+✓
+–
+–
+39.7±0.9 +3.7
+33.6±1.6
+-0.1
+✓
+✓
+–
+44.5±0.6 +8.5
+42.8±0.4 +9.1
+✓
+✓
+✓
+48.5±0.4 +12.5
+44.2±0.1 +10.5
+both semantic and panoptic labels. However, Syn-
+thia exhibits two notable limitations: i) its visual
+appearance is often far from realistic (Fig. 7,
+top), and ii) it provides annotations for only 16
+semantic classes, which do not fully match the
+standard 19-class Cityscapes taxonomy. Adapt-
+ing from Synthia to real-world datasets therefore
+remains a strong indicator of a method’s robust-
+ness due to the substantial domain gap. However,
+a more realistic scenario would likely use synthetic
+images better aligned with the target domain.
+To address such a scenario, we evaluate the
+recently introduced UrbanSyn dataset (G´omez
+et al. 2025) as an alternative source domain. As
+illustrated in Fig. 7, UrbanSyn exhibits substan-
+tially higher visual realism. Moreover, UrbanSyn
+follows the standard 19-class Cityscapes taxon-
+omy, which makes it a natural candidate for an
+improved synthetic-to-real benchmark.
+Table 7 presents the ablation study of MC-
+PanDA
+with
+DINOv2
+on
+the
+newly
+intro-
+duced benchmarks: UrbanSyn→Cityscapes and
+UrbanSyn→Vistas. From the table, we observe
+that MLS and CBPF together improve perfor-
+mance by 8.5 and 6.6 PQ19 points over the
+supervised baseline on UrbanSyn→Cityscapes and
+UrbanSyn→Vistas, respectively. Compared to the
+consistency baseline (BC), the combined contri-
+butions yield an additional 3.4 PQ19 points on
+both benchmarks. These results indicate that even
+with a more realistic and better aligned synthetic
+source domain, our proposed components remain
+effective and provide consistent gains.
+Complementary to improving the adaptation
+method itself, one can also improve the under-
+lying synthetic source domain. Table 8 exam-
+ines this effect by comparing the performance of
+MC-PanDA with DINOv2 when using Synthia
+or UrbanSyn as the source domain for adapta-
+tion to Cityscapes and Vistas. The comparison is
+Synthia
+UrbanSyn
+Fig. 7
+Visual comparison between the synthetic datasets
+Synthia (Ros et al. 2016) (top row) and UrbanSyn (G´omez
+et al. 2025) (bottom row).
+13
+
+
+Table 7 Ablation study on UrbanSyn→Cityscapes
+and UrbanSyn→Vistas with the self-supervised
+DINOv2 initialization. Top row corresponds to
+supervised training on UrbanSyn. We report mean±std
+over three random seeds. USyn: UrbanSyn.
+USyn→City
+USyn→Vistas
+BC
+MLS.99
+CBPF0.8
+PQ19
+PQ19
+–
+–
+–
+48.3
+↱
+42.1
+↱
+✓
+–
+–
+53.4±0.8 +5.1
+45.3±1.2 +3.2
+✓
+✓
+–
+54.5±0.4 +6.2
+47.3±0.1 +5.2
+✓
+✓
+✓
+56.8±0.7 +8.5
+48.7±0.6 +6.6
+reported in PQ16 over the 16 classes available in
+Synthia, which form a subset of the 19 classes in
+UrbanSyn. We observe gains of 11.3 and 8.0 PQ16
+points on Cityscapes and Vistas, respectively,
+when switching from Synthia to UrbanSyn. These
+results suggest that, in addition to advancing
+domain-adaptation methods themselves, improv-
+ing the quality and realism of the synthetic source
+domain can yield significant benefits.
+4.4.4 Clear-to-adverse benchmarks
+In previous domain-adaptive panoptic segmen-
+tation
+work,
+Cityscapes→Foggy
+Cityscapes
+has been the only benchmark used for clear-
+to-adverse
+adaptation.
+Foggy
+Cityscapes
+is
+generated
+by
+synthetically
+adding
+fog
+to
+Cityscapes images, which limits the diversity of
+adverse conditions being evaluated. To expand
+this setting, we introduce two new clear-to-
+adverse
+benchmarks:
+Cityscapes→ACDC
+and
+Cityscapes→MUSES.
+Figure
+8
+shows
+exam-
+ple images from ACDC (Sakaridis et al. 2021)
+and MUSES (Br¨odermann et al. 2024), while
+additional details are provided in subsection 4.1.
+We further ablate MC-PanDA with DINOv2-B
+on the two new clear-to-adverse benchmarks and
+present results in Tab. 9. The consistency baseline
+(BC) performs 5.5 PQ19 points below the super-
+vised model on ACDC, quantitatively confirming
+Table 8 Comparison of MC-PanDA with DINOv2
+when using Synthia versus UrbanSyn as the synthetic
+source domain. Results are reported in PQ16 for the
+16 classes shared between both datasets.
+Src. domain
+PQ16 on City
+PQ16 on Vistas
+Synthia
+48.5±0.4
+↱
+44.2±0.1
+↱
+UrbanSyn
+59.8±0.4
++11.3
+52.2±0.3
++8.0
+ACDC
+MUSES
+Fig.
+8
+Example images from the adverse-condition
+datasets: ACDC (Sakaridis et al. 2021) (top row) and
+MUSES (Br¨odermann et al. 2024) (bottom row).
+the noise amplification effect shown in Fig. 1. In
+contrast, combining MLS and CBPF yields sub-
+stantial gains: 6.8 and 10.6 PQ19 points over the
+supervised baseline, and 12.3 and 3.3 PQ19 points
+over consistency baseline (BC) on ACDC and
+MUSES, respectively.
+4.4.5 Simplifying the training pipeline
+After validation of our contributions on multiple
+benchmarks with the new DINOv2 initialization,
+we consider reducing the conceptual complexity of
+our method. As described in Sec. 3.5, we hypoth-
+esize that DINOv2 is robust enough to make the
+preliminary training stabilization phases obsolete.
+Table 10 explores this by comparing MC-PanDA
+with DINOv2 using the three-stage versus the sim-
+plified single-stage pipeline, both evaluated with
+a constant MLS threshold τ1. The two pipelines
+achieve comparable performance, while the single-
+stage version substantially reduces the training
+complexity. On the other hand, our preliminary
+experiments with the single-stage MC-PanDA and
+a Swin backbone failed to converge. These results
+confirm the stabilizing effect of DINOv2 backbone,
+which enables a single-stage training pipeline,
+adopted in all subsequent experiments.
+Table 9 Ablation study on Cityscapes→ACDC and
+Cityscapes→MUSES the self-supervised DINOv2
+initialization. Top row corresponds to supervised
+training on Cityscapes. We report mean±std over three
+random seeds.
+City→ACDC
+City→MUSES
+BC
+MLS.99
+CBPF0.8
+PQ19
+PQ19
+–
+–
+–
+48.7
+↱
+42.0
+↱
+✓
+–
+–
+43.3±1.2 -5.5
+49.3±0.5 +7.3
+✓
+✓
+–
+53.5±1.1 +4.8
+50.6±0.7 +8.7
+✓
+✓
+✓
+55.5±1.0 +6.8
+52.6±0.2 +10.6
+14
+
+
+Table 10 Comparison of the original three-stage
+MC-PanDA pipeline and the simplified single-stage
+MC-PanDA++ pipeline using a constant τ1.
+# stages
+Synthia→Vistas
+City→ACDC
+τ1 = 0.9
+τ1 = 0.99
+τ1 = 0.9
+τ1 = 0.99
+three
+42.1±3.3
+44.2±0.1
+52.9±1.2
+55.5±1.0
+single
+42.3±1.7
+44.4±1.2
+54.4±1.1
+54.1±1.5
+To further compare convergence, Table N1 reports
+intermediate
+checkpoints
+on
+Synthia→Vistas
+using DINOv2 initialization and a fixed τ1 =
+0.99. The single-stage variant follows a very sim-
+ilar convergence trajectory and slightly improves
+the final checkpoint, while removing the sepa-
+rate source-domain pre-training and fixed-teacher
+burn-in stages. Since both variants train the
+same Mask2Former-style architecture, their per-
+iteration memory cost is comparable. The main
+benefit of the single-stage pipeline is therefore
+reduced conceptual complexity and fewer stage-
+specific hyperparameters under a similar total
+iteration budget.
+Table N1 Convergence comparison on
+Synthia→Vistas. Both variants use DINOv2 and
+a fixed τ1 = 0.99, isolating the effect of the
+training pipeline. We report target-domain PQ
+at different training checkpoints, averaged over
+three random seeds.
+Checkpoint
+MC-PanDA
+three-stage
+MC-PanDA
+single-stage
+50k
+40.8
+41.5
+70k
+42.8
+43.0
+90k
+43.7
+43.9
+110k
+44.2
+44.4
+4.4.6 Per-class adaptive mask-wide
+loss scaling
+This section presents a detailed analysis of our
+main methodological contribution to the prelimi-
+nary MC-PanDA: introducing per-class and adap-
+tive mask-wide loss scaling, as described in 3.3.1.
+Intuitively, model confidence is not uniform across
+classes due to factors such as class imbalance,
+varying frequency, and differences in visual com-
+plexity. Therefore, requiring τ1 to be per-class
+constitutes a natural improvement over the global,
+constant threshold used in the preliminary MC-
+PanDA. However, selecting an optimal τ1 sepa-
+rately for each class is non-trivial and quickly
+becomes intractable. To address this, we make
+τ1 both, per-class and self-adapting, allowing it
+to be automatically updated during training and
+independent of its initial value.
+On the robustness of τ1.
+We first evaluate
+the robustness of the mask-confidence threshold
+by comparing single-stage MC-PanDA with a con-
+stant τ1 against our new per-class adaptive τ1
+(Table 11) on two benchmarks: Synthia→Vistas
+and Cityscapes→ACDC. In this experiment, we
+vary the initial value of τ1 and measure the final
+target-domain performance.
+Two main weaknesses of a constant τ1 emerge:
+(i) performance fluctuates considerably as τ1
+changes, and (ii) for a fixed τ1, the standard devi-
+ation across runs is large, reaching up to 4 PQ
+points. These instabilities highlight the sensitivity
+of MC-PanDA to manual threshold selection. In
+contrast, the per-class adaptive τ1 exhibits: (i) sta-
+ble performance across different starting values,
+and (ii) substantially reduced variance across runs.
+Beyond its stability benefits, the adaptive for-
+mulation also improves downstream performance
+by 2.8 PQ16 on Synthia→Vistas and 3.0 PQ19
+on Cityscapes→ACDC, on average. Thus, per-
+class self-adapting thresholding not only removes
+the need to tune τ1 but can also provide fur-
+ther performance gains. Additional experiments
+on robustness of per-class adaptive τ1 can be found
+in Table 14, and in an UrbanSyn→Vistas analysis
+reported in Appendix H.
+Figure 9 illustrates the effect of using a per-
+class adaptive τ1 (starting value equal 0.0) com-
+pared to a fixed τ1
+= 0.99 (as in the origi-
+nal MC-PanDA) when training the single-stage
+model. The left panel shows the panoptic qual-
+ity evolution for three classes: terrain, wall and
+car. Adaptive thresholding accelerates learning
+for rare classes such as terrain and wall, and also
+provides additional late-stage improvements for
+frequent car class. The middle panel depicts the
+evolution of adaptive τ1 over training, accompa-
+nied by the constant baseline, while the right panel
+provides a zoomed-in view. Overall, while a fixed
+τ1 = 0.99 was a reasonable choice in MC-PanDA,
+making τ1 both per-class and self-adapting can
+yield further stability and performance gains. We
+15
+
+
+Table 11
+Comparison of constant and per-class adaptive τ1 for different starting values on Synthia→Vistas (top) and
+Cityscapes→ACDC (bottom), using single-stage MC-PanDA with DINOv2-Base. For each starting value, we report
+mean±std panoptic quality (PQ) over three random seeds. The last column shows the average across all starting values.
+τ1 = 0.0
+τ1 = 0.5
+τ1 = 0.6
+τ1 = 0.7
+τ1 = 0.8
+τ1 = 0.9
+τ1 = 0.99
+Avg
+Synthia→Vistas
+constant
+–
+40.3±2.8
+42.2±1.6
+42.4±4.3
+37.2±2.6
+42.3±1.7
+44.4±1.2
+41.5±2.4
+↱
+per-class adaptive
+44.8±0.1
+43.6±0.4
+43.8±0.8
+44.6±1.0
+44.7±1.2
+44.2±0.6
+44.5±0.2
+44.3±0.4 +2.8
+Cityscapes→ACDC
+constant
+–
+53.6±2.6
+53.5±2.0
+53.4±0.5
+51.7±3.1
+54.4±1.1
+54.1±1.5
+53.5±0.9
+↱
+per-class adaptive
+56.3±0.6
+56.6±1.0
+56.6±0.6
+56.5±1.1
+56.2±0.3
+56.1±0.7
+57.0±0.6
+56.5±0.3 +3.0
+Fig. 9
+Per-class PQ performance (left) and evolution of the adaptive confidence threshold τ1 during training, alongside
+the constant baseline τ1 = 0.99 (middle), for Cityscapes→ACDC. Per-class adaptive τ1 can accelerate learning for rare
+classes such as terrain and wall, while also enabling additional late-stage improvements for frequent classes such as car.
+provide an additional rare/frequent-class analy-
+sis in Appendix I, where adaptive thresholding
+improves the average per-class PQ of the five
+rarest classes by 3.1 points on Cityscapes→ACDC.
+On the choice of aggregation function f.
+For the instance-wise aggregation function f (cf.
+Eq. 5), we use the third quartile by default.
+Table 12 further shows that MLS remains robust
+when employing alternative aggregation functions,
+such as the mean or median.
+Table 12 Different aggregation functions f for
+per-class adaptive τ1. We report mean±std
+panoptic quality (PQ) over three random seeds.
+f
+Synthia→Vistas
+City→ACDC
+mean
+44.4±0.3
+54.3±1.7
+median
+44.8±1.3
+55.2±0.7
+3. quartile
+44.8±0.1
+56.3±0.6
+On the choice of cross-instance aggrega-
+tion. Eq. 5 first aggregates pixel-level confidences
+within each mask using f, and then aggregates
+across teacher-predicted masks of the same class
+through the outer maxi∈In
+k operation. The fixed-
+threshold analysis in Table 11 suggests that MLS
+benefits from selective thresholding: lower val-
+ues of τ1 make the loss scaling more permissive
+and lead to less stable performance, while high
+thresholds perform best. This motivates the max-
+over-instances update, which anchors the adap-
+tive threshold of class k to the most confident
+teacher masks of that class, rather than allow-
+ing many low-confidence pseudo-masks to lower
+the threshold. To validate this design choice, we
+compare the default maximum with mean and
+third-quartile aggregation across instances of the
+same class, while keeping the instance-wise aggre-
+gation f fixed to the third quartile (Table N2).
+The maximum performs best or tied across all
+three benchmarks, while mean aggregation is con-
+sistently worse. This supports max-over-instances
+as a simple and effective default for the adaptive
+MLS threshold update.
+Global vs. per-class adaptation.
+As an alter-
+native to the per-class formulation in Eq. 5, τ1 can
+also be adapted globally, i.e., using a single thresh-
+old shared across all classes. In this case, a single
+16
+
+
+Table N2 Effect of the cross-instance aggregation
+over teacher-predicted masks of the same class in
+Eq. (5). We keep the instance-wise aggregation f fixed
+to the third quartile and vary the outer aggregation
+over instances. We report mean±std PQ over three
+random seeds.
+Outer
+aggregation
+Syn→Vistas
+City→ACDC
+City→MUSES
+mean
+43.5±1.7
+54.6±0.1
+52.0±0.6
+3. quartile
+43.9±0.0
+56.3±0.7
+52.0±1.2
+max
+44.8±0.1
+56.3±0.6
+52.4±0.4
+update term δn is computed over all instances:
+δn = max
+i∈In f
+ 
+ρi,r,c
+ (r, c) ∈M F
+i
+	
+,
+(9)
+where In denotes the set of all teacher-predicted
+instances in the batch at the training iteration n.
+This is different from the per-class formulation,
+which computes the maximum only over instances
+of class k (i.e., i ∈In
+k ). Table 13 compares the
+global-adaptive and per-class adaptive formula-
+tions on the Cityscapes→ACDC benchmark for
+several initial τ1 values. Per-class adaptation con-
+sistently yields higher performance, confirming it
+as a preferred choice for MC-PanDA++.
+Table 13 Comparison of global-adaptive and
+per-class adaptive τ1 on Cityscapes→ACDC for
+different initial threshold values. We report mean±std
+panoptic quality (PQ) over three random seeds.
+τ1
+Cityscapes→ACDC (PQ19)
+τ1 = 0.0
+τ1 = 0.5
+τ1 = 0.99
+global adaptive
+56.1±0.7
+55.3±0.5
+55.4±1.0
+per-class adaptive
+56.3±0.6
+56.6±1.0
+57.0±0.6
+4.4.7 Robustness of confidence-based
+point filtering
+Table 14 evaluates the robustness of confidence-
+based
+point
+filtering
+(CBPF)
+with
+respect
+to the threshold τ2 across three benchmarks:
+Synthia→Vistas
+and
+Cityscapes→{ACDC,
+MUSES}. For each setting, we vary the initial
+value of the per-class adaptive τ1 and report
+mean±std over three random seeds. Across all
+benchmarks and τ1 initializations, performance
+remains remarkably stable for τ2 ∈{0.7, 0.8, 0.9},
+with variations typically below 1 PQ pp. This
+indicates that CBPF is mostly insensitive to the
+precise choice of τ2, and that τ2 = 0.8, default
+value used in MC-PanDA, continues to be a reli-
+able choice in MC-PanDA++. Moreover, given the
+small differences observed across values, tuning
+τ2 offers negligible additional benefit.
+Table 14 Robustness of confidence-based point
+filtering (CBPF) with respect to the threshold τ2 on:
+Synthia→Vistas, Cityscapes→ACDC, and
+Cityscapes→MUSES, evaluated across different initial
+values of the per-class adaptive τ1. † marks the default
+setting used in MC-PanDA++, τ2 = 0.8.
+Synthia→Vistas (PQ16)
+Avg
+τ1=
+0.0
+0.5
+0.6
+0.7
+0.8
+0.9
+0.99
+τ2=0.7
+45.2 44.5 44.5 45.1 45.3 44.8 45.2
+44.9±0.3
+τ2=0.8† 44.8 43.6 43.8 44.6 44.7 44.2 44.5
+44.3±0.4
+τ2=0.9
+44.4 45.2 45.0 44.5 44.8 44.8 43.8
+44.6±0.4
+Cityscapes→ACDC (PQ19)
+Avg
+τ1=
+0.0
+0.5
+0.6
+0.7
+0.8
+0.9
+0.99
+τ2=0.7
+56.3 56.3 56.7 55.4 55.7 56.6 56.3
+56.2±0.4
+τ2=0.8† 56.3 56.6 56.6 56.6 56.2 56.1 57.0
+56.5±0.3
+τ2=0.9
+57.0 56.2 56.7 56.6 56.7 57.6 56.8
+56.8±0.4
+Cityscapes→MUSES (PQ19)
+Avg
+τ1=
+0.0
+0.5
+0.6
+0.7
+0.8
+0.9
+0.99
+τ2=0.7
+51.9 51.8 52.2 52.4 52.0 51.5 52.2
+52.0±0.3
+τ2=0.8† 52.4 52.1 52.1 52.4 52.7 52.0 52.6
+52.2±0.3
+τ2=0.9
+52.8 53.1 52.8 52.6 52.1 52.7 52.9
+52.7±0.3
+4.5 MC-PanDA++
+All components presented in the previous sections
+culminate to our final method, MC-PanDA++.
+It uses a strong self-supervised DINOv2, adopts
+a simplified single-stage training pipeline, and
+employs per-class adaptive mask-wide loss scaling.
+The latter substantially improves stability and
+removes the sensitivity to the initial choice of τ1,
+which was a key limitation of the preliminary MC-
+PanDA (Martinovi´c et al. 2024). We initialize τ1
+at 0.0 and let it evolve throughout training.
+We report the final performance of MC-
+PanDA++ in Table 15, compare it against the
+supervised source-only baselines, and evaluate
+the effect of scaling the encoder from DINOv2-
+B to DINOv2-L. The consistent improvements
+observed with the larger encoder further confirm
+the effectiveness of MC-PanDA++.
+17
+
+
+Table 15
+Overview of the final MC-PanDA++ results across six benchmarks. Improvements over the source-only
+fine-tuning baseline are shown for reference. All MC-PanDA++ results are reported as mean±std over three random seeds.
+Method
+Backbone
+Synthia (PQ16)
+UrbanSyn (PQ19)
+Cityscapes (PQ19)
+Cityscapes
+Vistas
+Cityscapes
+Vistas
+ACDC
+MUSES
+Source-only
+DINOv2-Base
+36.0
+↱
+33.7
+↱
+48.3
+↱
+42.1
+↱
+48.7
+↱
+42.0
+↱
+MC-PanDA++
+DINOv2-Base
+49.6
++13.6
+44.8
++11.1
+57.2
++8.9
+49.5
++7.4
+56.3
++7.6
+52.4
++10.4
+Source-only
+DINOv2-Large
+39.9
+↱
+37.9
+↱
+51.1
+↱
+45.2
+↱
+52.3
+↱
+46.4
+↱
+MC-PanDA++
+DINOv2-Large
+54.2
++14.3
+47.6
++9.7
+59.1
++8.0
+52.7
++7.5
+60.1
++7.8
+55.6
++9.2
+5 Qualitative analysis
+Figure 10 shows the road and traffic sign masks
+at two training checkpoints together with their
+corresponding mask-wide loss-scaling factors λi.
+A clear positive correlation emerges between
+mask quality and the value of λi, indicating
+that MLS effectively suppresses gradients for
+low-quality masks. This behavior is particularly
+important during early training, when many pixels
+are incorrectly excluded from the correspond-
+ing mask. We further quantify this qualitative
+observation in Appendix E by measuring the
+Spearman correlation between λi and the ground-
+truth IoU of matched teacher pseudo-masks on
+Cityscapes→ACDC. The resulting class-averaged
+correlation is positive for both stuff and thing
+classes, with an average of ρ = 0.61 over all 19
+classes. This confirms that MLS reliably reflects
+the true pseudo-mask quality across all classes,
+supporting its role in mitigating confirmation bias.
+20k
+40k
+Fig. 10 Illustration of the MLS factor λi for two model
+checkpoints during training, shown here for masks of classes
+road and traffic sign. As training progresses, the pre-
+dicted masks become more complete and visually coherent,
+and the corresponding λi values increase accordingly. A
+strong correlation is observed between the value of λi and
+the visual quality of the predicted mask.
+Figure 11 clearly illustrates how our mask-
+wide loss scaling (MLS) and confidence-based
+point filtering (CBPF) provide complementary
+benefits in selecting reliable pixels for domain-
+adaptive learning. Both the person mask (left)
+and the motorcycle mask (right) fail to capture
+all of their corresponding pixels, resulting in false-
+negative regions. These regions align closely with
+areas of low sampling affinities (highlighted in red,
+middle). Together, MLS and CBPF prevent the
+student model from learning from these erroneous
+pseudo-labels.
+Fig. 11
+Visual example illustrating the complementary
+roles of Mask-wide Loss Scaling (MLS) and Confidence-
+based Point Filtering (CBPF) in selecting reliable pixels
+for domain-adaptive learning, as also illustrated in MC-
+PanDA (Martinovi´c et al. 2024). The middle image high-
+lights two regions where back-propagation is suppressed
+due to low sampling affinity. The left and right images show
+that these regions correspond to false-negative predictions
+in the person and motorcycle masks, respectively.
+Figure 12 shows predictions on a Vistas
+image from models trained on the synthetic
+source domains Synthia and UrbanSyn (with-
+out adaptation), and compares them with MC-
+PanDA++. Several observations arise. First, com-
+paring the two source-only models, switching the
+source domain from Synthia to UrbanSyn already
+improves segmentation quality (e.g., clearer wall
+and fence regions), consistent with our findings
+in Section 4.4.3. Second, comparing source-only
+results with MC-PanDA++ demonstrates the sub-
+stantial benefit of the domain adaptation, which
+produces markedly better predictions, such as
+correctly identifying distant cars and deliver-
+ing more coherent wall and fence boundaries.
+18
+
+
+Vistas Img
+Ground-truth
+Source-only (Synth)
+MC-PanDA++ (Synth→Vistas)
+Source-only (USyn)
+MC-PanDA++ (USyn→Vistas)
+fence
+wall
+car
+building
+traffic sign
+Fig.
+12
+Predictions comparison on a Vistas image
+between source-only models trained on Synthia (mid-
+dle left) and UrbanSyn (bottom left), and MC-PanDA++
+(right). Switching the synthetic source from Synthia to
+UrbanSyn already yields more coherent predictions, even
+without adaptation. MC-PanDA++ further improves seg-
+mentation, particularly for distant cars, wall/ fence
+regions, and small traffic signs. Best viewed zoomed in.
+Finally, the figure also reveals that certain biases
+in the synthetic datasets persist even after adap-
+tation. For example, Synthia does not label road
+markings as road, and this misalignment propa-
+gates into the adapted model. This highlights the
+practical importance of ensuring that source- and
+target-domain taxonomies are well aligned.
+Figure 13 shows predictions of MC-PanDA++
+on
+two
+adverse-weather
+examples,
+compared
+against a source-only baseline trained exclusively
+on Cityscapes. Despite never observing ground-
+truth annotations from adverse conditions, MC-
+PanDA++ successfully recovers challenging parts:
+in
+the
+top
+row
+it
+detects
+a
+barely
+visible
+person and produces clearer segmentation of sky,
+sidewalk, and car regions. In the bottom row,
+MC-PanDA++ yields substantially more accurate
+segmentation under snowy and foggy conditions,
+correctly identifying buildings, distant cars, and
+traffic lights, among others.
+Failure cases. Fig. 14 shows representative fail-
+ure cases of MC-PanDA++. The left example
+illustrates source-domain coverage limitations in
+UrbanSyn→Vistas. When the target domain con-
+tains visual concepts that are poorly represented
+in the source domain, the model can map them
+to the closest available source-domain categories:
+sea regions are predicted as road, and boats as
+cars. The right example shows a nighttime ACDC
+scene, where distant objects remain difficult to
+segment due to limited visual evidence. Additional
+failure cases, including ambiguities such as per-
+sons on billboards being segmented as real person
+instances, are provided in Appendix D.
+6 Conclusion
+In this work, we presented MC-PanDA++, a
+novel approach for domain-adaptive panoptic
+segmentation. The proposed framework enables
+state-of-the-art panoptic architectures based on
+mask transformers to be effectively trained under
+domain shift within a teacher-student consistency-
+learning paradigm. We address the key challenge
+of such paradigms – confirmation bias – which
+arises from the repeated reinforcement of incor-
+rect pseudo-labels. To mitigate this, our method
+prevents learning from unreliable pseudo-labels
+through mask-wide loss scaling based on a teacher
+confidence. Furthermore, we introduce a novel
+point sampling mechanism that prioritizes loss
+computation in informative locations according to
+student uncertainty while simultaneously avoiding
+unreliable locations using teacher confidence.
+Compared to our preliminary approach (Mar-
+tinovi´c et al. 2024), MC-PanDA++ is both more
+accurate and more robust due to two key advance-
+ments. First, it employs class-dependent and self-
+adapting mask-wide loss scaling, which improves
+training stability, mitigates sensitivity to the ini-
+tial confidence threshold, and consistently yields
+superior performance. Second, it leverages strong
+self-supervised initialization, which enables the
+simplification of the original three-stage training
+design into a streamlined single-stage pipeline,
+thereby reducing both conceptual complexity and
+the number of hyperparameters.
+MC-PanDA++ sets a new state of the art
+in panoptic domain adaptation across standard
+benchmarks. While baseline consistency training
+suffers from collapse caused by confirmation bias,
+19
+
+
+ACDC Img
+Ground-truth
+Source-only (City)
+MC-PanDA++
+MUSES Img
+Ground-truth
+Source-only (City)
+MC-PanDA++
+road
+sidewalk
+building
+wall
+fence
+pole
+traffic light
+traffic sign
+vegetation
+terrain
+sky
+person
+rider
+car
+truck
+bus
+train
+motorcycle
+bicycle
+unlabeled
+Fig. 13
+Qualitative comparison of MC-PanDA++ against a source-only model (trained solely on Cityscapes) on the clear-
+to-adverse benchmarks City→ACDC (top) and City→MUSES (bottom). MC-PanDA++ yields substantially more accurate
+segmentations, especially in challenging regions such as person instances in top row and distant cars in bottom row, despite
+being trained only on clear-weather daytime ground-truth annotations. Best viewed zoomed in.
+Vistas Img
+ACDC Img
+Ground-truth
+Ground-truth
+MC-PanDA++ (Usyn→Vistas)
+MC-PanDA++ (City→ACDC)
+road
+sidewalk
+car
+bicycle
+train
+Fig. 14
+Representative failure cases of MC-PanDA++.
+Left:
+UrbanSyn→Vistas
+example
+illustrating
+source-
+domain coverage limitations, where target-domain regions
+such as sea and boats are mapped to the closest avail-
+able road-scene categories, such as road and car. Right:
+Cityscapes→ACDC nighttime example, where distant or
+weakly visible objects, such as train and bicycle regions,
+remain difficult to segment under limited visual evidence.
+MC-PanDA++ maintains a stable learning curve
+through the proposed confidence-guided training
+strategy. Comprehensive ablation studies confirm
+the effectiveness of our contributions across differ-
+ent backbones and setups, including synthetic-to-
+real, real-to-real, and clear-to-adverse scenarios.
+We anticipate that MC-PanDA++ will facili-
+tate the broader adoption of panoptic segmenta-
+tion and support the more reliable deployment
+of mask transformers in real-world applications.
+Moreover, its design is inherently compatible with
+ongoing advancements in backbone pre-training,
+mask-transformers, and pseudo-label refinement,
+ensuring its relevance in future research.
+Acknowledgements.
+This work was supported
+by the Croatian Recovery and Resilience Fund
+– NextGenerationEU (grant C1.4 R5-I2.01.0001)
+and the Croatian Science Foundation (grants
+DOK-NPOO-2023-10-2288 and MOBDOK-2023-
+4880). We also acknowledge the advanced com-
+puting resources provided by the University of
+Zagreb University Computing Centre (SRCE).
+Josip ˇSari´c has received funding from the Euro-
+pean Union’s Horizon Europe research and inno-
+vation program under the Marie Sklodowska-
+Curie COFUND Postdoctoral Programme grant
+agreement No. 101081355-SMASH and from the
+Republic of Slovenia and the European Union
+from the European Regional Development Fund.
+We
+thank
+Jan
+ˇSnajder,
+Ivan
+Grubiˇsi´c,
+Ryousuke Yamada, and Naomi Kombol for valu-
+able feedback that helped improve the manuscript.
+In memory of Siniˇsa ˇSegvi´c, who passed away
+before this work was published. He will be missed
+as a dear friend, mentor, and moral compass.
+Disclaimer.
+Co-funded
+by
+the
+European
+Union. Views and opinions expressed are however
+those of the author(s) only and do not necessarily
+reflect those of the European Union or European
+20
+
+
+Research Executive Agency. Neither the Euro-
+pean Union nor the granting authority can be
+held responsible for them.
+Data
+availability
+statement.
+We conduct
+our
+experiments
+on
+the
+following
+pub-
+licly
+available
+datasets:
+Cityscapes
+(Cordts
+et
+al.
+2016),
+Mapillary
+Vistas
+(Neuhold
+et
+al.
+2017),
+Foggy
+Cityscapes
+(Sakaridis
+et al. 2018), ACDC (Sakaridis et al. 2021),
+MUSES (Br¨odermann et al. 2024), Synthia (Ros
+et al. 2016) and UrbanSyn (G´omez et al. 2025).
+References
+Arazo, E., Ortego, D., Albert, P., O’Connor, N.E.,
+McGuinness, K.: Pseudo-labeling and confirma-
+tion bias in deep semi-supervised learning. In:
+Int. Joint Conf. on Neural Networks, pp. 1–8
+(2020)
+Asano,
+Y.M.,
+Rupprecht,
+C.,
+Vedaldi,
+A.:
+Self-labelling
+via
+simultaneous
+clus-
+tering
+and
+representation
+learning.
+In:
+Int.
+Conf.
+Learn.
+Represent.
+(2020).
+https://openreview.net/forum?id=Hyx-jyBFPr
+Ackermann, J., Sakaridis, C., Yu, F.: Maskomaly:
+Zero-shot mask anomaly segmentation. In: Brit.
+Mach. Vis. Conf. (2023)
+Ben-David, S., Blitzer, J., Crammer, K., Kulesza,
+A., Pereira, F., Vaughan, J.W.: A theory
+of learning from different domains. Machine
+Learning 79, 151–175 (2010)
+Br¨odermann, T., Bruggemann, D., Sakaridis, C.,
+Ta, K., Liagouris, O., Corkill, J., Van Gool, L.:
+MUSES: The Multi-Sensor Semantic Perception
+Dataset for Driving under Uncertainty. In: Eur.
+Conf. Comput. Vis., pp. 21–38 (2024)
+Berrada, T., Couprie, C., Alahari, K., Verbeek, J.:
+Guided distillation for semi-supervised instance
+segmentation. In: Winter Conf. on Appl. of
+Comput. Vis., pp. 475–483 (2024)
+Caron, M., Bojanowski, P., Joulin, A., Douze,
+M.: Deep clustering for unsupervised learning
+of visual features. In: Eur. Conf. Comput. Vis.,
+pp. 139–156 (2018)
+Cheng, B., Collins, M.D., Zhu, Y., Liu, T., Huang,
+T.S., Adam, H., Chen, L.-C.: Panoptic-deeplab:
+A simple, strong, and fast baseline for bottom-
+up panoptic segmentation. In: IEEE Conf.
+Comput. Vis. Pattern Recog., pp. 12472–12482
+(2020)
+Chen, T., Kornblith, S., Norouzi, M., Hinton, G.:
+A simple framework for contrastive learning
+of visual representations. In: Int. Conf. Mach.
+Learn., pp. 1597–1607 (2020)
+Caron, M., Misra, I., Mairal, J., Goyal, P.,
+Bojanowski, P., Joulin, A.: Unsupervised learn-
+ing of visual features by contrasting cluster
+assignments. In: Adv. Neural Inform. Process.
+Syst., vol. 33, pp. 9912–9924 (2020)
+Carion, N., Massa, F., Synnaeve, G., Usunier, N.,
+Kirillov, A., Zagoruyko, S.: End-to-end object
+detection with transformers. In: Eur. Conf.
+Comput. Vis., pp. 213–229 (2020)
+Cheng, B., Misra, I., Schwing, A.G., Kirillov,
+A., Girdhar, R.: Masked-attention Mask Trans-
+former for Universal Image Segmentation. In:
+IEEE Conf. Comput. Vis. Pattern Recog., pp.
+1280–1289 (2022)
+Cordts, M., Omran, M., Ramos, S., Rehfeld,
+T., Enzweiler, M., Benenson, R., Franke, U.,
+Roth, S., Schiele, B.: The Cityscapes Dataset
+for Semantic Urban Scene Understanding. In:
+IEEE Conf. Comput. Vis. Pattern Recog., pp.
+3213–3223 (2016)
+Cheng, B., Schwing, A., Kirillov, A.: Per-pixel
+classification is not all you need for semantic
+segmentation. In: Adv. Neural Inform. Process.
+Syst., vol. 34, pp. 17864–17875 (2021)
+Caron, M., Touvron, H., Misra, I., J´egou, H.,
+Mairal, J., Bojanowski, P., Joulin, A.: Emerging
+properties in self-supervised vision transform-
+ers. In: Int. Conf. Comput. Vis., pp. 9630–9640
+(2021)
+Dosovitskiy,
+A.,
+Beyer,
+L.,
+Kolesnikov,
+A.,
+Weissenborn,
+D.,
+Zhai,
+X.,
+Unterthiner,
+T.,
+Dehghani,
+M.,
+Minderer,
+M.,
+Heigold,
+G.,
+Gelly,
+S.,
+Uszkoreit,
+J.,
+Houlsby,
+N.:
+21
+
+
+An
+Image
+is
+Worth
+16x16
+Words:
+Trans-
+formers
+for
+Image
+Recognition
+at
+Scale.
+In:
+Int.
+Conf.
+Learn.
+Represent.
+(2021).
+https://openreview.net/forum?id=YicbFdNTTy
+Deli´c, A., Grcic, M., ˇSegvi´c, S.: Outlier detec-
+tion by ensembling uncertainty with negative
+objectness. In: Brit. Mach. Vis. Conf. (2024)
+French, G., Laine, S., Aila, T., Mackiewicz, M.,
+Finlayson, G.D.: Semi-supervised semantic seg-
+mentation needs strong, varied perturbations.
+In: Brit. Mach. Vis. Conf. (2020)
+Gu, A., Dao, T.: Mamba: Linear-time sequence
+modeling
+with
+selective
+state
+spaces.
+In:
+First Conf. on Language Modeling (2024).
+https://openreview.net/forum?id=tEYskw1VY2
+Ganin, Y., Lempitsky, V.S.: Unsupervised domain
+adaptation by backpropagation. In: Int. Conf.
+Mach. Learn., pp. 1180–1189 (2015)
+Grcic, M., Saric, J., Segvic, S.: On advantages
+of mask-level recognition for outlier-aware seg-
+mentation. In: IEEE Conf. Comput. Vis. Pat-
+tern Recog. Worksh., pp. 2937–2947 (2023)
+G´omez, J.L., Silva, M., Seoane, A., Borr`as, A.,
+Noriega, M., Ros, G., Iglesias-Guitian, J.A.,
+L´opez, A.M.: All for one, and one for all: Urban-
+syn dataset, the third musketeer of synthetic
+driving scenes. Neurocomputing 637, 130038
+(2025)
+He, K., Chen, X., Xie, S., Li, Y., Doll´ar, P.,
+Girshick, R.: Masked autoencoders are scalable
+vision learners. In: IEEE Conf. Comput. Vis.
+Pattern Recog., pp. 15979–15988 (2022)
+Hoyer, L., Dai, D., Van Gool, L.: Daformer:
+Improving network architectures and training
+strategies for domain-adaptive semantic seg-
+mentation. In: IEEE Conf. Comput. Vis. Pat-
+tern Recog., pp. 9914–9925 (2022)
+Hoyer, L., Dai, D., Van Gool, L.: Hrda: Context-
+aware high-resolution domain-adaptive seman-
+tic segmentation. In: Eur. Conf. Comput. Vis.,
+pp. 372–391 (2022)
+Hoyer, L., Dai, D., Wang, H., Gool, L.V.: MIC:
+masked image consistency for context-enhanced
+domain adaptation. In: IEEE Conf. Comput.
+Vis. Pattern Recog., pp. 11721–11732 (2023)
+He, K., Gkioxari, G., Doll´ar, P., Girshick, R.:
+Mask r-cnn. In: Int. Conf. Comput. Vis., pp.
+2961–2969 (2017)
+Huang, J., Guan, D., Xiao, A., Lu, S.: Cross-
+view regularization for domain adaptive panop-
+tic segmentation. In: IEEE Conf. Comput. Vis.
+Pattern Recog., pp. 10133–10144 (2021)
+H¨ummer, C., Schwonberg, M., Zhou, L., Cao, H.,
+Knoll, A., Gottschalk, H.: Strong but simple: A
+baseline for domain generalized dense percep-
+tion by clip-based transfer learning. In: Asian
+Conf. Comput. Vis., pp. 463–484 (2024)
+Jiang, K., Jiang, J., Liu, X., Yao, H., Lin, C.-W.:
+Ph-mamba: Enhancing mamba with position
+encoding and harmonized attention for image
+deraining and beyond. IEEE Trans. Image Pro-
+cess. 35, 1727–1739 (2026)
+Jain, J., Li, J., Chiu, M.T., Hassani, A., Orlov,
+N., Shi, H.: Oneformer: One transformer to rule
+universal image segmentation. In: IEEE Conf.
+Comput. Vis. Pattern Recog., pp. 2989–2998
+(2023)
+Kerssies, T., De Geus, D., Dubbelman, G.: How to
+benchmark vision foundation models for seman-
+tic segmentation? In: IEEE Conf. Comput. Vis.
+Pattern Recog. Worksh., pp. 1162–1171 (2024)
+Kirillov, A., Girshick, R., He, K., Doll´ar, P.:
+Panoptic feature pyramid networks. In: IEEE
+Conf. Comput. Vis. Pattern Recog., pp. 6392–
+6401 (2019)
+Kirillov, A., He, K., Girshick, R., Rother, C.,
+Doll´ar, P.: Panoptic segmentation. In: IEEE
+Conf. Comput. Vis. Pattern Recog., pp. 9396–
+9405 (2019)
+Kirillov,
+A.,
+Wu,
+Y.,
+He,
+K.,
+Girshick,
+R.:
+Pointrend: Image segmentation as rendering. In:
+IEEE Conf. Comput. Vis. Pattern Recog., pp.
+9796–9805 (2020)
+Kim, D., Woo, S., Lee, J., Kweon, I.S.: Video
+22
+
+
+panoptic segmentation. In: IEEE Conf. Com-
+put. Vis. Pattern Recog., pp. 9856–9865 (2020)
+Liu, W., Anguelov, D., Erhan, D., Szegedy, C.,
+Reed, S., Fu, C.-Y., Berg, A.C.: Ssd: Single shot
+multibox detector. In: Eur. Conf. Comput. Vis.,
+pp. 21–37 (2016)
+Li, Y.-J., Dai, X., Ma, C.-Y., Liu, Y.-C., Chen,
+K., Wu, B., He, Z., Kitani, K., Vajda, P.: Cross-
+domain adaptive teacher for object detection.
+In: IEEE Conf. Comput. Vis. Pattern Recog.,
+pp. 7571–7580 (2022)
+Loshchilov,
+I.,
+Hutter,
+F.:
+Decou-
+pled
+weight
+decay
+regularization.
+In:
+Int.
+Conf.
+Learn.
+Represent.
+(2019).
+https://openreview.net/forum?id=Bkg6RiCqY7
+Liu, Z., Lin, Y., Cao, Y., Hu, H., Wei, Y., Zhang,
+Z., Lin, S., Guo, B.: Swin transformer: Hierar-
+chical vision transformer using shifted windows.
+In: Int. Conf. Comput. Vis., pp. 9992–10002
+(2021)
+Lin, T.-Y., Maire, M., Belongie, S., Hays, J., Per-
+ona, P., Ramanan, D., Doll´ar, P., Zitnick, C.L.:
+Microsoft coco: Common objects in context. In:
+Eur. Conf. Comput. Vis., pp. 740–755 (2014)
+Li, Y., Mao, H., Girshick, R., He, K.: Exploring
+plain vision transformer backbones for object
+detection. In: Eur. Conf. Comput. Vis., pp. 280–
+296 (2022)
+Li, J., Raventos, A., Bhargava, A., Tagawa, T.,
+Gaidon, A.: Learning to fuse things and stuff.
+arXiv:1812.01192 (2018)
+Li, F., Zhang, H., Xu, H., Liu, S., Zhang, L.,
+Ni, L.M., Shum, H.-Y.: Mask dino: Towards a
+unified transformer-based framework for object
+detection and segmentation. In: IEEE Conf.
+Comput. Vis. Pattern Recog., pp. 3041–3050
+(2023)
+Martinovi´c, I., ˇSari´c, J., ˇSegvi´c, S.: MC-PanDA:
+Mask Confidence for Panoptic Domain Adapta-
+tion. In: Eur. Conf. Comput. Vis., pp. 167–185
+(2024)
+Mansour, E.A., Unal, O., Saha, S., Bejar, B., Gool,
+L.: Language-Guided Instance-Aware Domain-
+Adaptive Panoptic Segmentation. In: Winter
+Conf. on Appl. of Comput. Vis., pp. 1637–1648
+(2025)
+Neuhold,
+G.,
+Ollmann,
+T.,
+Rota
+Bulo,
+S.,
+Kontschieder, P.: The Mapillary Vistas Dataset
+for Semantic Understanding of Street Scenes.
+In: Int. Conf. Comput. Vis., pp. 4990–4999
+(2017)
+Nayal, N., Yavuz, M., Henriques, J.F., G¨uney, F.:
+RbA: Segmenting Unknown Regions Rejected
+by All. In: Int. Conf. Comput. Vis., pp. 711–722
+(2023)
+Oquab, M., Darcet, T., Moutakanni, T., Vo,
+H.V., Szafraniec, M., Khalidov, V., Fernandez,
+P., Haziza, D., Massa, F., El-Nouby, A., et
+al.: DINOv2: Learning robust visual features
+without supervision. Trans. Mach. Learn Res.
+(2024)
+Olsson, V., Tranheden, W., Pinto, J., Svensson, L.:
+Classmix: Segmentation-based data augmenta-
+tion for semi-supervised learning. In: Winter
+Conf. on Appl. of Comput. Vis., pp. 1369–1378
+(2021)
+Rai, S.N., Cermelli, F., Fontanel, D., Masone, C.,
+Caputo, B.: Unmasking anomalies in road-scene
+segmentation. In: Int. Conf. Comput. Vis., pp.
+4014–4023 (2023)
+Ren, S., He, K., Girshick, R., Sun, J.: Faster r-cnn:
+Towards real-time object detection with region
+proposal networks. IEEE Trans. Pattern Anal.
+Mach. Intell. 39(6), 1137–1149 (2017)
+Radford, A., Kim, J.W., Hallacy, C., Ramesh, A.,
+Goh, G., Agarwal, S., Sastry, G., Askell, A.,
+Mishkin, P., Clark, J., et al.: Learning trans-
+ferable visual models from natural language
+supervision. In: Int. Conf. Mach. Learn., pp.
+8748–8763 (2021)
+Ros, G., Sellart, L., Materzynska, J., Vazquez, D.,
+Lopez, A.M.: The SYNTHIA Dataset: A Large
+Collection of Synthetic Images for Semantic
+Segmentation of Urban Scenes. In: IEEE Conf.
+Comput. Vis. Pattern Recog., pp. 3234–3243
+(2016)
+23
+
+
+Richter, S.R., Vineet, V., Roth, S., Koltun, V.:
+Playing for Data: Ground Truth from Computer
+Games. In: Eur. Conf. Comput. Vis., vol. 9906,
+pp. 102–118 (2016)
+Sakaridis, C., Dai, D., Gool, L.V.: ACDC: the
+adverse
+conditions
+dataset
+with
+correspon-
+dences for semantic driving scene understand-
+ing. In: Int. Conf. Comput. Vis., pp. 10745–
+10755 (2021)
+Sakaridis, C., Dai, D., Van Gool, L.: Semantic
+foggy scene understanding with synthetic data.
+Int. J. Comput. Vis. 126, 973–992 (2018)
+Saha, S., Hoyer, L., Obukhov, A., Dai, D.,
+Van Gool, L.: EDAPS: Enhanced Domain-
+Adaptive Panoptic Segmentation. In: Int. Conf.
+Comput. Vis., pp. 19177–19188 (2023)
+Sun, B., Saenko, K.: Deep CORAL: Correlation
+Alignment for Deep Domain Adaptation. In:
+Eur. Conf. Comput. Vis. Worksh., vol. 9915, pp.
+443–450 (2016)
+Sim´eoni,
+O.,
+Vo,
+H.V.,
+Seitzer,
+M.,
+Baldas-
+sarre, F., Oquab, M., Jose, C., Khalidov, V.,
+Szafraniec, M., Yi, S., Ramamonjisoa, M., et al.:
+Dinov3. arXiv:2508.10104 (2025)
+Sheng, H., Xuanqi, W., Chang, Z., Jiacheng, W.,
+Pingxia, D., Yuwei, W.: Aigc video detection
+based on the fusion of spatial-frequency-optical
+flow multimodal features. Journal of Systems
+Engineering and Electronics, 1–15 (2026)
+Tschannen, M., Gritsenko, A., Wang, X., Naeem,
+M.F., Alabdulmohsin, I., Parthasarathy, N.,
+Evans, T., Beyer, L., Xia, Y., Mustafa, B., et al.:
+Siglip 2: Multilingual vision-language encoders
+with improved semantic understanding, local-
+ization, and dense features. arXiv:2502.14786
+(2025)
+Tranheden, W., Olsson, V., Pinto, J., Svensson,
+L.: Dacs: Domain adaptation via cross-domain
+mixed sampling. In: Winter Conf. on Appl. of
+Comput. Vis., pp. 1378–1388 (2021)
+Tarvainen, A., Valpola, H.: Mean teachers are bet-
+ter role models: Weight-averaged consistency
+targets improve semi-supervised deep learning
+results. In: Adv. Neural Inform. Process. Syst.,
+vol. 30, pp. 1195–1204 (2017)
+Tolan, J., Yang, H.-I., Nosarzewski, B., Couairon,
+G., Vo, H.V., Brandt, J., Spore, J., Majumdar,
+S., Haziza, D., Vamaraju, J., et al.: Very high
+resolution canopy height maps from rgb imagery
+using self-supervised vision transformer and
+convolutional decoder trained on aerial lidar.
+Remote Sensing of Environment 300, 113888
+(2024)
+Uijlings, J.R.R., Mensink, T., Ferrari, V.: The
+Missing Link: Finding Label Relations Across
+Datasets. In: Eur. Conf. Comput. Vis., pp.
+540–556 (2022)
+Venkataramanan, S., Pariza, V., Salehi, M., Kno-
+bel, L., Ramzi, E., Gidaris, S., Bursuc, A.,
+Asano, Y.M.: Franca: Nested matryoshka clus-
+tering for scalable visual representation learn-
+ing. In: IEEE Conf. Comput. Vis. Pattern
+Recog., pp. 10533–10544 (2026)
+Wei, Z., Chen, L., Jin, Y., Ma, X., Liu, T., Ling,
+P., Wang, B., Chen, H., Zheng, J.: Stronger
+fewer & superior: Harnessing vision founda-
+tion models for domain generalized semantic
+segmentation. In: IEEE Conf. Comput. Vis.
+Pattern Recog., pp. 28619–28630 (2024)
+Wang, W., Dai, J., Chen, Z., Huang, Z., Li, Z.,
+Zhu, X., Hu, X., Lu, T., Lu, L., Li, H., et al.:
+Internimage: Exploring large-scale vision foun-
+dation models with deformable convolutions. In:
+IEEE Conf. Comput. Vis. Pattern Recog., pp.
+14408–14419 (2023)
+Xiong, Y., Liao, R., Zhao, H., Hu, R., Bai, M.,
+Yumer, E., Urtasun, R.: Upsnet: A unified
+panoptic segmentation network. In: IEEE Conf.
+Comput. Vis. Pattern Recog., pp. 8810–8818
+(2019)
+Xu, H., Usuyama, N., Bagga, J., Zhang, S., Rao,
+R., Naumann, T., Wong, C., Gero, Z., Gonz´alez,
+J., Gu, Y., et al.: A whole-slide foundation
+model for digital pathology from real-world
+data. Nature 630(8015), 181–188 (2024)
+Xie, E., Wang, W., Yu, Z., Anandkumar, A.,
+Alvarez, J.M., Luo, P.: Segformer: Simple and
+24
+
+
+efficient design for semantic segmentation with
+transformers. In: Adv. Neural Inform. Process.
+Syst., vol. 34, pp. 12077–12090 (2021)
+Xiao, Y., Yuan, Q., Jiang, K., He, J., Wang, Y.,
+Zhang, L.: From degrade to upgrade: Learn-
+ing a self-supervised degradation guided adap-
+tive network for blind remote sensing image
+super-resolution. Information Fusion 96, 297–
+311 (2023)
+Yun, S., Chae, S., Lee, D., Ro, Y.: SoMA: Singular
+Value Decomposed Minor Components Adapta-
+tion for Domain Generalizable Representation
+Learning. In: IEEE Conf. Comput. Vis. Pattern
+Recog., pp. 25602–25612 (2025)
+Yu, Q., Wang, H., Qiao, S., Collins, M., Zhu,
+Y., Adam, H., Yuille, A., Chen, L.-C.: k-means
+Mask Transformer. In: Eur. Conf. Comput. Vis.,
+pp. 288–307 (2022)
+Zhou, Q., Feng, Z., Gu, Q., Cheng, G., Lu, X.,
+Shi, J., Ma, L.: Uncertainty-aware consistency
+regularization for cross-domain semantic seg-
+mentation. Computer Vision and Image Under-
+standing 221, 103448 (2022)
+Zendel,
+O.,
+Honauer,
+K.,
+Murschitz,
+M.,
+Steininger, D., Dom´ınguez, G.F.: Wilddash -
+creating hazard-aware benchmarks. In: Eur.
+Conf. Comput. Vis., vol. 11210, pp. 407–421
+(2018)
+Zhang,
+J.,
+Huang,
+J.,
+Zhang,
+X.,
+Lu,
+S.:
+UniDAformer:
+Unified
+Domain
+Adaptive
+Panoptic Segmentation Transformer via Hier-
+archical Mask Calibration. In: IEEE Conf.
+Comput. Vis. Pattern Recog., pp. 11227–11237
+(2023)
+Zlateski, A., Jaroensri, R., Sharma, P., Durand,
+F.: On the importance of label quality for
+semantic segmentation. In: IEEE Conf. Com-
+put. Vis. Pattern Recog., pp. 1479–1487 (2018)
+Zhu, L., Liao, B., Zhang, Q., Wang, X., Liu, W.,
+Wang, X.: Vision Mamba: Efficient Visual Rep-
+resentation Learning with Bidirectional State
+Space Model. In: Int. Conf. Mach. Learn., pp.
+62429–62442 (2024)
+Zendel,
+O.,
+Murschitz,
+M.,
+Zeilinger,
+M.,
+Steininger,
+D.,
+Abbasi,
+S.,
+Beleznai,
+C.:
+RailSem19: A Dataset for Semantic Rail Scene
+Understanding. In: IEEE Conf. Comput. Vis.
+Pattern Recog. Worksh., pp. 1221–1229 (2019)
+Zhu, X., Su, W., Lu, L., Li, B., Wang, X.,
+Dai,
+J.:
+Deformable
+DETR:
+Deformable
+Transformers for End-to-End Object Detec-
+tion. In: Int. Conf. Learn. Represent. (2021).
+https://openreview.net/forum?id=gZ9hCDWe6ke
+Zendel,
+O.,
+Sch¨orghuber,
+M.,
+Rainer,
+B.,
+Murschitz, M., Beleznai, C.: Unifying Panop-
+tic Segmentation for Autonomous Driving. In:
+IEEE Conf. Comput. Vis. Pattern Recog., pp.
+21319–21328 (2022)
+Zhou,
+J.,
+Wei,
+C.,
+Wang,
+H.,
+Shen,
+W.,
+Xie,
+C.,
+Yuille,
+A.,
+Kong,
+T.:
+Image
+BERT
+Pre-training
+with
+Online
+Tokenizer.
+In:
+Int.
+Conf.
+Learn.
+Represent.
+(2022).
+https://openreview.net/forum?id=ydopy-e6Dg
+Zheng, Z., Yang, Y.: Rectifying pseudo label learn-
+ing via uncertainty estimation for domain adap-
+tive semantic segmentation. Int. J. Comput.
+Vis. 129, 1106–1120 (2021)
+Zhou, B., Zhao, H., Puig, X., Fidler, S., Barriuso,
+A., Torralba, A.: Scene parsing through ade20k
+dataset. In: IEEE Conf. Comput. Vis. Pattern
+Recog., pp. 5122–5130 (2017)
+25
+
+
+Appendix A
+UrbanSyn
+filtering
+During an initial inspection of UrbanSyn (G´omez
+et al. 2025), we identified a small subset of images
+with clearly corrupted semantic annotations (e.g.,
+mislabeled road or sky regions; see Fig. A1).
+road
+sky
+building
+vegetation
+traffic sign
+Fig.
+A1
+Example of a mislabeled UrbanSyn image
+(ID 7014) where building, vegetation, and traffic sign
+regions are incorrectly annotated as road or sky.
+A closer inspection revealed that these errors
+were not isolated: a contiguous block of images,
+from ID 6973 to 7029, contained consistently
+incorrect labels. Given that UrbanSyn contains
+approximately
+7.5k
+labeled
+images,
+manually
+inspecting the entire dataset would be infeasible.
+To systematically verify whether additional cor-
+rupted labels existed, we designed the following
+screening procedure:
+1. Apply Mask2Former (M2F) (Cheng et al.
+2022), trained on Cityscapes, to all labeled
+UrbanSyn images.
+2. Compute per-image M2F losses for the entire
+dataset.
+3. Select images whose losses fall within the top
+10% as potential outliers.
+4. Manually
+inspect
+these
+high-loss
+images
+to determine whether additional annotation
+errors are present.
+This pipeline successfully re-identified 56 out of
+the 57 originally known corrupted images and
+revealed no further mislabeled examples. To avoid
+supervision noise in our experiments, we therefore
+removed all images with IDs 6973–7029 from the
+UrbanSyn labeled training set.
+All experiments that use UrbanSyn as the
+source domain are conducted on this filtered
+split, including the source-only baselines and all
+MC-PanDA++ variants. To quantify the effect of
+this filtering step, Table A1 compares the final
+performance of MC-PanDA++ with and without
+Table A1 Impact of UrbanSyn filtering on the final
+performance of MC-PanDA++. We report mean±std
+PQ over three random seeds.
+UrbanSyn filtering
+USyn→City
+USyn→Vistas
+–
+57.0±0.7
+49.2±0.5
+✓
+57.2±0.7
+49.5±0.2
+removing the corrupted images. The impact is
+minor: filtering changes the final performance by
+only +0.2 PQ on UrbanSyn→Cityscapes and +0.3
+PQ on UrbanSyn→Vistas, which is within the
+observed run-to-run variation. Nevertheless, we
+use the filtered split in all reported experiments
+to avoid known annotation noise and to provide a
+clean and reproducible benchmark setup.
+Appendix B
+Implementation
+details
+B.1
+Data augmentations
+We follow the augmentation setup used in MC-
+PanDA (Martinovi´c et al. 2024), repeated here
+for completeness. Our baseline image transforma-
+tions follow the standard Mask2Former (Cheng
+et al. 2022) pipeline: random resizing with fixed
+aspect ratio, random cropping, horizontal flipping,
+and SSD-style color jittering (Liu et al. 2016). All
+experiments use a crop size of 512 × 1024 pixels.
+For the shorter image side, we sample uniformly
+from:
+• [512, 2048] for Cityscapes, Foggy Cityscapes,
+UrbanSyn and Vistas,
+• [640, 1408] for Synthia,
+• [540, 2160] for ACDC and MUSES.
+As in MC-PanDA, color jitter is disabled for
+the teacher branch. The student branch receives
+additional strong augmentations implemented via
+torchvision:
+1. ColorJitter(
+brightness=(0.2, 1.8),
+contrast=(0.2, 1.8),
+saturation=(0.2, 1.8),
+hue=(-0.2, 0.2))
+2. RandomGrayscale(p=0.2)
+3. RandomApply(
+GaussianBlur(sigma=(0.1, 2)), p=0.5
+)
+26
+
+
+Source Image
+Target Image
+Student Image
+Pseudo-labels
+Fig. A2
+Illustration of SegMix during training. For each
+target image, half of the segments from a labeled source
+image are randomly selected and pasted onto the target
+image. This differs from ClassMix, which selects half of the
+classes and pastes all associated segments.
+Finally, we apply SegMix to combine labeled
+source-domain segments with unlabeled target
+images, as described in the main manuscript.
+Figure A2 shows representative training examples
+from the Synthia→Cityscapes experiment. The
+first two columns illustrate the augmented source
+and target images. The last two columns show the
+corresponding student inputs and pseudo-labels
+after SegMix, which combine teacher predictions
+(target domain) with ground-truth annotations
+(source domain). We note that segmentation-
+heavy source images occasionally dominate the
+student view, an aspect of segment-oriented mix-
+ing that may offer additional opportunities for
+future refinement
+B.2
+Training hyperparameters
+In
+experiments
+where
+Cityscapes
+or
+Urban-
+Syn serve as the source domain, we use 100
+Mask2Former queries, following Cheng et al.
+(2022). For Synthia→* experiments, we increase
+the number of queries to 200 due to the sub-
+stantially larger number of instances per image in
+Synthia (approximately 152), compared to only
+27 in Cityscapes. For point-based loss computa-
+tion, we follow Cheng et al. (2022) and sample
+Np = 112 × 112 points, with β = 75% selected
+from pixels with the highest sampling affinity.
+For the domain generalization (source-only)
+experiments used as supervised baselines, we train
+for 20k iterations (batch size 4) when the source
+domain is synthetic, and for 40k iterations when
+it is real (Cityscapes, ACDC, MUSES). We vary
+the number of iterations because different datasets
+converge at different rates, and using dataset-
+appropriate training durations yields stronger and
+fairer supervised baselines.
+Appendix C
+Per-mask vs.
+All-mask CBPF
+Fig. A3 provides a visual comparison between the
+all-mask confidence-based point filtering (CBPF)
+used in our method and the per-mask CBPF vari-
+ant, as discussed in Tab. 5 of the main manuscript.
+The left and middle columns illustrate the com-
+plementary roles of mask-wide loss scaling (MLS)
+and all-mask CBPF in suppressing unreliable gra-
+dients. The transition from the middle to the right
+column highlights the key limitation of per-mask
+CBPF: it fails to identify false negative regions
+that lie far from the predicted mask boundary.
+A closer inspection of the top-right example
+shows that per-mask CBPF incorrectly retains a
+large number of low-confidence pixels on the lower
+part of the left leg, which would lead the stu-
+dent to learn from erroneous pseudo-labels. These
+qualitative observations align with the quanti-
+tative results reported in Tab. 5 of the main
+manuscript, where all-mask CBPF provides a sub-
+stantial performance advantage over its per-mask
+counterpart.
+Fig. A3
+Visual comparison of per-mask and all-mask
+point filtering (cf. Table 5 main manuscript). The top
+row shows a person mask (left), uncertain pixels retained
+by all-mask filtering (middle), and those retained by per-
+mask filtering (right). The bottom row presents the same
+intermediate outputs for a motorcycle mask. As originally
+reported in the supplement of MC-PanDA (Martinovi´c
+et al. 2024), all-mask filtering more reliably identifies
+false negative pixel assignments than per-mask filtering, a
+behavior that complements and explains the quantitative
+differences observed in Tab. 5.
+Appendix D
+Failure cases
+Fig. A4 provides additional failure cases comple-
+menting Fig. 14 in the main manuscript. The
+27
+
+
+left example further illustrates source-domain cov-
+erage limitations in UrbanSyn→Vistas: target-
+domain concepts such as snow, which are absent
+from the source supervision, are mapped to the
+closest available road-scene classes, such as road
+and sidewalk. The right example shows an
+annotation-policy ambiguity, where person depic-
+tions on billboards are segmented as person
+instances.
+Vistas Img
+Vistas Img
+Ground-truth
+Ground-truth
+MC-PanDA++ (Usyn→Vistas)
+MC-PanDA++ (Usyn→Vistas)
+road
+sidewalk
+car
+person
+terrain
+Fig. A4
+Additional failure cases of MC-PanDA++. Left:
+UrbanSyn→Vistas example illustrating source-domain cov-
+erage limitations, where target-domain snow regions are
+mapped to the closest available road-scene categories, such
+as road and sidewalk. Right: UrbanSyn→Vistas example
+illustrating an annotation-policy ambiguity, where person
+depictions on billboards are segmented as person instances.
+Appendix E
+MLS and Mask
+Quality
+To further analyze the behavior of MLS, we mea-
+sure how the mask-wide weight λi relates to
+the actual quality of teacher pseudo-masks. We
+analyze teacher predictions from an intermediate
+checkpoint on all 1600 target-domain (i.e., ACDC)
+training images. Specifically, for each predicted
+mask, we compute our mask weight λi and com-
+pare it with the IoU between the prediction and
+its matched ground-truth mask, which we treat
+as the oracle mask quality. For stuff classes, the
+correspondence is unambiguous because each class
+forms a single semantic region per image. For
+thing classes, we compute correlations only over
+matched prediction–ground-truth instance pairs.
+Table A2 Full per-class Spearman ρ
+correlation between the MLS weight λi and
+pseudo-mask quality measured by IoU on
+Cityscapes→ACDC. For thing classes,
+correlations are computed over matched
+prediction–ground-truth instance pairs.
+Group
+Class
+# pairs
+Spearman ρ
+Stuff
+road
+1599
+0.52
+sidewalk
+1400
+0.65
+building
+1420
+0.87
+wall
+848
+0.66
+fence
+700
+0.59
+pole
+1587
+0.65
+tr. light
+784
+0.63
+tr. sign
+1463
+0.64
+vegetation
+1572
+0.74
+terrain
+715
+0.62
+sky
+1596
+0.83
+Avg. stuff
+–
+0.67
+Things
+person
+898
+0.45
+rider
+73
+0.43
+car
+4912
+0.70
+truck
+210
+0.52
+bus
+62
+0.79
+train
+88
+0.69
+motorcycle
+50
+0.21
+bicycle
+113
+0.42
+Avg. things
+–
+0.52
+All
+Avg. all
+–
+0.61
+Table A2 reports the per-class Spearman cor-
+relation. The correlation is positive for both stuff
+and thing classes, with class-averaged correlations
+of 0.67 and 0.52, respectively, and 0.61 over all
+19 classes. This supports the intended role of
+λi as a mask-level quality signal for weighting
+pseudo-label supervision.
+Appendix F
+EDAPS/LIDAPS
+with DINOv2
+To better separate the effect of the adaptation
+method from the effect of backbone initializa-
+tion, we additionally reproduce EDAPS (Saha
+et al. 2023) and LIDAPS (Mansour et al. 2025)
+28
+
+
+with DINOv2-B (Oquab et al. 2024). We use the
+official codebases of both methods and replace
+the original MiT-B5 (Xie et al. 2021) encoder
+with DINOv2-B through a ViTDet-style feature
+pyramid (Li et al. 2022), following the feature
+extraction strategy used in our implementation.
+As a sanity check, we first verified that our
+environment reproduces the original EDAPS and
+LIDAPS results with the MiT-B5 backbone.
+We found that directly replacing MiT-B5 with
+DINOv2-B leads to unstable training in these
+dual-branch panoptic architectures. In particu-
+lar, the Mask R-CNN-style (He et al. 2017)
+instance branch often collapsed, yielding zero PQ
+for things classes, while the semantic branch for
+stuff classes remained partially functional. This
+observation is also consistent with public imple-
+mentation reports discussing poor detection or
+instance-segmentation performance when using
+DINOv2 weights in Faster R-CNN (Ren et al.
+2017) / Mask R-CNN (He et al. 2017) or ViTDet-
+style pipelines.1 While these reports are not
+controlled benchmarks, they suggest that trans-
+ferring DINOv2 to two-stage instance-detection
+architectures may require additional stabiliza-
+tion. We therefore explored several stabiliza-
+tion strategies, including changes to the learning
+rate, backbone learning-rate multiplier, weight
+decay, warmup duration, pseudo-label confidence
+threshold, and normalization layers. Among these,
+adding GroupNorm to the instance-branch feature
+pyramid was crucial for stable training. We also
+found that increasing the crop size from 512×512
+to 512×1024 further improved performance for
+EDAPS on both benchmarks and for LIDAPS on
+Synthia→Cityscapes.
+Table A3 reports the resulting comparison.
+The DINOv2-B backbone improves some EDAP-
+S/LIDAPS results, confirming that stronger self-
+supervised encoders can also benefit compet-
+ing methods. Nevertheless, MC-PanDA++ remains
+ahead on both benchmarks. These results sup-
+port the conclusion that strong initialization
+is an important enabling component, but the
+proposed confidence-guided Mask2Former-based
+adaptation strategy remains essential for robust
+UDA panoptic segmentation.
+1https://github.com/facebookresearch/dinov2/issues/350,
+https://github.com/facebookresearch/dinov2/issues/65
+Appendix G
+Compute,
+memory, and
+inference-time
+comparison
+We compare the computational cost, memory
+usage,
+and
+inference
+speed
+of
+MC-PanDA++
+with
+LIDAPS,
+the
+strongest
+EDAPS-family
+baseline in Table A4. We report results on
+Synthia→Cityscapes and measure all runtimes on
+the same hardware setup, using a single NVIDIA
+RTX 6000 Ada GPU. For LIDAPS, the train-
+ing schedule consists of the standard 40k main
+training stage followed by the 10k instance-mixing
+stage. For inference, we evaluate 500 Cityscapes
+images at 1024×2048 resolution and report the
+mean runtime with data loading excluded.
+The comparison highlights the practical trade-
+off. LIDAPS uses a shorter training schedule and
+therefore has lower total GPU-hours than the final
+110k MC-PanDA++ model, while MC-PanDA++ is
+faster per training iteration. At a near matched-
+compute budget, the 85k checkpoint of MC-
+PanDA++ already outperforms LIDAPS by +3.8
+PQ. At inference, MC-PanDA++ is about 1.4–
+1.6× faster, requires substantially less memory,
+and achieves the best final performance. We also
+experimented with extending LIDAPS to 110k
+iterations, but performance even slightly degraded
+compared with the standard 50k schedule.
+Appendix H
+Initial τ1 –
+robustness
+We additionally evaluate the robustness of adap-
+tive class-dependent MLS to the initial value of τ1
+on UrbanSyn→Vistas. Table A5 shows that per-
+formance remains stable across a wide range of
+initial thresholds. The average performance across
+all tested initial values is 49.5±0.2 PQ, confirming
+the robustness trend observed on Synthia→Vistas
+(see Table 11), Cityscapes→ACDC (see Table 11),
+and Cityscapes→MUSES (see Table 14).
+29
+
+
+Table A3
+Extended performance (PQ16) comparison with EDAPS and LIDAPS on Synthia→Cityscapes and
+Synthia→Vistas. ‡ denotes our DINOv2-B reimplementations using the official codebases, a ViTDet-style feature
+pyramid, and GroupNorm normalization. For MC-PanDA++, we report the mean over three random seeds.
+Method
+Encoder / setting
+Synthia→City
+Synthia→Vistas
+EDAPS (Saha et al. 2023)
+MiT-B5
+41.2
+36.6
+LIDAPS (Mansour et al. 2025)
+MiT-B5
+44.8
+38.0
+EDAPS‡ (Saha et al. 2023)
+DINOv2-B, 512×512 crop
+36.1
+38.9
+EDAPS‡ (Saha et al. 2023)
+DINOv2-B, 512×1024 crop
+42.0
+40.5
+LIDAPS‡ (Mansour et al. 2025)
+DINOv2-B, 512×512 crop
+40.2
+37.0
+LIDAPS‡ (Mansour et al. 2025)
+DINOv2-B, 512×1024 crop
+44.7
+35.8
+MC-PanDA++
+DINOv2-B, 512×1024 crop
+49.6
+44.8
+Table A4
+Compute, memory, and inference-time comparison with LIDAPS on Synthia→Cityscapes. For LIDAPS,
+training includes the 40k main stage and the 10k instance-mixing stage. Inference is measured on 500 Cityscapes images
+(1024×2048), reporting the mean runtime with data loading excluded. ‡ denotes our DINOv2-B reimplementation of
+LIDAPS, described in Appendix F.
+Training
+Inference (1024×2048)
+Method
+Backbone
+Iters.
+Crop
+s/iter↓
+GPU-h↓
+Peak mem.↓
+FPS↑
+Peak mem.↓
+PQ↑
+LIDAPS
+MiT-B5
+40k+10k
+512×512
+1.77
+24.5
+17.5 GiB
+2.1
+6.6 GiB
+44.8
+LIDAPS‡
+DINOv2-B
+40k+10k
+512×1024
+1.83
+25.4
+29.2 GiB
+2.4
+8.2 GiB
+44.7
+MC-PanDA++ (85k ckpt.)
+DINOv2-B
+85k
+512×1024
+1.04
+24.6
+24.7 GiB
+3.4
+4.0 GiB
+48.6
+MC-PanDA++ (final)
+DINOv2-B
+110k
+512×1024
+1.04
+31.9
+24.7 GiB
+3.4
+4.0 GiB
+49.6
+Table A5 Robustness of adaptive class-dependent MLS
+to initial values of τ1 on UrbanSyn→Vistas. Each value is
+averaged over three random seeds. The last column reports
+the mean and standard deviation across initial τ1 values.
+initial τ1=
+0.0
+0.5
+0.6
+0.7
+0.8
+0.9
+0.99
+Avg.
+UrbanSyn
+→Vistas
+49.5 49.2 49.7 49.7 49.3 49.4 49.5
+49.5±0.2
+Appendix I
+Impact of
+adaptive
+thresholding on
+rare classes
+To analyze the behavior of the adaptive thresh-
+old update under class imbalance, we compare the
+fixed threshold τ1 = 0.99 with our per-class adap-
+tive threshold on Cityscapes→ACDC. We focus
+on the five most frequent and five rarest classes,
+where class frequency is measured as the percent-
+age of source-domain training images in which
+the class appears at least once. Table A6 reports
+per-class PQ averaged over three random seeds.
+Adaptive thresholding improves the average per-
+formance of the five most frequent classes by 1.6
+PQ and the five rarest classes by 3.1 PQ. Notably,
+all five rare classes improve, suggesting that the
+adaptive update alleviates the difficulty of using
+a single global threshold for classes with substan-
+tially different frequency and confidence statistics.
+Appendix J
+Per-class results
+As a complement to Tables 1 and 2 in the main
+manuscript, Table A7 reports per-class panoptic
+performance of MC-PanDA++ and compares it
+with state-of-the-art methods across four standard
+domain adaptation benchmarks.
+30
+
+
+Table A6
+Effect of per-class adaptive thresholding on the five most frequent and five rarest classes for Cityscapes →
+ACDC. We compare the fixed threshold τ1 = 0.99 with our per-class adaptive threshold. Class frequency, shown in
+parentheses, is measured as the percentage of source-domain training images in which the class appears at least once.
+Results are per-class PQ averaged over three random seeds.
+Five most frequent classes
+pole (99.1%)
+road (98.6%)
+building (98.6%)
+vegetation (97.2%)
+car (95.2%)
+Avg.
+fixed τ1 = 0.99
+42.2
+↱
+94.9
+↱
+79.6
+↱
+74.5
+↱
+64.1
+↱
+71.0
+↱
+adaptive τ1
+44.8
++2.7
+95.2
++0.3
+79.8
++0.1
+72.3
+-2.3
+71.4
++7.3
+72.7
++1.6
+Five rarest classes
+train (4.8%)
+bus (9.2%)
+truck (12.1%)
+motorcycle (17.2%)
+wall (32.6%)
+Avg.
+fixed τ1 = 0.99
+60.0
+↱
+62.0
+↱
+40.8
+↱
+31.0
+↱
+48.9
+↱
+48.5
+↱
+adaptive τ1
+62.5
++2.5
+62.8
++0.8
+44.1
++3.4
+35.5
++4.5
+53.0
++4.1
+51.6
++3.1
+Table A7 Per-class PQ performance evaluation on four standard domain adaptation setups and comparison with the
+state of the art. All experiments for MC-PanDA and MC-PanDA++ are averaged over three random seeds.
+road
+sidewalk
+building
+wall
+fence
+pole
+tr. light
+tr. sign
+vegetation
+sky
+person
+rider
+car
+bus
+motorcycle
+bicycle
+PQ16
+Method
+Synthia→Cityscapes
+CVRN
+86.6
+33.8
+74.6
+3.4
+0.0
+10.0
+5.7
+13.5
+80.3
+76.3
+26.0
+18.0
+34.1
+37.4
+7.3
+6.2
+32.1
+UniDAF
+73.7
+26.5
+71.9
+1.0
+0.0
+7.6
+9.9
+12.4
+81.4
+77.4
+27.4
+23.1
+47.0
+40.9
+12.6
+15.4
+33.0
+UniDAF-PSN
+87.7
+34.0
+73.2
+1.3
+0.0
+8.1
+9.9
+6.7
+78.2
+74.0
+37.6
+25.3
+40.7
+37.4
+15.0
+18.8
+34.2
+EDAPS
+77.5
+36.9
+80.1
+17.2
+1.8
+29.2
+33.5
+40.9
+82.6
+80.4
+43.5
+33.8
+45.6
+35.6
+18.0
+2.8
+41.2
+LIDAPS
+80.8
+48.8
+80.8
+17.6
+2.5
+29.9
+34.6
+42.9
+82.8
+82.9
+44.4
+40.5
+51.7
+39.2
+27.4
+10.7
+44.8
+MC-PanDA
+87.2
+51.8
+82.5
+16.1
+1.7
+36.3
+26.1
+54.3
+86.3
+86.4
+48.3
+37.7
+46.9
+45.8
+27.4
+23.9
+47.4
+MC-PanDA++
+89.9
+63.6
+84.8
+24.7
+3.6
+43.2
+34.5
+42.8
+82.5
+81.0
+46.8
+36.8
+54.2
+51.1
+27.9
+25.4
+49.6
+Synthia→Vistas
+CVRN
+33.4
+7.4
+32.9
+1.6
+0.0
+4.3
+0.4
+6.5
+50.8
+76.8
+30.6
+15.2
+44.8
+18.8
+7.9
+9.5
+21.3
+EDAPS
+77.5
+25.3
+59.9
+14.9
+0.0
+27.5
+33.1
+37.1
+72.6
+92.2
+32.9
+16.4
+47.5
+31.4
+13.9
+3.7
+36.6
+LIDAPS
+76.5
+25.2
+64.2
+14.0
+0.2
+29.1
+35.6
+35.3
+72.1
+94.4
+33.8
+18.3
+50.3
+33.9
+19.3
+5.9
+38.0
+MC-PanDA
+82.7
+26.5
+61.0
+5.5
+0.0
+39.9
+34.4
+51.3
+62.1
+85.6
+41.9
+11.4
+50.6
+25.1
+23.0
+18.1
+38.7
+MC-PanDA++
+87.6
+55.2
+65.3
+20.9
+1.2
+39.9
+42.1
+46.6
+68.4
+91.7
+40.8
+19.1
+54.7
+35.1
+25.2
+23.2
+44.8
+Cityscapes→Foggy Cityscapes
+CVRN
+93.6
+52.3
+65.3
+7.5
+15.9
+5.2
+7.4
+22.3
+57.8
+48.7
+32.9
+30.9
+49.6
+38.9
+18.0
+25.2
+35.7
+UniDAF
+93.9
+53.1
+63.9
+8.7
+14.0
+3.8
+10.0
+26.0
+53.5
+49.6
+38.0
+35.4
+57.5
+44.2
+28.9
+29.8
+37.6
+EDAPS
+91.0
+68.5
+80.9
+24.1
+29.0
+50.1
+47.2
+67.0
+85.3
+71.8
+50.9
+51.2
+64.7
+47.7
+36.9
+41.5
+56.7
+LIDAPS
+92.3
+70.0
+83.2
+23.8
+31.9
+56.4
+47.7
+68.8
+86.6
+72.5
+53.2
+53.6
+68.0
+56.6
+42.8
+45.9
+59.6
+MC-PanDA
+98.0
+80.6
+85.8
+45.7
+43.4
+60.3
+49.4
+73.8
+87.9
+81.7
+53.5
+47.8
+65.2
+61.6
+40.2
+44.3
+63.7
+MC-PanDA++
+97.9
+82.2
+87.9
+51.7
+53.4
+63.4
+51.3
+72.5
+89.3
+83.0
+53.4
+49.3
+66.3
+72.1
+45.6
+45.7
+66.6
+Cityscapes→Vistas
+CVRN
+77.3
+21.0
+47.8
+10.5
+13.4
+7.5
+14.1
+25.1
+62.1
+86.4
+37.7
+20.4
+55.0
+21.7
+14.3
+21.4
+33.5
+EDAPS
+58.8
+43.4
+57.1
+25.6
+29.1
+34.3
+35.5
+41.2
+77.8
+59.1
+35.0
+23.8
+56.7
+36.0
+24.3
+25.5
+41.2
+LIDAPS
+49.1
+44.3
+70.1
+26.5
+29.9
+37.4
+37.2
+43.2
+80.0
+46.1
+35.9
+25.0
+57.1
+41.6
+29.6
+28.4
+42.6
+MC-PanDA
+88.4
+49.1
+75.2
+35.2
+39.7
+50.3
+45.2
+54.0
+81.1
+96.2
+46.1
+30.1
+57.2
+42.0
+33.9
+37.3
+53.8
+MC-PanDA++
+92.9
+58.0
+75.9
+41.6
+45.9
+48.4
+48.6
+49.7
+81.2
+96.0
+46.6
+31.1
+63.0
+44.4
+36.0
+34.9
+55.9
+31
