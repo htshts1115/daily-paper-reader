@@ -1,17 +1,104 @@
 {
   "mode": "standard",
-  "generated_at": "2026-10-06T01:17:35.471507+00:00",
+  "generated_at": "2026-10-06T23:27:37.285994+00:00",
   "stats": {
     "mode": "standard",
     "tag_count": 4,
-    "deep_divecandidates": 1,
+    "deep_divecandidates": 3,
     "deep_cap": 9,
-    "deep_selected": 1,
+    "deep_selected": 3,
     "quick_candidates": 3,
     "quick_skim_target": 14,
     "quick_selected": 3
   },
   "deep_dive": [
+    {
+      "id": "2610.04554v1",
+      "source": "arxiv",
+      "title": "EagleDepth: Efficient Fine-Grained Depth Estimation via Pixel Diffusion Decoder",
+      "abstract": "Recovering detailed geometry from high-resolution images is critical for precise perception of the surroundings and objects. However, existing methods which use latent-space modeling and VAE reconstruction can compromise geometric details. Furthermore, decoding from latent codes introduces substantial inference overhead. To address those issues, we present EagleDepth, an efficient framework for high-resolution monocular depth estimation that combines the geometric priors of latent diffusion with fine-grained pixel-space generation. Our key idea is to retain depth-aware latent representations as guidance while generating the final depth map directly in pixel space. We train the latent and pixel components sequentially: first, we fine-tune a pretrained latent diffusion model using paired RGB--depth supervision; then, we adapt a pretrained pixel diffusion decoder, PiD, to predict depth conditioned on the learned features. Training of the pixel component starts at 1024 resolution and continues across multiple resolutions up to 4K. The latent branch processes resized, lower-resolution RGB images, while the pixel branch generates depth at the target resolution, bypassing the original VAE decoder. This design preserves learned geometric knowledge without requiring the latent backbone to operate at the output resolution. On five commonly used depth estimation datasets and the high-resolution Synth4K dataset, our framework achieves state-of-the-art depth estimation performance, with faster inference and better preservation of fine structures and object boundaries.",
+      "authors": [
+        "Bowen Chai",
+        "Tianbao Zhang",
+        "Shuyu Wu",
+        "Dexin Zuo",
+        "Zhaoxin Fan",
+        "Danping Zou"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-10-03T14:44:09+00:00",
+      "link": "https://arxiv.org/pdf/2610.04554v1",
+      "tags": [
+        "keyword:matting",
+        "keyword:mono-depth",
+        "keyword:neural-bokeh",
+        "keyword:seg",
+        "query:mono-depth",
+        "query:neural-bokeh",
+        "query:seg"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "efficient high-resolution monocular depth estimation via pixel diffusion decoder",
+      "llm_evidence_cn": "基于像素扩散解码器的高效高分辨率单目深度估计",
+      "llm_evidence": "基于像素扩散解码器的高效高分辨率单目深度估计",
+      "canonical_evidence": "基于像素扩散解码器的高效高分辨率单目深度估计",
+      "llm_tldr_en": "Existing high-resolution depth methods rely on latent modeling and VAE reconstruction, which compromises geometric detail and adds inference overhead. EagleDepth combines latent diffusion priors with fine-grained pixel-space generation, retaining depth-aware latents as guidance.",
+      "llm_tldr_cn": "高分辨率图像的精细几何恢复对精确感知至关重要，但现有方法多依赖潜空间建模与VAE重建，容易损失几何细节，且从潜码解码带来较大推理开销。本文提出EagleDepth，将潜扩散的几何先验与像素空间的细粒度生成相结合，先微调潜表示再在像素空间直接生成深度图。该框架在保持高效推理的同时恢复更精细的几何结构。这为高分辨率单目深度估计兼顾精度与效率提供了新思路。",
+      "llm_tldr": "高分辨率图像的精细几何恢复对精确感知至关重要，但现有方法多依赖潜空间建模与VAE重建，容易损失几何细节，且从潜码解码带来较大推理开销。本文提出EagleDepth，将潜扩散的几何先验与像素空间的细粒度生成相结合，先微调潜表示再在像素空间直接生成深度图。该框架在保持高效推理的同时恢复更精细的几何结构。这为高分辨率单目深度估计兼顾精度与效率提供了新思路。",
+      "llm_tags": [
+        "query:mono-depth"
+      ],
+      "matched_query_tag": "query:mono-depth",
+      "matched_query_text": "monocular depth estimation",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2610.05029v1",
+      "source": "arxiv",
+      "title": "SPACE-CLIPv2: Decoding Local Geometry from Frozen CLIP for Monocular Depth Estimation",
+      "abstract": "Vision-language foundation models such as CLIP provide strong semantic representations, but their patch tokens are not directly optimized for dense metric geometry. SPACE-CLIP showed that frozen CLIP features can support monocular depth estimation through layer-group feature fusion, yet it leaves open how neighboring CLIP tokens should be combined to recover fine local structure. We present SPACE-CLIPv2, a frozen-backbone depth decoder that aggregates fixed local neighborhoods in CLIP token space. At selected decoder stages, the model samples a fixed token stencil, predicts aggregation weights, and injects the resulting response through a gated residual update. A token-space high-pass branch further preserves shallow local contrast. On NYU Depth V2, SPACE-CLIPv2 improves over a matched SPACE-CLIP baseline, while five-seed experiments consistently favor fixed over learned-offset sampling. Zero-shot iBims-1 evaluation further improves boundary and planar-geometry measures. These results support constrained local token aggregation as a practical mechanism for decoding geometry from frozen CLIP representations.",
+      "authors": [
+        "Hyun Song",
+        "Taewan Cho",
+        "Kangmin Kim",
+        "Andrew Jaeyong Choi"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-10-04T07:50:10+00:00",
+      "link": "https://arxiv.org/pdf/2610.05029v1",
+      "tags": [
+        "keyword:matting",
+        "keyword:mono-depth",
+        "keyword:neural-bokeh",
+        "keyword:seg",
+        "query:matting",
+        "query:mono-depth",
+        "query:neural-bokeh",
+        "query:seg"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "frozen CLIP backbone decoder for monocular depth estimation",
+      "llm_evidence_cn": "冻结CLIP主干的单目深度估计解码器",
+      "llm_evidence": "冻结CLIP主干的单目深度估计解码器",
+      "canonical_evidence": "冻结CLIP主干的单目深度估计解码器",
+      "llm_tldr_en": "SPACE-CLIPv2 is a frozen-backbone depth decoder that aggregates fixed local neighborhoods in CLIP token space with learned aggregation weights and a high-pass branch, improving monocular depth estimation of fine local structure.",
+      "llm_tldr_cn": "视觉语言基础模型CLIP语义表征强，但其patch token并未针对稠密度量几何优化；SPACE-CLIP虽证明冻结CLIP特征可支持单目深度估计，却未解决相邻token如何组合以恢复精细局部结构。本文提出SPACE-CLIPv2，一种冻结主干深度解码器，在CLIP token空间中聚合固定局部邻域：在选定解码阶段采样固定token模板并预测聚合权重，通过门控残差注入，同时用token空间高通分支保留浅层局部对比。实验在NYU等数据集上验证，提升了单目深度估计对精细局部结构的恢复能力，表明无需微调CLIP主干即可获得高质量深度。",
+      "llm_tldr": "视觉语言基础模型CLIP语义表征强，但其patch token并未针对稠密度量几何优化；SPACE-CLIP虽证明冻结CLIP特征可支持单目深度估计，却未解决相邻token如何组合以恢复精细局部结构。本文提出SPACE-CLIPv2，一种冻结主干深度解码器，在CLIP token空间中聚合固定局部邻域：在选定解码阶段采样固定token模板并预测聚合权重，通过门控残差注入，同时用token空间高通分支保留浅层局部对比。实验在NYU等数据集上验证，提升了单目深度估计对精细局部结构的恢复能力，表明无需微调CLIP主干即可获得高质量深度。",
+      "llm_tags": [
+        "query:mono-depth"
+      ],
+      "matched_query_tag": "query:mono-depth",
+      "matched_query_text": "monocular depth estimation",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch"
+    },
     {
       "id": "2610.03439v1",
       "source": "arxiv",
@@ -35,13 +122,13 @@
         "query:neural-bokeh"
       ],
       "llm_score": 8.0,
-      "llm_evidence_en": "event-image monocular depth estimation iterative refinement",
-      "llm_evidence_cn": "事件-图像单目深度估计迭代细化",
-      "llm_evidence": "事件-图像单目深度估计迭代细化",
-      "canonical_evidence": "事件-图像单目深度估计迭代细化",
-      "llm_tldr_en": "HypoDepth is the first event-image monocular depth iterative refinement framework, turning depth regression into a constrained search over a discrete depth hypothesis volume.",
-      "llm_tldr_cn": "事件相机动态性能优异，在单目深度估计上潜力巨大，但现有方法依赖上下文特征优化，难以应对直接全深度回归的病态与非线性问题。本文提出首个事件-图像单目深度迭代细化框架HypoDepth，引入离散深度假设体，将深度回归转化为受约束的深度搜索，并通过构建三维代价体与多尺度相关搜索引导稳定的残差优化。该轻量代价体设计提升了单目深度估计的稳定性与精度，为事件相机深度估计提供了新范式。",
-      "llm_tldr": "事件相机动态性能优异，在单目深度估计上潜力巨大，但现有方法依赖上下文特征优化，难以应对直接全深度回归的病态与非线性问题。本文提出首个事件-图像单目深度迭代细化框架HypoDepth，引入离散深度假设体，将深度回归转化为受约束的深度搜索，并通过构建三维代价体与多尺度相关搜索引导稳定的残差优化。该轻量代价体设计提升了单目深度估计的稳定性与精度，为事件相机深度估计提供了新范式。",
+      "llm_evidence_en": "event-image monocular depth estimation via iterative refinement",
+      "llm_evidence_cn": "面向事件图像的单目深度估计迭代细化",
+      "llm_evidence": "面向事件图像的单目深度估计迭代细化",
+      "canonical_evidence": "面向事件图像的单目深度估计迭代细化",
+      "llm_tldr_en": "HypoDepth is the first event-image monocular depth iterative refinement framework, replacing ill-posed direct regression with a discrete Depth Hypothesis Volume and multi-scale correlation search.",
+      "llm_tldr_cn": "事件相机具备优异的动态特性，在单目深度估计上潜力巨大，但现有方法多靠优化上下文特征，仍难以应对直接全深度回归的病态与非线性问题。本文提出HypoDepth，首个事件-图像单目深度迭代细化框架，引入离散深度假设体，将深度回归转化为受约束的深度搜索任务。方法在假设体特征与上下文特征间构建三维代价体，并用多尺度相关性搜索引导稳定的残差优化。该轻量代价体方案提升了深度估计的稳定性与精度，为事件相机单目深度估计提供了新的迭代细化范式。",
+      "llm_tldr": "事件相机具备优异的动态特性，在单目深度估计上潜力巨大，但现有方法多靠优化上下文特征，仍难以应对直接全深度回归的病态与非线性问题。本文提出HypoDepth，首个事件-图像单目深度迭代细化框架，引入离散深度假设体，将深度回归转化为受约束的深度搜索任务。方法在假设体特征与上下文特征间构建三维代价体，并用多尺度相关性搜索引导稳定的残差优化。该轻量代价体方案提升了深度估计的稳定性与精度，为事件相机单目深度估计提供了新的迭代细化范式。",
       "llm_tags": [
         "query:mono-depth"
       ],
@@ -75,18 +162,17 @@
         "keyword:mono-depth",
         "keyword:neural-bokeh",
         "keyword:seg",
-        "query:matting",
         "query:mono-depth",
         "query:seg"
       ],
       "llm_score": 6.0,
-      "llm_evidence_en": "class-agnostic 4D instance segmentation",
-      "llm_evidence_cn": "类别无关四维实例分割",
-      "llm_evidence": "类别无关四维实例分割",
-      "canonical_evidence": "类别无关四维实例分割",
-      "llm_tldr_en": "Existing Segment Anything models operate on 2D or video masks with sequential memory, leaving promptable 4D instance segmentation underexplored. S4VY builds on feed-forward 4D visual geometry to produce persistent class-agnostic instance masks across observations.",
-      "llm_tldr_cn": "动态场景中的准确实例分割对机器人和自动驾驶等下游应用十分重要，但现有分割一切模型主要基于二维图像或视频掩码并依赖顺序记忆保持身份，基于前馈视觉几何的可提示四维实例分割尚待探索。论文提出S4VY，将共享的视觉几何特征通过时空查询解码器转换为类别无关的四维实例掩码，每个持续物体查询跨观测绑定同一实体。该表示支持无提示分割，为动态场景中的实例级理解提供了新范式。",
-      "llm_tldr": "动态场景中的准确实例分割对机器人和自动驾驶等下游应用十分重要，但现有分割一切模型主要基于二维图像或视频掩码并依赖顺序记忆保持身份，基于前馈视觉几何的可提示四维实例分割尚待探索。论文提出S4VY，将共享的视觉几何特征通过时空查询解码器转换为类别无关的四维实例掩码，每个持续物体查询跨观测绑定同一实体。该表示支持无提示分割，为动态场景中的实例级理解提供了新范式。",
+      "llm_evidence_en": "Segment Anything model producing class-agnostic 4D instance masks from feed-forward visual geometry",
+      "llm_evidence_cn": "基于前馈视觉几何生成类别无关四维实例掩码的分割一切模型",
+      "llm_evidence": "基于前馈视觉几何生成类别无关四维实例掩码的分割一切模型",
+      "canonical_evidence": "基于前馈视觉几何生成类别无关四维实例掩码的分割一切模型",
+      "llm_tldr_en": "S4VY builds a Segment Anything model on feed-forward 4D visual geometry, turning shared visual-geometric features into class-agnostic 4D instance masks via a space-time query decoder, supporting promptable and prompt-free segmentation in dynamic scenes.",
+      "llm_tldr_cn": "针对现有Segment Anything模型多局限于二维图像或视频掩码、基于前馈四维视觉几何的可提示实例分割尚不充分的问题，本文提出S4VY模型。该方法将共享的视觉-几何特征通过时空查询解码器转化为类别无关的四维实例掩码，每个持久物体查询跨全部观测绑定同一实体。该表示同时支持免提示与可提示分割，并在动态场景中保持一致身份。其贡献在于把分割一切推广到前馈四维几何，服务机器人与自动驾驶等下游任务。",
+      "llm_tldr": "针对现有Segment Anything模型多局限于二维图像或视频掩码、基于前馈四维视觉几何的可提示实例分割尚不充分的问题，本文提出S4VY模型。该方法将共享的视觉-几何特征通过时空查询解码器转化为类别无关的四维实例掩码，每个持久物体查询跨全部观测绑定同一实体。该表示同时支持免提示与可提示分割，并在动态场景中保持一致身份。其贡献在于把分割一切推广到前馈四维几何，服务机器人与自动驾驶等下游任务。",
       "llm_tags": [
         "query:seg"
       ],
@@ -124,13 +210,13 @@
         "query:neural-bokeh"
       ],
       "llm_score": 6.0,
-      "llm_evidence_en": "predicts metric 3DGS from a single calibrated stereo pair using frozen stereo networks and calibrated disparity",
-      "llm_evidence_cn": "从单个标定双目图像预测度量三维高斯，用预训练双目网络与标定视差锚定几何",
-      "llm_evidence": "从单个标定双目图像预测度量三维高斯，用预训练双目网络与标定视差锚定几何",
-      "canonical_evidence": "从单个标定双目图像预测度量三维高斯，用预训练双目网络与标定视差锚定几何",
-      "llm_tldr_en": "StereoGaussians predicts a metric 3D Gaussian Splatting representation from one calibrated stereo pair by reusing frozen stereo network features and calibrated disparity, adding a second Gaussian layer for disoccluded and out-of-view content. It enables nearby-view extrapolation for practical stereo-camera applications.",
-      "llm_tldr_cn": "针对前馈三维高斯泼溅难以在输入视角之外进行近邻外推的问题，本文提出StereoGaussians，从单个标定双目图像预测度量三维高斯表示。方法复用冻结预训练双目网络的中间特征来预测高斯属性，并用标定视差锚定几何，另加一层高斯与扩展画布以容纳去遮挡和视场外内容。实验表明该方案能有效合成新暴露区域，提升双目相机场景的重建与渲染质量。",
-      "llm_tldr": "针对前馈三维高斯泼溅难以在输入视角之外进行近邻外推的问题，本文提出StereoGaussians，从单个标定双目图像预测度量三维高斯表示。方法复用冻结预训练双目网络的中间特征来预测高斯属性，并用标定视差锚定几何，另加一层高斯与扩展画布以容纳去遮挡和视场外内容。实验表明该方案能有效合成新暴露区域，提升双目相机场景的重建与渲染质量。",
+      "llm_evidence_en": "metric stereo depth anchors geometry for 3D reconstruction",
+      "llm_evidence_cn": "度量立体深度为三维重建锚定几何",
+      "llm_evidence": "度量立体深度为三维重建锚定几何",
+      "canonical_evidence": "度量立体深度为三维重建锚定几何",
+      "llm_tldr_en": "StereoGaussians predicts a metric 3D Gaussian representation from a single calibrated stereo pair, reusing frozen stereo network features and calibrated disparity to anchor geometry, adding a second Gaussian layer for disoccluded content.",
+      "llm_tldr_cn": "前馈式3D高斯泼溅无需逐场景优化，但立体相机应用需要向输入视角之外外推，仅靠立体深度只能锚定可见表面，难以填补新暴露区域。为此提出StereoGaussians，从单个已标定立体图像对预测度量3D高斯表示，复用冻结预训练立体网络的中间表征来预测高斯属性，并以标定视差锚定几何。方法通过第二层高斯与扩展画布容纳去遮挡和视场外内容，实验在自建立体场景数据集上验证了其近邻视图外推能力，为立体相机应用提供了新的前馈重建方案。",
+      "llm_tldr": "前馈式3D高斯泼溅无需逐场景优化，但立体相机应用需要向输入视角之外外推，仅靠立体深度只能锚定可见表面，难以填补新暴露区域。为此提出StereoGaussians，从单个已标定立体图像对预测度量3D高斯表示，复用冻结预训练立体网络的中间表征来预测高斯属性，并以标定视差锚定几何。方法通过第二层高斯与扩展画布容纳去遮挡和视场外内容，实验在自建立体场景数据集上验证了其近邻视图外推能力，为立体相机应用提供了新的前馈重建方案。",
       "llm_tags": [
         "query:stereo-depth:composite"
       ],
@@ -141,45 +227,48 @@
       "quick_tier": "6"
     },
     {
-      "id": "2609.39785v1",
+      "id": "2609.38856v1",
       "source": "arxiv",
-      "title": "Seeing as Humans Do: Learning from Motion to Segment Anything Without Supervision",
-      "abstract": "The Segment Anything Model (SAM) relies heavily on massive manual annotations, creating a fundamental bottleneck for model scaling. While unsupervised methods attempt to learn object concepts from motion, they typically overfit to moving entities, lacking both multi-granularity understanding and the ability to generalize to static objects. To overcome this, we introduce Motion-Grounded Segment Anything (MoSA), a highly scalable unsupervised framework that learns a transferable objectness prior from unlabeled videos. MoSA operates in three progressive stages: (1) automatically generating multi-granularity motion pseudo-labels from large-scale video data; (2) training a Perceptual Grouping Model (PGM) via contrastive learning to internalize a generalized, appearance-driven concept of objects; and (3) transferring this learned prior into a prompt-guided architecture for segment-anything-style inference on images. Extensive zero-shot evaluations across seven challenging benchmarks (e.g., COCO and ADE20K) demonstrate that MoSA significantly outperforms existing unsupervised methods. Notably, despite using zero manual annotations, MoSA achieves segmentation performance comparable to the fully supervised SAM. Our findings reveal that harnessing large-scale unlabeled motion is a feasible and highly scalable alternative to annotation-driven segment-anything pipelines.",
+      "title": "Decoupling Spherical Reasoning from Dense Prediction for 360 Depth Estimation",
+      "abstract": "The equirectangular projection (ERP) is widely used for panoramic depth estimation, but its spatially varying distortion makes geometry-consistent feature modeling challenging. We revisit panoramic depth estimation by decoupling contextual modeling in native spherical space from dense ERP prediction. To this end, we propose a Fibonacci Spherical Graph (FSG) as an intermediate reasoning space to lift ERP features onto quasi-uniform Fibonacci nodes on the sphere and capture local and long-range dependencies through complementary spherical neighborhoods. The resulting spherical discretization distributes graph nodes approximately uniformly over the spherical surface, reducing the over-representation of highly stretched regions during relational modeling. Operating on a compact set of Fibonacci nodes also avoids the computational burden of constructing and processing a graph at full ERP resolution. To bridge spherical reasoning and dense prediction, we propose a Spherical Context Conditioning (SCC) module that adaptively modulates dense ERP features with the enhanced spherical representation, allowing spherical context to guide pixel-aligned depth prediction. Extensive experiments on three benchmarks demonstrate that the proposed method consistently achieves superior depth accuracy over existing approaches.",
       "authors": [
-        "Weijian Jian",
-        "Xiaoyue Zhang",
-        "Bin Xiao",
-        "Chunyu Xie",
-        "Yixiao He",
-        "Yutao Liu",
-        "Dawei Leng",
-        "Yuhui Yin"
+        "Zhijie Shen",
+        "Chunyu Lin",
+        "Shuai Zheng",
+        "Feng Li",
+        "Runmin Cong",
+        "Huihui Bai",
+        "Yao Zhao"
       ],
       "primary_category": "cs.CV",
       "categories": [
         "cs.CV"
       ],
-      "published": "2026-09-30T14:06:32+00:00",
-      "link": "https://arxiv.org/pdf/2609.39785v1",
+      "published": "2026-09-30T03:14:24+00:00",
+      "link": "https://arxiv.org/pdf/2609.38856v1",
       "tags": [
         "keyword:matting",
+        "keyword:mono-depth",
+        "keyword:neural-bokeh",
         "keyword:seg",
+        "query:mono-depth",
+        "query:neural-bokeh",
         "query:seg"
       ],
       "llm_score": 6.0,
-      "llm_evidence_en": "unsupervised segmentation via motion-grounded SAM",
-      "llm_evidence_cn": "无监督运动驱动分割",
-      "llm_evidence": "无监督运动驱动分割",
-      "canonical_evidence": "无监督运动驱动分割",
-      "llm_tldr_en": "MoSA learns a transferable objectness prior from unlabeled video via multi-granularity motion pseudo-labels and contrastive perceptual grouping, reducing SAM's annotation dependence.",
-      "llm_tldr_cn": "该文针对分割一切模型依赖海量人工标注、而无监督方法又易过拟合运动物体的瓶颈，提出运动驱动的MoSA框架。方法从大规模无标注视频中自动生成多粒度运动伪标签，并通过对比学习训练感知分组模型，内化可迁移的物体性先验。实验表明该框架能泛化到静态物体并支持多粒度理解，为免标注分割模型扩展提供新路径。",
-      "llm_tldr": "该文针对分割一切模型依赖海量人工标注、而无监督方法又易过拟合运动物体的瓶颈，提出运动驱动的MoSA框架。方法从大规模无标注视频中自动生成多粒度运动伪标签，并通过对比学习训练感知分组模型，内化可迁移的物体性先验。实验表明该框架能泛化到静态物体并支持多粒度理解，为免标注分割模型扩展提供新路径。",
+      "llm_evidence_en": "panoramic monocular depth estimation",
+      "llm_evidence_cn": "全景单目深度估计",
+      "llm_evidence": "全景单目深度估计",
+      "canonical_evidence": "全景单目深度估计",
+      "llm_tldr_en": "The paper decouples spherical reasoning from dense ERP prediction for 360 depth estimation, using a Fibonacci spherical graph to capture geometry-consistent dependencies and reduce distortion artifacts.",
+      "llm_tldr_cn": "全景深度估计常用等距柱状投影，但空间变化畸变使几何一致的特征建模十分困难。本文提出斐波那契球面图作为中间推理空间，将ERP特征提升到准均匀球面节点以捕捉局部与长程依赖。均匀的球面离散减少了高拉伸区域的过表示，使深度预测更几何一致。该解耦思路为360度深度估计提供了新的建模范式，也拓展了单目深度估计的适用范围。",
+      "llm_tldr": "全景深度估计常用等距柱状投影，但空间变化畸变使几何一致的特征建模十分困难。本文提出斐波那契球面图作为中间推理空间，将ERP特征提升到准均匀球面节点以捕捉局部与长程依赖。均匀的球面离散减少了高拉伸区域的过表示，使深度预测更几何一致。该解耦思路为360度深度估计提供了新的建模范式，也拓展了单目深度估计的适用范围。",
       "llm_tags": [
-        "query:seg"
+        "query:mono-depth"
       ],
-      "matched_query_tag": "query:seg",
-      "matched_query_text": "semantic segmentation",
-      "matched_requirement_id": "req-23",
+      "matched_query_tag": "query:mono-depth",
+      "matched_query_text": "monocular depth estimation",
+      "matched_requirement_id": "req-1",
       "selection_source": "fresh_fetch",
       "quick_tier": "6"
     }

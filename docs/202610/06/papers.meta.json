@@ -1,9 +1,39 @@
 {
   "label": "2026-10-06",
   "date": "2026-10-06",
-  "generated_at": "2026-10-06T01:19:38",
-  "count": 4,
+  "generated_at": "2026-10-06T23:29:55",
+  "count": 7,
   "papers": [
+    {
+      "paper_id": "202610/06/2610.04554v1-eagledepth-efficient-fine-grained-depth-estimation-via-pixel-diffusion-decoder",
+      "section": "deep",
+      "title_en": "EagleDepth: Efficient Fine-Grained Depth Estimation via Pixel Diffusion Decoder",
+      "authors": "Bowen Chai, Tianbao Zhang, Shuyu Wu, Dexin Zuo, Zhaoxin Fan, Danping Zou",
+      "date": "2026-10-03",
+      "pdf": "https://arxiv.org/pdf/2610.04554v1",
+      "score": "9.0",
+      "evidence": "基于像素扩散解码器的高效高分辨率单目深度估计",
+      "tldr": "从高分辨率图像恢复精细几何对周边与物体感知至关重要，但现有潜空间建模加VAE重建会损失几何细节，且从潜码解码带来大量推理开销。EagleDepth将潜扩散的几何先验与像素空间细粒度生成结合：先微调潜扩散模型获得深度感知潜表示作为引导，再让预训练像素扩散解码器PiD以该特征为条件直接生成深度图。潜分支处理低分辨率RGB，像素分支在1024至4K多分辨率上输出目标分辨率深度，绕过原始VAE解码器。在五个常用数据集与Synth4K上达到SOTA，推理更快且更好保留细结构与物体边界。",
+      "tags": "query:mono-depth",
+      "abstract_en": "Recovering detailed geometry from high-resolution images is critical for precise perception of the surroundings and objects. However, existing methods which use latent-space modeling and VAE reconstruction can compromise geometric details. Furthermore, decoding from latent codes introduces substantial inference overhead. To address those issues, we present EagleDepth, an efficient framework for high-resolution monocular depth estimation that combines the geometric priors of latent diffusion with fine-grained pixel-space generation. Our key idea is to retain depth-aware latent representations as guidance while generating the final depth map directly in pixel space. We train the latent and pixel components sequentially: first, we fine-tune a pretrained latent diffusion model using paired RGB--depth supervision; then, we adapt a pretrained pixel diffusion decoder, PiD, to predict depth conditioned on the learned features. Training of the pixel component starts at 1024 resolution and continues across multiple resolutions up to 4K. The latent branch processes resized, lower-resolution RGB images, while the pixel branch generates depth at the target resolution, bypassing the original VAE decoder. This design preserves learned geometric knowledge without requiring the latent backbone to operate at the output resolution. On five commonly used depth estimation datasets and the high-resolution Synth4K dataset, our framework achieves state-of-the-art depth estimation performance, with faster inference and better preservation of fine structures and object boundaries.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202610/06/2610.05029v1-space-clipv2-decoding-local-geometry-from-frozen-clip-for-monocular-depth-estimation",
+      "section": "deep",
+      "title_en": "SPACE-CLIPv2: Decoding Local Geometry from Frozen CLIP for Monocular Depth Estimation",
+      "authors": "Hyun Song, Taewan Cho, Kangmin Kim, Andrew Jaeyong Choi",
+      "date": "2026-10-04",
+      "pdf": "https://arxiv.org/pdf/2610.05029v1",
+      "score": "9.0",
+      "evidence": "冻结CLIP主干的单目深度估计解码器",
+      "tldr": "CLIP等视觉语言模型语义强，但其patch token未针对稠密几何优化。SPACE-CLIPv2在冻结CLIP上构建深度解码器，于选定阶段对固定局部邻域采样token、预测聚合权重，并经门控残差注入，另加token空间高通分支保留浅层局部对比。在NYU Depth V2上，它优于匹配的SPACE-CLIP基线，五种子实验一致支持固定采样优于学习偏移；零样本iBims-1也提升边界与平面几何指标。这表明受限局部token聚合是从冻结CLIP解码几何的有效机制。",
+      "tags": "query:mono-depth",
+      "abstract_en": "Vision-language foundation models such as CLIP provide strong semantic representations, but their patch tokens are not directly optimized for dense metric geometry. SPACE-CLIP showed that frozen CLIP features can support monocular depth estimation through layer-group feature fusion, yet it leaves open how neighboring CLIP tokens should be combined to recover fine local structure. We present SPACE-CLIPv2, a frozen-backbone depth decoder that aggregates fixed local neighborhoods in CLIP token space. At selected decoder stages, the model samples a fixed token stencil, predicts aggregation weights, and injects the resulting response through a gated residual update. A token-space high-pass branch further preserves shallow local contrast. On NYU Depth V2, SPACE-CLIPv2 improves over a matched SPACE-CLIP baseline, while five-seed experiments consistently favor fixed over learned-offset sampling. Zero-shot iBims-1 evaluation further improves boundary and planar-geometry measures. These results support constrained local token aggregation as a practical mechanism for decoding geometry from frozen CLIP representations.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
     {
       "paper_id": "202610/06/2610.03439v1-depth-hypothesis-guided-iterative-refinement-for-event-image-monocular-depth-estimation",
       "section": "deep",
@@ -46,6 +76,21 @@
       "tldr": "前馈式3DGS无需逐场景优化即可重建，但立体相机应用要求在输入视角附近外推，并渲染新暴露区域。StereoGaussians从单对校准立体图像预测度量3DGS，复用冻结预训练立体网络中间特征回归高斯属性，以标定视差锚定几何，并用第二高斯层与扩展画布容纳遮挡及视野外内容。作者构建SceneSplat-Stereo训练集，在真实与逼真立体基准上优于强视图合成基线，消融验证关键设计。",
       "tags": "query:stereo-depth",
       "abstract_en": "Feed-forward 3D Gaussian Splatting (3DGS) enables reconstruction without per- scene optimisation, but practical stereo-camera applications require nearby-view extrapolation beyond the input views. Stereo depth anchors visible surfaces, yet rendering newly exposed regions also requires learned appearance and additional scene capacity. We introduce StereoGaussians, which predicts a metric 3DGS representation from a single calibrated stereo pair. It reuses intermediate repre- sentations from frozen pretrained stereo networks to predict Gaussian attributes, while calibrated disparity anchors the geometry. A second Gaussian layer and an expanded image canvas provide capacity for disoccluded and outside-field-of- view content. For training, we construct SceneSplat-Stereo from quality-filtered 3DGS teachers, pairing stereo inputs with nearby target views across 803 training scenes. Experiments on unseen real and photorealistic stereo benchmarks demon- strate improvements over strong view-synthesis baselines, while ablation studies support our main design choices.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202610/06/2609.38856v1-decoupling-spherical-reasoning-from-dense-prediction-for-360-depth-estimation",
+      "section": "quick",
+      "title_en": "Decoupling Spherical Reasoning from Dense Prediction for 360 Depth Estimation",
+      "authors": "Zhijie Shen, Chunyu Lin, Shuai Zheng, Feng Li, Runmin Cong, Huihui Bai, Yao Zhao",
+      "date": "2026-09-30",
+      "pdf": "https://arxiv.org/pdf/2609.38856v1",
+      "score": "6.0",
+      "evidence": "全景单目深度估计",
+      "tldr": "全景深度估计广泛采用ERP投影，但投影带来的空间变化畸变使几何一致特征建模十分困难。本文提出Fibonacci球面图FSG作为中间推理空间，将ERP特征提升到球面上近似均匀的Fibonacci节点，并利用互补的球面邻域同时捕获局部与长程依赖，从而把球面上下文建模与密集ERP预测解耦。为连接球面推理和密集预测，提出球面上下文调制SCC，用增强后的球面表征自适应调制ERP特征，引导像素对齐的深度预测。在三个基准上，方法一致取得优于现有方法的深度精度。",
+      "tags": "query:mono-depth",
+      "abstract_en": "The equirectangular projection (ERP) is widely used for panoramic depth estimation, but its spatially varying distortion makes geometry-consistent feature modeling challenging. We revisit panoramic depth estimation by decoupling contextual modeling in native spherical space from dense ERP prediction. To this end, we propose a Fibonacci Spherical Graph (FSG) as an intermediate reasoning space to lift ERP features onto quasi-uniform Fibonacci nodes on the sphere and capture local and long-range dependencies through complementary spherical neighborhoods. The resulting spherical discretization distributes graph nodes approximately uniformly over the spherical surface, reducing the over-representation of highly stretched regions during relational modeling. Operating on a compact set of Fibonacci nodes also avoids the computational burden of constructing and processing a graph at full ERP resolution. To bridge spherical reasoning and dense prediction, we propose a Spherical Context Conditioning (SCC) module that adaptively modulates dense ERP features with the enhanced spherical representation, allowing spherical context to guide pixel-aligned depth prediction. Extensive experiments on three benchmarks demonstrate that the proposed method consistently achieves superior depth accuracy over existing approaches.",
       "source": "arxiv",
       "selection_source": "fresh_fetch"
     },
