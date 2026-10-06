@@ -48,17 +48,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-10-04</span>
+      <span class="dpr-home-dashboard-kicker">2026-10-06</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 3 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 4 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>0</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>1</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>3</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-10-04 22:06:40 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-10-06 01:19:36 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -69,7 +69,7 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日速读3篇，聚焦3D高斯泼溅、长时视频分割与域自适应全景分割。最值得关注的是用立体图像实现前馈3D高斯泼溅的StereoGaussians（7.0/10），其次是面向长时视频分割的LVMT（6.0/10）。普通读者可优先看StereoGaussians了解立体视觉如何高效生成3D场景，再按兴趣跟进视频分割方向。</p>
+<p>今日筛选4篇视觉几何与深度估计论文，精读1篇、速读3篇。最值得看的是精读的《Depth Hypothesis Guided Iterative Refinement for Event-Image Monocular Depth Estimation》（8.0/10），用事件相机+图像做单目深度并迭代精化；速读三篇（均6.0/10）覆盖前馈4D分割、立体图像高斯泼溅和运动驱动无监督分割。普通读者可优先从事件相机深度这篇入手，关注其迭代精化思路能否迁移到自动驾驶或机器人场景。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -78,12 +78,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">0 篇</strong>
+    <strong class="dpr-home-dashboard-count">1 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p class="dpr-home-dashboard-empty">今日暂无推荐。</p>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Depth Hypothesis Guided Iterative Refinement for Event-Image Monocular Depth Estimation">Depth Hypothesis Guided Iterative Refinement for Event-Image Monocular Depth Estimation</span></li></ul>
   </div>
-
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">mono-depth <strong>1</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -94,7 +94,7 @@
     <strong class="dpr-home-dashboard-count">3 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="StereoGaussians: Feed-Forward 3D Gaussian Splatting from Stereo Images">StereoGaussians: Feed-Forward 3D Gaussian Splatting from Stereo Images</span></li><li><span class="dpr-home-dashboard-paper-title" title="LVMT: Video Mask Transformer for Long-term Video Segmentation">LVMT: Video Mask Transformer for Long-term Video Segmentation</span></li><li><span class="dpr-home-dashboard-paper-title" title="MC-PanDA++: Simpler, Stronger, and More Robust Domain-Adaptive Panoptic Segmentation">MC-PanDA++: Simpler, Stronger, and More Robust Domain-Adaptive Panoptic Segmentation</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="S4VY: Segment Anything in Feed-Forward 4D Visual Geometry">S4VY: Segment Anything in Feed-Forward 4D Visual Geometry</span></li><li><span class="dpr-home-dashboard-paper-title" title="StereoGaussians: Feed-Forward 3D Gaussian Splatting from Stereo Images">StereoGaussians: Feed-Forward 3D Gaussian Splatting from Stereo Images</span></li><li><span class="dpr-home-dashboard-paper-title" title="Seeing as Humans Do: Learning from Motion to Segment Anything Without Supervision">Seeing as Humans Do: Learning from Motion to Segment Anything Without Supervision</span></li></ul>
   </div>
   <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">seg <strong>2</strong></span><span class="dpr-home-dashboard-tag">stereo-depth <strong>1</strong></span></div>
 </section>

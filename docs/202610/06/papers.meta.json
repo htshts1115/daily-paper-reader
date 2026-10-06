@@ -1,0 +1,69 @@
+{
+  "label": "2026-10-06",
+  "date": "2026-10-06",
+  "generated_at": "2026-10-06T01:19:38",
+  "count": 4,
+  "papers": [
+    {
+      "paper_id": "202610/06/2610.03439v1-depth-hypothesis-guided-iterative-refinement-for-event-image-monocular-depth-estimation",
+      "section": "deep",
+      "title_en": "Depth Hypothesis Guided Iterative Refinement for Event-Image Monocular Depth Estimation",
+      "authors": "Daikun Liu, Teng Wang, Changyin Sun",
+      "date": "2026-10-02",
+      "pdf": "https://arxiv.org/pdf/2610.03439v1",
+      "score": "8.0",
+      "evidence": "事件-图像单目深度估计迭代细化",
+      "tldr": "事件相机在单目深度估计中潜力巨大，但现有方法多依赖上下文特征优化，难以应对直接全深度回归的病态与非线性问题。本文提出HypoDepth，首个事件-图像单目深度迭代细化框架，通过离散深度假设体（DHV）将回归转化为约束深度搜索。方法构建DHV特征与上下文特征的三维代价体，并用多尺度相关性搜索引导残差优化，实现高效全局到局部细化。在DSEC与MVSEC上取得最优结果，且轻量模型兼顾精度与效率，可在资源受限设备实时运行。",
+      "tags": "query:mono-depth",
+      "abstract_en": "Event cameras hold excellent dynamic properties, showing great potential for monocular depth estimation (MDE). However, existing methods mainly improve performance by optimizing contextual features, but still struggle with the ill-posed and nonlinear nature of direct full-depth regression. In this paper, we propose HypoDepth, the first event-image monocular depth iterative refinement framework. By introducing a discrete Depth Hypothesis Volume (DHV), we transform the depth regression problem into a constrained depth search task. Specifically, we construct a 3D cost volume between the DHV features and contextual features and perform a multi-scale correlation search to guide stable residual optimization. This lightweight cost volume enables efficient global-to-local refinement across multi-resolution. Our method outperforms existing approaches on DSEC and MVSEC with state-of-the-art results and strong zero-shot generalization. Meanwhile, our tiny model achieves an excellent balance between accuracy and efficiency, enabling real-time performance on resource-limited devices.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202610/06/2609.36875v1-s4vy-segment-anything-in-feed-forward-4d-visual-geometry",
+      "section": "quick",
+      "title_en": "S4VY: Segment Anything in Feed-Forward 4D Visual Geometry",
+      "authors": "Jingdong Zhang, Xin Li, Jan Kautz, Wenping Wang, Chris Choy",
+      "date": "2026-09-29",
+      "pdf": "https://arxiv.org/pdf/2609.36875v1",
+      "score": "6.0",
+      "evidence": "类别无关四维实例分割",
+      "tldr": "动态场景实例分割是机器人与自动驾驶的关键需求，但现有 Segment Anything 多处理 2D 图像/视频掩码、依赖顺序记忆保持身份，基于前馈视觉几何的可提示 4D 分割仍待探索。S4VY 将共享视觉-几何特征经时空查询解码器转为类无关 4D 实例掩码，每个持久物体查询跨观测绑定同一实体。它还以主动树搜索、双流 grounder 与独立 critic 构建语言定位框架。静态与动态统一评测中，4D 实例分割与语言引导定位均达最先进水平。",
+      "tags": "query:seg",
+      "abstract_en": "Accurate instance segmentation in dynamic scenes is important for downstream applications such as robotics and autonomous driving. Existing Segment Anything models operate primarily on 2D image or video masks and preserve identity through sequential memory, while promptable 4D instance segmentation built upon feed-forward visual geometry remains underexplored. We introduce S4VY, a Segment Anything model built on feed-forward 4D visual geometry. From a set of RGB observations, S4VY transforms shared visual-geometric features into an exhaustive set of class-agnostic 4D instance masks through a space-time query decoder, with each persistent object query binding one entity across all observations. This representation supports prompt-independent segmentation as well as point- and box- conditioned selection, without requiring a seed mask or temporal ordering. We further develop an agentic harness for natural-language grounding in the large observation space of a 4D scene. Active tree search identifies relevant frames without scanning every fixed window; a dual-stream grounder combines fine-grained VLM visual priors with geometry-consistent instance features through complementary bounding-box prediction and object-query matching; and an independent critic selects the final 4D instance mask from their predictions. Extensive experiments demonstrate state-of-the-art 4D instance segmentation and strong language-guided grounding performance under a unified evaluation spanning static and dynamic scenes.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202610/06/2609.38592v1-stereogaussians-feed-forward-3d-gaussian-splatting-from-stereo-images",
+      "section": "quick",
+      "title_en": "StereoGaussians: Feed-Forward 3D Gaussian Splatting from Stereo Images",
+      "authors": "Boyuan Tian, Huangying Zhan, Zhan Li, Shin-Fang Chng, Hanwen Yang, Zirui Wang, Yi Xu",
+      "date": "2026-09-29",
+      "pdf": "https://arxiv.org/pdf/2609.38592v1",
+      "score": "6.0",
+      "evidence": "从单个标定双目图像预测度量三维高斯，用预训练双目网络与标定视差锚定几何",
+      "tldr": "前馈式3DGS无需逐场景优化即可重建，但立体相机应用要求在输入视角附近外推，并渲染新暴露区域。StereoGaussians从单对校准立体图像预测度量3DGS，复用冻结预训练立体网络中间特征回归高斯属性，以标定视差锚定几何，并用第二高斯层与扩展画布容纳遮挡及视野外内容。作者构建SceneSplat-Stereo训练集，在真实与逼真立体基准上优于强视图合成基线，消融验证关键设计。",
+      "tags": "query:stereo-depth",
+      "abstract_en": "Feed-forward 3D Gaussian Splatting (3DGS) enables reconstruction without per- scene optimisation, but practical stereo-camera applications require nearby-view extrapolation beyond the input views. Stereo depth anchors visible surfaces, yet rendering newly exposed regions also requires learned appearance and additional scene capacity. We introduce StereoGaussians, which predicts a metric 3DGS representation from a single calibrated stereo pair. It reuses intermediate repre- sentations from frozen pretrained stereo networks to predict Gaussian attributes, while calibrated disparity anchors the geometry. A second Gaussian layer and an expanded image canvas provide capacity for disoccluded and outside-field-of- view content. For training, we construct SceneSplat-Stereo from quality-filtered 3DGS teachers, pairing stereo inputs with nearby target views across 803 training scenes. Experiments on unseen real and photorealistic stereo benchmarks demon- strate improvements over strong view-synthesis baselines, while ablation studies support our main design choices.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202610/06/2609.39785v1-seeing-as-humans-do-learning-from-motion-to-segment-anything-without-supervision",
+      "section": "quick",
+      "title_en": "Seeing as Humans Do: Learning from Motion to Segment Anything Without Supervision",
+      "authors": "Weijian Jian, Xiaoyue Zhang, Bin Xiao, Chunyu Xie, Yixiao He, Yutao Liu, Dawei Leng, Yuhui Yin",
+      "date": "2026-09-30",
+      "pdf": "https://arxiv.org/pdf/2609.39785v1",
+      "score": "6.0",
+      "evidence": "无监督运动驱动分割",
+      "tldr": "针对SAM依赖海量人工标注、无监督运动方法又易过拟合运动物体且难泛化静态物体的问题，本文提出MoSA：从大规模无标注视频自动生成多粒度运动伪标签，用对比学习训练感知分组模型，习得外观驱动的通用物体性先验，再迁移到提示引导架构实现图像分割。在七个零样本基准上，MoSA显著超越现有无监督方法，并在零人工标注下达到与全监督SAM相当的性能，表明利用无标注运动是可行且可扩展的替代路线。",
+      "tags": "query:seg",
+      "abstract_en": "The Segment Anything Model (SAM) relies heavily on massive manual annotations, creating a fundamental bottleneck for model scaling. While unsupervised methods attempt to learn object concepts from motion, they typically overfit to moving entities, lacking both multi-granularity understanding and the ability to generalize to static objects. To overcome this, we introduce Motion-Grounded Segment Anything (MoSA), a highly scalable unsupervised framework that learns a transferable objectness prior from unlabeled videos. MoSA operates in three progressive stages: (1) automatically generating multi-granularity motion pseudo-labels from large-scale video data; (2) training a Perceptual Grouping Model (PGM) via contrastive learning to internalize a generalized, appearance-driven concept of objects; and (3) transferring this learned prior into a prompt-guided architecture for segment-anything-style inference on images. Extensive zero-shot evaluations across seven challenging benchmarks (e.g., COCO and ADE20K) demonstrate that MoSA significantly outperforms existing unsupervised methods. Notably, despite using zero manual annotations, MoSA achieves segmentation performance comparable to the fully supervised SAM. Our findings reveal that harnessing large-scale unlabeled motion is a feasible and highly scalable alternative to annotation-driven segment-anything pipelines.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    }
+  ],
+  "errors": []
+}
