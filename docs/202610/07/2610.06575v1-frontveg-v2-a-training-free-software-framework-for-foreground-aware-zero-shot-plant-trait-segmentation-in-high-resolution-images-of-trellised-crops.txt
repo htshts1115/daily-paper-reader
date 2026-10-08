@@ -1,0 +1,220 @@
+Title: FrontVeg V2: A Training-Free Software Framework for Foreground-Aware Zero-Shot Plant Trait Segmentation in High-Resolution Images of Trellised Crops
+
+URL Source: https://arxiv.org/pdf/2610.06575v1
+
+Published Time: Tue, 06 Oct 2026 03:18:53 GMT
+
+Number of Pages: 15
+
+Markdown Content:
+# FrontVeg V2: A Training-Free Software Framework for Foreground-Aware Zero-Shot Plant Trait Segmentation in High-Resolution Images of Trellised Crops 
+
+Abdoul Djalil Ousseini Hamza a, Herearii Metuarea b, Corentin Lothodé a, Morgane Roth c, Jacem Ben Hamden d, Eric Duchêne d,Lionel Ley e, David Alletru f, David Rousseau b, ∗
+
+> a
+
+IRHS, INRAE, Univ. Angers, Angers, France 
+
+> b
+
+LARIS, Univ. Angers, Angers, France 
+
+> c
+
+GAFL, INRAE, Montfavet, France 
+
+> d
+
+SVQV, UMR1131, INRAE, Univ. Strasbourg, Colmar, France 
+
+> e
+
+UEAV, INRAE, Colmar, France 
+
+> f
+
+UEA, UMR0393, INRAE, Toulenne, France 
+
+Abstract 
+
+FrontVeg V2 is an open-source, training-free software framework for foreground-aware zero-shot segmentation of plant traits in high-resolution images of trellised crops. The pipeline combines monocular depth estimation, auto-matic foreground extraction using Valley-Aware Depth Thresholding, tiled zero-shot segmentation, Graph-Based Mask Assembly, and geometry-aware fusion. This design enables plant organs and disease symptoms to be seg-mented while reducing detections arising from neighboring vegetation rows. The current implementation integrates Depth Anything V2 (DAV2) and SAM3 and can be used through both command-line batch processing and a Napari graphical interface. FrontVeg V2 provides a reusable framework for multi-crop, multi-trait digital phenotyping without task-specific model retraining. 
+
+Keywords: 
+
+Plant Phenotyping, Zero-Shot Segmentation, Foundation Models, Monocular Depth Estimation, Trellised Crops 
+
+> ∗
+
+Corresponding author. 
+
+Email address: david.rousseau@univ-angers.fr (David Rousseau )arXiv:2610.06575v1 [cs.CV] 5 Oct 2026 Required Metadata 
+
+All metadata are provided in Table 1, and the corresponding GitHub repos-itory is publicly available. 
+
+Nr. Code metadata description Please fill in this column 
+
+C1 Current code version v2.2.0 C2 Permanent GitHub link to code/repos-itory used for this code version 
+
+https://github.com/djaliloh/ FrontVegV2 
+
+C3 Legal Code License MIT License C4 Code versioning system used Git C5 Software code languages, tools, and ser-vices used Python, PyTorch, Napari C6 Compilation requirements, operating environments & dependencies Miniforge/Anaconda, Python 3.10, CUDA 12.1, PyTorch, SAM3, Depth Anything V2, napari, NumPy, OpenCV, SciPy, scikit-image, scikit-learn, Pillow, pandas, matplotlib C7 If available Link to developer documen-tation/manual 
+
+https://github.com/djaliloh/ FrontVegV2 
+
+C8 Support email for questions david.rousseau@univ-angers.fr 
+
+> Table 1: Code metadata
+
+1. Motivation and significance 
+
+Accurate plant trait segmentation is an important step in digital pheno-typing, as it provides the basis for measuring traits such as leaf area, fruit number, and disease severity from images. In trellised cropping systems, such as vineyards and modern orchards, this task remains challenging because a single side-view image can contain several vegetation rows with very similar visual appearances. As a result, segmen-tation models can detect organs from neighboring rows together with the target vegetation. This is particularly problematic when the objective is to characterize only the foreground crop row. At the same time, phenotyping images are often acquired at high resolution to preserve small structures such as leaves, fruits, and disease symptoms, making direct full-image inference difficult for many vision models. Monocular depth foundation models offer a complementary source of infor-mation by estimating relative scene depth directly from a single RGB image, 2without requiring additional depth sensors. Recent vision foundation mod-els provide strong zero-shot and open-vocabulary segmentation capabilities without task-specific training. Models such as SAM and SAM2 [1, 9], as well as open-vocabulary approaches such as GroundingDINO+SAM [11, 15, 1] and SAN [16], have reduced the need for task-specific segmentation mod-els. In parallel, monocular depth estimation has advanced through mod-els such as MiDaS, ZoeDepth, Metric3D, Depth Anything, and UniDepth [2, 3, 4, 5, 6, 7]. In agricultural imaging, existing datasets and methods have addressed fruit, leaf, grape cluster, and disease segmentation, including Min-neApple [17], WGISD [20], GrapeSAM [21], ViViD-5K [22], PlantSeg [23], and disease-specific approaches [24, 25, 26, 27]. However, these approaches generally focus on a specific crop, trait, disease, sensor, or segmentation task, and do not explicitly use scene geometry to identify the foreground vegeta-tion row. FrontVeg V2 builds on these complementary research directions by combining monocular depth estimation with tiled zero-shot segmentation in a training-free pipeline. The estimated depth is used as a geometric prior to restrict the segmentation to the foreground crop row, while open-vocabulary prompts allow the same framework to target different plant traits and disease symptoms. FrontVeg V2 is a training-free software pipeline designed for foreground-aware zero-shot segmentation of plant traits in high-resolution images of trellised crops. The software combines monocular depth estimation, auto-matic foreground extraction, tiled zero-shot segmentation, graph-based mask assembly, and geometry-aware mask fusion. Its main objective is not to re-place existing foundation models, but to provide a processing framework that makes their zero-shot predictions more suitable for structured agricul-tural scenes. The current implementation uses Depth Anything V2 [6] for monocular depth estimation and SAM3 [8] for zero-shot instance segmenta-tion, while their model paths are provided externally to the software rather than being fixed in the source code. From a scientific perspective, FrontVeg V2 provides a reusable framework for studying how monocular scene geometry can be combined with vision foundation models for plant phenotyping. It allows researchers to evaluate zero-shot segmentation on different crops and plant traits without retraining the complete pipeline for each new task. The configurable prompts, tiling pa-rameters, depth-processing parameters, and externally provided model paths also make it possible to test different models and processing configurations within the same workflow. In this way, the software can be used not only as a practical phenotyping tool, but also as an experimental framework for investigating geometry-aware zero-shot segmentation in agricultural environ-3ments. The software is also associated with our research presented in the CVPPA 2026 Workshop at ECCV [28], where the proposed framework was evalu-ated for zero-shot plant trait segmentation in trellised crops using side-view monocular RGB images. This provides an initial research application of the software, while the SoftwareX version is intended to make the complete im-plementation more accessible and reusable for future agricultural imaging studies. The software was evaluated on RGB images of grapevine, apricot, and apple trees acquired under heterogeneous field conditions. The evaluation dataset comprises 158 images from six geographic locations in France, Spain, Italy, Belgium, and Switzerland, including grapevine images from Colmar and apricot images from Amarine (France), as well as apple images from the DeepPhenoTree–CVPPAData Challenge dataset (DOI: https://doi.org/ 10.57745/NORPF1 ) [12]. Images were acquired with different camera sys-tems, illumination conditions, and viewpoints. The benchmark covers leaf and fruit segmentation for all three crops, and black rot and downy mildew segmentation for grapevine. Ground-truth masks (Table 2) were manually annotated at pixel level using LabelBox [18], following guidelines established with plant scientists and agronomists. Approximately 200 hours of annota-tion produced around 10,000 manually delineated object instances. 
+
+> Table 2: Distribution of images and annotated traits across species.
+
+Species Leaf Fruit Black Rot Downy Mildew Total Images Grapevine 15 25 25 23 88 Apricot Tree 10 25 – – 35 Apple Tree 10 25 – – 35 Total 35 75 25 23 158 The proposed framework was evaluated on four phenotypic traits representa-tive of vineyard and orchard monitoring: leaf and fruit for all crop species, and the two major grapevine diseases, black rot and downy mildew . These classes correspond to common phenotyping tasks related to canopy charac-terization, yield estimation, and disease assessment. FrontVeg V2 can be used in two main ways. For large-scale experiments, the command-line interface supports directory-based processing and config-urable parameters such as the input and output directories, textual prompt, tile size, tile overlap, and depth-processing parameters. This allows the same 4pipeline to be applied to a collection of images without manual interven-tion. For interactive analysis, the software is also provided as a Napari plu-gin https://napari-hub.org/plugins/frontvegv2.html , allowing users to load an image, configure the main processing parameters, run the seg-mentation pipeline, and inspect the resulting masks within the Napari envi-ronment. The same software implementation is therefore intended to support both batch processing for experiments and interactive inspection of individ-ual images. 
+
+2. Software description 
+
+FrontVeg V2 is a modular Python software for foreground-aware zero-shot plant trait segmentation in high-resolution agricultural images. Its core li-brary is decoupled from the graphical interface, enabling both batch process-ing on HPC clusters and interactive local visualization. 
+
+2.1. Software architecture 
+
+The pipeline is organized into two parallel processing branches followed by a final fusion step. Figure 1 illustrates the overall architecture. The soft-ware processes a monocular RGB image and a user-defined textual prompt (e.g., leaf , fruit ) to output an instance segmentation map restricted to the foreground vegetation row. The architecture comprises four main modules.   
+
+> Figure 1: Overall architecture of FrontVeg V2. The software processes the input RGB image through a depth-based foreground extraction branch and a tiled zero-shot segmen-tation branch. The two outputs are combined in the final fusion step to retain plant traits belonging to the foreground vegetation row.
+
+Geometry-Aware Foreground Extraction: The first branch extracts a binary foreground mask based on depth information. The software loads a 5monocular depth foundation model (DAV2 [6]) from an externally specified path. This design allows users to swap the depth estimator without modifying the pipeline source code. The model estimates a relative depth map from the RGB image. To automate the selection of the depth threshold, the software applies the Valley-Aware Depth Thresholding (VADT) algorithm. The software con-verts the depth map into a one-dimensional histogram H(x), where x ∈
+
+[0 , 255] . To suppress local fluctuations, it smooths the histogram with a Gaussian filter, yielding Hs(x). The prominent local maxima form the set 
+
+P = {p0, p 1, . . . , p n}. Since the first mode p0 generally corresponds to the distant background, the module discards it. For each consecutive pair of modes (pi, p i+1 ), the algorithm defines the corresponding valley as: 
+
+vi = arg min  
+
+> x∈[pi,p i+1 ]
+
+Hs(x).
+
+To avoid selecting thresholds from distant regions, the search is limited to the first four candidate valleys V = {v1, v 2, v 3, v 4}. The software selects the optimal threshold as: 
+
+Topt = arg min  
+
+> v∈V
+
+Hs(v).
+
+Thresholding the depth map with Topt directly yields the binary foreground mask Mf g .
+
+High-resolution Zero-Shot Segmentation: In parallel, the second branch processes the original RGB image. To preserve small plant structures, the software divides the image into overlapping square tiles. By default, it uses 
+
+640 × 640 tiles with an overlap factor O = 0 .5. This results in a stride S
+
+defined by: 
+
+S = L(1 − O),
+
+where L is the tile size. Both L and O are configurable by the user. Each tile is independently processed by a vision foundation model (SAM3 in our implementation [8]) using the user’s textual prompt. The software discards fragments smaller than 50 pixels or covering more than 55% of a tile. 
+
+Graph-Based Mask Assembly (GMA): Because overlapping tiles gen-erate redundant and fragmented predictions, the software applies a mask assembly module. GMA represents each valid mask fragment as a node in a graph. The module establishes edges between fragments using a two-stage overlap validation. First, it identifies candidate pairs using bounding box Intersection-over-Union ( IoU box > 0.05 ). Second, it evaluates these pairs using the mask IoU: 
+
+IoU mask (mi, m j ) = |mi ∩ mj ||mi| + |mj | − | mi ∩ mj |.
+
+6The module retains edges where IoU mask > 0.10 . The algorithm extracts connected components to form reconstructed object instances. For overlap-ping pixels belonging to different instances, GMA applies a Winner-Takes-All procedure based on confidence scores to output a unified segmentation mask 
+
+Msam .
+
+Geometry-Aware Fusion: Finally, the software aligns Mf g to the spatial resolution of Msam . It applies a pixel-wise logical AND operation between the two masks. This step acts as a geometric filter: it removes predictions located outside the foreground vegetation region without altering the shape of the objects detected by the zero-shot segmentation branch. 
+
+2.2. Software functionalities and interfaces 
+
+FrontVeg V2 provides two complementary interfaces: • Command-Line Interface (CLI): Designed for automated batch processing on HPC clusters. Users define input/output directories, model paths, and parameters (tile size, overlap, prompt) via arguments, allowing large-scale phenotyping without code modification. • Napari Plugin: A graphical interface ( https://napari-hub.org/ plugins/frontvegv2.html ) for interactive analysis. Agronomists can load images, tune pipeline parameters visually, and export both seg-mentation masks and quantitative instance statistics (object counts, areas). 
+
+2.3. Implementation details and code snippets 
+
+The software is implemented in Python 3.10 and relies on CUDA 12.1 for GPU-accelerated inference. The following code snippets highlight key imple-mentation mechanisms of the pipeline. Listing 1 illustrates the main execution workflow. It shows how the modules are initialized externally and orchestrated to process a directory of images. 
+
+Listing 1: Batch pipeline execution. 
+
+> frontveg_pipe = FrontVegPipeline(config) sam3_model = SAM3Predictor(checkpoint_path=args.sam3_ckpt) sam3_tiler = SAM3TiledInference(sam3_model, tile_size=args.tile_size) post_proc = PostProcessor() # Processes a folder, applies depth estimation, foreground masks frontveg_pipe.process_folder(str(subdir), output_root / "temp_frontveg") # For each image, fuse the SAM3 segmentation with the foreground mask id_map_raw, _ = sam3_tiler.process(pil_img, prompt=args.prompt) final_id_map, final_mask = post_proc.get_final_colored_map(id_map_raw, mask_fv)
+
+7Listing 2 details the Graph-Based Mask Assembly. To optimize computation time, the module uses a two-stage approach: a fast vectorized bounding box IoU filtering, followed by a precise mask intersection validation for remaining candidates. 
+
+Listing 2: Hybrid mask assembly with two-stage IoU validation. 
+
+> # Stage 1: Fast bounding box IoU boxes = torch.tensor([f[’bbox’] for f in fragments], dtype=torch.float32) box_iou_matrix = box_iou(boxes, boxes).numpy() # Stage 2: Precise mask intersection validation for i, j in np.argwhere(box_iou_matrix > 0.05): if intersection > 0: # ... calculates region intersection mask_iou = intersection / (area1 + area2 - intersection) if mask_iou > 0.10: adjacency[i, j] = adjacency[j, i] = True # Resolve graph n_leaves, labels = connected_components( csgraph=csr_matrix(adjacency), directed=False )
+
+Listing 3 demonstrates the final geometry-aware fusion. The logical inter-section ensures that only objects physically located within the foreground vegetation row are retained in the final instance map. 
+
+Listing 3: Final mask fusion using strict mask intersection. 
+
+> # 1. SAM Binary Mask mask_sam = (id_map_sam > 0).astype(np.uint8) * 255 # 2. Final Binary Intersection (The "True Foreground") final_binary_mask = cv2.bitwise_and(mask_sam, (mask_fv > 127).astype(np.uint8) * 255) # 3. Clean ID Map: Keep the ID only if it’s inside our strict intersection final_id_map = np.where(final_binary_mask > 0, id_map_sam, 0).astype(np.uint16)
+
+3. Illustrative examples 
+
+In addition to the examples shown in Fig. 3 and Fig. 2, we provide a video demonstration of the FrontVeg V2 graphical interface at: https://youtu. be/0sHq0k9mMcc .Figure 2 illustrates the FrontVeg V2 applied to high-resolution images of trellised crops (vine, apricot, and apple) to segment foreground-aware trait including, leaves, fruits, and vine disease symptoms (blackrot and mildew). Figure 3 demonstrates the qualitative results of zero-shot leaves segmentation with a comparison with existing methods. 
+
+4. Impact 
+
+FrontVeg V2 provides a single, training-free workflow for multi-crop plant trait segmentation, eliminating the need to annotate datasets and train ded-8Figure 2: Zero-shot segmentation of leaves, fruits, and disease symptoms (black rot and downy mildew) using trait-specific prompts. 
+
+Figure 3: Qualitative comparison of leaf segmentation between FrontVeg V2 and existing state-of-the-art methods. 
+
+icated models for each specific task. The software currently targets leaves, fruits, and disease symptoms (black rot, downy mildew) across grapevine, apple, and apricot orchards. 9The performance impact of FrontVeg V2 was evaluated on a vineyard bench-mark. Table 3 summarizes the comparison with existing zero-shot pipelines [28]. FrontVeg V2 outperforms state-of-the-art tools across all evaluated traits, with substantial gains on complex targets such as fruits (Dice 0.92 vs. 0.58 for INSID3 [14]) and disease symptoms, where competing methods fail (Dice < 0.20 ). 
+
+Table 3: Comparison with existing zero-shot segmentation approaches on the vineyard benchmark (mean ± standard deviation for Dice and IoU). Best results are in bold.                                                                                                            
+
+> GD-SAM2 [10, 9] Fl-SAM2 [13, 9] INSID3 [14] FrontVeg V2
+> Trait Dice IoU Dice IoU Dice IoU Dice IoU Leaves 0.84 ±0.04 0.73 ±0.06 0.81 ±0.05 0.68 ±0.06 0.90 ±0.04 0.82 ±0.06 0.95 ±0.02 0.90 ±0.04
+> Fruits 0.41 ±0.02 0.28 ±0.17 0.13 ±0.08 0.07 ±0.05 0.58 ±0.20 0.44 ±0.20 0.92 ±0.06 0.85 ±0.10
+> Black rot 0.00 ±0.00 0.00 ±0.00 0.00 ±0.00 0.00 ±0.00 0.00 ±0.00 0.00 ±0.00 0.61 ±0.11 0.45 ±0.12
+> Downy mildew 0.14 ±0.09 0.08 ±0.05 0.12 ±0.07 0.06 ±0.04 0.16 ±0.10 0.09 ±0.06 0.73 ±0.14 0.59 ±0.16
+
+To validate the algorithmic choices of FrontVeg V2, an ablation study was conducted (Table 4). The results confirm that using the foundation model (SAM3) alone yields poor results on small or complex targets (e.g., Dice 0.00 on black rot). The introduction of tiled inference and mask assembly sig-nificantly improves instance retrieval, while the geometry-aware foreground filter removes background noise. Their combined integration in FrontVeg V2 yields the highest overall accuracy. 
+
+Table 4: Ablation study of FrontVeg V2 software components on the vineyard benchmark (mean ± standard deviation for Dice and IoU).                                                                                                                                    
+
+> Leaves Fruits Black rot Downy mildew Configuration Dice IoU Dice IoU Dice IoU Dice IoU SAM3 0.78 ±0.11 0.65 ±0.12 0.78 ±0.20 0.69 ±0.20 0.00 ±0.00 0.00 ±0.00 0.35 ±0.21 0.23 ±0.15 + Tiling + NMS 0.90 ±0.04 0.83 ±0.07 0.90 ±0.08 0.83 ±0.14 0.50 ±0.16 0.35 ±0.15 0.72 ±0.15 0.59 ±0.17 + Our Foreground 0.78 ±0.11 0.65 ±0.13 0.80 ±0.25 0.71 ±0.23 0.00 ±0.00 0.00 ±0.00 0.35 ±0.21 0.23 ±0.15 + Tiling + NMS + Our Foreground 0.94 ±0.03 0.89 ±0.05 0.92 ±0.08 0.86 ±0.13 0.54 ±0.14 0.38 ±0.14 0.73 ±0.15 0.60 ±0.17 FrontVeg V2 0.95 ±0.02 0.90 ±0.04 0.92 ±0.06 0.85 ±0.10 0.61 ±0.11 0.45 ±0.12 0.73 ±0.15 0.60 ±0.16
+
+Beyond raw performance, FrontVeg V2 resolves the manual annotation bot-tleneck in digital phenotyping. Creating the 158-image evaluation dataset required approximately 200 hours of manual expert annotation. By offer-ing zero-shot inference without fine-tuning, FrontVeg V2 saves an estimated 1,300 hours of manual labor per 1,000 images, accelerating phenotypic data collection. Earlier versions of FrontVeg have supported agricultural research, including doctoral studies on grapevine leaf-area estimation and published work on tree segmentation [19]. The initial version, released in April, reached 5,789 downloads on PyPI during its first year, while FrontVeg V2 registered 2,666 downloads within its first month (August 2026) on PyPI representing a five-fold increase in average daily downloads. 10 5. Conclusions 
+
+FrontVeg V2 provides a training-free framework for foreground-aware plant trait segmentation in high-resolution images of trellised crops. By com-bining monocular depth estimation with tiled zero-shot segmentation and graph-based mask assembly, the software reduces interference from neigh-boring vegetation rows while preserving fine plant structures. Its modular implementation and availability through both command-line and Napari in-terfaces make it suitable for interactive analysis and large-scale phenotyping workflows. FrontVeg V2 therefore offers a reusable basis for geometry-aware, multi-crop and multi-trait phenotyping without task-specific model retrain-ing. The pipeline runs on consumer-grade hardware (Intel i7-11850H, 32 GB RAM, RTX 3080 16 GB) without cloud dependency. VADT preprocessing takes 1 s/image, while sliding-window SAM3 inference remains the main bottleneck ( 2 min/class), providing a baseline for future real-time edge de-ployment. 
+
+Acknowledgements 
+
+This work was supported by The French Programme et Équipements Priori-taires de Recherche (PEPR) AgroEcoNum ( https://www.pepr-agroeconum. fr/ ), the France 2030 program through the Agence Nationale de la Recherche (ANR), and the European Union’s Horizon Europe research innovation pro-gramme (No. 101094587, PHENET). This research used resources of the GLiCID Computing Facility (Ligerien Group for Intensive Distributed Com-puting, https://doi.org/10.60487/glicid , Pays de la Loire, France). This project was provided with computing HPC and storage resources by GENCI at IDRIS thanks to the grant 2025-AD010115553R1 on the super-computer Jean Zay’s H100 partition. We would like to thank Sirine Gharbi, Oumaima Karia, Justin Langlois, Paul Persello, and Thomas Lebouc, for their valuable assistance in annotating the dataset used in this study. 
+
+References 
+
+[1] A. Kirillov, E. Mintun, N. Ravi, H. Mao, C. Rolland, L. Gustafson, T. Xiao, S. Whitehead, A.C. Berg, W.-Y. Lo, P. Dollar, R. Girshick, “Segment Anything,” in: Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV), Paris, France, pp. 3992–4003, 2023. doi: 10.1109/ICCV51070.2023.00371. 11 [2] R. Ranftl, K. Lasinger, D. Hafner, K. Schindler, V. Koltun, “To-wards Robust Monocular Depth Estimation: Mixing Datasets for Zero-Shot Cross-Dataset Transfer,” IEEE Transactions on Pattern Analy-sis and Machine Intelligence, vol. 44, no. 3, pp. 1623–1637, 2022. doi: 10.1109/TPAMI.2020.3019967. [3] S.F. Bhat, R. Birkl, D. Wofk, P. Wonka, M. M"uller, “ZoeDepth: Zero-Shot Transfer by Combining Relative and Metric Depth,” arXiv preprint arXiv:2302.12288, 2023. [Online]. Available: https://arxiv.org/abs/ 2302.12288 
+
+[4] W. Yin, C. Zhang, H. Chen, Z. Cai, G. Yu, K. Wang, X. Chen, C. Shen, “Metric3D: Towards Zero-Shot Metric 3D Prediction from a Single Image,” in: Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV), pp. 9043–9053, 2023. [5] L. Yang, B. Kang, Z. Huang, X. Xu, J. Feng, H. Zhao, “Depth Anything: Unleashing the Power of Large-Scale Unlabeled Data,” in: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recog-nition (CVPR), pp. 10371–10381, 2024. [6] L. Yang, B. Kang, Z. Huang, Z. Zhao, X. Xu, J. Feng, H. Zhao, “Depth Anything V2,” Advances in Neural Information Processing Systems, vol. 37, pp. 21875–21911, 2024. [7] L. Piccinelli, Y.-H. Yang, C. Sakaridis, M. Segu, S. Li, L. Van Gool, F. Yu, “UniDepth: Universal Monocular Metric Depth Estimation,” in: Proceedings of the IEEE/CVF Conference on Computer Vision and Pat-tern Recognition (CVPR), pp. 10106–10116, 2024. [8] N. Carion, L. Gustafson, Y.-T. Hu, S. Debnath, R. Hu, D. Suris, C. Ryali, K.V. Alwala, H. Khedr, A. Huang, J. Lei, T. Ma, B. Guo, A. Kalla, M. Marks, J. Greer, M. Wang, P. Sun, R. Rädle, T. Afouras, E. Mavroudi, K. Xu, T.-H. Wu, Y. Zhou, L. Momeni, R. Hazra, S. Ding, S. Vaze, F. Porcher, F. Li, S. Li, A. Kamath, H.K. Cheng, P. Dollár, N. Ravi, K. Saenko, P. Zhang, C. Feichtenhofer, “SAM 3: Segment Any-thing with Concepts,” arXiv preprint arXiv:2511.16719, 2025. [Online]. Available: https://arxiv.org/abs/2511.16719 
+
+[9] N. Ravi, V. Gabeur, Y.-T. Hu, R. Hu, C. Ryali, T. Ma, H. Khedr, R. Rädle, C. Rolland, L. Gustafson, E. Mintun, J. Pan, K.V. Alwala, N. Carion, C.-Y. Wu, R. Girshick, P. Dollár, C. Feichtenhofer, “SAM 2: Seg-ment Anything in Images and Videos,” arXiv preprint arXiv:2408.00714, 2024. [Online]. Available: https://arxiv.org/abs/2408.00714 
+
+12 [10] T. Ren, Q. Jiang, S. Liu, Z. Zeng, W. Liu, H. Gao, H. Huang, Z. Ma, X. Jiang, Y. Chen, Y. Xiong, H. Zhang, F. Li, P. Tang, K. Yu, L. Zhang, ‘Grounding DINO 1.5: Advance the ‘Edge’ of Open-Set Object Detection,” arXiv preprint arXiv:2405.10300, 2024. [11] S. Liu, Z. Zeng, T. Ren, F. Li, H. Zhang, J. Yang, Q. Jiang, C. Li, J. Yang, H. Su, et al., “Grounding DINO: Marrying DINO with Grounded Pre-Training for Open-Set Object Detection,” in: Proceedings of the European Conference on Computer Vision (ECCV), pp. 38–55, Springer, 2024. [12] H. Metuarea, C. Lothode, A.-D. Hamza Ousseini, J. Garnier, W. Guerra, L. Lozano, A. Patocchi, S. Van Hoye, J. Labrosse, D. Rousseau, “Deep-PhenoTree – CVPPA Data Challenge,” CVPPA, 2026. [Online]. Avail-able: https://www.codabench.org/competitions/14963/ 
+
+[13] B. Xiao, H. Wu, W. Xu, X. Dai, H. Hu, Y. Lu, M. Zeng, C. Liu, L. Yuan, “Florence-2: Advancing a Unified Representation for a Variety of Vision Tasks,” in: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR), pp. 4818–4829, 2024. [14] C. Cuttano, G. Trivigno, C. Reich, D. Cremers, C. Masone, S. Roth, “IN-SID3: Training-Free In-Context Segmentation with DINOv3,” in: Pro-ceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR), pp. 21638–21648, 2026. [15] S. Liu, Z. Zeng, T. Ren, F. Li, H. Zhang, J. Yang, Q. Jiang, C. Li, J. Yang, H. Su, J. Zhu, L. Zhang, “Grounding DINO: Marrying DINO with Grounded Pre-Training for Open-Set Object Detection,” arXiv preprint arXiv:2303.05499, 2023. [Online]. Available: https://arxiv.org/abs/ 2303.05499 
+
+[16] M. Xu, Z. Zhang, F. Wei, H. Hu, X. Bai, “Side Adapter Net-work for Open-Vocabulary Semantic Segmentation,” arXiv preprint arXiv:2302.12242, 2023. [Online]. Available: https://arxiv.org/abs/ 2302.12242 
+
+[17] N. H"ani, P. Roy, V. Isler, “MinneApple: A Benchmark Dataset for Apple Detection and Segmentation,” arXiv preprint arXiv:1909.06441, 2019. [Online]. Available: https://arxiv.org/abs/1909.06441 [18] Labelbox, "Labelbox," Online, 2026. [Online]. Available: https:// labelbox.com 
+
+13 [19] Metuarea H, Laurens F, Guerra W, Lozano L, Patocchi A, Van Hoye S, Dutagaci H, Labrosse J, Rasti P, Rousseau D. Individual Segmentation of Intertwined Apple Trees in a Row via Prompt Engineering. Sensors. 2025 Jul 31;25(15):4721 [20] T.T. Santos, L.L. de Souza, A.A. dos Santos, S. Avila, “Grape Detection, Segmentation and Tracking using Deep Neural Networks and Three-Dimensional Association,” arXiv preprint arXiv:1907.11819, 2019. [On-line]. Available: https://arxiv.org/abs/1907.11819 
+
+[21] E. Torres-Lomas, J. Lado-Jimena, G. Garcia-Zamora, L. Diaz-Garcia, “Segment Anything for Comprehensive Analysis of Grapevine Cluster Architecture and Berry Properties,” arXiv preprint arXiv:2403.12935, 2024. [Online]. Available: https://arxiv.org/abs/2403.12935 
+
+[22] X. Tong, C. Zhang, M. Flaherty, A.M. Garcia, D. Gorman, J. Jaramillo, J.E. Vanden Heuvel, Y. Jiang, “ViViD-5K: Vineyard Vision Dataset for Field-Based Berry Detection and Segmentation and Grape Cluster Closure Estimation,” arXiv preprint arXiv:2605.24353, 2026. [Online]. Available: https://arxiv.org/abs/2605.24353 
+
+[23] T. Wei, Z. Chen, X. Yu, S. Chapman, P. Melloy, Z. Huang, “PlantSeg: A Large-Scale In-the-Wild Dataset for Plant Disease Segmentation,” arXiv preprint arXiv:2409.04038, 2024. [Online]. Available: https://arxiv. org/abs/2409.04038 
+
+[24] L. Rossi, M. Valenti, S.E. Legler, A. Prati, “LDD: A Dataset for Grape Diseases Object Detection and Instance Segmentation,” arXiv preprint arXiv:2206.10192, 2022. [Online]. Available: https://arxiv.org/abs/ 2206.10192 
+
+[25] M. Kerkech, A. Hafiane, R. Canals, “Vine Disease Detection in UAV Multispectral Images with Deep Learning Segmentation Approach,” arXiv preprint arXiv:1912.05281, 2019. [Online]. Available: https: //arxiv.org/abs/1912.05281 
+
+[26] M. Kerkech, A. Hafiane, R. Canals, “VddNet: Vine Disease Detec-tion Network Based on Multispectral Images and Depth Map,” arXiv preprint arXiv:2009.01708, 2020. [Online]. Available: https://arxiv. org/abs/2009.01708 
+
+[27] R. Rouš, J. Peller, G. Polder, S. Hageraats, T. Ruigrok, P.M. Blok, “Apple Scab Detection in Orchards using Deep Learning on Colour and 14 Multispectral Images,” arXiv preprint arXiv:2302.08818, 2023. [Online]. Available: https://arxiv.org/abs/2302.08818 
+
+[28] A.D.Ousseini Hamza, H. Metuarea, C. Lothodé, M. Roth, E. Duchêne, L. LEY, D. Allétru, D.M. ROUSSEAU, “Foreground-Aware Zero-Shot Plant Trait Segmentation in Trellised Crops Using Side View Monocular RGB Images”, 11th Workshop on Computer Vision in Plant Phenotyp-ing and Agriculture (CVPPA), ECCV 2026, Extended Abstract, 2026. [Online]. Available: https://openreview.net/forum?id=Z24CpPVqcU 
+
+15

@@ -1,0 +1,675 @@
+Title: M3SunAgent: Monocular 3D Spatial Understanding Agent for Metric Depth Estimation and 3D Visual Grounding
+
+URL Source: https://arxiv.org/pdf/2610.07982v1
+
+Published Time: Wed, 07 Oct 2026 01:07:45 GMT
+
+Number of Pages: 13
+
+Markdown Content:
+> 1
+
+# M3SunAgent: Monocular 3D Spatial Understanding Agent for Metric Depth Estimation and 3D Visual Grounding 
+
+Jinsong Zhang, Kejun Wu, Senior Member, IEEE , Ming Zhu, Renjie Qiao, Chengtao Cai, Senior Member, IEEE ,and Zhengguo Li, Fellow, IEEE 
+
+Abstract —Monocular metric depth estimation and 3D visual grounding represent the two complementary cornerstones of monocular 3D spatial understanding (M3Sun), from which the fundamental 3D spatial information required by M3Sun can be acquired. However, these complementary tasks are generally conducted by separate frameworks, which pose challenges of inflexible and unaligned spatial information access for embodied intelligence systems. In this paper, we propose a unified agent for monocular 3D spatial understanding (M3SunAgent) that leverages a large language model (LLM) as a task planner for spatial visual programming, which flexibly generate structured programs and coordinate tools. For instance-level metric depth estimation task, M3SunAgent invokes an object detector tool to locate the target, estimates depth at selected points with a depth estimation tool, and aggregates these predictions into an instance-level depth estimate. We also construct the M3Sun Instance (M3SI) dataset, a benchmark with 2,910 samples for evaluation. For monocular 3D visual grounding task, M3SunAgent uses a vision-language model (VLM) tool to locate the target and output basic spatial attributes, then combines back-projection tool with a dimension-lifting tool to predict its 3D bounding box. Experimental results demonstrate the superior performance of M3SunAgent. Specifically, in evaluations of instance-level monocular metric depth estimation, M3SunAgent achieves the best performance among all compared models, 52 .61% predicted instances are distributed below depth error 0.25 ( δ<0.25 ). In evaluations of monocular 3D visual grounding, M3SunAgent demonstrates overall competitive performance than vision and VLM models, reaching a 3D mean intersection over union (mIoU) of 41 .73% and exceeding the state-of-the-art MonoVLM model by 3.62% .
+
+Index Terms —Monocular 3D spatial understanding, metric depth estimation, monocular 3D visual grounding, large language models, vision-language models. 
+
+I. I NTRODUCTION 
+
+# MONOCULAR 3D spatial understanding (M3Sun) aims to understand the spatial relationships in an image, involving recognizing objects, and estimating their distances, 3D locations, physical extents, and orientations. The precise spatial properties of individual objects provided by M3Sun plays a vital role in embodied intelligence, teleoperation, and autonomous driving. For example, when a robot is instructed to “pick up the pen on the table”, it needs to locate the referred 
+
+> Jinsong Zhang, Kejun Wu, and Ming Zhu are with the School of Electronic Information and Communications, Huazhong University of Science and Tech-nology, Wuhan 430074, China. Renjie Qiao and Chengtao Cai are with College of Intelligent Systems Science and Engineering, Harbin Engineering University, Harbin 150001, China. Zhengguo Li is with Institute of Advanced Intelligence and Computation, Agency for Science, Technology and Research (A*STAR), Singapore. This work was supported by the National Natural Science Foundation of China under Grant 62501246.
+
+pen in the input image and estimate the distance to guide its motion planning [1]. In autonomous driving, an instruction such as “Avoid the car ahead on the right” requires the system to identify the referred vehicle and estimate its 3D position, dimensions, and heading. Such scenarios require systems to locate objects described in natural language and infer their spatial properties, motivating continued advances in M3Sun. Instance-level monocular metric depth estimation and monocular 3D visual grounding represent the two cornerstones of M3Sun. These tasks offer complementary 3D spatial in-formation, e.g., instance-level depth and 3D bounding box. The former estimates the metric depth of an instance in physical units, while the latter identifies the referred object and recovers its 3D structure, including its position, dimensions, and orientation [2]. Both types of spatial information are im-portant for understanding objects from a single image. Metric depth places object distance on a physical scale, enabling quantitative distance judgments. Accurate metric depth esti-mation can also provide additional cues for spatial reasoning. 3D structure characterizes the object’s location and spatial extent. When accurate 3D structures are provided as auxiliary cues, they can improve reasoning about object arrangement and spatial relationships [3]. Both tasks require systems to ground language descriptions in images and infer quantitative spatial properties by combining visual evidence with semantic cues. The common demand to identify objects and produce quantitative spatial estimates motivates studying these two tasks together. Recent research in M3Sun has explored various approaches to improve the accuracy of estimated spatial properties. Train-ing on diverse scenes and modeling camera parameters have improved metric distance estimation [4]. Beyond scale and camera modeling, planar geometry and scene semantics pro-vide additional cues for monocular depth estimation [5], [6]. These developments provide a basis for estimating the distance to a specified object after its location has been identified in the image. Improving estimates of the target’s 3D location and extent requires better alignment between language descriptions and image geometry. Spatial descriptions can provide cues for predicting the target’s 3D structure [7]. Target localization is also fundamental to this task. Accurately identifying the referred object in the image helps focus geometric estimation on that object and reduce the influence of irrelevant scene elements [8]. Together, these advances establish a strong basis for recovering object-level spatial information from a single RGB image. Estimating the distance to a referred object requires lo-cating the target and extracting depth measurements from arXiv:2610.07982v1 [cs.CV] 6 Oct 2026 2
+
+the corresponding instance. However, many monocular depth estimators predict depth across the entire image [4], [9]. Such scene-level predictions do not identify the referred object or directly provide its instance-level depth. In monocular 3D visual grounding, specialized architectures have achieved strong performance [7]. However, models designed for this specific task may lack the flexibility to handle other spatial queries. Advances in large language models (LLMs) and vision-language models (VLMs) have enabled their application to a wider range of visual tasks [10]. These developments have motivated attempts to improve the flexibility of visual models for spatial understanding. With spatial training, VLMs can reason about object positions, orientations, and 3D re-lationships [11]. However, achieving such performance may require substantial 3D training data, computational resources, and multi-stage training procedures [12]. Moreover, VLMs may still face challenges in producing accurate metric distance estimates due to the difficulty of grounding visual observations into physical scales [13]. Meanwhile, advances in LLM-based agents provide a po-tential solution to these limitations. In an agent architecture, the LLM serves as a central cognitive planner that performs reasoning and coordinates tool execution. Specialized mod-els and computational tools execute specific operations and pass intermediate results between steps [14]. The agent then integrates their outputs to generate the final response. This division of labor allows the planning LLM to be applied without additional training, reducing the related cost. It also allows the agent to coordinate different expert models within a shared framework and support multiple tasks. Additional models and tools can be incorporated to extend the range of spatial queries that the agent can handle [15]. Furthermore, quantitative outputs from specialized components can provide the LLM with more reliable evidence for generating the final response. These capabilities have contributed to the growing use of agent-based methods for 3D spatial understanding [16]. For these two tasks, a unified agent should retain intermediate measurements of the queried object and combine them to produce the required spatial output. To address the need for a unified agent in M3Sun, we propose M3SunAgent , a monocular spatial understanding agent that converts a natural language query into an exe-cutable program. The LLM generates programs by identify-ing the requested task and arranging the required operations in the proper order. A program interpreter then executes these operations through registered visual tools and geometric computations while transferring intermediate results between operations. For instance-level metric depth estimation, the agent localizes the referred object and estimates its depth at selected image points. It aggregates these predictions into an instance-level metric distance estimate. For monocular 3D visual grounding, a VLM predicts the target’s basic spatial attributes. Back-projection and a specialized 2D-to-3D lifting model use these predictions to recover the 3D geometry required to construct its 3D bounding box. Both pipelines share the same planning and execution framework. Our main contributions are summarized as follows:  
+
+> •
+
+We propose M3SunAgent , a monocular spatial under-standing agent that flexibly supports instance-level metric depth estimation and 3D visual grounding. M3SunAgent leverages spatial visual programming to understand di-verse natural-language queries by a LLM task planner, converting complex queries into executable programs. These programs coordinate distinct models and opera-tions, allowing them to collaboratively execute for spatial understanding.  
+
+> •
+
+For metric depth estimation, we use focal-length nor-malization to reduce the effects of intrinsics, together with multi-point sampling and outlier filtering to improve robustness. For monocular 3D visual grounding, we use a VLM for target localization and basic spatial attribute prediction, explicit back-projection for camera adaptation, and a specialized lifting model for accurate dimensions and yaw estimation.  
+
+> •
+
+We construct the M3Sun Instance (M3SI) dataset, a benchmark with 2,910 samples for instance-level metric depth estimation. We evaluate M3SunAgent on M3SI for this task and on Mono3DRefer for monocular 3D visual grounding. Across these evaluations, the agent outperforms the spatial VLM baselines and achieves competitive performance to task-specific vision methods. II. R ELATED WORK 
+
+A. Monocular metric depth estimation 
+
+Monocular metric depth estimation aims to recover depth values in physical units from a single RGB image. Its gen-eralization is influenced by camera parameters, scene scale, and imaging conditions. The focus of this task has gradually shifted from improving benchmark performance toward real-world scale recovery, cross-domain generalization, and adap-tation to diverse camera models [17]. Methods that consider focal length and depth scale seek to improve absolute depth prediction in unseen scenes [18]. Some methods estimate camera parameters directly from the input image to improve high-resolution depth prediction [19]. Self-supervised methods have also addressed challenging conditions, including day– night illumination changes [20]. These advances improve depth prediction across diverse scenes and imaging conditions. However, these depth maps primarily describe scene-level geometry. They do not directly provide the distance to an object identified by language. Research on monocular 3D detection has also explored object-level depth estimation. Some methods separate objects from background regions and estimate object depth to assist monocular 3D object detection, while others exploit object-related depth information to improve 3D localization [21], [22]. These approaches support 3D localization but are de-signed for detection rather than instance-level metric depth estimation. At the point level, DepthLM uses visual prompts to estimate metric depth at specified image locations [23]. A single point may nevertheless be insufficient for an extended or partially occluded object, and a target region may contain background surfaces. Thus, obtaining a stable distance for a specific instance requires both reliable depth measurements from the target and strategies to reduce the influence of unreliable samples. 3
+
+B. Monocular 3D visual grounding 
+
+Recent studies have explored aligning language with visual content represented in different forms [24]. Within this context, visual grounding aims to associate a referring expression with a target object in an image or a 3D scene. In 2D images, visual grounding methods use visual and linguistic information to locate the referred object [25]. Grounding in 3D scenes further incorporates geometric information to identify the referred object. ScanRefer matches language descriptions to objects in RGB-D scans [26]. Pseudo-EV addresses ambiguity in viewpoint-dependent spatial descriptions [27]. However, these 3D approaches use observations that are unavailable when only a single RGB image is available. Monocular 3D visual grounding aims to infer the referred object’s 3D location and extent from a single image and language descriptions. Mono3DVG introduced this setting using descriptions that include both appearance and geometric cues [2]. Subsequent methods use cross-modal interaction to incorporate geometric features [28] and dimension-decoupled text encoding to represent spatial expressions [7]. More re-cently, VLM-based approaches have also emerged. MonoVLM adapts a VLM for this task [8]. GR3D integrates 2D and 3D grounding within a spatial VLM [29]. Although these methods achieve strong performance, they are generally designed for specific tasks. As a result, they may lack the flexibility to handle other types of spatial queries. 
+
+C. LLM Agents for Spatial Understanding 
+
+LLMs can use contextual information to support reason-ing [30]. Agent-based methods further use LLMs to plan operations and coordinate specialized models to complete dif-ferent tasks. HuggingGPT uses an LLM to plan subtasks and select expert models. It then executes the subtasks with those models and integrates their outputs [15]. Another line of work represents the required operations as executable programs. VisProg generates such programs from language instructions and composes visual operations to obtain a result [16]. For 3D spatial questions, VADAR uses a dynamic API that can be extended with functions for new queries [31]. SpaceTools further investigates spatial tool coordination by training a VLM through interactive exploration and feedback [14]. These studies demonstrate the potential of LLM agents for modular perception and embodied reasoning. However, their applica-tion to monocular metric depth estimation and monocular 3D visual grounding remains underexplored. M3SunAgent addresses this gap by using a unified agent framework to coordinate specialized visual models and geometric tools for both tasks. It can be adopted to integrate conventional physics-driven control methods and emerging data-driven vision lan-guage action to address long horizon tasks from the hybrid system point of view [32]. III. M ETHOD 
+
+A. Overview of M3SunAgent 
+
+M3SunAgent takes a single RGB image and a natural-language query as inputs. As shown in Fig. 1, a LLM serves as the task planner, determining whether the query corresponds to instance-level metric depth estimation or monocular 3D visual grounding. Through spatial visual programming, the LLM then generates the corresponding domain-specific language (DSL) program [31]. The program interpreter then executes the specified operations by invoking registered visual tools and geometric computations from the Tool Registry. The resulting spatial estimate is passed to the LLM, which combines it with the original query to formulate the final answer. This shared planning and execution framework supports both M3Sun tasks. The two tasks produce different forms of spatial informa-tion. A distance query requires a metric estimate associated with the referred instance. A 3D grounding query requires a 3D bounding box describing the instance’s position, di-mensions, and orientation. In both cases, the DSL program passes target-specific intermediate results between operations, ensuring that subsequent operations remain associated with the same referred object. This keeps subsequent estimates associated with the same object. The following subsections describe the program execution mechanism and the operators used for each task. 
+
+B. Spatial Visual Programming 
+
+LLMs and VLMs provide strong instruction understanding and semantic reasoning, but reliable metric depth estima-tion and monocular 3D visual grounding remain challenging. Specialized vision models provide explicit localization and geometric estimates, but are typically designed for predefined perception tasks. To combine these complementary capa-bilities, M3SunAgent adopts a spatial visual programming paradigm [16]. The workflows of the two tasks are shown in Algorithms 1 and 2. Given a natural language query, the LLM generates a DSL program composed of task-specific operators. The program interpreter executes these operators by invoking visual tools and geometric computations registered in the Tool Registry for target localization, depth estimation, aggregation, 3D center recovery, geometric attribute estimation, and 3D box construction. 
+
+Algorithm 1 Execution for Instance-Level Metric Depth Es-timation                                                           
+
+> Notation: Edenotes the in-context DSL examples. Pdenotes the generated DSL program. Tdenotes the tool registry. rdenotes the LLM invocation index. 1: for r∈ { 1,2}do
+> 2: if r= 1 then
+> 3: LLM( QUERY ,E)→(TASK ,DESCRIPTION , P )
+> 4: if TASK =INSTANCE DEPTH then
+> 5: Generated DSL program P:
+> 6: TARGET = LOCATE(IMAGE, DESCRIPTION)
+> 7: DEPTHS = DEPTH(IMAGE, TARGET, INTRINSICS)
+> 8: DISTANCE = AGGREGATE(DEPTHS)
+> 9: ToolRegistry → T
+> 10: ProgramInterpreter (P, T)→DISTANCE
+> 11: end if
+> 12: else if r= 2 ∧TASK =INSTANCE DEPTH then
+> 13: LLM( QUERY ,DISTANCE )→ANSWER
+> 14: return ANSWER
+> 15: end if
+> 16: end for 4
+
+Spatial Visual Programming 
+
+> Monocular 3D Visual Grounding LIFT GROUND
+> LOCATE DEPTH AGGREGATE BUILD BACKPROJECT
+
+⋯
+
+> Program Interpreter Tool Registry DSL Programming Instance Metric Depth Estimation
+
+LLM Task Planner The target is approximately 7.93 m from the camera. 
+
+Yaw: 0.06 rad 3D Center: (1.82, 0.46, 7.70) m Size (w, h, l): 0.54 × 1.84 × 1.19m 
+
+M3SunAgent Output 
+
+Image Query 
+
+> Question: How far is the target from the camera?
+
+⋯
+
+> Question: Find the object and provide its 3D bounding box.
+
+M3SunAgent Input Monocular 3D Visual Grounding 
+
+VLM 
+
+> BOX PROJECTED CENTER DEPTH
+> Description
+
+GROUND 
+
+locate and output basic spatial attribute 
+
+> Projected Center
+
+3D center 
+
+> BACK-Projection
+
+BACKPROJECT 
+
+Recover The 3D Center 
+
+BOX3D BUILD 
+
+Construct the 3D Box  
+
+> 3D Center Dimensions Yaw Angle
+> w
+> h
+> l
+> ↻θY
+> 2D → 3D Lifting
+> Intrinsics
+
+LIFT 
+
+Estimate Size and Yaw 
+
+> Box
+
+Instance-Level Metric Depth Estimation 
+
+d1 d2 ⋯ d9
+
+D = median AGGREGATE 
+
+Filter and Aggregate 
+
+d1 d2 ⋯ d9
+
+DEPTH 
+
+Estimate Target Point Depths 
+
+Pre-processing Depth VLM 
+
+LOCATE 
+
+Locate the Target 
+
+Description Detector 
+
+Fig. 1. Overview of M3SunAgent. Given an RGB image and a natural-language query, the LLM selects the task and generates a corresponding DSL program, which is executed by the program interpreter using perception models and geometric operations. For instance-level metric depth estimation, point-wise depth predictions within the referred object are aggregated into an instance-level metric distance. For monocular 3D visual grounding, a VLM locates the target and predicts basic spatial attribute, which is combined with back-projection and a 2D-to-3D lifting model to construct the 3D bounding box. The result is then used to generate the final response. 
+
+Algorithm 2 Execution for Monocular 3D Visual Grounding 
+
+Notation: E denotes the in-context DSL examples. P denotes the generated DSL program. T denotes the tool registry. r denotes the LLM invocation index. 1: for r ∈ { 1, 2} do 
+
+2: if r = 1 then 
+
+3: LLM( QUERY , E) → (TASK , DESCRIPTION , P )
+
+4: if TASK = GROUNDING 3D then 
+
+5: Generated DSL program P :
+
+6: B2D, C2D, DZ = GROUND(IMAGE, DESCRIPTION) 
+
+7: C3D = BACKPROJECT(C2D, DZ, INTRINSICS) 
+
+8: SIZE, YAW = LIFT(IMAGE, B2D, INTRINSICS) 
+
+9: BOX3D = BUILD(C3D, SIZE, YAW) 
+
+10: ToolRegistry → T 
+
+11: ProgramInterpreter (P, T ) → BOX3D 
+
+12: end if 
+
+13: else if r = 2 ∧ TASK = GROUNDING 3D then 
+
+14: LLM( QUERY , BOX3D ) → ANSWER 
+
+15: return ANSWER 
+
+16: end if 
+
+17: end for 
+
+M3SunAgent uses in-context examples to guide DSL pro-gram generation. We construct several example programs based on the predefined task workflows and provide them to the LLM together with the current query. Rather than directly predicting the final spatial result, the LLM extracts the target description and generates a DSL program based on these examples. Each DSL statement assigns the result of an operator call to an output variable. For example, target localization is expressed as TARGET = LOCATE(IMAGE, DESCRIPTION) , where LOCATE is the DSL operator, IMAGE 
+
+and DESCRIPTION are its input variables, and TARGET is its output variable. The output variables can be referenced by subsequent statements, thereby defining the data dependencies within the program. The LLM therefore serves as the task planner rather than directly predicting the requested spatial result. After generation, the DSL program is parsed and executed by the Program Interpreter [16]. The interpreter processes the statements in execution order and retrieves the tool corresponding to each operator from the Tool Registry. A registered tool may be either a learned model or a deterministic computations. After each tool is invoked, its result is stored in the corresponding output variable and passed to subsequent operations when required. For example, the target localized by 
+
+LOCATE can be passed to DEPTH to estimate depth values at selected target points. This execution mechanism allows M3SunAgent to connect multiple specialized tools through the intermediate variables defined in the DSL program. The agent calls the LLM twice for each query. In the first invocation, the LLM uses the query and in-context examples to identify the requested task and generate a corresponding DSL program. The interpreter then executes the program by invok-ing registered visual tools and geometric operations. Together, these operations produce either the referred object’s metric 5DEPTHS = DEPTH(IMAGE, TARGET, INTRINSICS)        
+
+> Vision Encoder
+> text prompt ：Given this image, how far is the point pointed by the red arrow from the camera? Output the thinking process in <think>...</think>. Output only the numerical distance in meters, without the unit, in <answer>...</answer>
+> Normalize Focal Length
+> Sample Nine Target Points
+> Overlay Visual Markers Tokens
+> Text Encoder
+> Sampled Depth Values
+> Robust Filtering Median → DISTANCE
+> trash can
+> open-vocabulary object detector
+> 2D BOX
+
+d1
+
+d2
+
+d3
+
+d4
+
+d5
+
+⋮
+
+d9       
+
+> Depth Estimation Model
+> DISTANCE = AGGREGATE(DEPTHS) TARGET=LOCATE (IMAGE,DESCRIPTION)
+> Fig. 2. Overview of the instance-level metric depth estimation pipeline in M3SunAgent. LOCATE identifies the object referred to in the input description and returns its 2D bounding box. DEPTH normalizes the focal length and samples nine points within the box. It then uses a depth estimation model to predict the depth of these sampled points. AGGREGATE filters unreliable predictions and computes the median of the remaining depth estimates to obtain the target’s distance.
+
+distance or its 3D bounding box. In the second invocation, the LLM combines the computed result with the original query to formulate the final answer. The LLM thus handles task planning and response synthesis, while specialized tools perform spatial estimation. Defining DSL operators separately from their implementations also allows tools to be added or replaced. 
+
+C. Instance-Level Metric Depth Estimation Pipeline 
+
+For instance-level metric depth estimation, M3SunAgent generates a DSL program with three operators: LOCATE ,
+
+DEPTH , and AGGREGATE . As summarized in Algorithm 1, the first LLM invocation identifies the requested task and generates the program. The interpreter then executes it us-ing registered tools. These tools localize the referred object, estimate metric depth at selected points within its image region, and aggregate the predictions into an instance-level metric distance. The second LLM invocation uses this distance and the original query to formulate the final answer. Fig. 2 illustrates the detailed execution process of the DSL program. The specific details are given below. 
+
+LOCATE The LOCATE operator takes the input image and the target description extracted during task planning. It invokes a registered localization tool built on an open-vocabulary object detector [33]. Given IMAGE and DESCRIPTION , the tool identifies the referred instance and returns its 2D bounding box as TARGET . This step focuses subsequent depth sampling on the target region. 
+
+DEPTH Instance-level metric depth estimation requires the point-wise depth predictions to be associated with the referred instance. When executing DEPTH , the interpreter invokes a registered depth estimation model [23]. Given IMAGE ,
+
+TARGET , and INTRINSICS , the tool applies focal length normalization and estimates metric depth at multiple locations within the target region. Metric depth prediction is sensitive to variations in camera focal length [34]. To reduce this sensitivity, the input image is resized to normalize its effective focal length to a canonical value. The target bounding box is then used to sample nine points: one center point, four axial points, and four points near the corners. This pattern covers different parts of the target and avoids relying on a single location. A visual marker is placed at each sampled point, and the resulting marked images are passed to the depth model. The model predicts the metric depth at each location and returns the nine values as DEPTHS . Using a small set of representative points provides spatial coverage of the target while keeping the number of model evaluations limited. 
+
+AGGREGATE A 2D bounding box provides only an approximate target region and may include background pixels. Sampled points near object boundaries or occluded regions may therefore produce depths that do not represent the referred instance. The AGGREGATE operator invokes a registered aggregation tool to reduce the influence of these unreliable depth predictions. The tool first removes non-finite values and negative depth predictions. If fewer than four valid values remain, outlier removal is skipped because quartile statistics may be unreliable for such a small sample. Let a and b denote the 25th and 75th percentiles of the valid depth predictions, respectively. The range of retained values is defined as 
+
+[a − 1.5( b − a), b + 1 .5( b − a)] . (1) Values outside this range are treated as outliers and removed. 6C3D=BACKPROJECT (C2D, DZ, INTRINSICS) (SIZE, YAW) = LIFT (IMAGE, B2D, INTRINSICS) BOX3D = BUILD(C3D, SIZE, YAW) 
+
+> (B2D, C2D, DZ) = GROUND (IMAGE, DESCRIPTION)
+
+Back Projection 
+
+> Center
+> 3D center
+
+𝐀 𝐀 ′ 𝐀 ′
+
+𝐀 
+
+𝐀 𝐀 ′ 𝐀       
+
+> 2D BOX
+> 𝐀 𝐀 0𝐀 𝐀
+> 0𝐀 𝐀 𝐀 𝐀
+> 001
+> Intrinsics
+> 2D to 3D lifting model
+
+𝐀 y
+
+𝐀 𝐀 W lh                   
+
+> BOX3D
+> Image Encoder Text Encoder
+> Vision-Language Model
+> 2D BOX Center Depth Target Description Center (w,h,l) 𝐀 y
+> 𝐀 𝐀 0𝐀 𝐀
+> 0𝐀 𝐀 𝐀 𝐀
+> 001
+> Intrinsics Depth
+> Fig. 3. Overview of the monocular 3D visual grounding pipeline in M3SunAgent. Given an RGB image and a target description, GROUND predicts the referred object’s 2D bounding box, the image-plane projection of its 3D center, and its depth. BACKPROJECT uses the projected center, depth, and camera intrinsics to recover the 3D center. LIFT estimates the object’s dimensions and yaw angle from the image, 2D box, and camera intrinsics. BUILD combines the recovered attributes to construct the final 3D bounding box.
+
+The median of the remaining values provides a robust estimate of the target distance and is returned as DISTANCE .
+
+D. Monocular 3D Visual Grounding Pipeline 
+
+Monocular 3D visual grounding requires identifying alanguage-referred object and recovering its 3D bounding box in camera coordinates. For this task, the LLM generates a DSL program comprising four operations. GROUND predicts the target’s 2D bounding box, projected 3D center, and depth. BACKPROJECT uses camera intrinsics to recover its 3D center from these estimates. LIFT estimates the target’s dimensions and orientation. Finally, BUILD combines these attributes into a 3D bounding box. The interpreter executes the operations using registered tools and passes intermediate results between them. Fig. 3 illustrates the detailed execution process. Algorithm 2 summarizes how the program is gener-ated and executed. 
+
+GROUND For monocular 3D grounding, the target descrip-tion may also contain spatial information, such as its relative position, distance, and spatial relationships with other objects. Such information can provide useful cues for estimating the target’s 3D properties. To make better use of these semantic cues during target localization, we do not rely solely on an open-vocabulary detector as in Section III-C. Instead, we employ a VLM [35] that predicts the target’s 2D bounding box while also estimating several basic spatial attributes, including the image-plane projection of its 3D center and its depth. These outputs are returned as B2D , C2D , and DZ , respectively. The bounding box B2D is represented as [x1, y 1, x 2, y 2], and the projected center C2D is represented as [u, v ]. The depth DZ 
+
+denotes the depth of the target center in the camera coordinate system. The projected center is not necessarily the geometric center of the 2D bounding box. Instead, it corresponds to the projection of the target 3D center onto the image plane. According to the pinhole camera model, the target 3D center 
+
+(Xc, Y c, Z c) and its projected coordinates (u, v ) satisfy 
+
+u = fx
+
+Xc
+
+Zc
+
++ cx, v = fy
+
+Yc
+
+Zc
+
++ cy , (2) where fx and fy are the focal lengths in pixels along the horizontal and vertical directions, respectively, and (cx, c y )
+
+denotes the camera principal point. 
+
+BACKPROJECT The BACKPROJECT operator invokes a registered geometric tool to recover the target 3D center. Given 
+
+C2D , DZ , and INTRINSICS , the tool performs deterministic back-projection as 
+
+Xc = u − cx
+
+fx
+
+dZ , Yc = v − cy
+
+fy
+
+dZ , Zc = dZ . (3) The recovered 3D center (Xc, Y c, Z c) is returned as C3D .The explicit back-projection directly incorporates camera in-trinsics into the computation of the 3D center. This allows the recovered coordinates to adapt to different camera configura-tions rather than relying on fixed camera parameters. 
+
+LIFT The remaining geometric attributes are estimated by the LIFT operator. It invokes a registered lifting tool built on a specialized 2D-to-3D model [36]. Given IMAGE , B2D ,and INTRINSICS , the tool estimates the object dimensions and 3D rotation. The dimensions are represented as s = ( w, h, l )
+
+in meters, where w, h, and l denote the width, height, and length, respectively. The rotation is represented by a quater-nion (qw, q x, q y , q z ).7
+
+In our 3D box representation, the target orientation is expressed as a yaw angle around the Y -axis of the camera coordinate system. Under the quaternion convention used in our implementation, the yaw angle is computed as 
+
+θY = atan2  2( qwqy − qxqz ), 1 − 2( q2 
+
+> y
+
++ q2 
+
+> z
+
+) . (4) The estimated dimensions and yaw angle are returned as 
+
+SIZE and YAW . Using the lifting tool reduces the amount of 3D geometric information that must be predicted directly by the VLM. 
+
+BUILD Finally, the BUILD operator combines C3D , SIZE ,and YAW through a deterministic geometric operation to con-struct the target’s 3D bounding box. The constructed box is stored as BOX3D . In the second LLM invocation, the LLM uses this result and the original query to formulate the final answer. IV. E XPERIMENTS 
+
+A. Experimental Settings 1) Datasets: M3SI To evaluate our framework on instance-level metric depth estimation, we construct a new bench-mark, named the M3Sun Instance (M3SI) dataset, based on ETH3D [37]. ETH3D provides images and pixel-level depth annotations for 13 diverse real-world scenes. Although it is widely used for monocular depth estimation and stereo matching, its original annotations are not directly applicable to instance-level distance estimation, which aims to measure the metric distance from each object instance to the camera. We adapt ETH3D to this task through a multi-stage annotation pipeline. A LLM is used to identify candidate object cate-gories and generate object descriptions for each image. When multiple objects of the same category appear in an image, attributes such as color, spatial location, and relative size are added to distinguish individual instances. The resulting object descriptions are then used as text prompts for Grounding DINO [33] to obtain the corresponding 2D bounding boxes. Given the detected boxes and the associated depth maps, we sample valid depth values within each detected object region. The sampled values represent axial depth along the camera 
+
+Z-axis rather than the Euclidean distance from the camera center. We therefore use the camera intrinsics to convert each axial depth value into a Euclidean distance. The median of the sampled distances is used as the ground-truth distance for each object instance. Following this pipeline, we construct M3SI, which contains 2,910 samples for instance-level metric depth estimation. Representative annotated instances are shown in Fig. 4. 
+
+Mono3DRefer We evaluate M3SunAgent on the 
+
+Mono3DRefer dataset [2] to assess its performance on monocular 3D visual grounding. It contains 29,990 training samples, 5,735 validation samples, and 5,415 test samples. We use the training split to fine-tune the VLM responsible for target localization in the 3D visual grounding pipeline. We then evaluate the resulting model on the test split following the evaluation protocol defined in the original Mono3DRefer study. Following the subset definitions of Qu et al. [8], the test set is organized along three dimensions: target uniqueness, ① black trashbin · 7.20 m         
+
+> ②wooden picnic bench · 3.60 m
+> ①black trash bin far right · 13.19 m
+> ②yellow poster · 13.59 m
+> ①red bicycle · 5.24 m
+> ②round manhole cover · 3.21 m
+> ①black trash bin · 13.19 m
+> ②red fire extinguisher box · 13.25 m
+> ③red fire extinguisher · 13.21 m
+> Fig. 4. Examples of annotated instances in M3SI. Blue bounding boxes mark the target objects. The text beneath each image provides their descriptions and ground-truth distances from the camera in meters.
+
+target depth, and localization difficulty. Target uniqueness divides the samples into Unique and Multiple subsets. In the Unique subset, the target is the only instance of its category in the scene, whereas the Multiple subset contains other instances of the same category. Target depth divides the samples into Near ( 0–15 m), Medium ( 15 –35 m), and Far (> 35 m) subsets. Localization difficulty follows the standard KITTI definitions [38]. Samples are categorized as Easy, Moderate, or Hard according to their degrees of occlusion and truncation. 
+
+2) SOTA models for comparison: In the metric depth es-timation task, M3SunAgent is compared with two groups of models. The first group consists of general-purpose VLMs, including the closed-source model GPT-5 and the open-source models Pixtral-12B [39], InternVL3-8B [40], InternVL3.5-8B [41], the Qwen2.5-VL series [42], the Qwen3-VL series [35], Molmo2-8B [43], and LLaVA-1.5-7B [44]. The second group contains VLMs trained on task-specific datasets to enhance spatial perception and understanding, including SpaceLLaVA [1] and SpaceQwen [45], as well as DepthVLM [46], which augments a VLM with a depth prediction head for generating dense depth maps. All models are evaluated on the same test dataset. In monocular 3D visual grounding, we consider both VLM-based methods and computer vision (CV) methods as base-lines. The VLM-based methods include MiMo-VL-7B [47], Qwen2.5-VL-72B [42], Gemini-2.5-Flash, GPT-5, GPT-o3, Gemini-2.5-Pro, and MonoVLM [8], which is specifically trained for this task. The CV methods include Mono3DVG [2], Mono3DVG-TGE [28] and some two-stage methods. Their results are taken from the corresponding original papers. 
+
+3) Evaluation metrics: We evaluate instance-level metric depth estimation using absolute and relative errors, threshold accuracy, and the distribution of relative errors. Let ˆdi and di8                                                                                                                                 
+
+> TABLE I COMPARISON OF INSTANCE -LEVEL METRIC DEPTH ESTIMATION RESULTS ON M3SI. T HE BEST AND SECOND -BEST RESULTS ARE SHOWN IN BOLD AND UNDERLINED ,RESPECTIVELY .Method Year Valid/Total MAE ↓RMSE ↓MedAE ↓MRE (%) ↓MedRE (%) ↓δ<0.25 (%) ↑
+> General-Purpose VLMs
+> GPT-5 2025 1970/2910 3.31 5.07 1.80 39.22 34.43 24.33 Pixtral-12B [39] 2024 2810/2910 4.06 6.83 2.28 58.25 38.86 31.27 InternVL3-8B [40] 2025 2910/2910 4.60 6.96 2.84 51.68 53.06 16.36 InternVL3.5-8B [41] 2025 2910/2910 5.03 7.76 2.85 54.24 51.60 20.55 Qwen2.5-VL-3B [42] 2025 2910/2910 14.79 82.42 3.83 203.50 63.42 17.04 Qwen2.5-VL-7B [42] 2025 2900/2910 5.11 10.13 3.74 90.34 58.74 22.89 Qwen3-VL-4B [35] 2025 2910/2910 5.00 7.26 2.88 49.85 52.17 16.39 Qwen3-VL-8B [35] 2025 2910/2910 4.78 6.85 2.91 51.54 52.52 14.91 Molmo2-8B [43] 2026 2910/2910 4.84 10.19 2.41 75.99 46.64 29.28 LLaVA-1.5-7B [44] 2023 2875/2910 30.89 144.69 4.65 463.15 88.99 4.91
+> Task-Specific Spatial VLMs
+> SpaceLLaVA [1] 2024 2871/2910 32.66 53.98 6.71 426.52 95.91 2.44 DepthVLM [46] 2026 2910/2910 5.05 7.20 3.02 55.03 56.68 7.01 SpaceQwen2.5-VL-3B [45] 2025 2910/2910 6.29 8.49 4.28 76.71 80.78 4.40
+> M3SunAgent (Ours) –2910/2910 2.26 3.76 1.26 27.04 23.28 52.61
+
+denote the predicted and ground-truth distances of sample i,respectively. The relative error of a valid prediction is 
+
+ri = | ˆdi − di|
+
+di
+
+. (5) Let V be the set of samples with valid numerical predictions, 
+
+Nv = |V| , and N is the total number of test samples. We report mean absolute error (MAE), root mean squared error (RMSE), median absolute error (MedAE), mean relative error (MRE), and median relative error (MedRE) over V. MRE and MedRE are expressed as percentages. We define a metric, δ<0.25 , which represents the percentage of samples with a relative error below 25% . It is calculated as follows: 
+
+δ<0.25 = 1
+
+N
+
+X
+
+> i∈V
+
+I(ri < 0.25) , (6) where I(·) is the indicator function. Using N as the denomi-nator counts invalid predictions as incorrect. To examine the error distribution, we divide the test outputs into five mutually exclusive categories. The first four contain valid predictions with relative errors in 
+
+E1 = [0 , 0.10) , E2 = [0 .10 , 0.20) ,
+
+E3 = [0 .20 , 0.25) , E4 = [0 .25 , 0.50) . (7) Their proportions are 
+
+pk = 1
+
+N
+
+X
+
+> i∈V
+
+I(ri ∈ E k), k ∈ { 1, 2, 3, 4}. (8) The fifth category includes valid predictions with relative errors of at least 50% and all invalid predictions: 
+
+p5 = 1
+
+N
+
+"
+
+(N − Nv ) + X
+
+> i∈V
+
+I(ri ≥ 0.50) 
+
+#
+
+. (9) This distribution provides a detailed view of prediction errors across different accuracy ranges while also accounting for large errors and invalid outputs. For monocular 3D visual grounding, we measure the volu-metric overlap between each predicted 3D bounding box and its ground-truth box. Let IoU 3Di denote this overlap for sample 
+
+i, and let S be the evaluation set with NS = |S| . Mean 3D IoU (mIoU) is reported as a percentage: 
+
+mIoU( S) = 1
+
+NS
+
+X
+
+> i∈S
+
+IoU 3Di . (10) A higher mIoU indicates greater overall overlap between the predicted and ground-truth 3D bounding boxes. It provides a continuous measure of 3D localization quality and reflects errors in the predicted object position, dimensions, and orien-tation. We also report grounding accuracy at a given IoU threshold 
+
+τ :
+
+Acc@ τ (S) = 1
+
+NS
+
+X
+
+> i∈S
+
+I  IoU 3Di ≥ τ  . (11) We report Acc@0 .25 and Acc@0 .5, which represent the per-centages of samples with 3D IoU values of at least 0.25 
+
+and 0.5, respectively. While mIoU measures the average overlap quality, Acc@ τ measures the proportion of predictions that meet a specified localization threshold. The two metrics therefore provide complementary measures of 3D grounding performance. 
+
+B. Comparison with State-of-the-Art Monocular Metric Depth Estimation Methods 1) Quantitative Evaluation: The quantitative results are re-ported in Table I and Fig. 5. The “Valid” column indicates the number of test samples for which a model produces a valid and parseable numerical prediction. MAE, RMSE, MedAE, MRE, and MedRE are calculated only over these valid predictions. The threshold accuracy metrics are evaluated over the entire dataset, with invalid outputs treated as incorrect predictions. The results show that many VLMs struggle to predict accurate 9M3SunAgent (Ours) 
+
+GPT-5 Pixtral-12B InternVL3-8B Qwen3-VL-8B Molmo2-8B Qwen3-VL-4B InternVL3.5-8B DepthVLM Qwen2.5-VL-7B SpaceQwen2.5-VL-3B Qwen2.5-VL-3B LLaVA-1.5-7B SpaceLLaVA 
+
+020 40 60 80 100 
+
+> Depth Error Distribution (%)
+
+23.71 9.83 12.78 5.02 4.09 13.23 4.60 7.97 8.32 5.60 20.89 9.17 12.99 7.35 6.91 11.68 7.36 8.35 3.06 9.72 7.11 8.01 5.33 5.50 3.99 3.91 4.37 4.43 4.23 4.85 4.33 32.48 24.33 28.21 29.14 30.66 23.54 29.90 27.29 30.76 22.09 10.45 23.10 9.14 14.91 51.34 40.52 54.50 54.43 47.18 53.71 52.16 62.23 55.02 85.15 59.86 85.95 95.60 
+
+Per-Instance Relative Depth Error Range 
+
+< 10% 10 --20% 20 --25% 25 --50% Error: ≥ 50% or invalid 
+
+Fig. 5. Distribution of per-instance relative depth errors on M3SI. Each stacked bar shows the percentage of test instances in five mutually exclusive categories: errors below 10% , in [10% , 20%) , [20% , 25%) , or [25% , 50%) , and errors of at least 50% or invalid predictions. How far is the green box from the camera? 
+
+GT : 2.160 m 
+
+M3SunAgent : The green box is approximately 2.33 meters from the screen. 
+
+Pixtral : The green box is approximately 3 meters 
+
+from the camera. 
+
+InternVl : The green box is approximately 3 to 4 feet (0.914 to 1.219 meters) from the camera. 
+
+Qwen : 1.2 meters .
+
+Molmo : The green box is approximately 10 feet (3.048 meters) from the camera. 
+
+LLaVA : The green box is far from the camera. 
+
+How many meters away is the trash can from me? 
+
+GT: 2.618 m M3SunAgent : The trash can is approximately 2.38 meters 
+
+from you. 
+
+Pixtral : The trash can is approximately 2 meters 
+
+away from you. 
+
+InternVl : The trash can is approximately 2 meters 
+
+away from you. 
+
+Qwen : 1.5 .
+
+Molmo : The trash can is approximately 10 meters 
+
+away from you. 
+
+LLaVA : 10 .
+
+What is the distance to the vending machine? 
+
+GT : 3.728 m M3SunAgent : The vending machine is approximately 
+
+3.30 meters from the camera. 
+
+Pixtral : The vending machine is approximately 10 meters away. 
+
+InternVl : The distance to the vending machine is approximately 3 meters .
+
+Qwen : 1.5 meters .
+
+Molmo : The vending machine is approximately 10 feet (3.048 meters) away. 
+
+LLaVA : 10 feet (3.048 meters) .
+
+How far away is the clock? 
+
+GT : 3.464 m M3SunAgent : The clock is approximately 3.23 meters 
+
+from the camera. 
+
+Pixtral : The clock is mounted on the wall between a whiteboard on the left and a projection screen on the right. 
+
+InternVl : The clock is approximately 10 to 15 feet (3.048 to 4.572 meters) away. 
+
+Qwen: 1.5 meters .
+
+Molmo : The clock is approximately 10 feet (3.048 meters) away. 
+
+LLaVA : The clock is far away .
+
+What's the distance to the air-conditioning? 
+
+GT : 1.974 m M3SunAgent : The air-conditioning is approximately 
+
+2.18 meters from the camera. 
+
+Pixtral : The air-conditioning unit is positioned near the corner of the room, adjacent to a window with frosted glass panels. 
+
+InternVl : The distance to the air-conditioning is approximately 1 meter .
+
+Qwen : 1.5 meters .
+
+Molmo : The air-conditioning unit is approximately 3 feet (0.914 meters) away from the wall. 
+
+LLaVA : 10 feet (3.048 meters). 
+
+How far is the trash can from the camera? 
+
+GT : 1.639 m 
+
+M3SunAgent : The trash can is approximately 1.88 meters 
+
+from the camera. 
+
+Pixtral :The trash can is approximately 3 meters 
+
+from the camera. 
+
+InternVl : Approximately 2meters. 
+
+Qwen :1.5 meters .
+
+Molmo : The trash can is approximately 10 feet (3.048 meters) from the camera. 
+
+LLaVA : The trash can is 10 feet (3.048 meters) from the camera. 
+
+Fig. 6. Qualitative comparison of M3SunAgent and general-purpose VLMs on real-world instance-level metric depth estimation. Each column shows the image and query, the ground-truth distance (GT), and the models’ responses. Green boxes mark the referred objects, while red dots indicate the depth-sampling locations used by M3SunAgent. 
+
+metric depth. Some models produce large numerical errors, while others occasionally return responses that cannot be parsed. M3SunAgent achieves the best performance across all reported error metrics and produces valid predictions for all 2,910 test samples. It also obtains substantially lower errors than GPT-5. Moreover, 52.61% of its predictions have a relative error below 25%, demonstrating both high accuracy and stable output quality. Task-specific spatial VLMs do not consistently perform well on this task. SpaceLLaVA shows limited accuracy despite 10 
+
+TABLE II COMPARISON OF 3D VISUAL GROUNDING ACCURACY (%) ON THE MONO 3DR EFER [2] TEST SET . T HE BEST AND SECOND -BEST RESULTS ARE SHOWN IN BOLD AND UNDERLINED , RESPECTIVELY .Method Year 
+
+Acc@0 .25 Acc@0 .5
+
+Unique Multiple Overall Unique Multiple Overall 
+
+CV Methods 
+
+Cube R-CNN + Rand [2] 2024 32.76 13.36 17.02 14.61 7.21 8.60 Cube R-CNN + Best [2] 2024 35.29 60.52 55.77 16.67 32.99 29.92 ZSGNet + backproj [2] 2024 9.02 16.56 15.14 0.29 2.23 1.87 FAOA + backproj [2] 2024 11.96 13.79 13.44 2.06 2.12 2.11 ReSC + backproj [2] 2024 11.96 23.69 21.48 0.49 3.94 3.29 Mono3DVG [2] 2024 57.65 65.92 64.36 33.04 46.85 44.25 Mono3DVG-TGE [28] 2025 62.45 69.83 68.44 44.22 52.83 51.21 
+
+General-Purpose VLMs 
+
+MiMo-VL-7B [47] 2025 0.81 1.18 1.11 0.00 0.06 0.05 Qwen2.5-VL-72B [42] 2025 0.69 0.08 0.20 0.00 0.00 0.00 Gemini-2.5-Flash 2025 0.23 0.86 0.74 0.00 0.00 0.00 GPT-5 2025 2.09 6.89 5.98 0.36 0.21 0.23 GPT-o3 2025 1.71 3.04 2.79 0.19 0.18 0.18 Gemini-2.5-Pro 2025 0.81 2.04 1.81 0.00 0.09 0.07 
+
+Task-Specific VLMs 
+
+MonoVLM-Qwen [8] 2026 53.99 63.77 61.89 31.02 39.08 38.13 MonoVLM-MiMo [8] 2026 61.59 71.23 69.41 32.68 45.34 42.96 
+
+M3SunAgent (Ours) – 67.94 71.58 70.90 36.47 44.10 42.66 TABLE III COMPARISON OF 3D VISUAL GROUNDING ACCURACY (%) ON SELECTED SUBSETS OF THE MONO 3DR EFER TEST SET . T HE BEST AND SECOND -BEST RESULTS ARE SHOWN IN BOLD AND UNDERLINED , RESPECTIVELY .
+
+Method Year Near Easy Medium Moderate 
+
+Acc@0 .25 Acc@0 .5 Acc@0 .25 Acc@0 .5 Acc@0 .25 Acc@0 .5 Acc@0 .25 Acc@0 .5
+
+CV Methods 
+
+Cube R-CNN + Rand [2] 2024 17.40 11.45 21.12 11.41 18.01 8.15 17.85 8.01 Cube R-CNN + Best [2] 2024 67.76 41.45 59.66 33.05 60.69 30.35 60.56 33.45 ZSGNet + backproj [2] 2024 24.87 0.59 21.33 3.35 16.74 3.71 13.87 0.63 FAOA + backproj [2] 2024 18.03 0.53 17.51 3.43 15.64 3.95 12.18 1.34 ReSC + backproj [2] 2024 33.68 0.59 27.90 5.71 24.03 6.15 19.23 1.97 Mono3DVG [2] 2024 64.74 53.49 72.36 51.80 75.44 55.48 69.23 48.66 Mono3DVG-TGE [28] 2025 68.02 56.64 76.91 60.30 78.49 61.87 73.66 56.48 
+
+General-Purpose VLMs 
+
+MiMo-VL-7B [47] 2025 1.63 0.10 0.69 0.00 0.73 0.00 0.99 0.00 Qwen2.5-VL-72B [42] 2025 0.18 0.00 0.21 0.00 0.24 0.00 0.25 0.00 Gemini-2.5-Flash 2025 1.13 0.00 0.64 0.00 0.40 0.00 0.58 0.00 GPT-5 2025 5.14 0.07 4.81 0.08 7.12 0.50 7.18 0.38 GPT-o3 2025 3.01 0.15 2.98 0.18 3.06 0.13 3.33 0.14 Gemini-2.5-Pro 2025 2.72 0.15 1.65 0.12 1.29 0.00 1.24 0.00 
+
+Task-Specific VLMs 
+
+MonoVLM-Qwen [8] 2026 74.06 49.72 68.53 40.03 54.52 33.08 55.64 34.05 MonoVLM-MiMo [8] 2026 78.15 52.18 74.14 45.25 63.74 36.89 64.80 38.40 
+
+M3SunAgent (Ours) – 84.74 64.34 77.34 50.73 71.57 40.00 68.94 43.24 
+
+being trained on large-scale spatial data. DepthVLM adds a dense depth prediction head to LLM, but this design does not improve instance-level metric depth estimation on our benchmark. In contrast, M3SunAgent combines the target localization capability of an open-vocabulary detector with the metric depth estimation capability of a specialized VLM. This combination enables accurate target localization and reliable depth estimation, resulting in stable instance-level metric depth predictions across most samples. The stacked bar chart in Fig. 5 further compares the models under different relative error thresholds. M3SunAgent achieves the highest accuracy at all four thresholds. Under the strict 10% threshold, it reaches 23.71%, while the best competing model, Molmo2-8B, achieves 13.23%. Under the more relaxed 50% threshold, M3SunAgent achieves 85.09%, whereas the second-best model reaches 59.48%. These consistent gains indicate that M3SunAgent provides more accurate and reliable instance-level metric depth estimates across both strict and moderate error tolerances. 11 
+
+TABLE IV GROUNDING M IOU (%) ON THE MONO 3DR EFER TEST SET ACROSS OBJECT OCCURRENCE , DISTANCE , AND DIFFICULTY SUBSETS . T HE BEST AND SECOND -BEST RESULTS ARE SHOWN IN BOLD AND UNDERLINED , RESPECTIVELY .Method Year mIoU (%) ↑
+
+Object Occurrence Distance Difficulty Unique Multiple Overall Near Medium Far Easy Moderate Hard 
+
+General-Purpose VLMs 
+
+MiMo-VL-7B [47] 2025 1.45 1.76 1.71 2.25 1.45 0.94 0.95 1.47 2.84 Qwen2.5-VL-72B [42] 2025 1.33 0.79 0.89 0.99 0.85 0.74 1.00 0.92 0.72 Gemini-2.5-Flash 2025 1.02 1.35 1.29 1.82 0.94 0.66 1.00 1.23 1.72 GPT-5 2025 5.91 7.91 7.53 8.16 6.96 6.94 7.44 7.42 7.73 GPT-o3 2025 4.83 6.18 5.93 6.36 5.99 5.05 5.81 6.29 5.77 Gemini-2.5-Pro 2025 1.58 2.55 2.37 3.25 1.95 1.14 2.03 2.24 2.90 
+
+Task-Specific VLMs 
+
+MonoVLM-Qwen [8] 2026 25.31 30.02 29.13 34.35 25.97 22.58 31.11 26.35 28.90 MonoVLM-MiMo [8] 2026 33.34 39.22 38.11 43.46 34.80 31.46 40.02 35.69 37.68 M3SunAgent (Ours) – 38.61 42.46 41.73 54.33 40.51 30.53 46.67 41.72 34.83 Positioned on the left side of the road between a silver car and a black car, the second car on my left is a red one, standing still and facing towards me. Its height is estimated at around 1.4 meters and it is situated approximately 10 to 20 meters away from me at a northwesterly direction of 30 degrees. At a distance of around 10 meters from me, there is a silver-colored car parked on the right side of the road. It's the first car in the line and is facing away from me. The car is positioned at a bearing of roughly 20 degrees north-east. A black car, located approximately 30 degrees northwest of my position and about 10 meters away, is traveling in the left lane and situated closest to me. This first car is oriented with its back facing me as it travels straight ahead. At a distance of about 10 meters from me, the first car on the right side of the road, about 4.3 meters long and color black, is parked with its back facing towards me, at a direction of approximately 20 degrees north-east from my position. The black car is parked on the left side of the road, approximately 10 degrees northwest of me. It is within 20 meters of my position, and it's facing towards me. It is the first car on the left and is located in front of the second black car. 
+
+> Mono3DVG  Description Input M3SunAge nt(ous)  GPT-5 Gemini 2.5 Pro Gemini 2.5 Flash
+
+Fig. 7. Qualitative comparison on five representative samples from the Mono3DRefer test set. Each column shows a referring description and an input image, followed by the 3D bounding boxes predicted by GPT-5, Gemini-2.5-Pro, Gemini-2.5-Flash, Mono3DVG, and M3SunAgent. The boxes are shown as image projections and in 3D views. Blue indicates the ground truth, red indicates baseline predictions, and green indicates M3SunAgent predictions. 
+
+2) Qualitative Evaluation: Fig. 6 presents a qualitative comparison between M3SunAgent and general-purpose VLMs on instance-level metric depth estimation. The test images were captured with a mobile phone. The camera intrinsics were estimated from the EXIF metadata of each image. During image capture, a handheld laser rangefinder was used to mea-sure the actual distance from the target object to the camera. This measurement was used as the ground-truth distance. The top row of the figure shows the target localization results produced by M3SunAgent. The green bounding boxes indicate the detected target regions, while the red points denote the sampling locations selected within each box. M3SunAgent can identify the referred target from the natural language query and predict a physical distance close to the laser measurement, even in real-world mobile-phone images. General-purpose VLMs can often recognize the target and understand the query. However, their distance estimates are usually coarse and rely heavily on visual and semantic priors. Some examples show large numerical errors, vague descriptions, or no valid distance value. 12 
+
+C. Comparison with State-of-the-Art Monocular 3D Visual Grounding Methods 1) Quantitative Evaluation: Table II compares M3SunAgent with the baseline methods using Acc@0 .25 and 
+
+Acc@0 .5 under the Unique, Multiple, and Overall settings. Table III reports these metrics on the Near and Medium distance subsets and the Easy and Moderate difficulty subsets. Table IV presents the mIoU results across different object occurrence, target distance, and localization difficulty categories. As can be seen, M3SunAgent matches or exceeds the MonoVLM variants on most major metrics. It also remains competitive with task-specific vision methods such as Mono3DVG. Tables II and IV show that M3SunAgent performs con-sistently under both the Unique and Multiple settings. On the Unique subset, it achieves an Acc@0 .25 of 67 .94% and an mIoU of 38 .61% . On the Multiple subset, M3SunAgent reaches an Acc@0 .25 of 71 .58% and an mIoU of 42 .46% . Its mIoU is 3.24 percentage points higher than that of MonoVLM-MiMo. Under the stricter Acc@0 .5 criterion, M3SunAgent achieves an overall accuracy of 42 .66% , close to the 42 .96% 
+
+obtained by MonoVLM-MiMo. M3SunAgent performs well on nearby and less occluded targets. On the Near and Easy subsets, it achieves Acc@0 .25 
+
+scores of 84 .74% and 77 .34% , together with mIoU scores of 54 .33% and 46 .67% , respectively. On the Medium and 
+
+Moderate subsets, the corresponding mIoU scores are 40 .51% 
+
+and 41 .72% . Its Acc@0 .25 scores are 71 .57% and 68 .94% ,while its Acc@0 .5 scores are 40 .00% and 43 .24% , respec-tively. On the Far and Hard subsets, M3SunAgent obtains mIoU scores of 30 .53% and 34 .83% . These results rank second among the VLM-based methods and are 0.93 and 
+
+2.85 percentage points lower than those of MonoVLM-MiMo, respectively. The decrease from Near to Far and from Easy 
+
+to Hard indicates that distant targets and severe occlusion or truncation remain challenging for accurate 3D localization. Nevertheless, M3SunAgent remains competitive among the VLM-based methods across all reported distance and difficulty subsets. 
+
+2) Qualitative Evaluation: Fig. 7 presents a qualitative comparison between M3SunAgent and several representative baseline methods. MonoVLM are not involved in comparison due to lack of open-source mdoel weight. General-purpose VLMs can infer the approximate target location from the language description. Their estimates of object length, width, and height are also reasonably close to the ground truth. However, their predictions of the yaw angle and 3D center contain large errors. These errors reduce the overlap be-tween the predicted and ground-truth 3D bounding boxes. In some cases, the predicted box is completely displaced from the target. M3SunAgent accurately identifies the referred object from detailed language descriptions and produces 3D bounding boxes with greater overlap. Its estimates of the object dimensions, 3D center, and yaw angle are close to the corresponding ground-truth values. V. C ONCLUSIONS 
+
+This paper presents M3SunAgent, a monocular spatial un-derstanding agent for instance-level metric depth estimation and monocular 3D visual grounding. Given an RGB image and a natural-language query, a LLM generates an executable program that coordinates specialized visual models and geo-metric operations. For depth estimation, the agent localizes the referred object and aggregates pointwise predictions to obtain an instance-level metric distance. For 3D visual grounding, it combines VLM-based target localization and spatial attribute prediction with camera back-projection and specialized lift-ing to estimate the object’s 3D bounding box. This shared framework connects language-guided target identification with quantitative spatial estimation across both tasks. We also introduce the M3SI Dataset, which contains 2,910 samples for evaluating instance-level metric depth estimation. Experiments on M3SI show that M3SunAgent achieves the best overall per-formance across the reported depth metrics. On Mono3DRefer, it achieves overall Acc@0 .25 and Acc@0 .5 scores of 70 .90% 
+
+and 42 .66% , respectively. These results demonstrate the ef-fectiveness of coordinating specialized tools to estimate the spatial properties of language-referred objects from a single RGB image. M3SunAgent may be useful to integrate physics-driven controller and data-driven vision language action to address long horizon tasks from hybrid system point of view. REFERENCES [1] B. Chen, Z. Xu, S. Kirmani, B. Ichter, D. Sadigh, L. Guibas, and F. Xia, “Spatialvlm: Endowing vision-language models with spatial reasoning capabilities,” in Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , 2024, pp. 14 455–14 465. [2] Y. Zhan, Y. Yuan, and Z. Xiong, “Mono3dvg: 3d visual grounding in monocular images,” in Proceedings of the AAAI Conference on Artificial Intelligence , vol. 38, no. 7, 2024, pp. 6988–6996. [3] Q. Wang, J. He, Y. Pan, S. Y. Yeo, X. Yang, and S. Li, “Monosr: Open-vocabulary spatial reasoning on monocular images,” in Computer Vision – ECCV 2026 . Springer, 2026, pp. 20–37. [4] M. Hu, W. Yin, C. Zhang, Z. Cai, X. Long, H. Chen, K. Wang, G. Yu, C. Shen, and S. Shen, “Metric3d v2: A versatile monocular geometric foundation model for zero-shot metric depth and surface normal estimation,” IEEE Transactions on Pattern Analysis and Machine Intelligence , vol. 46, no. 12, pp. 10 579–10 596, 2024. [5] L. Liu, R. Zhu, J. Deng, Z. Song, W. Yang, and T. Zhang, “Plane2Depth: Hierarchical adaptive plane guidance for monocular depth estimation,”                                         
+
+> IEEE Transactions on Circuits and Systems for Video Technology ,vol. 35, no. 2, pp. 1136–1149, 2025. [6] R. Zhu, C. Wang, Z. Song, L. Liu, J. He, J. Deng, T. Zhang, and Y. Zhang, “Scaledepth: Decomposing metric depth estimation into semantic-aware scale prediction and adaptive relative depth estimation,”
+> IEEE Transactions on Circuits and Systems for Video Technology , 2026. [7] Y. Li, M. Liu, Z. Li, Y. Bian, X. Wang, E. Zhai, and Y. Wang, “Mono3dvg-ensd: Enhanced spatial-aware and dimension-decoupled text encoding for monocular 3d visual grounding,” in Proceedings of the AAAI Conference on Artificial Intelligence , vol. 40, no. 8, 2026, pp. 6726–6734. [8] H. Qu, H. N. Mahjoub, V. Tadiparthi, K. Lee, and T. Chen, “Monovlm: Monocular 3d visual grounding with vision language models,” in Pro-ceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 2026, pp. 30 986–30 996. [9] S. Shao, Z. Pei, W. Chen, D. Sun, P. C. Chen, and Z. Li, “Monodiffusion: Self-supervised monocular depth estimation using diffusion model,”
+> IEEE Transactions on Circuits and Systems for Video Technology ,vol. 35, no. 4, pp. 3664–3678, 2024. [10] K. Wu, F. Li, W. Liu, Q. Liu, and Y. Yang, “Corrupted bitstream semantic understanding by adaptive-modal large language models,”
+> Pattern Recognition , vol. 180, p. 114151, 2026. 13
+
+[11] W. Ma, L. Ye, C. de Melo, A. L. Yuille, and J. Chen, “Spatialllm: A compound 3d-informed design towards spatially-intelligent large multimodal models,” in Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , 2025. [12] C. H. Song, V. Blukis, J. Tremblay, S. Tyree, Y. Su, and S. Birchfield, “Robospatial: Teaching spatial understanding to 2d and 3d vision-language models for robotics,” in 2025 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) . IEEE, 2025, pp. 15 768–15 780. [13] S. D. Bhat and T. Yamasaki, “Consistent yet wrong: Evidence in-sensitivity in spatial vision-language models,” in Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) Workshops , June 2026, pp. 7463–7472. [14] S. Chen, M. A. Uy, C. H. Song, F. Ladhak, A. Murali, Q. Qu, S. Birch-field, V. Blukis, and J. Tremblay, “Spacetools: Tool-augmented spatial reasoning via double interactive rl,” in Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 2026, pp. 37 109–37 120. [15] Y. Shen, K. Song, X. Tan, D. Li, W. Lu, and Y. Zhuang, “Hugginggpt: Solving ai tasks with chatgpt and its friends in hugging face,” Advances in Neural Information Processing Systems , vol. 36, pp. 38 154–38 180, 2023. [16] T. Gupta and A. Kembhavi, “Visual programming: Compositional visual reasoning without training,” in Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , 2023, pp. 14 953–14 962. [17] S. Shao, Z. Pei, W. Chen, P. C. Chen, and Z. Li, “Iebins: Iterative elastic bins for monocular depth estimation and completion,” International Journal of Computer Vision , vol. 133, no. 5, pp. 2463–2486, 2025. [18] C. Wei, M. Yang, L. He, and N. Zheng, “Fs-depth: Focal-and-scale depth estimation from a single image in unseen indoor scene,” IEEE Transactions on Circuits and Systems for Video Technology , vol. 34, no. 11, pp. 10 604–10 617, 2024. [19] A. Bochkovskiy, A. Delaunoy, H. Germain, M. Santos, Y. Zhou, S. Richter, and V. Koltun, “Depth pro: Sharp monocular metric depth in less than a second,” in 
+
+International Conference on Learning Representations , 2025. [Online]. Available: https://proceedings.iclr.cc/paper files/paper/2025/ hash/bc8b2058fd96978a4146f18298cb2d39-Abstract-Conference.html [20] S. Hou, M. Fu, R. Wang, Y. Yang, and W. Song, “Self-supervised monocular depth estimation for all-day images based on dual-axis transformer,” IEEE Transactions on Circuits and Systems for Video Technology , vol. 34, no. 10, pp. 9939–9953, 2024. [21] X. Wang, W. Yin, T. Kong, Y. Jiang, L. Li, and C. Shen, “Task-aware monocular depth estimation for 3d object detection,” in Proceedings of the AAAI conference on artificial intelligence , vol. 34, no. 07, 2020, pp. 12 257–12 264. [22] L. Peng, X. Wu, Z. Yang, H. Liu, and D. Cai, “Did-m3d: Decoupling instance depth for monocular 3d object detection,” in European Confer-ence on Computer Vision . Springer, 2022, pp. 71–88. [23] C.-F. Yeh, H. Xu, Z. Liu, G. P. Meyer, X. Lei, C. Zhao, S.-W. Li, V. Chandra, Y. Shi et al. , “Depthlm: Metric depth from vision language models,” in International Conference on Learning Representations , vol. 2026, 2026, pp. 134 491–134 505. [24] J. Liang, K. Wu, X. Hu, and T. Liu, “Cibic: Pixel-free foundation model for robust corrupted image bitstream captioning,” Pattern Recognition ,p. 114238, 2026. [25] C. Wang, W. Feng, S. Lyu, G. Cheng, X. Li, B. Liu, and Q. Zhao, “A masked reference token supervision-based iterative visual-language framework for robust visual grounding,” IEEE Transactions on Circuits and Systems for Video Technology , vol. 35, no. 1, pp. 75–90, 2025. [26] D. Z. Chen, A. X. Chang, and M. Nießner, “Scanrefer: 3d object local-ization in rgb-d scans using natural language,” in European conference on computer vision . Springer, 2020, pp. 202–221. [27] L. Geng, J. Yin, G. Chen, and Q. Jia, “Pseudo-ev: Enhancing 3d visual grounding with pseudo embodied viewpoint,” IEEE transactions on circuits and systems for video technology , vol. 35, no. 8, pp. 8031–8044, 2025. [28] Y. Li, M. Liu, Y. Bian, X. Wang, Z. Li, G. Li, and Y. Wang, “Dual enhancement on 3d vision-language perception for monocular 3d visual grounding,” in Proceedings of the 33rd ACM International Conference on Multimedia , 2025, pp. 4552–4561. [29] A.-C. Cheng, Y. Fu, Y. Ji, L. Zhu, G. Zhan, Z. Zhang, Z. Yang, S. Han, Y. Lu, P. Molchanov, V. N. Murali, J. Kautz, X. Wang, H. Yin, and S. Liu, “Grounded 3d-aware spatial vision-language modeling,” in Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , June 2026, pp. 16 688–16 700. [30] J. Gao, K.-H. Yap, K. Wu, D. T. Phan, K. Garg, and B. S. Han, “Con-textual human object interaction understanding from pre-trained large language model,” in ICASSP 2024-2024 IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP) . IEEE, 2024, pp. 13 436–13 440. [31] D. Marsili, R. Agrawal, Y. Yue, and G. Gkioxari, “Visual agentic ai for spatial reasoning with a dynamic api,” in Proceedings of the Computer Vision and Pattern Recognition Conference , 2025, pp. 19 446–19 455. [32] Z. Li, Y. Soh, and C. Wen, Switched and Impulsive Systems: Analysis, Design and Applications , ser. Lecture Notes in Control and Information Sciences. Berlin, Heidelberg: Springer-Verlag, 2005, vol. 313. [33] S. Liu, Z. Zeng, T. Ren, F. Li, H. Zhang, J. Yang, Q. Jiang, C. Li, J. Yang, H. Su et al. , “Grounding dino: Marrying dino with grounded pre-training for open-set object detection,” in European conference on computer vision . Springer, 2024, pp. 38–55. [34] K. Wu, Y. Yang, M. Yu, and Q. Liu, “Block-wise focal stack image representation for end-to-end applications,” Optics Express , vol. 28, no. 26, pp. 40 024–40 043, 2020. [35] S. Bai, Y. Cai, R. Chen, K. Chen, X. Chen, Z. Cheng, L. Deng, W. Ding, C. Gao, C. Ge et al. , “Qwen3-vl technical report,” arXiv preprint arXiv:2511.21631 , 2025. [36] W. Huang, J. Zhang, S. Li, J. Duan, Y. Cheng, J. Cho, M. Wallingford, R. Soraki, C. D. Kim, S. Liu et al. , “Wilddet3d: Scaling promptable 3d detection in the wild,” 2026. [37] T. Sch¨ ops, J. L. Sch¨ onberger, S. Galliani, T. Sattler, K. Schindler, M. Pollefeys, and A. Geiger, “A multi-view stereo benchmark with high-resolution images and multi-camera videos,” in Conference on Computer Vision and Pattern Recognition (CVPR) , 2017. [38] A. Geiger, P. Lenz, and R. Urtasun, “Are we ready for autonomous driving? the kitti vision benchmark suite,” in 2012 IEEE conference on computer vision and pattern recognition . IEEE, 2012, pp. 3354–3361. [39] P. Agrawal, S. Antoniak, E. B. Hanna, B. Bout, D. Chaplot, J. Chud-novsky, D. Costa, B. De Monicault, S. Garg, T. Gervet et al. , “Pixtral 12b,” arXiv preprint arXiv:2410.07073 , 2024. [40] J. Zhu, W. Wang, Z. Chen, Z. Liu, S. Ye, L. Gu, H. Tian, Y. Duan, W. Su, J. Shao et al. , “Internvl3: Exploring advanced training and test-time recipes for open-source multimodal models,” arXiv preprint arXiv:2504.10479 , 2025. [41] W. Wang, Z. Gao, L. Gu, H. Pu, L. Cui, X. Wei, Z. Liu, L. Jing, S. Ye, J. Shao et al. , “Internvl3. 5: Advancing open-source multi-modal models in versatility, reasoning, and efficiency,” arXiv preprint arXiv:2508.18265 , 2025. [42] S. Bai et al. , “Qwen2.5-vl technical report,” 2025. [Online]. Available: https://arxiv.org/abs/2502.13923 [43] C. Clark, J. Zhang, Z. Ma, J. S. Park, R. Tripathi, S. Lee, M. Salehi, J. Ren, C. D. Kim, Y. Yang et al. , “Molmo2: Open weights and data for vision-language models with video understanding and grounding,” in Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 2026, pp. 28 652–28 668. [44] H. Liu, C. Li, Q. Wu, and Y. J. Lee, “Visual instruction tuning,” 
+
+Advances in neural information processing systems , vol. 36, pp. 34 892– 34 916, 2023. [45] M. Jia, Z. Qi, S. Zhang, W. Zhang, X. Yu, J. He, H. Wang, and L. Yi, “Omnispatial: Towards comprehensive spatial reasoning benchmark for vision language models,” in International Conference on Learning Representations , vol. 2026, 2026, pp. 35 634–35 670. [46] H. Yu, X. Qu, Y. Wang, J. Zhu, and L. Ke, “Unlocking dense metric depth estimation in vlms,” arXiv preprint arXiv:2605.15876 , 2026. [47] Core Team et al. , “Mimo-vl technical report,” 2025. [Online]. Available: https://arxiv.org/abs/2506.03569
