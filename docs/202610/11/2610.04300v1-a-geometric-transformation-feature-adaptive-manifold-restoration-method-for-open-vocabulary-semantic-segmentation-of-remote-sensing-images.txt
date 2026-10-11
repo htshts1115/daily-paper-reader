@@ -1,0 +1,2696 @@
+A Geometric-Transformation Feature-Adaptive Manifold Restoration
+Method for Open-Vocabulary Semantic Segmentation of Remote
+Sensing Images
+Jianzheng Wanga, Huan Nia,∗, Xiaonan Niub, Danfeng Hongc and Haiyan Guana
+a School of Remote Sensing and Geomatics Engineering, Nanjing University of Information Science and Technology, China, Nanjing, 210044, China
+bNanjing Center, China Geological Survey, Nanjing, 210016, China
+cSchool of Automation, Southeast University, Nanjing, 210096, China
+A R T I C L E I N F O
+Keywords:
+Open-Vocabulary
+Semantic Segmentation
+Geometric Transformation
+Feature Representation
+A B S T R A C T
+The semantic information of objects in remote sensing images is typically invariant to geometric trans-
+formations from the dihedral group D4. However, SAM3-based open-vocabulary semantic segmen-
+tation (OVSS) methods often exhibit inconsistent responses to different geometric transformations.
+To exploit this property and improve the stability of OVSS for remote sensing images, we propose
+a feature-adaptive manifold repair method based on dihedral-group geometric transformations. First,
+we introduce multi-scale harmonic-guided D4 view selection (MH-D4VS) to select complementary
+candidate views from a set of geometrically transformed views. Next, we propose original-view-
+anchored adaptive manifold repair (OAMR), which uses the original view as an anchor and reliable
+cross-view information to selectively repair locally unreliable visual features. Finally, we develop
+pixel decoder test-time adaptation (PD-TTA) for SAM3, which fine-tunes only the parameters of
+the GroupNorm layers online during inference, thereby enhancing the model’s ability to adapt to
+sample-level distribution shifts. Experimental results show that the proposed method achieves an
+average mIoU of 55.6% across eight remote sensing semantic segmentation benchmarks and delivers
+consistent performance improvements under different SAM3-based inference frameworks.
+1. Introduction
+With the rapid development of Vision–Language Models
+(VLMs) and Vision Foundation Models (VFMs), Open-
+Vocabulary Semantic Segmentation (OVSS) has gradually
+emerged as a major paradigm for overcoming the con-
+straints of fixed label spaces. Existing OVSS methods can
+be broadly categorized into training-based and training-
+free approaches. The current mainstream paradigm is still
+primarily built upon CLIP [1] and its adaptations for dense
+prediction. These methods mainly rely on reconstructing the
+internal attention maps or features of CLIP, as exemplified
+by MaskCLIP [2], SCLIP [3], ClearCLIP [4], and ResCLIP
+[5]. However, the CLIP image encoder is biased toward
+relatively large objects, while its text encoder is sensitive to
+the ordering of objects, as discussed in [6]. In fine-grained,
+multi-object remote sensing scenes, these biases may further
+exacerbate insufficient responses to local objects. Conse-
+quently, CLIP-based approaches still struggle to fully satisfy
+the requirements of remote sensing applications for precise
+spatial localization.
+To address this limitation, another line of research com-
+bines CLIP with VFMs to exploit the finer-grained spa-
+tial structure provided by models such as DINO [7, 8]
+and SAM [9, 10]. Representative methods include Proxy-
+CLIP [11], CorrCLIP [12], and SegEarth-OV [13]. Although
+such multi-model collaboration can jointly preserve seman-
+tic openness and structural resolution, the feature spaces,
+resolutions, and response mechanisms of different models
+∗Corresponding author
+ORCID(s):
+are not inherently consistent. Therefore, additional feature
+alignment, information injection, or post-processing proce-
+dures are typically required. The introduction of SAM3 [14]
+provides new possibilities for constructing a more unified
+OVSS framework. Unlike the aforementioned approaches,
+SAM3 is designed for promptable concept segmentation and
+simultaneously performs concept recognition and pixel-level
+prediction within a unified query-based Transformer archi-
+tecture. Nevertheless, a unified model architecture does not
+necessarily imply that its visual representations inherently
+conform to the geometric transformation relationships found
+in remote sensing scenes. Owing to the nadir-view imaging
+configuration of remote sensing imagery, the semantics of
+the same ground object generally remain invariant under ge-
+ometric transformations from the dihedral group D4. How-
+ever, the SAM3 visual encoder produces different responses
+because such transformations alter spatial sampling, local
+context, and position-dependent representations. This study
+seeks to exploit these response discrepancies to repair and
+enhance visual representations, thereby improving segmen-
+tation performance.
+However, simply enumerating all D4 geometric trans-
+formations and directly averaging their predictions or fea-
+tures cannot guarantee the effective utilization of image
+information. To address this issue, we propose Multi-Scale
+Harmonic-Guided D4 View Selection (MH-D4VS), which
+selects structurally informative and geometrically com-
+plementary transformations. Specifically, MH-D4VS con-
+structs a compact complex harmonic orientation descriptor
+from multi-scale oriented edges and supplements it with
+chirality information to distinguish between rotations and
+Jianzheng Wang et al.: Preprint submitted to Elsevier
+Page 1 of 23
+arXiv:2610.04300v1  [cs.CV]  3 Oct 2026
+
+
+GFMR for RS OVSS
+reflections. It then evaluates the structural preferences of
+different geometric views according to the analytical action
+of D4 transformations in the harmonic domain. By jointly
+considering structural quality, geometric diversity, and the
+balance among transformation families, MH-D4VS adap-
+tively selects three complementary views from these non-
+identity candidates.
+Building upon MH-D4VS, we further propose Original-
+View-Anchored Adaptive Manifold Repair (OAMR). Al-
+though the candidate views selected by MH-D4VS provide
+complementary geometric information, visual features ex-
+tracted under different D4 transformations exhibit varying
+degrees of response shifts. Consequently, candidate features
+at certain spatial locations may contain unstable or even
+erroneous semantic activations. Simple multi-view aver-
+aging or direct feature fusion may propagate these unre-
+liable responses into the final representation, preventing
+the model from fully exploiting the complementary advan-
+tages of multi-view observations. Based on this observation,
+OAMR treats the original view as both the spatial and
+representation-state anchor. It evaluates feature consistency
+across different views within a unified coordinate system and
+establishes local reference structures using stable regions.
+Selective repair is performed when the feature from the
+original view deviates significantly from the local reference
+structure and the candidate views provide representations
+that are more consistent across views. In this manner, aux-
+iliary views are used to correct locally unreliable responses
+while preserving the stable information already contained in
+the original-view representation.
+After the multi-view geometric information has been
+selected and repaired, the semantic responses of the model to
+the current test sample may still be affected by cross-domain
+distribution shifts. This issue is particularly prominent in re-
+mote sensing imagery, where different regions often exhibit
+substantial variations in imaging conditions, object scales,
+texture distributions, and scene compositions. As a result,
+the fixed feature distributions learned by a pretrained model
+may not remain consistently reliable across different scenes.
+To address this problem, we design Pixel Decoder Test-
+Time Adaptation for SAM3 (PD-TTA), a test-time adapta-
+tion strategy tailored to the SAM3 dense visual decoder. PD-
+TTA uses the predictive uncertainty of the current sample as
+a self-supervised signal and performs sample-specific distri-
+bution recalibration by imposing an entropy-based constraint
+on the decoder representations. This enables the model to
+dynamically adjust its semantic responses according to the
+current input and improves prediction stability under varying
+scene conditions. Adaptation is performed independently
+for each test sample without requiring additional annotated
+data. During online adaptation, only the parameters of the
+GroupNorm layers are fine-tuned, while all other model
+parameters remain frozen. PD-TTA therefore improves the
+stability of semantic predictions without modifying the main
+inference architecture of SAM3.
+The main contributions of this work are summarized as
+follows:
+1. We propose MH-D4VS, which characterizes direc-
+tional structures using multi-scale complex harmonics
+and chirality. By jointly considering structural pref-
+erence, D4 geometric diversity, and transformation-
+family balance, MH-D4VS adaptively selects com-
+plementary non-identity views, thereby improving the
+geometric stability of the feature representations pro-
+duced by the pretrained SAM3 model.
+2. We propose OAMR, which imposes reliability con-
+straints on multi-view visual features through original-
+view-anchored local manifold modeling. OAMR con-
+structs a local manifold reference using an adaptive
+local subspace and evaluates the manifold consistency
+of the original and candidate features through refined
+cross-view metrics. It repairs locations whose features
+deviate significantly from the local manifold and are
+supported by reliable candidate views. In addition,
+Cross-Scale Guidance is introduced to provide com-
+plementary fine-grained spatial evidence.
+3. We design PD-TTA for the dense decoding architec-
+ture of SAM3. By integrating MH-D4VS, OAMR, and
+PD-TTA, we establish a new OVSS inference frame-
+work for remote sensing imagery, termed Geometry-
+Transformation-Aware Feature-Adaptive Manifold Restora-
+tion (GFMR). Experiments on remote sensing datasets
+demonstrate that GFMR achieves higher segmenta-
+tion accuracy than existing OVSS methods.
+2. Related Work
+2.1. Training-Based OVSS
+Training-based OVSS methods are typically built upon
+large-scale pretrained Vision–Language Models (VLMs)
+and further adapted to dense prediction tasks using data
+with pixel-level or region-level annotations. According to
+how visual representations are integrated with class se-
+mantics, existing methods can be broadly divided into two
+categories: mask-classification-based methods and dense-
+feature-adaptation-based methods.
+Mask-classification-based methods generally first gener-
+ate class-agnostic regions or masks and then perform open-
+vocabulary category recognition using visual–language sim-
+ilarity. OpenSeg [15], ZegFormer [16], OVSeg [17], and
+MasQCLIP [18] follow this paradigm. By decoupling re-
+gion generation from open-vocabulary category recognition,
+these methods extend the language semantics acquired
+during pretraining to previously unseen categories. Another
+line of research directly adapts the dense representations
+of visual–language models. LSeg [19] constructs an open-
+vocabulary prediction space through pixel-level visual–
+language alignment. SAN [20], SED [21], and CAT-Seg
+[22] further improve the spatial discriminability of visual–
+language features using side networks, adaptation mod-
+ules, or cost-aggregation mechanisms. SegCLIP [23] and
+GroupViT [24] learn region grouping or visual-token aggre-
+gation from image–text supervision, providing alternative
+approaches to open-vocabulary region modeling.
+Jianzheng Wang et al.: Preprint submitted to Elsevier
+Page 2 of 23
+
+
+GFMR for RS OVSS
+Overall, training-based methods can explicitly reduce
+the representation gap between image-level pretraining and
+pixel-level prediction by leveraging task-relevant data, and
+therefore generally exhibit strong adaptability to down-
+stream tasks. However, their performance depends on addi-
+tional training data, optimization procedures, and computa-
+tional resources. Consequently, their deployment flexibility
+is limited in applications involving rapidly changing cate-
+gory spaces or scarce annotations.
+2.2. Training-Free OVSS
+Training-free OVSS aims to perform open-vocabulary
+dense prediction by directly exploiting the visual and se-
+mantic knowledge already encoded in pretrained models,
+without optimizing model parameters on the target data.
+Existing studies have primarily explored three directions:
+extracting spatial information from the internal representa-
+tions of CLIP, exploiting structural priors provided by Visual
+Foundation Models (VFMs), and combining VLMs with
+VFMs to jointly preserve open-vocabulary semantics and
+fine-grained spatial representations. These three research
+directions have ultimately begun to converge toward unified
+foundation-model frameworks.
+2.2.1. CLIP Internal Representation Adaptation
+Methods in this category directly exploit the patch
+representations and attention relationships already encoded
+within CLIP, enabling a visual encoder originally designed
+for image-level recognition to produce spatial responses
+that are more suitable for pixel-level prediction. MaskCLIP
+[2] directly recovers patch-level visual representations from
+CLIP. SCLIP [3] and ClearCLIP [4] improve spatial con-
+sistency by modifying token interactions within the self-
+attention mechanism. NACLIP [25] further strengthens local
+neighborhood relationships to improve localization capabil-
+ity. ResCLIP [5], in contrast, exploits the spatial correlations
+retained in intermediate layers to enhance high-level pixel-
+wise dense representations.
+These studies demonstrate that the internal representa-
+tions of CLIP retain local information that can be used for
+pixel-level prediction. Nevertheless, the CLIP pretraining
+objective primarily focuses on global image–text alignment,
+while local boundaries, spatial adjacency relationships, and
+fine-grained object structures are not directly optimized.
+Therefore, relying exclusively on the reconstruction of inter-
+nal attention maps or patch representations remains insuf-
+ficient to fully bridge the gap between image-level visual–
+language pretraining and fine-grained spatial understanding.
+2.2.2. Visual Foundation Models for Structure
+Discovery
+Visual foundation models generally provide more ex-
+plicit local correspondences and category-agnostic spatial
+structures than visual–language models. The DINO family
+[7, 8] learns visual representations with strong local corre-
+spondence capabilities through large-scale self-supervised
+learning. Building upon such representations, TokenCut [26]
+and CutLER [27, 28] further discover salient regions and
+instance structures from self-supervised features. The SAM
+family [9, 10], meanwhile, exhibits strong category-agnostic
+region segmentation capabilities. Based on this capability,
+E-SAM [29] constructs a training-free entity segmentation
+framework that addresses the over-segmentation and under-
+segmentation problems that may occur during automatic
+mask generation with SAM. OmniSAM [30] further ex-
+plores the ability of SAM to model cross-field-of-view in-
+formation in panoramic scenes.
+These methods can effectively characterize the regional
+organization and object structures within an image. How-
+ever, their visual embeddings are generally not directly
+aligned with an open-vocabulary textual semantic space.
+Consequently, VFMs are better suited to serving as sources
+of spatial structure and have difficulty independently per-
+forming OVSS.
+2.2.3. VLM–VFM Collaborative OVSS
+To jointly exploit the open-vocabulary semantic capa-
+bilities of VLMs and the fine-grained spatial structures of
+VFMs, multi-model collaboration has gradually become an
+important direction in OVSS. Some studies enhance the
+visual representations of arbitrary categories using external
+visual references. For example, ReCo [31], OVDiff [32],
+FOSSIL [33], and FreeDA [34] employ retrieval systems,
+generative models, or offline visual references to construct
+richer visual support information for textual categories.
+Another category of methods directly establishes rep-
+resentational connections between visual–language models
+and self-supervised visual models. Talk2DINO [35] maps
+the textual semantics of CLIP to the patch-level visual fea-
+tures of DINO-v2, whereas CLIP-DINOiser [36] uses lo-
+calization priors provided by self-supervised features to
+improve the local representations of CLIP. Because these ap-
+proaches require additional mapping modules or lightweight
+feature learning, they differ to some extent from a strictly
+training-free setting with no parameter updates.
+In collaborative frameworks that strictly require no ad-
+ditional training, a more common strategy is to use external
+VFMs to provide spatial structural guidance. ProxyCLIP
+[11] and CorrCLIP [12] improve the spatial responses of
+CLIP by exploiting structural relationships derived from
+external visual models. CASS [37] further introduces object-
+level contextual information. Trident [38] jointly employs
+foundation models such as CLIP, DINO, and SAM to en-
+hance OVSS ability through their complementary represen-
+tations.
+Overall, VLM–VFM collaboration can simultaneously
+preserve open-vocabulary semantics and spatial structure.
+However, such approaches generally depend on multiple
+foundation models with different pretraining objectives and
+feature spaces, requiring feature mapping, attention guid-
+ance, or cross-model information interaction to establish
+connections among them.
+Jianzheng Wang et al.: Preprint submitted to Elsevier
+Page 3 of 23
+
+
+GFMR for RS OVSS
+2.2.4. From Heterogeneous Collaboration to Unified
+Foundation Models
+In contrast to the aforementioned heterogeneous model
+collaboration paradigms, the introduction of SAM3 [14]
+provides a new foundation for OVSS frameworks. SAM3 is
+designed for promptable concept segmentation and jointly
+models concept recognition and dense prediction within
+a unified architecture, allowing open-vocabulary semantic
+understanding and spatial segmentation to share the same
+visual representation system. Based on this framework, Ac-
+tiveSAM [39] further improves inference efficiency by dy-
+namically selecting active categories according to the in-
+put image, thereby reducing redundant computation during
+large-scale open-vocabulary inference.
+To some extent, SAM3 reduces the cross-model in-
+terfaces and representational discrepancies associated with
+conventional VLM–VFM collaboration. Nevertheless, a uni-
+fied architecture does not necessarily imply that its visual
+representations can naturally adapt to the spatial properties
+of different data domains. For remote sensing imagery, ar-
+bitrary object orientations caused by nadir-view imaging,
+substantial scale variations, and densely distributed objects
+continue to pose new challenges to spatial representation and
+geometric adaptability.
+2.3. OVSS for Remote Sensing Images
+Extending OVSS to remote sensing imagery is not
+merely a matter of transferring a model to a new data
+domain. Nadir-view imaging means that objects belonging
+to the same category generally lack a fixed orientation.
+Variations in spatial resolution and object size also intro-
+duce substantial scale differences, while high-resolution
+scenes often contain densely distributed small objects, com-
+plex boundaries, and large continuous regions. Therefore,
+in addition to preserving semantic generalization to open
+categories, remote sensing OVSS must explicitly address
+challenges such as orientation and scale variations.
+Existing studies have explored spatial-detail recovery
+and domain adaptation [40, 41] for remote sensing imagery
+from different perspectives. SegEarth-OV [13] restores high-
+resolution visual–language representations through feature
+upsampling. A related annotation-free extension [42] further
+introduces AlignEarth, extending open-vocabulary segmen-
+tation to the Synthetic Aperture Radar (SAR) modality.
+GSNet [43] employs a dual-branch architecture to com-
+bine remote-sensing-specific priors with general visual–
+language semantics, whereas SkySense-O [44] enhances
+open-world visual representations through remote-sensing-
+specific visual–language pretraining. ConInfer [45] further
+considers semantic dependencies among different spatial
+units in large-scale remote sensing scenes and improves
+regional prediction consistency through contextual joint
+inference.
+The strong category-agnostic spatial modeling capability
+of the SAM family has also been increasingly introduced
+into open-world remote sensing applications. AerOSeg [46]
+and SCORE [47] use SAM features to provide structural
+guidance and regional context. RemoteSAM [48] and In-
+structSAM [49] utilize SAM-based pipelines to unify seg-
+mentation with broader interpretation tasks. Following the
+introduction of SAM3, SegEarth-OV3 [50] enhances its
+application to training-free remote sensing OVSS through
+prediction fusion and class-presence filtering. ProC-SAM3
+[51], meanwhile, improves remote sensing OVSS inference
+through prompt expansion and reliable-response aggrega-
+tion.
+Overall, existing remote sensing OVSS methods have
+made continuous progress in high-resolution feature extrac-
+tion, domain adaptation, cross-model collaboration, contex-
+tual modeling, and the utilization of SAM-based foundation
+models. Nevertheless, existing SAM3-based remote sensing
+OVSS methods primarily focus on inference mechanisms
+such as prediction fusion, category filtering, and prompt cal-
+ibration, while the multi-view geometric information arising
+from rotations and reflections in remote sensing imagery has
+yet to be systematically exploited.
+On the one hand, the structural information provided by
+different geometric views is not equivalent for a given scene,
+and simply enumerating all transformations can introduce
+redundant observations. On the other hand, even after dif-
+ferent views are realigned to a unified coordinate system, the
+high-dimensional features at corresponding spatial locations
+may still exhibit substantial response discrepancies. Direct
+averaging or indiscriminate fusion may therefore propagate
+unreliable responses. Consequently, identifying representa-
+tive and complementary geometric information from the
+multi-view observations generated by a unified foundation
+model itself, and reliably exploiting this information to en-
+hance the original visual representation, remains an impor-
+tant research problem in OVSS for remote sensing imagery.
+3. Methodology
+3.1. Overall Framework
+The overall pipeline of the proposed GFMR framework
+for OVSS of remote sensing images is illustrated in Figure 1.
+GFMR consists of three interconnected components. First,
+MH-D4VS analyzes the multi-scale directional structures of
+the input image and selects three candidate views with both
+structural representativeness and geometric complementar-
+ity from the seven non-identity D4 transformations. Subse-
+quently, the features from the selected candidate views are
+realigned to the original coordinate system. Taking the orig-
+inal view as the anchor, OAMR constructs a local manifold
+reference and combines adaptive subspace modeling with
+cross-view consistency measurements to identify locally
+anomalous features that deviate from the manifold. Selective
+repair is performed when the candidate views provide more
+reliable representations. Finally, PD-TTA uses the semantic
+uncertainty of the current test image to perform sample-
+specific adaptation of the affine parameters of the Group-
+Norm layers online in the PixelDecoder that participate in
+the forward pass.
+Jianzheng Wang et al.: Preprint submitted to Elsevier
+Page 4 of 23
+
+
+GFMR for RS OVSS
+Figure 1: Overview of the proposed Geometry-Transformation-Aware Feature-Adaptive Manifold Restoration framework (GFMR).
+GFMR consists of three components including MH-D4VS, OAMR and PD-TTA.
+3.2. Multi-Scale Harmonic-Guided D4 View
+Selection
+Roads, building boundaries, and other artificial struc-
+tures in remote sensing images often exhibit prominent
+directional patterns. Different rotated and reflected views
+alter the relative relationships between these structures and
+their local contexts, thereby producing diverse visual re-
+sponses. However, the structural contributions of different
+D4 transformations are not equivalent for a given scene.
+Directly enumerating all transformations not only introduces
+redundant observations but also increases the computational
+cost of subsequent multi-view feature extraction. To address
+this issue, we propose the Multi-Scale Harmonic-Guided D4
+View Selection (MH-D4VS) module as shown in figure 2.
+Before visual encoding, MH-D4VS selects three representa-
+tive and geometrically complementary candidate views from
+the seven non-identity D4 transformations according to the
+directional structures of the input image.
+MH-D4VS uses the directional structures of the input
+image as the basis for view selection. It characterizes the
+relative preferences of different geometric views through
+image-domain structural responses and further constrains
+the geometric complementarity among candidates at the set
+level. Specifically, the module first describes the directional
+structures of the input image using multi-scale complex har-
+monics and introduces chirality to capture the handedness
+differences between rotations and reflections. It then derives
+the structural response of each transformation through the
+analytical action of the D4 group in the harmonic domain.
+Finally, the optimal three-view combination is determined
+by jointly considering structural quality, geometric diversity,
+and transformation-family balance.
+3.2.1. Multi-Scale Harmonic Structural Encoding
+Given an input image 𝐼, we first convert it into a
+grayscale representation and construct a multi-scale struc-
+tural description over the scale set 
+=
+{1, 2, 4}. At
+each scale 𝑠, the horizontal and vertical gradients, denoted
+by 𝐺(𝑠)
+𝑥(𝑥) and 𝐺(𝑠)
+𝑦(𝑥), respectively, are computed using
+the horizontal and vertical Sobel operators. The gradient
+magnitude is then defined as
+𝐺(𝑠)(𝑥) =
+√(
+𝐺(𝑠)
+𝑥(𝑥)
+)2
++
+(
+𝐺(𝑠)
+𝑦(𝑥)
+)2
+.
+(1)
+To reduce interference from weak textures and noise in
+the global orientation statistics, only locations with suffi-
+ciently strong gradient responses are retained for subsequent
+computation. Let 𝑀𝑠(𝑥) ∈{0, 1} denote the strong-edge in-
+dicator at scale 𝑠. The corresponding edge weight is defined
+as
+{
+𝑤𝑠(𝑥) = 𝐺(𝑠)(𝑥)𝑀𝑠(𝑥),
+𝑀𝑠(𝑥) ∈{0, 1}.
+(2)
+Here, 𝑀𝑠(𝑥) = 1 indicates that location 𝑥is retained for
+structural statistics, whereas 𝑀𝑠(𝑥) = 0 indicates that it is
+discarded. By preserving variations in gradient magnitude,
+𝑤𝑠(𝑥) assigns greater contributions to more prominent edges
+in the overall orientation description.
+Based on this representation, the two-dimensional edge
+orientation is expressed as a complex-valued oriented tan-
+gent:
+𝑒𝑠(𝑥) =
+−𝐺(𝑠)
+𝑦(𝑥) + i𝐺(𝑠)
+𝑥(𝑥)
+max (𝐺(𝑠)(𝑥), 𝜀) ,
+(3)
+where i =
+√
+−1, and 𝜀> 0 is a sufficiently small constant
+introduced for numerical stability. At locations with nonzero
+gradients, 𝑒𝑠(𝑥) is approximately a unit complex number and
+can be written as
+𝑒𝑠(𝑥) ≈exp (i𝜃𝑠(𝑥)) ,
+(4)
+where 𝜃𝑠(𝑥) denotes the oriented edge-tangent direction at
+location 𝑥. Unlike representations that describe only an un-
+oriented principal axis, this oriented complex representation
+preserves directional sign information. Consequently, odd-
+order harmonics can further distinguish structures exhibiting
+opposite directional relationships.
+Jianzheng Wang et al.: Preprint submitted to Elsevier
+Page 5 of 23
+
+
+GFMR for RS OVSS
+Figure 2: Overview of MH-D4VS. Multi-scale oriented edges are first used to construct and aggregate first- to fourth-order
+complex harmonic moments, while chirality is computed to capture handedness information. The action of the D4 group is then
+applied to derive the structural preferences of different geometric views. Finally, the optimal three-view combination 𝐶∗is selected
+by jointly considering structural quality 𝑄(𝐶), geometric diversity 𝐷(𝐶), and transformation-family balance 𝐹(𝐶). The selected
+views are combined with the original view 𝑂to form the multi-view representation used in subsequent processing.
+Using the above representation, the 𝑛-th-order weighted
+complex harmonic moment at scale 𝑠is computed as
+𝑚(𝑠)
+𝑛=
+∑
+𝑥
+𝑤𝑠(𝑥)𝑒𝑠(𝑥)𝑛
+∑
+𝑥
+𝑤𝑠(𝑥)
+,
+𝑛= 1, … , 4.
+(5)
+Here, 𝑚(𝑠)
+𝑛
+represents the 𝑛-th-order directional-structure
+statistic at scale 𝑠. Different harmonic orders correspond to
+different directional periodicities. The first-order (𝑛= 1) and
+third-order (𝑛= 3) harmonics preserve asymmetric informa-
+tion about oriented structures, while the second-order har-
+monic (𝑛= 2) primarily characterizes axial structures. The
+fourth-order harmonic (𝑛= 4) responds to scene patterns
+exhibiting four-fold directional characteristics. Therefore,
+the first- to fourth-order harmonics describe the directional
+organization of remote sensing images from complementary
+perspectives without explicitly estimating a single dominant
+orientation.
+Because different scales contain different amounts of
+informative structural content, we further perform adaptive
+aggregation according to the edge-response strength at each
+scale. Let 𝑋𝑠denote the set of all spatial locations at scale 𝑠.
+The scale weight is defined as
+𝛼𝑠=
+1
+|𝑋𝑠|
+∑
+𝑥∈𝑋𝑠
+𝑤𝑠(𝑥),
+(6)
+where |𝑋𝑠| is the number of spatial locations at scale 𝑠,
+and 𝛼𝑠reflects the overall strength of the informative edge
+responses at that scale. Accordingly, the global 𝑛-th-order
+complex harmonic moment is defined as
+𝑚𝑛=
+∑
+𝑠∈
+𝛼𝑠𝑚(𝑠)
+𝑛
+∑
+𝑠∈
+𝛼𝑠
+,
+𝑛= 1, … , 4.
+(7)
+This aggregation is performed only among moments
+of the same harmonic order, thereby preserving the di-
+rectional interpretation associated with each order. Mean-
+while, scales with stronger informative edge responses re-
+ceive larger weights, allowing the representation to capture
+both local contours and broader directional structures. The
+resulting global multi-scale harmonic representation is 𝒎=
+{𝑚1, 𝑚2, 𝑚3, 𝑚4
+}, which serves as the basis for the subse-
+quent construction of chirality and the modeling of structural
+responses under different D4 geometric views.
+3.2.2. Cross-Order Harmonic Chirality Representation
+Relying solely on individual harmonic responses may
+be insufficient to distinguish rotated and reflected views
+with similar orientation statistics. To capture the changes
+in handedness induced by reflection, we construct a cross-
+order chirality representation after multi-scale aggregation.
+Specifically, we define 𝐼12 = 𝑚2
+1𝑚∗
+2, 𝐼13 = 𝑚3
+1𝑚∗
+3, 𝐼24 =
+𝑚2
+2𝑚∗
+4. Here, (⋅)∗denotes complex conjugation, and 𝐼12,
+𝐼13, and 𝐼24 are cross-order complex statistics obtained by
+coupling harmonics of different orders. The final normalized
+Jianzheng Wang et al.: Preprint submitted to Elsevier
+Page 6 of 23
+
+
+GFMR for RS OVSS
+chirality is defined as
+𝜒= Im(𝐼12) + Im(𝐼13) + Im(𝐼24)
+|𝐼12| + |𝐼13| + |𝐼24| + 𝜀
+.
+(8)
+Here, Im(⋅) denotes the imaginary part of a complex number,
+|⋅| denotes its magnitude, and 𝜀is a small positive constant
+introduced for numerical stability. The resulting chirality
+satisfies −1 ≤𝜒≤1.
+These cross-order combinations exploit the phase re-
+lationships among harmonics of different orders to con-
+struct a reflection-sensitive descriptor. Under rotation, the
+phase shifts associated with different harmonic orders cancel
+within the cross-order combinations. Under reflection, the
+complex-conjugate relationship reverses the signs of the
+imaginary parts of these combinations. Therefore, 𝜒com-
+pensates for the limited ability of harmonic real parts alone
+to distinguish rotations from reflections and provides hand-
+edness information for the subsequent structural scoring of
+D4 views.
+3.2.3. Group-Aware Structural Response Modeling
+After obtaining the global harmonic representation and
+chirality, MH-D4VS evaluates the structural responses of
+different geometric views using the analytical transformation
+rules of the D4 group in the harmonic domain. We partition
+D4 into a rotation subset and a reflection subset:
+{ ={𝑂, 𝑅90, 𝑅180, 𝑅270},
+={𝑀0, 𝑀45, 𝑀90, 𝑀135}.
+(9)
+Here, 𝑂denotes the identity transformation, contains four
+rotation states, and contains four reflection states. Thus,
+D4 = ∪.
+Since complex harmonics follow explicit transformation
+rules under rotation and reflection, the 𝑛-th-order harmonic
+moment after applying transformation 𝑔can be expressed as
+𝑚(𝑔)
+𝑛
+=
+{
+𝑒i𝑛Δ𝜃𝑔𝑚𝑛,
+𝑔∈,
+(−1)𝑛𝑒i𝑛Δ𝜃𝑔𝑚∗
+𝑛,
+𝑔∈,
+𝑛= 1, … , 4. (10)
+Here, 𝑚𝑛is the global 𝑛-th-order harmonic moment of the
+original view, and 𝑚(𝑔)
+𝑛
+denotes the corresponding harmonic
+response after transformation 𝑔. The angle Δ𝜃𝑔is deter-
+mined by the geometric action of the corresponding D4
+transformation and follows the rotation and reflection con-
+ventions adopted in this work. Furthermore, 𝑛∈{1, 2, 3, 4}
+denotes the harmonic order, and (⋅)∗denotes complex con-
+jugation. Rotations primarily induce harmonic phase shifts,
+whereas reflections additionally involve complex conjuga-
+tion and a parity-dependent factor determined by the har-
+monic order. This analytical relationship allows the struc-
+tural responses of different D4 views to be derived directly
+from the original harmonic descriptor, without recomputing
+orientation statistics for each transformed image.
+Correspondingly, chirality preserves its sign under rota-
+tion, whereas reflection reverses handedness. We therefore
+define
+𝜒𝑔=
+{
+𝜒,
+𝑔∈,
+−𝜒,
+𝑔∈.
+(11)
+Here, 𝜒is the chirality of the original view obtained in the
+preceding subsection, and 𝜒𝑔denotes the chirality response
+associated with transformation 𝑔. We then construct the
+structural score of view 𝑔using the harmonic responses and
+chirality:
+𝑆(𝑔) =
+4
+∑
+𝑛=1
+𝛽𝑛Re(𝑚(𝑔)
+𝑛
+) + 𝜆𝜒𝜒𝑔.
+(12)
+Here, Re(⋅) denotes the real part of a complex number,
+𝛽𝑛is the weight of the 𝑛-th-order harmonic and controls
+the relative contribution of the corresponding directional
+structure, and 𝜆𝜒is the chirality weight. In this work, we
+set (𝛽1, 𝛽2, 𝛽3, 𝛽4) = (0.35, 0.70, 0.20, 0.50), 𝜆𝜒= 0.20.
+Finally, a temperature-scaled softmax converts the struc-
+tural scores of all D4 elements into continuous structural
+preferences:
+𝑝(𝑔) =
+exp(𝑆(𝑔)∕𝑇)
+∑
+ℎ∈D4 exp(𝑆(ℎ)∕𝑇).
+(13)
+Here, 𝑇is the temperature parameter, which is set to 𝑇=
+0.10. The probability 𝑝(𝑔) represents the relative structural
+preference of the input image within the D4 transformation
+space. A larger 𝑝(𝑔) indicates greater alignment between
+the corresponding geometric view and the directional struc-
+tures of the current scene. This distribution characterizes
+the structural compatibility of different candidate views and
+provides a structural-quality criterion for the subsequent
+diversity-aware joint selection of three views.
+3.2.4. Diversity-Aware Triplet Selection
+The structural preference 𝑝(𝑔) defined above describes
+the relative compatibility between each D4 transformation
+and the directional structures of the current image. However,
+independently selecting the three non-identity transforma-
+tions with the highest probabilities may yield candidates
+that are geometrically similar or even belong to the same
+transformation family, thereby reducing the complementar-
+ity of multi-view observations. We therefore jointly select
+the three views as a set, explicitly accounting for their ge-
+ometric differences and transformation-family composition
+while preserving structural compatibility.
+Let the set of non-identity candidates be
+= D4⧵{𝑂} = {𝑅90, 𝑅180, 𝑅270, 𝑀0, 𝑀45, 𝑀90, 𝑀135}.
+(14)
+Here, 𝑂denotes the original view. Considering all triplets
+𝐶⊂with |𝐶| = 3, the seven non-identity transformations
+yield (7
+3
+) = 35 candidate combinations. We first define the
+structural-quality term as
+𝑄(𝐶) =
+∑
+𝑔∈𝐶𝑝(𝑔)
+∑
+ℎ∈𝑝(ℎ),
+(15)
+Jianzheng Wang et al.: Preprint submitted to Elsevier
+Page 7 of 23
+
+
+GFMR for RS OVSS
+where 𝑝(𝑔) is the structural probability of view 𝑔obtained
+in the preceding subsection. The term 𝑄(𝐶) measures the
+fraction of the total non-identity structural probability mass
+captured by triplet 𝐶. A larger 𝑄(𝐶) indicates that the
+selected views are collectively more compatible with the
+directional structures of the input image.
+Structural quality alone cannot prevent geometric redun-
+dancy among candidates. To address this issue, we represent
+each D4 element 𝑔by its corresponding two-dimensional
+orthogonal transformation matrix 𝐴𝑔. The normalized ge-
+ometric distance between two transformations is defined as
+𝑑(𝑔𝑖, 𝑔𝑗) =
+‖𝐴𝑔𝑖−𝐴𝑔𝑗‖𝐹
+√
+8
+,
+(16)
+where ‖⋅‖𝐹denotes the Frobenius norm. The distance cal-
+culation includes both the three candidate views and the
+original view 𝑂, thereby evaluating the overall coverage of
+the complete four-view set 𝐶= {𝑂, 𝑔1, 𝑔2, 𝑔3} in the D4
+transformation space. Let 𝑑mean(𝐶) and 𝑑min(𝐶) denote the
+mean and minimum distances, respectively, over all pairs of
+distinct views in 𝐶. Geometric diversity is then defined as
+𝐷(𝐶) = 1
+2𝑑mean(𝐶) + 1
+2𝑑min(𝐶).
+(17)
+The mean distance measures the overall geometric spread of
+the view set, while the minimum distance discourages any
+two views from being excessively similar. Together, these
+terms increase geometric coverage in D4 while reducing
+redundant observations.
+In addition to geometric distance, rotations and reflec-
+tions provide different types of geometric observations. Let
+the non-identity rotation subset and the reflection subset be
+{′ ={𝑅90, 𝑅180, 𝑅270},
+={𝑀0, 𝑀45, 𝑀90, 𝑀135}.
+(18)
+We accordingly define the transformation-family bal-
+ance term as
+𝐹(𝐶) =
+{
+1,
+𝐶∩′ ≠∅∧𝐶∩≠∅,
+0,
+otherwise.
+(19)
+This term encourages each candidate triplet to include both
+rotated and reflected views, preventing the selected obser-
+vations from being concentrated entirely within a single
+transformation family. Since it primarily serves as a discrete
+constraint on the composition of the triplet, it is assigned a
+relatively small weight in the final objective.
+Combining structural quality, geometric diversity, and
+transformation-family balance, we define the joint triplet
+score as
+𝐽(𝐶) = 𝜆𝑄𝑄(𝐶) + 𝜆𝐷𝐷(𝐶) + 𝜆𝐹𝐹(𝐶),
+(20)
+where 𝜆𝑄, 𝜆𝐷, and 𝜆𝐹control the relative contributions of
+the three terms. In our experiments, these weights are set
+to 𝜆𝑄= 0.65, 𝜆𝐷= 0.30, and 𝜆𝐹= 0.05. The optimal
+candidate triplet is then obtained as
+𝐶∗= arg max
+𝐶⊂, |𝐶|=3
+𝐽(𝐶).
+(21)
+The larger weight assigned to structural quality ensures that
+candidate selection remains primarily driven by the direc-
+tional structures of the current image. Geometric diversity
+further discourages transformations with high probabilities
+but strong mutual redundancy, while transformation-family
+balance promotes complementarity between rotations and
+reflections. Together, these three terms turn independent
+view ranking into joint optimization at the set level.
+After obtaining the optimal candidate set 𝐶∗, we sort its
+three elements in descending order of their structural proba-
+bilities 𝑝(𝑔) and designate them as the Principal, Secondary,
+and Third candidate views, respectively:
+𝑝(𝑃) ≥𝑝(𝑆) ≥𝑝(𝑇),
+𝑃, 𝑆, 𝑇∈𝐶∗.
+(22)
+The views 𝑃, 𝑆, and 𝑇are therefore not selected directly
+as the global top three among all seven non-identity D4 trans-
+formations according to 𝑝(𝑔). Instead, 𝐽(𝐶) first identifies
+the optimal triplet with overall complementarity, after which
+the candidates are ordered within this set. Consequently, a
+transformation with a relatively high structural probability
+may still be excluded if it is geometrically redundant with
+other candidates. The final multi-view set is expressed as
+= {𝑂} ∪𝐶∗= {𝑂, 𝑃, 𝑆, 𝑇}.
+(23)
+Here, 𝑂preserves the original spatial reference, while 𝑃,
+𝑆, and 𝑇provide auxiliary observations jointly constrained
+by structural compatibility and geometric complementarity.
+These views serve as inputs to subsequent cross-view feature
+modeling and selective repair.
+3.3. Original-Anchored Adaptive Multi-View
+Manifold Repair (OAMR)
+Following MH-D4VS, we obtain a multi-view set con-
+sisting of the original view 𝑂and three complementary
+candidate views 𝑃, 𝑆, and 𝑇. Although these views depict
+the same scene, their encoded visual features reside in differ-
+ent geometric coordinate systems. Even after spatial align-
+ment, the high-dimensional features at corresponding loca-
+tions may differ in reliability. Direct cross-view averaging
+or indiscriminate fusion may propagate locally anomalous
+responses into the final representation and compromise the
+stable semantic information already present in the original
+view.
+To address this issue, we propose Original-Anchored
+Adaptive Manifold Repair (OAMR) as shown in figure 3.
+OAMR first identifies reliable locations based on cross-view
+consistency and constructs local manifold references from
+actual view features. It then characterizes the multimodal
+structure of high-dimensional features using adaptive local
+subspaces and further refines cross-view reliability estimates
+through local tangent spaces and neighborhood relation-
+ships. Finally, complete feature replacement is performed
+Jianzheng Wang et al.: Preprint submitted to Elsevier
+Page 8 of 23
+
+
+GFMR for RS OVSS
+Figure 3: Overview of OAMR. Features from the three candidate views are first aligned to the original coordinate system through
+inverse D4 transformations, and reliable cross-view observations are used to construct adaptive local subspaces. Refined cross-view
+metrics and candidate support then identify reliable replacement sources, enabling selective repair only of original-view features
+that deviate significantly from the local manifold. Finally, candidate-source consistency at a high-resolution feature level guides
+cross-scale extension at the target repair level.
+only when a candidate view receives sufficient cross-view
+support and can substantially improve the manifold con-
+sistency of the original feature. Meanwhile, high-resolution
+feature levels provide fine-grained evidence of candidate
+sources to supplement local decisions at the target repair
+level.
+3.3.1. Reliable Anchor Initialization
+For the multi-scale features produced by the visual back-
+bone, let the feature map of view 𝑣at scale 𝑙be
+𝐹(𝑙)
+𝑣
+∈ℝ𝐶𝑙×𝐻𝑙×𝑊𝑙,
+(24)
+where 𝐶𝑙, 𝐻𝑙, and 𝑊𝑙denote the number of channels, height,
+and width at this level, respectively. For each candidate
+view 𝑣∈{𝑃, 𝑆, 𝑇}, let 𝑔𝑣denote its corresponding D4
+transformation. We first restore the candidate features to the
+original coordinate system through the inverse group action:̃
+𝐹(𝑙)
+𝑣
+= 𝑔−1
+𝑣
+(𝐹(𝑙)
+𝑣
+) ,
+𝑣∈{𝑃, 𝑆, 𝑇}.
+(25)
+We also set̃ 𝐹(𝑙)
+𝑂
+= 𝐹(𝑙)
+𝑂. The four views thus have explicit
+geometric correspondences at the same spatial locations. At
+spatial location 𝑥, let 𝑓𝑣(𝑥) ∈ℝ𝐶𝑙denote the aligned feature
+vector of view 𝑣. Cross-view consistency evaluation and
+local manifold modeling use its 𝐿2-normalized form:̂
+𝑓𝑣(𝑥) =
+𝑓𝑣(𝑥)
+‖𝑓𝑣(𝑥)‖2 + 𝜀.
+(26)
+This normalization is used only for reliability evaluation
+and manifold-distance computation. When the repair con-
+ditions are satisfied, feature replacement uses the complete,
+unnormalized candidate feature aligned through the inverse
+transformation, thereby preserving the original numerical
+representation of the output features.
+Local manifold estimation should prioritize locations
+with relatively stable cross-view representations. To this
+end, we first compute the cosine consistency between the
+original view and each of the three candidate views:
+𝑐𝑣(𝑥) =̂ 𝑓𝑂(𝑥)⊤̂𝑓𝑣(𝑥),
+𝑣∈{𝑃, 𝑆, 𝑇}.
+(27)
+Let 𝑐(1)(𝑥) and 𝑐(2)(𝑥) denote the two largest similarities
+among the three candidates. The initial anchor score is
+Jianzheng Wang et al.: Preprint submitted to Elsevier
+Page 9 of 23
+
+
+GFMR for RS OVSS
+defined as
+𝑎(𝑥) =
+𝑐(1)(𝑥) + 𝑐(2)(𝑥)
+2
+.
+(28)
+We then combine an adaptive quantile threshold with a
+minimum consistency requirement to determine the reliable
+anchor set:
+{
+0 = {𝑥∣𝑎(𝑥) ≥𝜏𝑎},
+𝜏𝑎= max(𝑄𝑞(𝑎), 𝜏min
+𝑎
+) .
+(29)
+Here, 𝑄𝑞(⋅) denotes the quantile operator, and 𝜏min
+𝑎
+is the
+minimum consistency threshold. Combining the responses
+of the two most consistent candidates reduces the influence
+of accidentally high similarities on reliable-region identifi-
+cation.
+At each reliable location, OAMR selects an observed fea-
+ture with the highest overall consistency with the other views
+as the manifold reference sample, rather than averaging the
+features from all four views. Specifically, we define
+𝑣∗(𝑥) = arg max
+𝑣∈
+⎡
+⎢
+⎢
+⎢⎣
+1
+|| −1
+∑
+𝑢∈
+𝑢≠𝑣̂
+𝑓𝑣(𝑥)⊤̂𝑓𝑢(𝑥) + 𝛿𝟏(𝑣= 𝑂)
+⎤
+⎥
+⎥
+⎥⎦
+.
+(30)
+Here, 𝟏(⋅) is the indicator function, and 𝛿introduces a small
+bias toward the original view, giving it higher selection
+priority when cross-view consistency scores are nearly tied.
+Each reliable location therefore contributes only one medoid
+drawn from the observed views to subsequent manifold
+estimation:
+𝑓med(𝑥) = 𝑓𝑣∗(𝑥)(𝑥),
+𝑥∈0.
+(31)
+Selecting actual observed samples avoids synthetic represen-
+tations introduced by cross-view averaging that may not be-
+long to the actual feature distribution, while allowing stable
+candidate observations to contribute to the construction of
+local reference structures.
+3.3.2. Adaptive Local Subspace Modeling
+High-level visual features typically contain multiple se-
+mantic regions and local structural patterns, making it diffi-
+cult for a single global linear subspace to adequately char-
+acterize their distribution. OAMR constructs an adaptive
+mixture of local subspaces from reliable medoid samples,
+allowing different structural regions to be represented by
+different low-dimensional linear approximations.
+For the 𝑘-th local subspace, let 𝜇𝑘and 𝑈𝑘denote its mean
+and orthonormal basis, respectively. Given a feature vector
+𝑓, its orthogonal reconstruction residual with respect to this
+subspace is defined as
+𝑟𝑘(𝑓) = ‖‖‖
+(𝐼−𝑈𝑘𝑈⊤
+𝑘
+) (𝑓−𝜇𝑘
+)‖‖‖2 ,
+(32)
+where 𝐼is the identity matrix. The dimensionality of each
+local subspace is determined adaptively according to the
+cumulative explained variance of its feature spectrum, rather
+than being fixed in advance. This preserves the domi-
+nant feature variations while preventing excessively high-
+dimensional subspaces from reducing the discriminative
+power of anomaly residuals. To reduce the influence of a
+small number of anomalous anchors on manifold estimation,
+samples in the high-residual tail are removed during local
+PCA fitting, and the subspace is re-estimated. Let 𝑚𝑘and 𝑠𝑘
+denote the median and robust scale of the reference resid-
+uals for the 𝑘-th subspace, respectively. The standardized
+anomaly score of a feature relative to the local manifold is
+then expressed as
+𝑧(𝑓) = min
+𝑘
+𝑟𝑘(𝑓) −𝑚𝑘
+𝑠𝑘
+.
+(33)
+Taking the minimum ensures that each feature is evaluated
+against its best-matching local subspace. The robust residual
+scale is estimated using the residual median and the Median
+Absolute Deviation (MAD), reducing the influence of a
+small number of extreme responses on the anomaly score.
+The number of local subspaces is also determined adap-
+tively according to the feature distribution of the current
+image. Initially, all reliable medoid samples are used to fit a
+single robust local subspace. Underfitted sample clusters are
+then prioritized based on their upper-quantile reconstruction
+residuals, and candidate child clusters are generated through
+deterministic binary splitting. A split is accepted only when
+both child clusters contain sufficient samples, exhibit clear
+structural separation, and achieve a sufficient reduction in
+reconstruction error relative to the parent subspace. This
+process proceeds recursively until no valid split remains
+or a predefined complexity limit is reached. Consequently,
+simple scenes retain fewer local models, whereas images
+containing diverse structural patterns can be represented
+by multiple local subspaces, avoiding reliance on a fixed
+number of linear models.
+3.3.3. Refined Cross-View Metric-Guided Refit
+Initial cosine consistency provides stable seed sam-
+ples for local manifold estimation. However, pointwise
+directional similarity alone is insufficient to characterize
+anisotropic variations within the local manifold and spatial
+neighborhood structure. To improve the accuracy of reliable
+anchors and local manifold references, OAMR constructs
+a refined cross-view metric based on the initial mixture
+of local subspaces. This metric is used to reselect reliable
+locations and medoids from the observed views, followed by
+one guided refit of the local subspace mixture. This process
+refines the initial cosine-driven manifold estimate into a
+cross-view reference structure jointly constrained by local
+geometry and neighborhood relationships.
+At location 𝑥, the reference local subspace is first deter-
+mined by the original view:
+𝑘𝑂(𝑥) = arg min
+𝑘
+𝑧𝑘
+(𝑓𝑂(𝑥)) .
+(34)
+Consequently, all comparisons between views at this loca-
+tion use the local reference structure associated with the
+Jianzheng Wang et al.: Preprint submitted to Elsevier
+Page 10 of 23
+
+
+GFMR for RS OVSS
+original view, preventing any candidate view from redefin-
+ing the local coordinate reference. Let 𝑈denote the or-
+thonormal basis of the reference subspace and {𝜆𝑗}𝑟
+𝑗=1 its
+retained eigenvalues. The feature difference between two
+aligned views 𝑢and 𝑣is defined as
+Δ𝑢𝑣(𝑥) =̂ 𝑓𝑣(𝑥) −̂ 𝑓𝑢(𝑥).
+(35)
+OAMR separately measures the variation along the local
+tangent space and the orthogonal component outside the
+local subspace, yielding the local geometric distance
+𝑑𝑢𝑣
+loc(𝑥) = 𝜔𝑡𝑑𝑢𝑣
+𝑡(𝑥) + 𝜔⟂𝑑𝑢𝑣
+⟂(𝑥).
+(36)
+Here, 𝑑𝑢𝑣
+𝑡
+normalizes variations along tangent-space direc-
+tions according to the local eigenvalues, while 𝑑𝑢𝑣
+⟂mea-
+sures orthogonal deviations that cannot be explained by
+the reference subspace. The weights 𝜔𝑡and 𝜔⟂control the
+contributions of these two components and are set to 𝜔𝑡=
+0.35 and 𝜔⟂= 0.65 in this work. This formulation dis-
+tinguishes anisotropic variations permitted within the local
+manifold from anomalous responses that deviate from the
+local structure.
+Beyond pointwise feature differences, OAMR further
+characterizes the relationship pattern between each loca-
+tion and its local neighborhood. Let 𝜋𝑣(𝑥) denote the local
+relation distribution of view 𝑣at location 𝑥, obtained by
+normalizing the cosine relationships between the central
+feature and its neighboring features. The neighborhood-
+structure discrepancy between two views is measured using
+the Jensen–Shannon divergence:
+𝑑𝑢𝑣
+rel(𝑥) = 𝐷JS
+(𝜋𝑢(𝑥) ‖ 𝜋𝑣(𝑥)) .
+(37)
+The local geometric distance and neighborhood relation dis-
+tance are standardized separately using robust statistics and
+then combined into the final pairwise cross-view distance:
+𝑑𝑢𝑣(𝑥) = 𝑍[(1 −𝜂) 𝑍(𝑑𝑢𝑣
+loc(𝑥)) + 𝜂𝑍(𝑑𝑢𝑣
+rel(𝑥))] . (38)
+Here, 𝑍(⋅) denotes standardization based on the median
+and a robust scale estimate, and 𝜂controls the relative
+contribution of neighborhood relation information. This dis-
+tance accounts for both local manifold geometry and spatial
+relational consistency, extending beyond pointwise cosine
+similarity.
+Using this refined cross-view metric, OAMR reselects
+reliable anchors and their corresponding medoid samples,
+then updates the adaptive mixture of local subspaces accord-
+ingly. The updated manifold model is subsequently used to
+compute the final cross-view distances, providing a unified
+reliability criterion for candidate-support assessment and
+replacement-source selection.
+3.3.4. Selective Feature Replacement with Candidate
+Support
+Once the final local subspaces have been established,
+we compute the standardized residuals of the original view
+and the three candidate views relative to the local manifold,
+denoted by 𝑧𝑂(𝑥), 𝑧𝑃(𝑥), 𝑧𝑆(𝑥), and 𝑧𝑇(𝑥), respectively.
+A larger 𝑧𝑣(𝑥) indicates a greater deviation of the corre-
+sponding feature from the current reliable local manifold.
+However, a low candidate residual alone does not guarantee
+reliability, as a candidate may produce an isolated, erroneous
+response that happens to lie close to a local subspace. There-
+fore, before admitting a candidate into the set of replacement
+sources, OAMR additionally requires cross-view support
+from other candidate views. Let 𝑠𝑣(𝑥) denote the number of
+other candidates supporting candidate 𝑣at location 𝑥. The
+eligible candidate set is defined as
+(𝑥) = {𝑣∈{𝑃, 𝑆, 𝑇} ∣𝑠𝑣(𝑥) ≥𝜏𝑠},
+(39)
+where 𝜏𝑠is the required support count, set to 𝜏𝑠= 2 in this
+work. At feature levels where the refined metric is enabled,
+mutual support between candidates is determined by the
+previously defined pairwise distances and their adaptive
+thresholds. At higher-resolution guidance levels, support re-
+lationships are established using a more lightweight cosine-
+consistency measure. Candidate support determines only
+eligibility for replacement; it does not involve averaging
+multiple candidate features.
+For eligible candidates, we further consider both their
+local manifold anomaly scores and their overall consistency
+across views. Let̄ 𝑐𝑣(𝑥) denote the cross-view consistency
+cost of candidate 𝑣, standardized using robust statistics. The
+candidate selection score is defined as
+𝜓𝑣(𝑥) = (1 −𝜌)𝑧𝑣(𝑥) + 𝜌̄ 𝑐𝑣(𝑥),
+(40)
+where 𝜌controls the contribution of multi-view consis-
+tency to replacement-source selection. The selected candi-
+date source is
+𝑣†(𝑥) = arg min
+𝑣∈(𝑥)
+𝜓𝑣(𝑥).
+(41)
+If (𝑥) is empty, the original-view feature is retained at that
+location. This selection process requires candidates to be
+both close to the reliable local manifold and consistent with
+other geometric observations.
+Even when an eligible candidate exists, OAMR does not
+immediately perform replacement. A location 𝑥is identified
+as requiring repair only when all the following conditions
+are satisfied:
+⎧
+⎪
+⎨
+⎪⎩
+𝑧𝑂(𝑥) > 𝜏𝑂,
+𝑧𝑣†(𝑥) < 𝜏𝐶,
+𝑧𝑂(𝑥) −𝑧𝑣†(𝑥) > Δ𝑧.
+(42)
+Here, 𝜏𝑂identifies original-view features that deviate sig-
+nificantly from the reliable manifold, 𝜏𝐶ensures that the
+candidate lies within an acceptable manifold range, and Δ𝑧
+requires a sufficient reduction in residual relative to the
+original feature. We set 𝜏𝑂= 3.0, 𝜏𝐶= 1.25, and Δ𝑧= 1.25.
+The final feature update uses selective hard replacement:
+𝑓rep(𝑥) =
+{
+𝑓𝑣†(𝑥),
+𝑥∈rep,
+𝑓𝑂(𝑥),
+otherwise,
+(43)
+Jianzheng Wang et al.: Preprint submitted to Elsevier
+Page 11 of 23
+
+
+GFMR for RS OVSS
+where rep denotes the initial set of repair locations satis-
+fying the above conditions. The replacement feature 𝑓𝑣†(𝑥)
+is the complete, unnormalized candidate feature aligned
+through the inverse transformation, rather than the normal-
+ized vector used for scoring. Thus, OAMR neither computes
+a weighted average of candidate features nor continuously
+interpolates between the original and candidate represen-
+tations. Each repaired location retains a complete high-
+dimensional feature produced by an actual view.
+3.3.5. Cross-Scale Guidance
+Visual features at the target repair level have relatively
+low spatial resolution, with each feature location corre-
+sponding to a comparatively large image region. Conse-
+quently, they may provide only a coarse characterization of
+local anomalies and fine-grained spatial structures. OAMR
+therefore introduces cross-scale guidance, using a high-
+resolution feature level to provide finer-grained evidence
+of candidate sources and supplement local decisions at the
+target repair level.
+Let 𝑙𝑟denote the target level where feature repair is per-
+formed, and let 𝑙𝑔denote the corresponding guidance level
+with higher spatial resolution. Both levels independently
+determine candidate sources, but the guidance level only
+provides cross-scale evidence; its features are not directly
+written into the final output. Because the two levels have
+explicit spatial correspondences, each location 𝑥at the target
+repair level corresponds to a local region 𝐵(𝑥) at the high-
+resolution guidance level. Let 𝑆𝑔(𝑦) denote the candidate-
+source mapping obtained at the guidance level, where 𝑦∈
+𝐵(𝑥) represents a high-resolution location within the cor-
+responding region. For candidate view 𝑣∈{𝑃, 𝑆, 𝑇}, its
+source-support count within 𝐵(𝑥) is defined as
+𝑁𝑣(𝑥) =
+∑
+𝑦∈𝐵(𝑥)
+𝟏[𝑆𝑔(𝑦) = 𝑣] .
+(44)
+Here, 𝟏(⋅) is the indicator function. We then select the
+candidate view receiving the most fine-grained support:
+𝑣cs(𝑥) = arg max
+𝑣∈{𝑃,𝑆,𝑇}
+𝑁𝑣(𝑥).
+(45)
+This view is the most strongly supported candidate within
+the corresponding high-resolution region. When its support
+count reaches a predefined threshold, location 𝑥is consid-
+ered to have stable cross-scale candidate evidence. This pro-
+cess aggregates consistent candidate-source decisions from
+multiple high-resolution locations into the corresponding
+location at the target repair level, reducing the influence of an
+individual coarse-resolution feature response on the repair
+decision.
+High-resolution evidence is used only to supplement
+locations that have not yet been selected for repair by the
+local manifold criterion at the target level. It does not reverse
+replacements already accepted at that level. Let rep denote
+the initial repair set and cs the set of additional locations
+supported by cross-scale evidence. The final repair set is
+final = rep ∪cs.
+(46)
+For locations 𝑥∈rep, the candidate source determined
+by the local manifold criterion at the target repair level
+is retained. For locations 𝑥∈cs added solely through
+cross-scale evidence, replacement uses the complete can-
+didate feature corresponding to 𝑣cs(𝑥) at the target repair
+level, aligned to the original coordinate system. Thus, high-
+resolution guidance extends the coverage of reliable re-
+pair through source consistency within fine-grained regions
+while preserving existing repair decisions.
+Finally, only the repaired features at the target repair
+level are written into the output feature state. The high-
+resolution guidance level and all other feature levels where
+repair is disabled retain their original-view representations.
+Positional encodings and other deterministic spatial infor-
+mation are likewise inherited from the original view and
+are excluded from local manifold estimation and cross-view
+replacement, ensuring that the repaired features maintain a
+spatial reference consistent with the original image.
+Through this cross-scale guidance mechanism, OAMR
+converts fine-grained candidate consistency in high-resolution
+features into additional reliability evidence for the target
+repair level. This allows locations that lack sufficient evi-
+dence to trigger repair at a single scale to be corrected when
+stable cross-view support exists within their corresponding
+local regions. Combined with the preceding original-view-
+anchored local manifold modeling and candidate-support
+constraints, OAMR selectively uses complementary infor-
+mation from multiple views without indiscriminately fusing
+entire feature maps.
+3.4. Pixel Decoder Test-Time Adaptation
+The preceding multi-view selection and manifold repair
+enhance the adaptability of SAM3 to geometric transfor-
+mations in remote sensing imagery at the input-observation
+and visual-representation levels, respectively. The repaired
+visual features continue through the original cross-modal
+encoding, MaskDecoder, and PixelDecoder pathways of
+SAM3 to produce pixel-level predictions. However, the
+affine parameters of the GroupNorm layers in the PixelDe-
+coder are pretrained on source-domain data, and their nor-
+malization behavior may not adequately accommodate vari-
+ations in appearance and scene distributions across remote
+sensing images. We therefore further propose Pixel Decoder
+Test-Time Adaptation (PD-TTA) as shown in figure 4 for
+SAM3.
+PD-TTA introduces no separate adaptation branch and
+preserves the original input and output formats of SAM3.
+Instead, it directly designates the affine parameters of the
+GroupNorm layers that participate in the PixelDecoder for-
+ward pass as the parameters to be adapted at test time. An
+unsupervised loss is then constructed from the responses
+produced by the original semantic prediction pathway of
+SAM3.
+3.4.1. Integration with the SAM3 PixelDecoder
+For the current test image, we follow the original text-
+prompting mechanism of SAM3 and sequentially use the
+dataset category names as query words. Text encoding and
+Jianzheng Wang et al.: Preprint submitted to Elsevier
+Page 12 of 23
+
+
+GFMR for RS OVSS
+Figure 4: The PD-TTA in PixelDecoder of SAM3
+cross-modal interaction produce category-specific visual–
+semantic features, which are then passed to the PixelDecoder
+through the original decoding pathway. In the current model
+configuration, two GroupNorm layers in the PixelDecoder
+actively participate in the forward computation. During test-
+time adaptation, only the affine scale parameters 𝛾and bias
+parameters 𝛽of these GroupNorm layers receive gradients.
+The convolutional layers, text-related modules, semantic
+head, and all other learnable parameters remain frozen.
+PD-TTA therefore adjusts the normalization behavior
+within the existing PixelDecoder without replacing any net-
+work layers in SAM3, allowing the adapted features to
+pass seamlessly through its original subsequent decoding
+and prediction stages. To reduce the computational cost of
+backpropagation, only the feature copies used for adaptation
+are resized while preserving their aspect ratio. The visual
+states and spatial dimensions used for the actual inference
+pass remain unchanged.
+3.4.2. Semantic Feedback and Local–Global Entropy
+Objective
+To directly constrain PixelDecoder parameter updates
+using the semantic predictions of SAM3, we decode features
+from different active stages of the PixelDecoder using the
+frozen semantic head. Semantic responses at different spatial
+scales are aligned to the resolution of the final active stage
+through bilinear interpolation and then fused with equal
+weights. For category 𝑐, the fused semantic response is
+expressed as
+⎧
+⎪
+⎨
+⎪⎩̄
+𝑧𝑐(𝑢; 𝜃) = 1
+𝑆
+𝑆
+∑
+𝑠=1
+[
+𝑠
+(
+𝐻
+(
+𝐷(𝑠)
+𝜃(𝐹𝑐)
+))]
+𝑢,
+𝜃= {𝛾𝑙, 𝛽𝑙}𝑙∈.
+(47)
+Here, 𝑐denotes the category index, and 𝐹𝑐denotes the
+PixelDecoder input features obtained using the name of
+category 𝑐through the original text-prompting and cross-
+modal encoding pathways of SAM3. The quantity 𝑆is the
+number of PixelDecoder feature levels used for semantic-
+response fusion, and 𝑠indexes these levels. The mapping
+𝐷(𝑠)
+𝜃(⋅) denotes the forward computation producing features
+at the 𝑠-th PixelDecoder level under parameters 𝜃. The
+function 𝐻(⋅) is the frozen semantic head, while 𝑠(⋅) aligns
+the semantic response from the 𝑠-th feature level to the
+common spatial resolution through bilinear interpolation.
+The variable 𝑢denotes a spatial location in the fused feature
+map, and̄ 𝑧𝑐(𝑢; 𝜃) is the fused semantic logit for category 𝑐
+at that location. The set 𝜃contains the parameters adapted
+at test time, consisting of the affine scale parameters 𝛾𝑙and
+bias parameters 𝛽𝑙of the active GroupNorm layers indexed
+by . This formulation specifies how PD-TTA is integrated
+into SAM3: the adaptable parameters reside within the Pix-
+elDecoder, while the semantic feedback driving adaptation
+comes from the original semantic head.
+After obtaining the fused logits, we apply softmax along
+the category dimension to obtain pixel-level category prob-
+abilities. Image-level category probabilities are obtained by
+first spatially averaging the fused logits and then applying
+softmax along the category dimension. To jointly constrain
+local pixel predictions and image-level category discrimina-
+tion, and inspired by the joint local–global entropy optimiza-
+tion strategy used in the MLMP test-time adaptation method
+[52], PD-TTA adopts the following local–global entropy
+objective:
+TTA = −1
+|Ω|
+∑
+𝑢∈Ω
+𝐶
+∑
+𝑐=1
+𝑝𝑐,𝑢log 𝑝𝑐,𝑢−𝛼cls
+𝐶
+∑
+𝑐=1
+𝑞𝑐log 𝑞𝑐. (48)
+Here, TTA is the unsupervised test-time adaptation loss of
+PD-TTA. The quantity 𝐶denotes the total number of dataset
+categories, with 𝑐∈{1, … , 𝐶} indexing the categories. The
+set Ω contains all spatial locations in the fused feature map,
+|Ω| is the number of these locations, and 𝑢∈Ω denotes
+an individual location. The probability 𝑝𝑐,𝑢is the pixel-level
+prediction that location 𝑢belongs to category 𝑐, obtained
+by applying softmax to the fused logits along the category
+dimension. Thus, the first term on the right-hand side is the
+mean local entropy over all spatial locations.
+The probability 𝑞𝑐is the image-level category probabil-
+ity obtained by spatially averaging the fused logits over Ω
+and then applying softmax along the category dimension.
+Accordingly, the second term is the weighted global cate-
+gory entropy. The coefficient 𝛼cls controls the contribution
+of this global entropy term and balances the local pixel-level
+and image-level category constraints. We set 𝛼cls = 1.0 in
+this work.
+3.4.3. Test-Time Adaptation and Inference
+At test time, the entropy loss is computed from the
+semantic feedback of SAM3 described above. Backpropaga-
+tion computes gradients only for the GroupNorm parameters
+𝛾and 𝛽within the PixelDecoder, which are updated using
+the Adam optimizer. Throughout optimization, the text en-
+coder, cross-modal interaction modules, convolutional lay-
+ers, semantic head, and all other parameters of SAM3 remain
+frozen. After the predefined number of test-time updates,
+the adapted GroupNorm parameters are used directly in
+the existing PixelDecoder, and the actual inference pass
+for the current image follows the original cross-modal en-
+coding, MaskDecoder, and semantic prediction pathways of
+SAM3. PD-TTA therefore confines adaptation to normaliza-
+tion within the PixelDecoder while preserving the original
+prompting mechanism, semantic decoding architecture, and
+inference pipeline.
+Jianzheng Wang et al.: Preprint submitted to Elsevier
+Page 13 of 23
+
+
+GFMR for RS OVSS
+The key experimental settings are 𝜂= 1×10−3,
+𝑇=
+1,
+𝑆max = 72,
+𝛼cls = 1.0. Here, 𝜂is the Adam
+learning rate used to update the GroupNorm affine param-
+eters at test time. The quantity 𝑇is the number of gradient
+updates performed for the current test image. The parameter
+𝑆max specifies the maximum spatial side length allowed
+when resizing the adaptation feature copies while preserving
+their aspect ratio to reduce backpropagation costs. The coef-
+ficient 𝛼cls is the weight of the global category entropy term
+in the local–global entropy objective. These settings control
+only the strength and computational cost of PixelDecoder
+normalization adaptation for the current image; they do not
+alter the input dimensions used for actual inference or the
+original network architecture of SAM3.
+4. Experiments
+We evaluate the proposed method on eight widely used
+remote sensing semantic segmentation datasets: OpenEarthMap
+[53], LoveDA [54], iSAID [55], UAVid [56], UDD5 [57],
+VDD [58], Potsdam and Vaihingen [59]. Mean Intersection-
+over-Union (mIoU) is used as the main evaluation metric
+across all datasets.
+4.1. Datasets
+The introduction of the employed eight remote sensing
+datasets are shown as follows:
+(1) OpenEarthMap consists of high-resolution remote
+sensing images acquired from aerial and satellite platforms,
+covering 44 countries and regions worldwide. The imagery
+has a spatial resolution of approximately 0.25–0.50 m, pri-
+marily contains three visible RGB bands, and provides an-
+notations for eight land-cover classes.
+(2) LoveDA contains high-resolution remote sensing
+images obtained through Google Earth, with a spatial resolu-
+tion of approximately 0.30 m and three visible RGB bands. It
+covers both urban and rural scenes and includes seven land-
+cover classes.
+(3) iSAID is built upon the high-resolution aerial im-
+agery of DOTA-v1.0. Its images originate from multiple
+sources, including Google Earth, GF-2, and JL-1, with spa-
+tial resolutions varying by source. The dataset primarily
+contains RGB imagery, together with some panchromatic
+imagery, and provides annotations for 15 typical object
+categories.
+(4) UAVid consists of high-resolution urban video im-
+agery captured from oblique viewpoints using unmanned
+aerial vehicles (UAVs), primarily in RGB format. Because
+the imagery is acquired through low-altitude oblique imag-
+ing, its ground spatial resolution varies with the imaging
+distance and viewing angle. The dataset includes eight cate-
+gories of urban land cover and objects.
+(5) UDD5 contains three-channel RGB imagery ac-
+quired by UAVs across multiple urban and campus scenes at
+flight altitudes of approximately 60–100 m. It comprises five
+classes: vegetation, buildings, roads, vehicles, and others.
+(6) VDD contains high-resolution RGB imagery cap-
+tured using a DJI Mavic Air II UAV across urban, indus-
+trial, rural, and natural scenes. Its ground spatial resolution
+varies with viewing angle and flight conditions. The dataset
+includes seven land-cover classes and covers diverse viewing
+angles and illumination conditions.
+(7) Potsdam and (8) Vaihingen are both part of the ISPRS
+2D Semantic Labeling Benchmark and consist of very-high-
+resolution orthophotos acquired from aerial platforms. Their
+spatial resolutions are approximately 0.05 m and 0.099 m,
+respectively. Potsdam provides four-band imagery compris-
+ing RGB and near-infrared (NIR) bands, whereas Vaihingen
+primarily contains NIR, red, and green (NIR–R–G) bands.
+Both datasets include six urban land-cover classes.
+Together, these datasets span satellite, aerial, and UAV
+imaging platforms and exhibit substantial differences in spa-
+tial resolution, object scale, and viewpoint. They therefore
+enable a comprehensive evaluation of OVSS performance
+across diverse remote sensing scenarios.
+4.2. Implementation Details
+We use the officially released SAM3 model with its
+Perception Encoder-Large+ (PE-L+) visual backbone and
+follow the text-prompting and prediction-fusion settings of
+SegEarth-OV3 [50] by default. GFMR requires no dataset-
+level training on the target datasets. Except for the Group-
+Norm affine parameters updated online by PD-TTA during
+prediction for each individual image, the visual encoder, text
+encoder, PixelDecoder convolutional layers, instance head,
+semantic head, and all other module parameters of SAM3
+remain frozen. The original mask-generation and result-
+fusion procedures are preserved.
+MH-D4VS and OAMR use the same inference config-
+uration across all datasets, without parameter adjustments
+for individual test sets. MH-D4VS performs candidate geo-
+metric view selection before visual encoding, while OAMR
+operates on the aligned multi-view visual features and pre-
+serves the spatial reference of the original view and the
+subsequent prediction pipeline. None of them requires gradi-
+ent computation or model parameter updates; together, they
+form the training-free visual adaptation core of GFMR.
+The PD-TTA settings are fixed across all experiments
+as 𝜂= 1 × 10−3, 𝑇= 1, 𝑆max = 72, and 𝛼cls = 1.0. A
+new Adam optimizer is initialized for each image, and the
+SAM3’s default GroupNorm parameters are restored after
+the actual prediction pass. Consequently, neither adapted
+parameters nor optimizer momentum is carried over between
+images.
+4.3. Comparison with State-of-the-Art Methods
+Figure 5 presents a qualitative comparison between
+GFMR and existing OVSS methods. Table 1 reports the
+corresponding quantitative results on eight remote sensing
+benchmark datasets. GFMR achieves an average mIoU of
+55.6%, outperforming all compared methods. These results
+demonstrate the complementary benefits of geometric view
+selection, anchored manifold repair, and sample-specific
+Jianzheng Wang et al.: Preprint submitted to Elsevier
+Page 14 of 23
+
+
+GFMR for RS OVSS
+Figure 5: Qualitative comparison of the proposed method with existing open-vocabulary semantic segmentation methods.
+Table 1
+Performance comparison of open-vocabulary semantic segmentation methods on eight remote sensing benchmark datasets (mIoU,
+%). The best results are highlighted in bold.
+Method
+OpenEarthMap
+LoveDA
+iSAID
+Potsdam
+Vaihingen
+UAVid
+UDD5
+VDD
+Avg.
+CLIP [1]
+12.0
+12.4
+7.5
+15.6
+10.8
+10.9
+9.5
+14.2
+11.6
+MaskCLIP [2]
+25.1
+27.8
+14.5
+33.9
+29.9
+28.6
+32.4
+32.9
+28.1
+SCLIP [3]
+29.3
+30.4
+16.1
+39.6
+35.9
+31.4
+38.7
+37.9
+32.4
+GEM [60]
+33.9
+31.6
+17.7
+39.1
+36.4
+33.4
+41.2
+39.5
+34.1
+ClearCLIP [4]
+31.0
+32.4
+18.2
+42.0
+36.2
+36.2
+41.8
+39.3
+34.6
+ProxyCLIP [11]
+38.9
+34.3
+21.8
+49.0
+47.5
+35.8
+40.8
+47.8
+39.5
+ResCLIP [5]
+39.8
+35.5
+21.2
+47.4
+40.3
+42.5
+50.4
+42.5
+39.9
+SegEarth-OV [13]
+40.3
+36.9
+21.7
+47.1
+40.0
+42.5
+50.6
+45.3
+40.6
+CorrCLIP [12]
+32.9
+36.9
+25.5
+51.9
+47.0
+38.3
+46.1
+47.3
+40.7
+ReAttnCLIP [61]
+41.1
+37.0
+23.2
+48.7
+29.9
+44.0
+53.7
+49.7
+40.9
+ConInfer [45]
+42.0
+39.3
+20.1
+50.0
+31.4
+46.4
+46.9
+50.3
+40.8
+ProC-SAM3 [51]
+41.0
+41.6
+20.7
+57.1
+60.4
+54.3
+71.6
+64.2
+51.4
+SegEarth-OV3 [50]
+42.9
+47.4
+27.6
+57.8
+60.8
+54.7
+71.7
+64.5
+53.4
+Ours
+49.5
+48.3
+29.9
+58.4
+64.3
+55.3
+72.7
+66.2
+55.6
+decoder adaptation while preserving the core architecture
+and original prediction pipeline of SAM3 and keeping
+all model parameters frozen except the GroupNorm affine
+parameters updated by PD-TTA.
+Across individual datasets, GFMR maintains consistent
+advantages under different remote sensing imaging condi-
+tions. On OpenEarthMap, the mIoU increases from 42.9%
+with SegEarth-OV3 to 49.5%. On Vaihingen, which contains
+high-resolution aerial imagery, it improves from 60.8% to
+Jianzheng Wang et al.: Preprint submitted to Elsevier
+Page 15 of 23
+
+
+GFMR for RS OVSS
+Table 2
+Evaluation of the proposed training-free visual adaptation modules on ProC-SAM3, another SAM 3-based framework (mIoU, %).
+Method
+OpenEarthMap
+LoveDA
+iSAID
+Potsdam
+Vaihingen
+UAVid
+UDD5
+VDD
+Avg.
+ProC-SAM3
+41.0
+41.6
+20.7
+57.1
+60.4
+54.3
+71.6
+64.1
+51.4
+ProC-SAM3 + MH-D4VS + OAMR
+47.7
+42.0
+25.8
+57.3
+60.6
+54.6
+72.4
+65.4
+53.2
+64.3%. GFMR also achieves 72.7% and 66.2% on UDD5 and
+VDD, respectively. Improvements of varying magnitudes are
+also observed on LoveDA, iSAID, Potsdam, and UAVid.
+These results indicate that the benefits extend across satel-
+lite, aerial, and UAV platforms rather than being restricted
+to a single data distribution.
+GFMR consists of two complementary adaptation mech-
+anisms applied at test time. MH-D4VS and OAMR adjust
+only geometric views and visual feature states, without gra-
+dient computation or model parameter updates. PD-TTA
+requires neither target-dataset annotations nor offline train-
+ing and performs self-supervised updates only to the affine
+parameters of the GroupNorm layers in the PixelDecoder
+when predicting each test image. GFMR thus retains the
+advantages of training-free visual adaptation while introduc-
+ing lightweight, image-specific online adaptation to further
+improve robustness to sample-level distribution shifts.
+To evaluate the compatibility of the training-free vi-
+sual adaptation core with different SAM3-based inference
+frameworks, we integrate MH-D4VS and OAMR into ProC-
+SAM3 [51], preserving its original text prompts, prediction
+heads, and subsequent decoding pipeline. PD-TTA is ex-
+cluded from this transfer experiment to isolate the effects of
+transferring the two modules from those of additional test-
+time parameter updates. Table 2 reports the corresponding
+quantitative results.
+Integrating MH-D4VS and OAMR increases the average
+mIoU of ProC-SAM3 from 51.4% to 53.2%, with positive
+gains on all eight datasets. OpenEarthMap and iSAID im-
+prove by 6.7 and 5.1 percentage points, respectively, while
+Potsdam, Vaihingen, UAVid, UDD5, and VDD also show
+improvements. These results indicate that visual represen-
+tation enhancement through geometric view selection and
+anchored manifold repair does not depend on a specific
+implementation of text prompting or result fusion and can
+be transferred to other SAM3-based OVSS frameworks.
+Figure 6 further presents a qualitative comparison. Com-
+pared with the original ProC-SAM3, integrating the pro-
+posed modules produces more complete object coverage and
+fewer local misclassifications in some regions. In particular,
+the second row shows numerous misclassifications in the
+original ProC-SAM3 predictions relative to the ground truth,
+which are substantially reduced after incorporating MH-
+D4VS and OAMR. Together with the quantitative results,
+these observations indicate that MH-D4VS and OAMR, as
+training-free modules operating within the visual represen-
+tation pathway, are compatible with different SAM3-based
+inference frameworks.
+Figure 6: Qualitative results of the proposed method within the
+ProC-SAM3 framework. (a) Input images; (b) predictions from
+the original ProC-SAM3; (c) predictions after integrating the
+proposed MH-D4VS and OAMR modules; (d) ground truth.
+4.4. Ablation Studies
+4.4.1. Overall Module Analysis
+We use the complete inference pipeline of SegEarth-
+OV3 as the baseline and introduce MH-D4VS, OAMR,
+and PD-TTA in different configurations to analyze their
+contributions to overall performance. Random-3 replaces
+the structure-aware triplet selection of MH-D4VS, while
+Mean Fusion replaces the selective feature repair of OAMR.
+Random-3 randomly selects three views without replace-
+ment from the seven non-identity candidate transformations,
+leaving the remaining visual encoding and feature alignment
+procedures unchanged. Mean Fusion applies the inverse
+transformations to align the three candidate feature maps
+and then averages them with the original-view features using
+equal weights. Starting from the SAM3’s default Group-
+Norm parameters, PD-TTA performs one online, sample-
+specific update based on the local–global semantic entropy
+of the current image and uses the adapted state for inference.
+All other model parameters remain frozen.
+Table 3 shows that the complete GFMR framework
+(setting F) achieves the best results on OpenEarthMap, Vai-
+hingen, and VDD. Compared with the baseline (setting
+A), it improves mIoU by 6.55, 3.50, and 1.71 percentage
+points, respectively. These results demonstrate that the three
+modules provide complementary benefits through geometric
+observation construction, feature reliability repair, and on-
+line calibration of sample-level distributions.
+Jianzheng Wang et al.: Preprint submitted to Elsevier
+Page 16 of 23
+
+
+GFMR for RS OVSS
+Table 3
+Overall ablation results for MH-D4VS, OAMR, and PD-TTA (mIoU, %). A dash (–) indicates that the original SegEarth-OV3
+baseline configuration is retained without introducing the corresponding module or replacement strategy. A check mark (✓)
+indicates the proposed module. For MH-D4VS, a cross (×) denotes Random-3 view selection, while a circle (◦) denotes the use
+of all candidate views. For OAMR, a cross (×) denotes Mean Fusion. PD-TTA denotes Pixel Decoder Test-Time Adaptation.
+Ablation Setting
+MH-D4VS
+OAMR
+PD-TTA
+OpenEarthMap
+Vaihingen
+VDD
+A. (SegEarth-OV3 baseline)
+–
+–
+–
+42.90
+60.80
+64.50
+B.
+✓
+×
+–
+44.16
+60.77
+53.05
+C.
+×
+✓
+–
+46.27
+62.74
+64.79
+D.
+◦
+✓
+–
+47.21
+63.17
+65.06
+E.
+✓
+✓
+–
+48.78
+63.79
+65.77
+F.
+✓
+✓
+✓
+49.45
+64.30
+66.21
+Table 4
+Ablation study of different components in MH-D4VS (mIoU, %).
+Multi-Scale Harmonic
+Structural Encoding
+Cross-Order Harmonic
+Chirality Representation
+Diversity-Aware
+Triplet Selection
+OpenEarthMap
+Vaihingen
+VDD
+×
+✓
+✓
+48.17
+63.56
+65.71
+✓
+×
+✓
+48.07
+63.58
+65.62
+✓
+✓
+×
+48.19
+63.64
+65.72
+✓
+✓
+✓
+49.45
+64.30
+66.21
+With MH-D4VS retained, replacing OAMR with Mean
+Fusion (setting B) substantially degrades performance, par-
+ticularly on VDD, indicating that indiscriminate averaging
+can propagate locally inconsistent responses. With OAMR
+retained, replacing MH-D4VS with Random-3 (setting C)
+also underperforms structure-aware selection, highlighting
+the importance of representative and complementary can-
+didate views for effective subsequent repair. Using all can-
+didate views (setting D) yields modest gains over Random-
+3, but still underperforms the proposed structure-aware se-
+lection, suggesting that simply increasing the number of
+views does not guarantee more effective complementary
+information. Adding PD-TTA to the training-free core (set-
+ting F) further improves performance on all three datasets,
+demonstrating that a single image-specific online adaptation
+step based on entropy minimization provides consistent ad-
+ditional benefits.
+4.4.2. Ablation of MH-D4VS
+Table 4 further examines the contributions of individ-
+ual components within MH-D4VS. MH-D4VS consists of
+three components including Multi-Scale Harmonic Struc-
+tural Encoding, Cross-Order Harmonic Chirality Represen-
+tation and Diversity-Aware Triplet Selection. The complete
+configuration achieves mIoU scores of 49.45%, 64.30%, and
+66.21% on OpenEarthMap, Vaihingen, and VDD, respec-
+tively. Removing Multi-Scale Harmonic Structural Encod-
+ing reduces these scores to 48.17%, 63.56%, and 65.71%, re-
+spectively. Removing Cross-Order Harmonic Chirality Rep-
+resentation yields 48.07%, 63.58%, and 65.62%, while re-
+moving Diversity-Aware Triplet Selection results in 48.19%,
+63.64%, and 65.72%.
+All three simplified configurations consistently reduce
+performance. Multi-Scale Harmonic Structural Encoding
+captures complementary directional information across dif-
+ferent spatial extents. Cross-Order Harmonic Chirality Rep-
+resentation provides additional chirality-based discrimi-
+nation between rotations and reflections. Diversity-Aware
+Triplet Selection further constrains the geometric comple-
+mentarity of the candidate set beyond the structural pref-
+erences of individual views. These results indicate that the
+performance of MH-D4VS arises from the combined con-
+tributions of multi-scale orientation descriptors, reflection-
+sensitive modeling, and set-level view selection, rather than
+from a single structural metric.
+4.4.3. Ablation of OAMR
+Table 5 examines the roles of Adaptive Local Subspace
+Modeling, Refined Cross-View Metric-Guided Refit, and
+Cross-Scale Guidance in OAMR by removing one compo-
+nent at a time. The complete OAMR configuration achieves
+mIoU scores of 49.45%, 64.30%, and 66.21% on Open-
+EarthMap, Vaihingen, and VDD, respectively. Removing
+any component reduces performance.
+Without Adaptive Local Subspace Modeling, perfor-
+mance drops to 44.13%, 60.88%, and 64.35%, indicating
+that a single fixed manifold reference cannot adequately
+characterize the feature distributions of different regions.
+Removing Refined Cross-View Metric-Guided Refit yields
+44.24%, 60.90%, and 64.36%, respectively. This suggests
+that initial consistency alone is insufficient for reliable cross-
+view assessment, whereas metric refinement based on local
+manifold geometry and neighborhood relationships further
+improves anchor and candidate-source estimation.
+When only Cross-Scale Guidance is removed, perfor-
+mance decreases to 46.26%, 63.74%, and 65.64%. The
+larger decline on OpenEarthMap indicates that fine-grained
+candidate-source evidence from the high-resolution guid-
+ance level can supplement local decisions at the target repair
+level. Overall, Adaptive Local Subspace Modeling provides
+Jianzheng Wang et al.: Preprint submitted to Elsevier
+Page 17 of 23
+
+
+GFMR for RS OVSS
+Figure 7: Qualitative comparison of different ablation configurations. From left to right: representative samples from the
+OpenEarthMap, Vaihingen, and VDD datasets.
+Table 5
+Ablation study of different components in OAMR (mIoU, %).
+Adaptive Local
+Subspace Modeling
+Refined Cross-View
+Metric-Guided Refit
+Cross-Scale
+Guidance
+OpenEarthMap
+Vaihingen
+VDD
+×
+✓
+✓
+44.13
+60.88
+64.35
+✓
+×
+✓
+44.24
+60.90
+64.36
+✓
+✓
+×
+46.26
+63.74
+65.64
+✓
+✓
+✓
+49.45
+64.30
+66.21
+the structural reference, Refined Cross-View Metric-Guided
+Refit improves cross-view reliability estimation, and Cross-
+Scale Guidance extends repair to additional regions with
+fine-grained support. Together, these components form the
+complete OAMR repair process.
+4.4.4. Visual Analysis of Feature Differences and
+Manifold Repair under D4 Transformations
+Figure 8 presents feature visualizations before and after
+OAMR repair in a shared PCA space. The colors represent
+only the projections of high-dimensional features onto a low-
+dimensional principal component space and do not corre-
+spond to specific semantic classes. We therefore focus on
+the spatial distribution of different regions, local continuity,
+and relative changes before and after repair.
+At the global level, the dominant feature distribution
+patterns remain largely consistent before and after OAMR
+repair. The locations and contours of large-scale regions,
+as well as their relative spatial relationships, show no sub-
+stantial changes. This suggests that the repair process does
+not introduce extensive feature reconstruction and largely
+preserves the major spatial structures of the original features.
+Locally, the repaired feature representations exhibit greater
+continuity. Some isolated responses that previously differed
+markedly from their surroundings, along with fragmented
+local variations, become less pronounced. Visual transitions
+between adjacent tokens become more gradual, resulting
+Jianzheng Wang et al.: Preprint submitted to Elsevier
+Page 18 of 23
+
+
+GFMR for RS OVSS
+Figure 8: Visualization of multi-view feature repair with OAMR. On the left, the top row shows the Original View and three
+transformed views (Principal, Secondary, and Third), while the bottom row visualizes their features in a shared PCA space after
+alignment to the original coordinate system. The right panel shows the features repaired by OAMR. All features use the same
+PCA projection and color mapping. Colors indicate only relative feature projections in the low-dimensional PCA space and do not
+correspond to specific semantic classes.
+Figure 9: Spatial distribution, replacement sources, and changes in local manifold consistency for selective feature repair with
+OAMR. (a) Final feature repair regions, with red locations indicating feature replacement. (b) Distribution of final replacement
+sources. 𝑂indicates retention of the original-view features, while 𝑃, 𝑆, and 𝑇indicate replacement with aligned features from
+the Principal, Secondary, and Third candidate views, respectively. (c) Spatial distribution of improvements in local manifold
+anomaly scores. Colors represent the minimum local subspace anomaly score before repair minus the anomaly score after repair.
+Positive values indicate improved consistency with the local manifold, whereas negative values indicate increased deviation. Black
+contours delineate the final repair locations, and the displayed values report the mean improvement within the final repair regions.
+(d) Changes in the feature distribution at the final repair locations in a shared PCA space. Gray crosses denote the means of
+reliable anchor features. Red and green points represent the original-view features before repair and the candidate features used
+for replacement, respectively. Connecting lines indicate paired feature changes at the same spatial location, while red and green
+crosses denote the feature means before and after repair, respectively.
+in more spatially consistent local regions. Meanwhile, the
+major boundaries between existing regions remain distinct,
+with no evident widespread blurring or merging of regions.
+These observations are consistent with the selective repair
+mechanism of OAMR.
+As shown in Figure 9(a), feature repair in OAMR is dis-
+tinctly selective. The replaced tokens are distributed across
+different spatial regions of the image, while other locations
+retain their original-view features. This agrees with the de-
+sign of OAMR, which performs replacement at locations sat-
+isfying both the anomaly criteria and candidate acceptance
+conditions, indicating that the method does not extensively
+reconstruct the entire feature map.
+Figure 9(b) further illustrates the actual feature sources at
+the repaired locations. All three candidate views, Principal,
+Secondary, and Third, contribute to the final repair. Their
+contributions are spatially interspersed, with no single can-
+didate serving as the replacement source for all locations.
+Jianzheng Wang et al.: Preprint submitted to Elsevier
+Page 19 of 23
+
+
+GFMR for RS OVSS
+This indicates that OAMR independently evaluates multiple
+candidate features at each anomalous location and selects a
+candidate token that satisfies the local manifold constraints
+and better suits that location, rather than using a fixed
+transformed view as the global repair source.
+Figure 9(c) shows that anomaly-score changes remain
+close to zero at locations where no replacement occurs,
+whereas more pronounced changes are concentrated within
+the final repair regions delineated by black contours. This
+is because unrepaired locations retain the same original
+features before and after repair, leaving their local sub-
+space anomaly scores essentially unchanged. Within the
+final repair regions, anomaly-score improvements are pre-
+dominantly positive, with a mean improvement of 4.531.
+Since this metric is defined as the anomaly score before
+repair minus that after repair, positive values indicate that
+feature replacement reduces the standardized deviation of
+the corresponding token from its nearest local subspace.
+These results show that, for the current sample, the candidate
+features selected by OAMR generally reduce local manifold
+anomalies at the repaired locations.
+Figure 9(d) further illustrates the feature changes of
+these repaired tokens in a shared PCA projection space.
+Features at different locations move in different directions
+after repair, rather than undergoing a uniform translation.
+This observation agrees with the location-specific candidate
+selection mechanism of OAMR based on local structure. The
+mean of the repaired features moves closer to the reference
+mean of the reliable anchors. Meanwhile, some features
+initially distant from the reference region move toward the
+reliable feature distribution after replacement. These obser-
+vations are consistent with the reduction in local subspace
+anomaly scores shown in Figure 9(c), providing intuitive
+qualitative evidence of improved feature consistency from
+a two-dimensional projection perspective.
+5. Conclusion
+This work proposes GFMR to address the underutiliza-
+tion of geometric information, inconsistent local representa-
+tions across views, and distribution shifts between samples
+in SAM3-based OVSS of remote sensing images. Without
+modifying the core architecture or original prediction path-
+way of SAM3, GFMR integrates geometry-aware view se-
+lection, original-view-anchored manifold repair, and online
+PixelDecoder adaptation at test time into a unified inference
+pipeline. Specifically, MH-D4VS uses multi-scale complex
+harmonics, chirality, and set-level geometric constraints to
+select three representative and complementary D4 candidate
+views. Anchored to the original view, OAMR uses adaptive
+local subspaces, refined cross-view metrics, and cross-scale
+guidance to repair locally anomalous representations using
+only candidate features with reliable support. PD-TTA uses
+local–global semantic entropy computed from the outputs
+of the frozen semantic head as a self-supervised signal to
+update the affine parameters of two GroupNorm layers in the
+PixelDecoder online during image segmentation. MH-D4VS
+and OAMR require no gradient updates, while PD-TTA
+requires neither target-dataset-level training nor additional
+annotations.
+Experiments on eight remote sensing benchmarks demon-
+strate that GFMR achieves an average mIoU of 55.6%, with
+consistent gains across satellite, aerial, and UAV imagery.
+Transferring MH-D4VS and OAMR to another SAM3-
+based inference framework, ProC-SAM3, also yields sub-
+stantial segmentation improvements, demonstrating the com-
+patibility of the proposed modules with different frame-
+works. Ablation studies further confirm the complementar-
+ity of the three components: the training-free MH-D4VS and
+OAMR modules account for the primary performance gains,
+while PD-TTA provides consistent additional improvements
+at the sample level. There remains considerable room to
+improve the effectiveness of test-time adaptation (TTA)
+for SAM3 inference. Future work will further investigate
+the integration of TTA strategies into the SAM3 inference
+process.
+References
+[1] Alec Radford, Jong Wook Kim, Chris Hallacy, Aditya Ramesh,
+Gabriel Goh, Sandhini Agarwal, Girish Sastry, Amanda Askell,
+Pamela Mishkin, Jack Clark, Gretchen Krueger, and Ilya Sutskever.
+Learning Transferable Visual Models From Natural Language Su-
+pervision. In Marina Meila and Tong Zhang, editors, Proceedings
+of the 38th International Conference on Machine Learning, volume
+139 of Proceedings of Machine Learning Research, pages 8748–
+8763. PMLR, July 2021. URL https://proceedings.mlr.press/v139/
+radford21a.html.
+[2] Chong Zhou, Chen Change Loy, and Bo Dai. Extract Free Dense
+Labels from CLIP. In Computer Vision – ECCV 2022: 17th European
+Conference, Tel Aviv, Israel, October 23–27, 2022, Proceedings, Part
+XXVIII, pages 696–712, Berlin, Heidelberg, 2022. Springer-Verlag.
+ISBN 978-3-031-19814-4.
+doi: 10.1007/978-3-031-19815-1_40.
+URL https://doi.org/10.1007/978-3-031-19815-1_40.
+[3] Feng Wang, Jieru Mei, and Alan Yuille. SCLIP: Rethinking Self-
+Attention for Dense Vision-Language Inference. In Aleš Leonardis,
+Elisa Ricci, Stefan Roth, Olga Russakovsky, Torsten Sattler, and Gül
+Varol, editors, Computer Vision – ECCV 2024, pages 315–332, Cham,
+2025. Springer Nature Switzerland. ISBN 978-3-031-72664-4.
+[4] Mengcheng Lan, Chaofeng Chen, Yiping Ke, Xinjiang Wang, Litong
+Feng, and Wayne Zhang.
+ClearCLIP: Decomposing CLIP Repre-
+sentations for Dense Vision-Language Inference. In Aleš Leonardis,
+Elisa Ricci, Stefan Roth, Olga Russakovsky, Torsten Sattler, and Gül
+Varol, editors, Computer Vision – ECCV 2024, pages 143–160, Cham,
+2025. Springer Nature Switzerland. ISBN 978-3-031-72970-6.
+[5] Yuhang Yang, Jinhong Deng, Wen Li, and Lixin Duan. ResCLIP:
+Residual Attention for Training-free Dense Vision-language Infer-
+ence. 2025 IEEE/CVF Conference on Computer Vision and Pattern
+Recognition (CVPR), pages 29968–29978, 2025. URL https://api.
+semanticscholar.org/CorpusID:274234839.
+[6] Reza Abbasi, Ali Nazari, Aminreza Sefid, Mohammadali Banay-
+eeanzade, Mohammad Hossein Rohban, and Mahdieh Soleymani
+Baghshah. CLIP Under the Microscope: A Fine-Grained Analysis
+of Multi-Object Representation.
+2025 IEEE/CVF Conference on
+Computer Vision and Pattern Recognition (CVPR), pages 9308–9317,
+2025. URL https://api.semanticscholar.org/CorpusID:276647984.
+[7] Mathilde Caron, Hugo Touvron, Ishan Misra, Hervé Jégou, Julien
+Mairal, Piotr Bojanowski, and Armand Joulin. Emerging Properties
+in Self-Supervised Vision Transformers.
+In Proceedings of the
+IEEE/CVF International Conference on Computer Vision (ICCV),
+pages 9650–9660, October 2021.
+Jianzheng Wang et al.: Preprint submitted to Elsevier
+Page 20 of 23
+
+
+GFMR for RS OVSS
+[8] Maxime Oquab, Timothée Darcet, Théo Moutakanni, Huy V. Vo,
+Marc Szafraniec, Vasil Khalidov, Pierre Fernandez, Daniel HAZIZA,
+Francisco Massa, Alaaeldin El-Nouby, Mido Assran, Nicolas Ballas,
+Wojciech Galuba, Russell Howes, Po-Yao Huang, Shang-Wen Li, Is-
+han Misra, Michael Rabbat, Vasu Sharma, Gabriel Synnaeve, Hu Xu,
+Herve Jegou, Julien Mairal, Patrick Labatut, Armand Joulin, and Piotr
+Bojanowski.
+DINOv2: Learning Robust Visual Features without
+Supervision.
+Transactions on Machine Learning Research, 2024.
+ISSN 2835-8856. URL https://openreview.net/forum?id=a68SUt6zFt.
+[9] Alexander Kirillov, Eric Mintun, Nikhila Ravi, Hanzi Mao, Chloé
+Rolland, Laura Gustafson, Tete Xiao, Spencer Whitehead, Alexan-
+der C. Berg, Wan-Yen Lo, Piotr Dollár, and Ross B. Girshick.
+Segment Anything.
+2023 IEEE/CVF International Conference on
+Computer Vision (ICCV), pages 3992–4003, 2023. URL https://api.
+semanticscholar.org/CorpusID:257952310.
+[10] Nikhila Ravi, Valentin Gabeur, Yuan-Ting Hu, Ronghang Hu, Chai-
+tanya Ryali, Tengyu Ma, Haitham Khedr, Roman Rädle, Chloe
+Rolland, Laura Gustafson, Eric Mintun, Junting Pan, Kalyan Va-
+sudev Alwala, Nicolas Carion, Chao-Yuan Wu, Ross Girshick,
+Piotr Dollar, and Christoph Feichtenhofer.
+SAM 2: Seg-
+ment Anything in Images and Videos.
+In Y. Yue, A. Garg,
+N. Peng, F. Sha, and R. Yu, editors, International Conference
+on Learning Representations, volume 2025, pages 28085–28128,
+2025.
+URL https://proceedings.iclr.cc/paper_files/paper/2025/
+file/45c1f6a8cbf2da59ebf2c802b4f742cd-Paper-Conference.pdf.
+[11] Mengcheng Lan, Chaofeng Chen, Yiping Ke, Xinjiang Wang, Litong
+Feng, and Wayne Zhang.
+ProxyCLIP: Proxy Attention Improves
+CLIP for Open-Vocabulary Segmentation. In European Conference
+on Computer Vision, 2024. URL https://api.semanticscholar.org/
+CorpusID:271843307.
+[12] Dengke Zhang, Fagui Liu, and Quan Tang. CorrCLIP: Reconstructing
+Patch Correlations in CLIP for Open-Vocabulary Semantic Segmen-
+tation. In Proceedings of the IEEE/CVF International Conference on
+Computer Vision (ICCV), pages 24677–24687, October 2025.
+[13] Kaiyu Li, Ruixun Liu, Xiangyong Cao, Xueru Bai, Feng Zhou, Deyu
+Meng, and Zhi Wang. SegEarth-OV: Towards Training-Free Open-
+Vocabulary Segmentation for Remote Sensing Images. In Confer-
+ence on Computer Vision and Pattern Recognition, pages 10545–
+10556, 2025. doi: 10.1109/CVPR52734.2025.00986. URL https:
+//mlanthology.org/cvpr/2025/li2025cvpr-segearthov/.
+[14] Nicolas Carion, Laura Gustafson, Yuan-Ting Hu, Shoubhik Debnath,
+Ronghang Hu, Dídac Surís, Chaitanya K. Ryali, Kalyan Vasudev
+Alwala, Haitham Khedr, Andrew Huang, Jie Lei, Tengyu Ma, Bais-
+han Guo, Arpit Kalla, Markus Marks, Joseph Greer, Meng Wang,
+Peize Sun, Roman Radle, Triantafyllos Afouras, Effrosyni Mavroudi,
+Katherine Xu, Tsung-Han Wu, Yu Zhou, Liliane Momeni, Rishi
+Hazra, Shuangrui Ding, Sagar Vaze, Francois Porcher, Feng Li,
+Siyuan Li, Aishwarya Kamath, Ho Kei Cheng, Piotr Doll’ar, Nikhila
+Ravi, Kate Saenko, Pengchuan Zhang, and Christoph Feichtenhofer.
+SAM 3: Segment Anything with Concepts. ArXiv, abs/2511.16719,
+2025. URL https://api.semanticscholar.org/CorpusID:283226295.
+[15] Golnaz Ghiasi, Xiuye Gu, Yin Cui, and Tsung-Yi Lin.
+Scaling
+Open-Vocabulary Image Segmentation with Image-Level Labels. In
+European Conference on Computer Vision, 2022. URL https://api.
+semanticscholar.org/CorpusID:250895808.
+[16] Jian Ding, Nan Xue, Gui-Song Xia, and Dengxin Dai. Decoupling
+Zero-Shot Semantic Segmentation. In Proceedings of the IEEE/CVF
+Conference on Computer Vision and Pattern Recognition (CVPR),
+pages 11583–11592, June 2022.
+[17] Feng Liang, Bichen Wu, Xiaoliang Dai, Kunpeng Li, Yinan
+Zhao, Hang Zhang, Peizhao Zhang, Peter Vajda, and Diana Mar-
+culescu.
+Open-Vocabulary Semantic Segmentation With Mask-
+Adapted CLIP.
+In Proceedings of the IEEE/CVF Conference on
+Computer Vision and Pattern Recognition (CVPR), pages 7061–7070,
+June 2023.
+[18] Xin Xu, Tianyi Xiong, Zheng Ding, and Zhuowen Tu. MasQCLIP
+for open-vocabulary universal image segmentation. In Proceedings of
+the IEEE/CVF International Conference on Computer Vision (ICCV),
+pages 887–898, October 2023.
+[19] Boyi Li, Kilian Q Weinberger, Serge Belongie, Vladlen Koltun,
+and Rene Ranftl.
+Language-Driven Semantic Segmentation.
+In
+International Conference on Learning Representations, 2022. URL
+https://mlanthology.org/iclr/2022/li2022iclr-languagedriven/.
+[20] Mengde Xu, Zheng Zhang, Fangyun Wei, Han Hu, and Xiang Bai.
+Side Adapter Network for Open-Vocabulary Semantic Segmenta-
+tion. 2023 IEEE/CVF Conference on Computer Vision and Pattern
+Recognition (CVPR), pages 2945–2954, 2023.
+URL https://api.
+semanticscholar.org/CorpusID:257102616.
+[21] Bin Xie, Jiale Cao, Jin Xie, Fahad Shahbaz Khan, and Yanwei Pang.
+SED: A Simple Encoder-Decoder for Open-Vocabulary Semantic
+Segmentation.
+2024 IEEE/CVF Conference on Computer Vision
+and Pattern Recognition (CVPR), pages 3426–3436, 2024.
+URL
+https://api.semanticscholar.org/CorpusID:265457250.
+[22] Seokju Cho, Heeseong Shin, Sunghwan Hong, Anurag Arnab,
+Paul Hongsuck Seo, and Seungryong Kim. CAT-Seg: Cost aggrega-
+tion for open-vocabulary semantic segmentation. In Proceedings of
+the IEEE/CVF Conference on Computer Vision and Pattern Recogni-
+tion (CVPR), pages 4113–4123, June 2024.
+[23] Huaishao Luo, Junwei Bao, Youzheng Wu, Xiaodong He, and Tianrui
+Li. SegCLIP: Patch Aggregation with Learnable Centers for Open-
+Vocabulary Semantic Segmentation. In International Conference on
+Machine Learning, 2023.
+URL https://api.semanticscholar.org/
+CorpusID:254043520.
+[24] Jiarui Xu, Shalini De Mello, Sifei Liu, Wonmin Byeon, Thomas
+Breuel, Jan Kautz, and X. Wang. GroupViT: Semantic Segmentation
+Emerges from Text Supervision.
+2022 IEEE/CVF Conference on
+Computer Vision and Pattern Recognition (CVPR), pages 18113–
+18123, 2022.
+URL https://api.semanticscholar.org/CorpusID:
+247026092.
+[25] Sina Hajimiri, Ismail Ben Ayed, and José Dolz.
+Pay Attention to
+Your Neighbours: Training-Free Open-Vocabulary Semantic Seg-
+mentation. 2025 IEEE/CVF Winter Conference on Applications of
+Computer Vision (WACV), pages 5061–5071, 2025.
+URL https:
+//api.semanticscholar.org/CorpusID:269137404.
+[26] Yangtao Wang, Xi Shen, Yuan Yuan, Yuming Du, Maomao Li,
+Shell Xu Hu, James L. Crowley, and Dominique Vaufreydaz. Token-
+Cut: Segmenting Objects in Images and Videos With Self-Supervised
+Transformer and Normalized Cut.
+IEEE Transactions on Pattern
+Analysis and Machine Intelligence, 45(12):15790–15801, December
+2023. ISSN 1939-3539. doi: 10.1109/TPAMI.2023.3305122.
+[27] Xudong Wang, Rohit Girdhar, Stella X. Yu, and Ishan Misra. Cut
+and Learn for Unsupervised Object Detection and Instance Segmen-
+tation. 2023 IEEE/CVF Conference on Computer Vision and Pattern
+Recognition (CVPR), pages 3124–3134, 2023.
+URL https://api.
+semanticscholar.org/CorpusID:256274671.
+[28] Xudong Wang, Ishan Misra, Ziyun Zeng, Rohit Girdhar, and
+Trevor Darrell.
+VideoCutLER: Surprisingly Simple Unsupervised
+Video Instance Segmentation.
+In 2024 IEEE/CVF Conference on
+Computer Vision and Pattern Recognition (CVPR), pages 22755–
+22764, Los Alamitos, CA, USA, June 2024. IEEE Computer So-
+ciety.
+doi: 10.1109/CVPR52733.2024.02147.
+URL https://doi.
+ieeecomputersociety.org/10.1109/CVPR52733.2024.02147.
+[29] Weiming Zhang, Dingwen Xiao, Lei Chen, and Lin Wang.
+E-
+SAM: Training-Free Segment Every Entity Model. 2025 IEEE/CVF
+International Conference on Computer Vision (ICCV), pages 24688–
+24697, 2025.
+URL https://api.semanticscholar.org/CorpusID:
+277065927.
+[30] Ding Zhong, Xu Zheng, Chenfei Liao, Yuanhuiyi Lyu, Jialei Chen,
+Shengyang Wu, Linfeng Zhang, and Xuming Hu. OmniSAM: Omni-
+directional segment anything model for UDA in panoramic semantic
+segmentation. In Proceedings of the IEEE/CVF International Confer-
+ence on Computer Vision (ICCV), pages 23892–23901, October 2025.
+[31] Gyungin Shin, Weidi Xie, and Samuel Albanie.
+ReCo: Re-
+trieve and Co-segment for Zero-shot Transfer.
+In S. Koyejo,
+Jianzheng Wang et al.: Preprint submitted to Elsevier
+Page 21 of 23
+
+
+GFMR for RS OVSS
+S. Mohamed, A. Agarwal, D. Belgrave, K. Cho, and A. Oh, ed-
+itors, Advances in Neural Information Processing Systems, vol-
+ume 35, pages 33754–33767. Curran Associates, Inc., 2022.
+URL https://proceedings.neurips.cc/paper_files/paper/2022/file/
+daabe43c3e1d06980aa23880bfbe1f45-Paper-Conference.pdf.
+[32] Laurynas Karazija, Iro Laina, Andrea Vedaldi, and Christian Rup-
+precht.
+Diffusion Models for Open-Vocabulary Segmentation.
+In
+Aleš Leonardis, Elisa Ricci, Stefan Roth, Olga Russakovsky, Torsten
+Sattler, and Gül Varol, editors, Computer Vision – ECCV 2024, pages
+299–317, Cham, 2025. Springer Nature Switzerland. ISBN 978-3-
+031-72652-1.
+[33] Luca Barsellotti, Roberto Amoroso, Lorenzo Baraldi, and Rita Cuc-
+chiara.
+FOSSIL: Free Open-Vocabulary Semantic Segmentation
+through Synthetic References Retrieval. In IEEE/CVF Winter Con-
+ference on Applications of Computer Vision, WACV 2024, Waikoloa,
+HI, USA, January 3-8, 2024, pages 1453–1462. IEEE, 2024. doi:
+10.1109/WACV57701.2024.00149. URL https://doi.org/10.1109/
+WACV57701.2024.00149.
+[34] Luca Barsellotti, Roberto Amoroso, Marcella Cornia, Lorenzo
+Baraldi, and Rita Cucchiara. Training-Free Open-Vocabulary Seg-
+mentation with Offline Diffusion-Augmented Prototype Generation.
+In Proceedings of the IEEE/CVF Conference on Computer Vision and
+Pattern Recognition (CVPR), pages 3689–3698, June 2024.
+[35] Luca Barsellotti, Lorenzo Bianchi, Nicola Messina, Fabio Carrara,
+Marcella Cornia, Lorenzo Baraldi, Fabrizio Falchi, and Rita Cuc-
+chiara.
+Talking to DINO: Bridging Self-Supervised Vision Back-
+bones with Language for Open-Vocabulary Segmentation. In Pro-
+ceedings of the IEEE/CVF International Conference on Computer
+Vision (ICCV), pages 22025–22035, October 2025.
+[36] Monika Wysoczańska, Oriane Siméoni, Michaël Ramamonjisoa, An-
+drei Bursuc, Tomasz Trzciński, and Patrick Pérez. CLIP-DINOiser:
+Teaching CLIP a Few DINO Tricks for Open-Vocabulary Semantic
+Segmentation.
+In Aleš Leonardis, Elisa Ricci, Stefan Roth, Olga
+Russakovsky, Torsten Sattler, and Gül Varol, editors, Computer Vision
+– ECCV 2024, pages 320–337, Cham, 2025. Springer Nature Switzer-
+land. ISBN 978-3-031-73030-6.
+[37] Chanyoung Kim, Dayun Ju, Woojung Han, Ming-Hsuan Yang,
+and Seong Jae Hwang.
+Distilling Spectral Graph for Object-
+Context
+Aware
+Open-Vocabulary
+Semantic
+Segmentation.
+In
+IEEE/CVF
+Conference
+on
+Computer
+Vision
+and
+Pattern
+Recognition,
+CVPR
+2025,
+Nashville,
+TN,
+USA,
+June
+11-15,
+2025,
+pages
+15033–15042.
+Computer
+Vision
+Foundation
+/
+IEEE,
+2025.
+doi:
+10.1109/CVPR52734.2025.01400.
+URL
+https://openaccess.thecvf.com/content/CVPR2025/html/
+Kim_Distilling_Spectral_Graph_for_Object-Context_Aware_
+Open-Vocabulary_Semantic_Segmentation_CVPR_2025_paper.html.
+[38] Yuheng Shi, Minjing Dong, and Chang Xu.
+Harnessing Vision
+Foundation Models for High-Performance, Training-Free Open Vo-
+cabulary Segmentation. 2025 IEEE/CVF International Conference
+on Computer Vision (ICCV), pages 23487–23497, 2025. URL https:
+//api.semanticscholar.org/CorpusID:274023681.
+[39] Tran Dinh Tien and Zhiqiang Shen. ActiveSAM: Image-Conditional
+Class Pruning for Fast and Accurate Open-Vocabulary Segmentation.
+ArXiv, abs/2606.16996, 2026.
+URL https://api.semanticscholar.
+org/CorpusID:289301507.
+[40] Jie Chen, Jingru Zhu, Ya Guo, Geng Sun, Yi Zhang, and Min
+Deng. Unsupervised domain adaptation for semantic segmentation of
+high-resolution remote sensing imagery driven by category-certainty
+attention. IEEE Transactions on Geoscience and Remote Sensing,
+60:1–15, 2022.
+doi: 10.1109/TGRS.2021.3140108.
+URL https:
+//doi.org/10.1109/TGRS.2021.3140108.
+[41] Jie Chen, Peien He, Jingru Zhu, Ya Guo, Geng Sun, Min Deng, and
+Haifeng Li. Memory-contrastive unsupervised domain adaptation for
+building extraction of high-resolution remote sensing imagery. IEEE
+Transactions on Geoscience and Remote Sensing, 61:1–15, 2023. doi:
+10.1109/TGRS.2023.3262576. URL https://doi.org/10.1109/TGRS.
+2023.3262576.
+[42] Kaiyu Li, Xiangyong Cao, Ruixun Liu, Shihong Wang, Zixuan Jiang,
+Zhi Wang, and Deyu Meng.
+Annotation-Free Open-Vocabulary
+Segmentation for Remote-Sensing Images. ArXiv, abs/2508.18067,
+2025. URL https://api.semanticscholar.org/CorpusID:280711754.
+[43] Chengyang Ye, Yunzhi Zhuge, and Pingping Zhang. Towards Open-
+Vocabulary Remote Sensing Image Semantic Segmentation.
+In
+AAAI Conference on Artificial Intelligence, 2025. URL https://api.
+semanticscholar.org/CorpusID:275119304.
+[44] Qi Zhu, Jiangwei Lao, Deyi Ji, Junwei Luo, Kang Wu, Yingying
+Zhang, Lixiang Ru, Jian Wang, Jingdong Chen, Ming Yang, Dong
+Liu, and Feng Zhao.
+SkySense-O: Towards open-world remote
+sensing interpretation with vision-centric visual-language modeling.
+In Proceedings of the IEEE/CVF Conference on Computer Vision and
+Pattern Recognition (CVPR), pages 14733–14744, June 2025.
+[45] Wenyang Chen, Zhanxuan Hu, Yaping Zhang, Hailong Ning, and
+Yonghang Tai.
+ConInfer: Context-Aware Inference for Training-
+Free Open-Vocabulary Remote Sensing Segmentation.
+ArXiv,
+abs/2603.29271, 2026.
+URL https://api.semanticscholar.org/
+CorpusID:286977064.
+[46] Saikat Dutta, Akhil Vasim, Siddhant Gole, Hamid Rezatofighi,
+and Biplab Banerjee.
+AerOSeg: Harnessing SAM for Open-
+Vocabulary Segmentation in Remote Sensing Images.
+2025
+IEEE/CVF Conference on Computer Vision and Pattern Recognition
+Workshops (CVPRW), pages 2245–2255, 2025. URL https://api.
+semanticscholar.org/CorpusID:277780423.
+[47] Shiqi Huang, Shuting He, Huaiyuan Qin, and Bihan Wen. SCORE:
+Scene context matters in open-vocabulary remote sensing instance
+segmentation. In Proceedings of the IEEE/CVF International Confer-
+ence on Computer Vision (ICCV), pages 12559–12569, October 2025.
+[48] Liang Yao, Fan Liu, Delong Chen, Chuanyi Zhang, Yijun Wang,
+Ziyun Chen, Wei Xu, Shimin Di, and Yuhui Zheng. RemoteSAM:
+Towards Segment Anything for Earth Observation. Proceedings of
+the 33rd ACM International Conference on Multimedia, 2025. URL
+https://api.semanticscholar.org/CorpusID:278886842.
+[49] Yijie Zheng, Weijie Wu, Qingyun Li, Xuehui Wang, Xu Zhou, Aiai
+Ren, Jun Shen, Long Zhao, Guoqing Li, and Xue Yang. InstructSAM:
+A Training-Free Framework for Instruction-Oriented Remote Sensing
+Object Recognition.
+ArXiv, abs/2505.15818, 2025.
+URL https:
+//api.semanticscholar.org/CorpusID:278782382.
+[50] Kaiyu Li, Shengqi Zhang, Yupeng Deng, Zhi Wang, Deyu Meng,
+and Xiangyong Cao. SegEarth-OV3: Exploring SAM 3 for Open-
+Vocabulary Semantic Segmentation in Remote Sensing Images.
+ArXiv, abs/2512.08730, 2025.
+URL https://api.semanticscholar.
+org/CorpusID:283711637.
+[51] Yanghui Song, Nanqing Liu, Haonan Yin, Yingjie Gao, Chengfu
+Yang, and Qi Ming. Prompt-calibrated SAM 3 for open-vocabulary
+remote-sensing semantic segmentation. IEEE Geoscience and Re-
+mote Sensing Letters, 23:6015205, 2026. doi: 10.1109/LGRS.2026.
+3713378. URL https://doi.org/10.1109/LGRS.2026.3713378.
+[52] Mehrdad Noori, David OSOWIECHI, Gustavo Adolfo Vargas Hakim,
+Ali Bahri, Moslem Yazdanpanah, Sahar Dastani, Farzad Beizaee,
+Ismail Ben Ayed, and Christian Desrosiers. Test-Time Adaptation of
+Vision-Language Models for Open-Vocabulary Semantic Segmenta-
+tion. In The Thirty-ninth Annual Conference on Neural Information
+Processing Systems, 2025. URL https://openreview.net/forum?id=
+CH76rSKWZr.
+[53] Junshi Xia, Naoto Yokoya, Bruno Adriano, and Clifford Broni-
+Bediako. OpenEarthMap: A Benchmark Dataset for Global High-
+Resolution Land Cover Mapping. In Proceedings of the IEEE/CVF
+Winter Conference on Applications of Computer Vision (WACV),
+pages 6254–6264, January 2023.
+[54] Junjue Wang, Zhuo Zheng, Ailong Ma, Xiaoyan Lu, and Yanfei
+Zhong. LoveDA: A Remote Sensing Land-Cover Dataset for Domain
+Adaptive Semantic Segmentation. In J. Vanschoren and S. Yeung,
+editors, Proceedings of the Neural Information Processing Systems
+Track on Datasets and Benchmarks, volume 1, 2021. URL https:
+//datasets-benchmarks-proceedings.neurips.cc/paper_files/paper/
+2021/file/4e732ced3463d06de0ca9a15b6153677-Paper-round2.pdf.
+Jianzheng Wang et al.: Preprint submitted to Elsevier
+Page 22 of 23
+
+
+GFMR for RS OVSS
+[55] Syed Waqas Zamir, Aditya Arora, Akshita Gupta, Salman H. Khan,
+Guolei Sun, Fahad Shahbaz Khan, Fan Zhu, Ling Shao, Gui-Song
+Xia, and Xiang Bai. iSAID: A Large-Scale Dataset for Instance Seg-
+mentation in Aerial Images. In IEEE/CVF Conference on Computer
+Vision and Pattern Recognition Workshops, pages 28–37, 2019. URL
+https://mlanthology.org/cvprw/2019/zamir2019cvprw-isaid/.
+[56] Ye Lyu, George Vosselman, Gui-Song Xia, Alper Yilmaz, and
+Michael Ying Yang. UAVid: A semantic segmentation dataset for
+UAV imagery.
+ISPRS Journal of Photogrammetry and Remote
+Sensing, 165:108–119, 2020. ISSN 0924-2716. doi: https://doi.org/
+10.1016/j.isprsjprs.2020.05.009.
+URL https://www.sciencedirect.
+com/science/article/pii/S0924271620301295.
+[57] Yu Chen, Yao Wang, Peng Lu, Yisong Chen, and Guoping Wang.
+Large-Scale Structure from Motion with Semantic Constraints of
+Aerial Images.
+In Pattern Recognition and Computer Vision:
+First Chinese Conference, PRCV 2018, Guangzhou, China, Novem-
+ber 23-26, 2018, Proceedings, Part I, pages 347–359, Berlin, Hei-
+delberg, 2018. Springer-Verlag.
+ISBN 978-3-030-03397-2.
+doi:
+10.1007/978-3-030-03398-9_30.
+URL https://doi.org/10.1007/
+978-3-030-03398-9_30.
+[58] Wenxiao Cai, Ke Jin, Jinyan Hou, Cong Guo, Letian Wu, and Wankou
+Yang. VDD: Varied Drone Dataset for semantic segmentation. J.
+Vis. Comun. Image Represent., 109(C), June 2025. ISSN 1047-3203.
+doi: 10.1016/j.jvcir.2025.104429. URL https://doi.org/10.1016/j.
+jvcir.2025.104429.
+[59] F. Rottensteiner, G. Sohn, J. Jung, M. Gerke, C. Baillard, S. Benitez,
+and U. Breitkopf.
+THE ISPRS BENCHMARK ON URBAN OB-
+JECT CLASSIFICATION AND 3D BUILDING RECONSTRUC-
+TION. ISPRS Annals of the Photogrammetry, Remote Sensing and
+Spatial Information Sciences, I-3:293–298, 2012.
+doi: 10.5194/
+isprsannals-I-3-293-2012.
+URL https://isprs-annals.copernicus.
+org/articles/I-3/293/2012/.
+[60] Walid Bousselham, Felix Petersen, Vittorio Ferrari, and Hilde
+Kuehne. Grounding Everything: Emerging Localization Properties
+in Vision-Language Transformers. In Proceedings of the IEEE/CVF
+Conference on Computer Vision and Pattern Recognition (CVPR),
+pages 3828–3837, June 2024.
+[61] Xin Niu, Manqi Zhao, Dongsheng Jiang, Yingying Wu, and Bing
+Su. ReAttnCLIP: Training-Free Open-Vocabulary Remote Sensing
+Image Segmentation via Re-defined Attention in CLIP. In Proceed-
+ings of the IEEE/CVF Conference on Computer Vision and Pattern
+Recognition (CVPR), pages 24980–24989, June 2026.
+Jianzheng Wang et al.: Preprint submitted to Elsevier
+Page 23 of 23
