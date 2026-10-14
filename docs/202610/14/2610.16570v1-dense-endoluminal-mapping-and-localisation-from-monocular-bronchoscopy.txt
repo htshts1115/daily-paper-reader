@@ -1,0 +1,1693 @@
+1
+Dense Endoluminal Mapping and Localisation
+from Monocular Bronchoscopy
+Salvatore Esposito1, Matias Mattamala1, Daniel Rebain2, Liang Zhao1, Kev Dhaliwal1, Mohsen Khadem1,
+Subramanian Ramamoorthy1
+1University of Edinburgh
+2University of British Columbia
+Abstract—Bronchoscopy inserts a camera through the airways
+to diagnose endoluminal disease. Locating the camera along
+the airway usually requires additional equipment, such as an
+electromagnetic tracker and a preoperative CT scan. In this
+paper, we investigate the use of the monocular camera stream to
+localise the bronchoscope without requiring additional sensing.
+We introduce a monocular SLAM system that localises the tip
+of a bronchoscope and reconstructs the airway surface around it
+from RGB video alone. A Depth Anything 3 backbone, fine-tuned
+on over a million photorealistic airway renderings, returns metric
+per-pixel depth and is the system’s only source of scale. DINOv3
+features routed through a custom cross-attention matcher supply
+sub-pixel correspondences on mucosa where classical descriptors
+fail. Both enter a factor graph alongside a dense constraint
+from projective iterative closest point (ICP) registration against
+the system’s own running reconstruction, so surface evidence
+stabilises the directions the visual factors leave weakly observable.
+On six airways rendered from patient CT scans, the system
+reaches 26.1 mm mean absolute trajectory error and 77.5 % mean
+surface F-score. Its mean surface accuracy exceeds that of five
+recent monocular SLAM and feed-forward baselines. MASt3R-
+SLAM, which fits a free scale to the ground truth, has a lower
+mean trajectory error (22.0 mm). ORB-SLAM3 completes only
+two of the six airways, whereas our system completes all six and
+also reconstructs two ex vivo specimens.
+Index Terms—Computer Vision for Medical Robotics, Map-
+ping, SLAM, Bronchoscopy
+I. INTRODUCTION
+B
+RONCHOSCOPY is a procedure for examining and
+sampling the airway [1]. Asthma, chronic obstructive
+pulmonary disease, cystic fibrosis and endoluminal tumours
+affect the airway walls or obstruct the lumen [2]–[5]. In each
+case an operator advances a bronchoscope to a specific airway
+and works under direct vision to sample or inspect it.
+In current practice the tip is located with equipment brought
+in alongside the bronchoscope: an electromagnetic field gen-
+erator tracks the catheter, and that tracking is registered to a
+computed tomography (CT) airway map acquired before the
+procedure [7]. This locates the catheter but recovers nothing
+about the surface it observes, and its accuracy is bounded by
+the CT-to-patient registration and by repeat CT imaging that
+accumulates ionising radiation [8].
+The camera at the tip of the bronchoscope passes within
+millimetres of the tissue. Some robotic bronchoscopes support
+navigation [9] and camera-pose estimation [10], without map-
+ping the surface. Dense reconstruction has been demonstrated
+mainly in the gastrointestinal tract [11], [12]. In the lung, the
+airway reconstruction we are aware of anchors its geometry
+to a preoperative CT scan [13].
+Fig. 1.
+From bronchoscope video to an endoluminal map. A robotic
+bronchoscope (left) streams RGB video of the airway interior. This video feds
+our system, which estimates the camera pose and reconstructs the airway wall,
+using learnt modules trained on synthetic bronchoscopy data (top right). The
+robot image is taken from the Ion system page of Intuitive [6].
+Four properties of endoluminal imaging stand between the
+video and that goal. First, the mucosa lacks enough texture
+to enable feature-based tracking, so endoscopic adaptations
+of established visual SLAM systems such as ORB-SLAM
+produce sparse maps and cannot hold one track from the start
+of a sequence to its end [11], [12], [14]. Second, a single
+camera recovers geometry only up to an unknown factor, so
+neither the trajectory nor the map built by monocular SLAM
+reflects the real dimensions of the lumen. Third, the light
+source travels with the camera, so specular highlights slide
+across the tissue instead of staying fixed to it, and the depth
+estimated at those pixels is corrupted [15]. Lastly, the airway
+is locally a tube, which leaves rotation about its axis and
+translation along it weakly observable, similar to the problem
+LiDAR SLAM faces in tunnels [16].
+In this work, we introduce a monocular mapping and
+localisation system that addresses these four challenges, shown
+in Fig. 1. The system represents the airway wall as a truncated
+signed distance field (TSDF), a voxel grid in which each voxel
+stores its signed distance to the nearest surface, clipped to
+a narrow band around the surface. Our contributions are as
+follows.
+1) Bronchoscopy metric depth predictor. A fine-tuned depth
+estimator that supplies the system’s metric scale and per-
+pixel uncertainty.
+arXiv:2610.16570v1  [cs.CV]  12 Oct 2026
+
+
+2
+2) Dense matcher for textureless mucosa. We propose a
+custom feature matcher based on a cross-attention head
+trained for sub-pixel matching of DINOv3 features within
+the airway.
+3) Two-pass factor graph fusing visual measurements with
+a dense surface constraint. We propose a factor graph
+formulation that combines visual landmark measurements
+and motion models, which first estimates an initial pose
+for TSDF-based ICP registration, and then refines the
+trajectory estimate with the ICP correspondences.
+4) An experimental validation on six airways rendered from
+patient CT scans, all from the public ATM’22 dataset [17],
+as well as ex vivo specimens, reaching 26.13 mm mean
+absolute trajectory error (ATE) and 77.47 % mean F-score
+in reconstruction. The mean surface accuracy exceeds that
+of five classical and feed-forward baselines. MASt3R-
+SLAM, which fits a free scale, has a lower mean ATE
+(22.02 mm).
+II. RELATED WORK
+A. Medical Visual SLAM and Reconstruction
+Medical visual SLAM is more visually challenging than
+outdoor SLAM because the tissue lacks the texture ordi-
+nary scenes provide. For example, ORB-SLAM [18] relies
+on extracted keypoints from corners; LSD-SLAM [19] and
+DSO [20] align images by their pixel intensities instead, rely-
+ing on a constant brightness assumption. The mucosa breaks
+these assumptions, which has been observed when transferring
+these methods to endoscopic applications, shown by a reduced
+number of matches and sparser maps [14]. For this reason,
+prior works have presented colonoscopy-specific approaches,
+such as handheld monocular reconstruction [11], multi-map
+colonoscopy SLAM [12] to target the gastrointestinal tract, or
+self-supervised depth predictors on endoscopic video [21].
+Other endoscopic systems estimate tissue deformation to-
+gether with the camera. DefSLAM [22] and NR-SLAM [23]
+recover a deforming surface from monocular video, MIS-
+SLAM [24] couples ORB-SLAM with dense deformable
+tracking on stereoscope video, and Zhang et al. carry the same
+treatment into endovascular intervention [25]. These methods
+model deforming tissue. The airways show little deformation
+in our ex vivo ventilated-lung video, so we assume they are
+rigid and do not compare against these methods (Sec. IX-H).
+Bronchoscopy research itself prioritises navigation over
+reconstruction. Catheter localisation against a preoperative
+CT airway map is the goal of bronchoscopy registration,
+electromagnetic tracking, and learned shared-control assistants
+such as the AI co-pilot bronchoscope robot [9]. These recover
+the pose of the scope relative to the scan, and none reconstructs
+the lumen surface. Concurrent work fits dense Gaussian-splat
+reconstructions of bronchoscopy by coupling them to a paired
+inhale/exhale preoperative CT scan [13], but still relies on
+the volumetric prior to anchor the geometry. The closest
+precedent is Deng et al. [10], who benchmarked feature-
+based visual odometry on bronchoscopy phantoms and ex vivo
+lungs against electromagnetic-tracking ground truth but did
+not produce a surface map. Of the systems above, each either
+anchors its geometry to a preoperative scan or stops at the
+catheter pose without reconstructing the lumen.
+B. Learning and Hybrid Approaches to 3D Reconstruction
+Such a system now needs measurements available from a
+single image. DINOv3 [26] describes every image patch with
+a learned feature vector, and those vectors stay distinctive on
+surfaces where ORB and SIFT find no corners to describe.
+Depth Anything 3 [27] predicts depth, confidence and ray map
+from a single image, where stereo and structure from motion
+need several views to triangulate it. VGGT [28] predicts the
+geometry itself, returning camera parameters, depth maps and
+point maps for a set of images in one pass and without any
+geometric optimisation. DROID-SLAM [29] also reconstructs
+with an end-to-end model, but keeps an explicit optimisation
+and learns the update it applies to optical flow, depth and pose.
+Several SLAM systems build on these feed-forward models.
+MASt3R-SLAM [30] tracks against the per-pixel 3D points a
+two-view model predicts and fuses them in real time, VGGT-
+SLAM 2.0 [31] aligns per-chunk reconstructions on the SL(4)
+manifold, and ViSTA-SLAM [32] pairs a two-view front end
+with a pose graph. Endo3R [33] adapts the same idea to
+surgical video, predicting globally aligned point maps and
+camera poses from monocular endoscopy. In each, the learned
+model predicts the geometry and the back end combines the
+predictions.
+Building upon these methods, we use learnt components
+in the front end to mitigate the four challenges described in
+the Introduction (Sec. I, which are trained on bronchoscopy-
+oriented data. However, we still rely on a factor graph
+formulation to fuse the different geometrical cues and their
+uncertainties, making our system hybrid.
+III. SYSTEM OVERVIEW
+Fig. 2 summarises our system. It takes monocular RGB
+bronchoscopy video with known intrinsics, and returns a
+metric trajectory of the scope tip together with a dense
+reconstruction of the endoluminal surface.
+For every frame the front end predicts a metric depth
+map with per-pixel reliability from a bronchoscopy-adapted
+Depth Anything 3 (DA3) backbone [27], and extracts dense
+DINOv3 patch descriptors that stay discriminative on mucosa.
+The system keeps two maps: a sparse landmark map of
+3D points back-projected from those measurements, and a
+dense surface map stored as a truncated signed distance field
+(TSDF). For each new keyframe, a trained matcher links the
+current descriptors to the landmarks predicted to be visible,
+and PnP on the surviving correspondences supplies an initial
+pose. This pose is used to optimise the factor graph with
+the visual landmarks and motion model, and returns a visual-
+only pose. That pose initialises a projective point-to-plane ICP
+registration against the local TSDF submap, whose surviving
+correspondences re-enter the same graph for a second update.
+Only the fused pose are used for TSDF integration.
+
+
+3
+Fig. 2.
+System overview. For every frame, the front end (Sec. IV) predicts metric depth and dense descriptors. Camera pose tracking (Sec. VI) matches
+descriptors across keyframes and solves PnP for an initial pose. The back end (Sec. VII) refines that pose by pose-graph optimisation, registers the depth against
+the running map by ICP, adds the resulting constraint to the pose graph, and integrates the fused pose into a dense TSDF reconstruction. Map management
+(Sec. V) maintains the resulting landmark and TSDF maps.
+TABLE I
+NOTATION USED ACROSS THE ARTICLE.
+Symbol
+Description
+It, K
+RGB frame at time t; camera intrinsics
+Dt, St
+predicted metric depth and its standard deviation
+Qt
+per-pixel depth reliability, ∈[0, 1]
+Tt
+WC, Tt,⋆
+WC
+camera pose; best camera pose estimate (after pass two)
+ℓj
+W
+position of landmark j in the world frame W
+utj, ztj
+measured patch coordinate and optical-axis depth
+σz
+tj
+standard deviation of the depth measurement ztj
+Φ
+truncated signed distance field (TSDF)
+A. Preliminaries
+Table I collects the symbols used throughout the paper.
+The input is a sequence of monocular frames {It}T
+t=0 with
+known intrinsics K. We estimate the camera trajectory X =
+{Tt
+WC}T
+t=0, a sparse landmark map L = {ℓj
+W}N
+j=1, and a dense
+endoluminal surface stored as a TSDF Φ : R3 →R on a voxel
+grid. The zero level set of Φ is the reconstructed airway wall.
+Poses follow the camera-to-world convention, Tt
+WC ∈SE(3)
+and ℓj
+W ∈R3, and landmark j seen from camera t has
+camera-frame coordinates (Tt
+WC)−1 ℓj
+W = [xtj, ytj, ztj]T . The
+calibrated projection model maps a camera-frame point to
+pixel coordinates,
+πK
+ [x, y, z]T 
+=
+
+fxx/z + cx, fyy/z + cy
+T .
+(1)
+IV. FRONT-END
+The front end produces three outputs per frame: metric
+depth with per-pixel reliability, a dense descriptor field, and
+the 3D landmark candidates that combine them.
+A. Monocular Metric Depth Estimation
+For every frame we predict a dense metric depth map
+Dt with the DA3 backbone, fine-tuned on bronchoscopy
+renderings with ground truth depth. Fine-tuning adapts the
+predictor to the illumination and diameter of small airways
+and fixes its absolute scale. This predictor is the only source
+of metric scale in the system.
+A second head predicts a per-pixel depth uncertainty. We
+train it to output the scale St, in millimetres, of a Laplace
+distribution over log-depth, because its heavier tails keep
+specular and occluded pixels, where depth error is largest, from
+dominating the fit. We combine St with two geometric terms
+and one temporal term into a per-pixel reliability
+Qt = exp
+"
+−
+ St
+τσDt
+2#
+qr qs qτ ∈[0, 1].
+(2)
+The leading factor divides the predicted error by the local
+depth, which makes it a fractional error: one millimetre
+matters more at 5 mm range than at 50 mm. It approaches
+1 as that fraction vanishes and decays as it grows, and it is
+zero wherever the depth is invalid. St is a fixed fraction of Dt
+(Appendix A-A). The ratio therefore depends on the predicted
+uncertainty alone and does not grow with distance. Its decay
+constant is τσ = 0.02 on the synthetic phantom sequences,
+0.05 on the CT-derived airways and 0.15 on ex vivo data,
+whose depth predictions are less accurate. qr discounts the
+tunnel centre, where monocular depth is least constrained. It
+is enabled on ex vivo data only. qs discounts patches whose
+descriptor resembles its immediate neighbours, since those are
+hard to re-find. qτ discounts depths that disagree with the map
+already built, and applies once at least five mapped landmarks
+are in view.
+Qt is a unitless score. Sec. IV-B converts it to a metric
+standard deviation for each pixel. The training data and
+optimisation schedule are given in Appendix A-A.
+
+
+4
+Fig. 3. Keypoint correspondences on textureless mucosa using DINO features. The rows show two ex vivo sequences and the columns the same keypoints
+tracked over four forward displacements. The second row overlays the cosine similarity map for the red keypoint. The same regions are tracked despite the
+displacement. The front end therefore uses the pre-trained DINOv3 features without fine-tuning.
+B. Dense Features and Landmark Initialisation
+We extract dense image features from a frozen DINOv3
+ViT-7B/16 backbone [26]. It produces a 42 × 42 patch grid
+of 4096-D descriptors from each 672 × 672 RGB frame. The
+matcher of Sec. VI-A projects these into a 256-D matching
+space, and the map stores those vectors. We use DINOv3
+because its features stay distinctive on textureless mucosa.
+Sec. IX-D substitutes ORB into the pipeline to measure the
+difference.
+Fig. 3 shows an example of sparse keypoint tracking on two
+ex vivo sequences as the scope advances through the airway. A
+match is kept when the similarity of its best candidate exceeds
+that of the second-best candidate, or of the no-match option,
+by more than 0.05 (the margin test), and when tracking it
+back to the source frame lands within 16 px of its origin (the
+cycle test). Several hundred of the 1764 patches pass both tests
+at each separation, and 66–123 per sequence pass at all four
+separations.
+Depth and descriptors differ in resolution: a descriptor
+covers a 16 × 16 patch, whereas depth is predicted per pixel.
+We compute features on a resized, patch-aligned copy of the
+frame, so we scale the matcher’s coordinates back to the
+original image before applying the intrinsics. A single K is
+then used everywhere and depth is not rescaled.
+Each patch is assigned one depth and one reliability, both
+area-averaged over the pixels it covers. Patches with non-
+positive depth are discarded, as are those whose reliability Q
+falls below 0.15; that floor is held fixed across every sequence
+reported here. Back-projecting the centre of a surviving patch
+through K at its depth gives a 3D point, which inherits the
+patch descriptor.
+The depth standard deviation converts the reliability of a
+patch into metric units,
+σz
+tj = α ztj max(1 −Qtj, ϵ) ,
+α = 0.1, ϵ = 10−2, (3)
+so it ranges from 0.1 % of the depth at Q = 1 to 10 % at
+Q = 0; the floor ϵ keeps the standard deviation from collapsing
+to zero. The depth factor constrains the camera-frame z
+coordinate alone. Lateral position is left to the projection
+factor, whose covariance Σπ
+tj = (σπ)2I2 is isotropic.
+V. MAP CREATION AND MANAGEMENT
+We update the maps from the camera pose of each keyframe,
+which are estimated by the Camera Tracking process later
+described in Sec. VI.
+A. Maps
+The sparse landmark map holds the 3D points that carry the
+visual factors. The dense map is the TSDF, which we integrate
+from posed depth frames. Because the integration uses the
+fused pose, Sec. VII-C describes it with the back end.
+Each landmark j stores:
+• its position ℓj
+W, which is the variable the graph optimises;
+• its five most recent descriptors, and the representative
+among them used for matching;
+• the keyframes that have observed it;
+• its state, tentative or confirmed.
+A landmark starts as tentative and becomes confirmed at its
+second observation. Only confirmed landmarks are used for
+pose estimation (Sec. VI).
+B. Map Initialisation
+The first keyframe defines the world frame: we insert T0
+WC =
+I4 and anchor it with a prior factor. Every reliable patch is
+back-projected,
+ℓj
+W = T0
+WC
+
+z0j K−1
+u0j
+1
+
+,
+(4)
+
+
+5
+inserted as a landmark variable, and connected to T0
+WC by a
+projection factor and a depth factor; the projection factor alone
+would leave it under-constrained along its viewing ray. The
+factors are defined in Sec. VII.
+C. Updating the Map with New Observations
+For a new keyframe t, the predicted pose of Sec. VI
+selects candidate landmarks by field of view, positive depth,
+and TSDF occlusion. Our matcher (Sec. VI-A) then proposes
+correspondences between those candidates and the current
+patches. We filter proposals by descriptor tests, visibility and
+depth consistency, AP3P RANSAC, and a projection-residual
+check after optimisation. Only accepted matches create obser-
+vation records and descriptor updates.
+D. Landmark Birth
+Patches that match no existing landmark are considered for
+birth once the current pose has been accepted and optimised.
+Birth requires the reliability and depth tests of Sec. IV-B,
+a keyframe labelled stable (Sec. VI), and a duplicate check
+against nearby landmarks. We initialise the new landmark
+with Eq. (4) evaluated at the accepted pose, and it enters the
+graph as in Sec. V-B.
+The map stores the 256-D descriptors that the matcher
+compares (the projection of the 4096-D DINOv3 vectors), and
+matches against whichever of a landmark’s five lies closest to
+their mean. When a landmark is re-observed, we average the
+new descriptor with that representative at rate 0.1, re-normalise
+it, and add it to the bank in place of the raw one. This lets
+the stored appearance follow gradual change.
+VI. CAMERA POSE TRACKING
+We localise each new keyframe against the map in two
+steps: descriptor matching gives 2D–3D correspondences, and
+PnP gives an initial pose. The factor graph of Sec. VII then
+refines it together with the map.
+A. Image-to-Map Matching
+The landmarks predicted to be visible (Sec. V) are matched
+with the current frame’s patches at sub-pixel accuracy, using a
+custom-trained cross-attention matcher. Its architecture, train-
+ing data, and losses are described in Appendix A-B.
+Matches are accepted by the margin and cycle tests of
+Sec. IV-B and carry the projection-noise model given there.
+On the ex vivo sequences we choose the reference keyframes
+by estimated pixel displacement, targeting separations of 0, 15
+and 30 px. Close references give reliable matches, and distant
+ones support triangulation.
+B. Pose Initialisation
+PnP. Given the landmark correspondences and the current
+graph estimates ℓj
+W, AP3P RANSAC (3000 iterations, 3.0 px
+reprojection threshold) estimates a pose hypothesis, refined
+on its inliers. An inlier floor of min(25, max(20, 0.08 nraw))
+rejects solutions backed by too few correspondences. The floor
+rises from 20 to 25 as the candidate count grows. If RANSAC
+fails, iterative PnP on the same correspondences is the fallback,
+with the landmark coordinates held at their current graph
+estimates. If both fail, a constant-velocity model predicts the
+pose, and a weak between-pose factor ties the new keyframe
+to the previous one.
+Pose quality. A keyframe is marked stable only when the
+primary RANSAC pose estimate succeeds with enough inliers.
+Only stable keyframes extend the map: the others keep the
+trajectory connected, but cannot create landmarks, update
+descriptors, or drive TSDF integration. We loosen the between-
+pose factor as the pose it follows gets weaker, from 5 mm and
+2◦after a RANSAC pose to 50 mm and 10◦after a constant-
+velocity one. On the ex vivo sequences, backward motion
+beyond 2 mm along the optical axis is rejected and replaced
+by the velocity prediction.
+VII. BACK-END
+A. Factor Graph Formulation
+The back end estimates the camera trajectory X and the
+landmark map L jointly, treating every front-end output as
+a measurement in a single factor graph. It is solved in two
+passes: the first uses the visual landmarks alone, the second
+adds a geometric factor from point-to-plane ICP against the
+surface already reconstructed, constraining the motion that is
+perpendicular to the airways’ direction.
+Reprojection factor. Every accepted observation ties land-
+mark j to keyframe t through the residual
+rproj = πK
+   Tt
+WC
+−1 ℓj
+W
+
+−ut,j,
+(5)
+where πK is the camera projection function, and ut,j is
+the measured patch coordinate, under the isotropic image
+covariance Σt,j
+proj of Sec. IV-B.
+Depth factor. For each landmark we also define a depth
+residual that constrains the depth to the estimated value (from
+the fine-tuned DA3 model):
+rdepth =
+  Tt
+WC
+−1 ℓj
+W
+
+z −zt,j,
+(6)
+where zt,j is the corresponding depth estimate of the pixel j
+from keyframe t Dt, with standard deviation σt,j
+z
+of Eq. (3).
+This residual constrains the z coordinate in the camera frame
+(the optical-axis depth), which differs from the Euclidean
+range. Later observations of the same landmark carry the
+reprojection residual alone.
+Anchor factor. A unary prior on the first pose fixes the
+global position and orientation that a monocular graph cannot
+otherwise determine. Writing ¯X0 for the anchor, held at the
+identity at frame zero, its residual is
+ranchor = Log
+ T0
+WC
+
+,
+(7)
+with a fixed covariance Σ0.
+Motion factor. A weak between-pose factor encodes the
+bronchoscope’s forward advance. With ∆Tt−1,t ∈SE(3) the
+
+
+6
+Fig. 4.
+Two-pass factor graph. White circles are keyframe poses Tt
+WC
+and landmarks ℓj
+W; coloured circles are factors, one colour per type (legend,
+bottom). (1) The first pass optimises an anchor factor on the first pose,
+a motion factor between consecutive poses, a reprojection factor for each
+observation of a landmark, and one depth factor between a landmark and
+the keyframe that created it. It returns the first-pass pose Tt
+WC. (2) That pose
+initialises the point-to-plane ICP registration of Sec. VII-B against the TSDF
+submap. (3) The accepted correspondences add one ICP factor on the current
+pose, alongside the ICP factors of earlier poses, and re-optimising propagates
+the correction to earlier poses and landmarks, returning the fused pose Tt,⋆
+WC .
+relative motion predicted by the constant-velocity model of
+Sec. VI, it contributes
+rmotion = Log
+ ∆Tt−1
+WC Tt−1,t−1 Tt
+WC
+
+,
+(8)
+under a covariance Σm,t set by the predecessor’s pose-quality
+label (Sec. VI).
+ICP factor. At every timestep t we optimise the graph twice.
+The first pass uses the factors above and the history, and
+returns the pose Tt
+WC. We then register the current depth
+against the TSDF map by point-to-plane ICP, initialised from
+this pose (Sec. VII-B), and the second pass adds one ICP
+factor on Tt
+WC (Fig. 4). The factor stacks one residual for each
+correspondence i accepted by ICP,
+ricp,i = n⊤
+i
+ Tt
+WC pi −qi
+
+,
+(9)
+where pi is the point in the camera frame, and qi and ni
+are the corresponding TSDF surface point and normal in the
+world frame. We weight each residual by σicp
+i
+of Eq. (13).
+Factor graph optimisation. We solve the estimation problem
+using a factor graph formulation. The second pass minimises
+the objective below, and the first pass omits its last term:
+min
+X,L
+∥ranchor∥2
+Σ0 +
+X
+(t,j)∈O
+ρ
+
+∥rproj∥2
+Σt,j
+proj
+
++
+X
+(t,j)∈Oz
+ρ
+
+(∥rdepth∥2
+σt,j
+z
+
++
+X
+t∈M
+ρ
+ ∥rmotion∥2
+Σm,t
+
++
+X
+t∈D
+X
+i∈Ct
+ρ
+ r2
+icp,i/(σi
+icp)2
+,
+(10)
+where ρ(·) is a robust kernel for each factor, O is the set
+of landmark observations and Oz ⊆O those that also carry
+a depth residual. M is the set of frames carrying a motion
+factor, and D those carrying an ICP factor, whose accepted
+correspondences are Ct. We solve this problem using iSAM2
+[34] for each incoming keyframe.
+B. Point-to-Plane ICP
+The first-pass pose rests on a few hundred patch corre-
+spondences, which can under-constrain the camera motion.
+We therefore register the dense depth prediction against a
+local TSDF map of the last 15 keyframes and let the sur-
+viving correspondences enter the graph as an extra constraint,
+improving both trajectory and surface accuracy (Sec. IX-D).
+The registration is standard projective point-to-plane ICP, as
+in KinectFusion [35]: ray-cast correspondences, a robust M-
+estimator and a damped Gauss-Newton solve, run here against
+the TSDF with a custom GPU implementation.
+Data association. We raycast each pixel of the current view
+to the surface. Along the ray we sample the trilinearly inter-
+polated field every δ = 0.8 sv, for voxel size sv. At the first
+sign change, from Φk > 0 to Φk+1 ≤0, we place the surface
+point the fraction Φk/(Φk −Φk+1) of a step past sample k.
+Normals come from the TSDF gradient by central differences
+with trilinear interpolation.
+Robust point-to-plane ICP. Let pi be a source point in the
+current camera frame and (qi, ni) its corresponding TSDF
+surface point and normal in the submap, with accumulated
+weight W(qi) of Eq. (20). With Tt
+AC =
+ TWA
+−1Tt
+WC the
+transform from the current camera to the submap, the point-
+to-plane residual is
+ri
+ Tt
+AC
+
+= nT
+i
+ Tt
+AC pi −qi
+
+,
+(11)
+with the standard rotation-first Jacobian Ji under a left SE(3)
+perturbation.
+Specular highlights and depth artefacts produce outliers,
+so we minimise the residuals under a Welsch kernel with
+graduated non-convexity [36], modulating its scale τ from
+wide to tight,
+ρτ(r) = τ 2
+1 −exp
+
+−r2
+2τ 2
+
+,
+τk = τ0 γk,
+(12)
+with τ0 = max(P95(|ri|), 3σmed), γ = (τmin/τ0)1/nγ, nγ = 4
+stages, τmin = max(τfloor, σmed) with floor τfloor = 1 µm,
+and σmed the median of σicp
+i
+(below) over the current corre-
+spondences. The IRLS weights are wi = βi exp(−r2
+i /(2τ 2)),
+where
+βi = cos θi
+(σicp
+i
+)2 ,
+σicp
+i
+=
+s
+St(ui)2 +
+s2
+v
+max(W(qi), 1)
+(13)
+combines the DA3 depth precision St with the TSDF’s own
+accumulated evidence at that voxel and the cosine of the
+surface incidence angle. Each stage solves the damped normal
+equations
+ JT ΩkJ + λLM diag(JT ΩkJ)
+
+δξ = −JT Ωkr,
+(14)
+with Ωk = diag(w1, . . . , wN) the stage-k weights, r and
+J stacked over correspondences, and λLM the Levenberg–
+Marquardt damping. A backtracking line search (η
+∈
+{1, 0.5, 0.25}) controls step acceptance; damping resets each
+stage and the schedule advances after three consecutive rejec-
+tions.
+
+
+7
+Anisotropic
+conditioning.
+Write
+H
+=
+JT ΩkJ +
+λLM diag(JT ΩkJ) for the matrix on the left of Eq. (14).
+It couples rotation (radians) and translation (millimetres) at
+incomparable scales, so we apply a diagonal scaling G =
+diag(1, 1, 1, dmed, dmed, dmed), where dmed is the median source
+depth, and take the eigendecomposition of the scaled matrix,
+Hs = GT HG = VΛVT , with orthonormal eigenvectors
+V and eigenvalue diagonal Λ = diag(λi). The spectrum
+reports how strongly the surface constrains each direction:
+inside a tube the eigenvalue along the lumen axis is orders of
+magnitude smaller than the radial ones. We use it to diagnose
+degeneracy and to compute the update without altering it,
+giving the update
+δξ = G V Λ−1VT (−GT b),
+b = JT Ωkr,
+(15)
+with b the gradient. When the spectrum stays ill-conditioned,
+we discard the ICP correction for that keyframe and keep the
+pose the visual factors already provide.
+Solving and accepting the alignment. We initialise the
+alignment using the estimate of Tt
+WC obtained from the first
+optimisation pass (Fig. 4). The solver minimises
+¯Tt
+AC = arg min
+T
+X
+i
+βi ρτ
+ ri(T)
+
+,
+(16)
+with the reliability weights βi above, and returns the refined
+pose ¯Tt,icp
+WC
+= TWA ¯Tt
+AC in the world frame. We add an ICP
+factor only if the ICP result passes three conditions.
+(i) Support. The registration returns at least 100 correspon-
+dences.
+(ii) Convergence. The solver converges.
+(iii) Rotation consistency. A converged registration with at
+least 200 correspondences must not differ from the first-
+pass rotation by more than 15◦. Only rotation about
+directions that the ICP Hessian constrains counts, because
+the roll about a straight lumen is unobservable. Beyond
+the threshold the first-pass pose was confidently wrong,
+and we reject the keyframe.
+A keyframe that fails (i) or (ii) loses only its surface constraint,
+and tracking continues on the visual factors. An accepted reg-
+istration passes the graph its correspondences at the converged
+pose, expressed in the world frame, (pi, qi, ni, σicp
+i
+), as the
+residuals of Eq. (9).
+C. TSDF Fusion
+The surface is built from the output of the factor graph opti-
+misation Tt,⋆
+WC , the most refined estimate the system produces.
+Integration happens once per keyframe, after the second pass,
+and only when the keyframe is labelled stable (Sec. VI).
+For a voxel centre x, define pc =
+ Tt,⋆
+WC
+−1x and u =
+πK(pc). When u lies inside the image and Dt(u) is valid, let
+ps
+t be the back-projection of u at depth Dt(u). The signed
+distance is the difference between the range to the observed
+surface and the range to the voxel, along that viewing ray,
+dt(x) = ∥ps
+t∥−∥pc∥,
+(17)
+ϕt(x) = clip(dt(x)/µ, −1, 1) ,
+(18)
+where µ is the truncation distance; voxels with |dt(x)| > µ
+are not updated. The running TSDF average obeys
+Φ+(x) = W(x)Φ(x) + wt(x)ϕt(x)
+W(x) + wt(x)
+,
+(19)
+W +(x) = W(x) + wt(x).
+(20)
+Here W(x) is the accumulated evidence weight. Integration
+into a voxel stops once W(x) reaches a cap Wmax, which
+freezes well-observed geometry against later, noisier evidence.
+We weight each pixel by the precision the depth predictor
+reports for it,
+wt(x) = clip
+
+1
+St(u)2 , wmin, wmax
+
+,
+(21)
+using the standard deviation St of Sec. IV-A, because a
+millimetre of depth error means the same thing at every voxel,
+whereas the reliability Qt governs only the sparse factors. The
+clip stops a single confident but wrong pixel from dominating
+a voxel. Pixels with invalid depth, depth beyond the integration
+range, or a failed validity mask are not integrated.
+A per-voxel consistency check protects established geom-
+etry. Once a voxel has accumulated weight above 3, we
+attenuate by 0.05× any incoming observation whose discrep-
+ancy |dt(x) −µ Φ(x)| exceeds 2 mm, and repeated agreeing
+evidence still corrects the voxel gradually. The ex vivo con-
+figuration uses 5, 4 mm and 0.1×.
+VIII. IMPLEMENTATION DETAILS
+The system is implemented in Python. The front end builds
+on PyTorch modules, and the back end uses the Python
+bindings of the GTSAM library. The dense TSDF and the ICP
+solver are custom CUDA kernels. The optimisation problem
+is implemented with GTSAM and runs on the CPU.
+The TSDF uses 0.5 mm voxels on the synthetic sequences
+and 1.0 mm on ex vivo data, with a truncation distance of
+four voxels. We extract meshes with marching cubes on its
+zero level set. Projection factors use isotropic image noise,
+σ = 2 px synthetic and 4 px ex vivo, under a Huber kernel.
+Depth factors use the standard deviation of Eq. (3), and each
+ICP residual uses σicp
+i
+of Eq. (13) under a Huber kernel.
+IX. EXPERIMENTS
+A. Setup
+Datasets. We use three sets and refer to them by these names
+throughout.
+(i)
+CT-derived airways (Patients 1 to 6). Six synthetic bron-
+choscopy sequences that we render from patient lung CT
+scans. Patients 1 to 6 are cases ATM 001, ATM 003,
+ATM 004, ATM 007, ATM 124 and ATM 063 of the
+public multi-site ATM’22 dataset [17]. The airways span
+the airway tree from primary bronchi (8–15 mm diameter)
+down to subsegmental branches (2–4 mm), as shown
+in Fig. 5. They cover the difficulties of Sec. I: long
+cylindrical segments, textureless walls, and narrow bifur-
+cations with sharp viewpoint change and self-occlusion.
+We render RGB sequences with endoscopic lighting and
+procedural texture variation, each traversing a single
+
+
+8
+Patient 1
+Patient 2
+Patient 3
+Patient 4
+Patient 5
+Patient 6
+Start
+End
+Fig. 5.
+Camera paths on the six CT-derived airways. Each panel is a
+synthetic airway rendered from the CT scan of one patient (all six are ATM’22
+cases [17]; Sec. IX-A). Open circles mark the start; filled diamonds mark the
+end.
+branch. The six comprise 3,376 frames, between 312
+and 714 per sequence, and 90–203 mm of catheter travel.
+Ground truth depth and pose come from the simulator
+and are used only for evaluation. On these sequences
+the predicted depth and its uncertainty are multiplied
+by one factor, 0.857, the geometric mean of the ratio
+of ground truth to predicted depth over ten further CT-
+derived airways that are not among the six. This set is
+the benchmark of Exp. 1 and Exp. 2.
+(ii) Synthetic phantom sequences B00, B46, B71, B96, B97
+and B118, named by branch index. They are six branches
+of the same phantom lung and are used only for the
+ablation of Exp. 3.
+(iii) Ex vivo sequences. Sequences from ex vivo lung pro-
+cedures with a custom continuum robot carrying an
+integrated RGB camera and co-located light source
+(Sec. IX-E). Two of them have no ground truth pose. The
+others carry an electromagnetic tracking (EMT) sensor,
+which provides a ground truth position.
+The synthetic sequences are static; the ex vivo lungs are
+ventilated and breathe during acquisition. Sec. IX-H discusses
+the rigid-scene assumption this leaves in place.
+Baselines. We compare our system against five recent
+monocular SLAM systems that use different tracking strate-
+gies: classical sparse feature-based (ORB-SLAM3 [18]); a
+surgical-domain feed-forward reconstructor trained on en-
+doscopic video (Endo3R [33]); and three general-domain
+feed-forward systems (MASt3R-SLAM [30], VGGT-SLAM
+2.0 [31], ViSTA-SLAM [32]). Endo3R is the only baseline
+whose training distribution already contains endoluminal tis-
+sue. All methods receive the same rendered sequences; the
+baselines consume every frame, while our pipeline processes
+every third frame on these sequences. Baselines use the best
+parameter configuration found by grid search on the training
+sequences.
+Evaluation. To evalaute the performance of our method, we
+report trajectory ATE and three reconstruction metrics on runs
+TABLE II
+METRIC DEPTH ACCURACY OF THE BRONCHOSCOPY-ADAPTED DA3
+PREDICTOR ON THE SIX CT-DERIVED AIRWAYS (PATIENTS 1 TO 6,
+SEC. IX-A), PER VALID PIXEL AGAINST SIMULATOR GROUND TRUTH. THE
+SCALE FACTOR s⋆= median(z/ˆz) TESTS ABSOLUTE SCALE. LOWER
+ABSREL/RMSE, HIGHER δ1, AND s⋆NEARER 1.00 ARE BETTER.
+Anatomy
+AbsRel ↓
+RMSE (mm) ↓
+δ1 (%) ↑
+s⋆(→1)
+Patient 1
+0.174
+5.22
+73.5
+0.883
+Patient 2
+0.186
+4.80
+75.3
+0.882
+Patient 3
+0.159
+5.13
+79.3
+0.954
+Patient 4
+0.116
+3.65
+88.3
+1.058
+Patient 5
+0.171
+4.98
+75.4
+0.931
+Patient 6
+0.148
+4.50
+85.7
+0.920
+Mean
+0.159
+4.71
+79.6
+0.938
+with more than 80 % temporal coverage; runs below that
+threshold are considered as failed.
+The Absolute Trajectory Error (ATE, RMSE in mm) mea-
+sures the average trajectory error of the estimated camera
+trajectories after a Sim(3) alignment (SE(3) alignment for our
+method) over the first 40 % of matched poses. The ground
+truth of the synthetic sequence is obtained from the simulator;
+the ground truth of part of the ex-vivo sequences is provided
+by the EMT.
+To evaluate the reconstructions, we produce a ground truth
+cloud for the synthetic sequences by back projecting the
+ground truth depth at the ground truth trajectory poses, after
+we remove invalid far-plane samples. The estimated clouds
+produced by each method are transformed by the same align-
+ment of the trajectories. We crop the estimated clouds to fit
+the ground truth evaluation volume and voxelise them at 1 mm
+to compute the error metrics we present as follows.
+The F-score @ 10 mm (%) [37] is the harmonic mean of pre-
+cision and recall at a 10 mm tolerance. Chamfer distance (CD)
+is the RMS symmetric nearest-neighbour distance and mea-
+sures typical surface error. The Hausdorff distance (HD) [38]
+is the symmetric worst-case nearest-neighbour distance, HD =
+max{supp∈P infg∈G ∥p −g∥, supg∈G infp∈P ∥g −p∥}, the
+largest distance by which the two surfaces disagree [39].
+B. Exp 1 – Metric Depth and Scale Accuracy
+We first evaluate the scale accuracy of the depth predictor,
+since it provides scale for the whole reconstruction pipeline.
+The depth factor of Eq. (6) and the TSDF integration of
+Sec. VII-C both use the predicted depth output, so a systematic
+scale error would propagate to the trajectory and the surface
+alike.
+We evaluate the predictor directly on the six synthetic
+airways, where the simulator supplies ground truth depth
+(Sec. IX-A). Table II reports, per valid pixel, the absolute
+relative error (AbsRel) and RMSE (mm), the threshold accu-
+racy δ1 (max(ˆz/z, z/ˆz) < 1.25), and the global scale factor
+s⋆= median(z/ˆz). s⋆is computed on the depth the pipeline
+consumes, after the factor of Sec. IX-A and without per-
+frame rescaling, to test the metric-depth assumption rather than
+relative depth quality.
+Across the six airways, the predictor reaches a mean AbsRel
+of 0.159 and δ1 of 79.6 %, with an RMSE of 4.71 mm over a
+
+
+9
+Fig. 6. Estimated trajectories on the six CT-derived airways (rows: synthetic airways rendered from the CT scans of Patients 1 to 6, all ATM’22 cases [17];
+Sec. IX-A) for ours, Endo3R, MASt3R-SLAM, VGGT-SLAM 2.0 and ViSTA-SLAM (columns). Dashed grey is ground truth. Colour shows per-frame ATE
+after alignment (blue →red, common scale capped at 100 mm). Each trajectory is aligned with Sim(3) on its first 40 % of poses and then left unaltered;
+Table III uses SE(3) for ours. Each row uses the projection plane that the airway’s ground truth moves in; a baseline whose estimate leaves the airway also
+leaves the panel. Numerical ATE values are in Table III.
+working range of a few tens of millimetres. The quantity that
+governs the reconstruction is s⋆: its mean is 0.938 and the
+six span 0.882 to 1.058. The evaluation uses every valid pixel
+of every frame of each traverse, masking non-positive ground
+truth and pixels beyond the predictor’s trained range.
+C. Exp 2 – Pose Tracking and Reconstruction Accuracy
+We next evaluate the accuracy of the estimated camera
+trajectories. Fig. 6 illustrates aligned trajectories and per-frame
+ATE, and Fig. 7 shows the reconstructed surfaces beside the
+observed ground truth. Table III reports ATE, F-score, CD and
+HD on all six airways.
+ORB-SLAM3 completes only two of the six airways, at
+20.84 and 6.98 mm ATE. The smooth mucosal surface yields
+too few corner matches to keep successful tracking. We mark
+the failed sequences as ×. We do not report the surface metrics
+for the cases when the algorithms only output a sparse map
+(indicated by “–”).
+Among the feed-forward systems, MASt3R-SLAM is the
+strongest baseline (22.02 mm mean ATE, 74.17 % mean F-
+score). VGGT-SLAM 2.0 drifts the most (127.43 mm mean
+ATE) and on two airways places no geometry inside the
+ground truth volume at all. Endo3R reaches 86.89 mm mean
+ATE despite endoscopic training data. ViSTA-SLAM accumu-
+lates less drift than either, yet fragments the surface (F-score
+26.30 %).
+Ours has the best mean F-score, Chamfer distance and
+Hausdorff distance of Table III: 77.47 % against 74.17 % for
+MASt3R-SLAM, 9.30 mm against 12.33 mm, and 42.42 mm
+against 57.44 mm. Its mean ATE of 26.13 mm is higher than
+the 22.02 mm of MASt3R-SLAM, which is aligned with a free
+scale; ORB-SLAM3 has the lowest mean (13.91 mm) but only
+on the two airways it completes. It is also the only one of the
+six systems that produces metric outputs.
+Fig. 7 shows the spatial structure behind these numbers.
+MASt3R-SLAM produces an accurate reconstruction but it
+covers only part of each airway. Endo3R and VGGT-SLAM
+2.0 return clouds that extend well beyond the anatomy, and
+Endo3R on one airway and VGGT-SLAM 2.0 on two leave
+nothing inside the volume the ground truth occupies. ViSTA-
+SLAM fragments the surface, whereas our reconstructions
+preserve both the curvature of the lumen and the angle of
+bifurcations.
+
+
+10
+TABLE III
+TRACKING AND RECONSTRUCTION METRICS ON THE SIX CT-DERIVED AIRWAYS (PATIENTS 1 TO 6, SEC. IX-A). OUR METHOD IS ALIGNED WITH
+SE(3) AND KEEPS ITS METRIC SCALE; EVERY OTHER METHOD IS ALIGNED WITH SIM(3). THE ALIGNMENTS ARE COMPUTED USING THE FIRST 40 % OF
+POSES. F-SCORE AT 10 MM. “×” MARKS TRACKING FAILURE OR UNDER 80 % TEMPORAL COVERAGE; “–” MARKS A SPARSE MAP, WHICH HAS NO
+SURFACE TO EVALUATE. †THE MEAN IS OVER THE ENTRIES OF THE ROW THAT ARE NOT “×”.
+Method
+Patient 1
+Patient 2
+Patient 3
+Patient 4
+Patient 5
+Patient 6
+Mean†
+ATE (mm) ↓
+Ours
+26.42
+34.19
+28.26
+34.53
+22.57
+10.83
+26.13
+ORB-SLAM3 [18]
+×
+×
+×
+20.84
+×
+6.98
+13.91
+Endo3R [33]
+52.36
+52.10
+163.42
+107.05
+62.00
+84.39
+86.89
+MASt3R-SLAM [30]
+15.17
+12.35
+23.62
+23.07
+29.12
+28.77
+22.02
+VGGT-SLAM 2.0 [31]
+321.39
+46.73
+111.57
+53.46
+72.66
+158.75
+127.43
+ViSTA-SLAM [32]
+33.41
+17.64
+47.60
+40.81
+18.28
+30.27
+31.34
+F-score (%) ↑
+Ours
+75.54
+79.76
+70.38
+77.05
+79.17
+82.94
+77.47
+ORB-SLAM3
+–
+–
+–
+–
+–
+–
+–
+Endo3R
+66.98
+×
+1.31
+2.04
+31.17
+17.05
+23.71
+MASt3R-SLAM
+81.85
+80.92
+75.37
+72.82
+76.22
+57.83
+74.17
+VGGT-SLAM 2.0
+×
+7.81
+0.00
+3.18
+0.00
+×
+2.75
+ViSTA-SLAM
+30.12
+38.12
+20.06
+21.76
+30.78
+16.95
+26.30
+CD (mm) ↓
+Ours
+9.18
+7.65
+13.92
+9.05
+8.28
+7.72
+9.30
+ORB-SLAM3
+–
+–
+–
+–
+–
+–
+–
+Endo3R
+13.71
+×
+32.28
+37.63
+17.85
+24.83
+25.26
+MASt3R-SLAM
+8.28
+11.22
+13.97
+13.71
+9.03
+17.80
+12.33
+VGGT-SLAM 2.0
+×
+33.30
+90.63
+69.22
+66.23
+×
+64.84
+ViSTA-SLAM
+28.57
+19.31
+34.09
+34.57
+21.53
+27.64
+27.62
+HD (mm) ↓
+Ours
+39.68
+28.50
+60.86
+48.39
+35.33
+41.74
+42.42
+ORB-SLAM3
+–
+–
+–
+–
+–
+–
+–
+Endo3R
+67.92
+×
+77.65
+117.36
+49.46
+84.02
+79.28
+MASt3R-SLAM
+54.35
+49.98
+69.32
+64.27
+32.73
+73.99
+57.44
+VGGT-SLAM 2.0
+×
+88.80
+195.53
+162.96
+151.39
+×
+149.67
+ViSTA-SLAM
+102.53
+66.71
+120.32
+118.01
+75.94
+88.00
+95.25
+TABLE IV
+ABLATION STUDY ON THE SIX SYNTHETIC PHANTOM SEQUENCES
+(MEANS OVER B00, B46, B71, B96, B97 AND B118; SEC. IX-A; NOT
+THE CT-DERIVED AIRWAYS OF TABLE III), EACH ROW REMOVING OR
+REPLACING ONE COMPONENT. ATE AND CD IN MM, F-SCORE IN %; BEST
+PER COLUMN IN BOLD. “×” INDICATES TRACKING FAILURE.
+Configuration
+ATE ↓
+F-score ↑
+CD ↓
+Ours (full)
+6.12
+95.3
+4.10
+ORB instead of DINO matcher
+×
+×
+×
+w/o TSDF map and ICP factor
+16.34
+64.9
+13.97
+single-pass fusion
+18.88
+70.2
+15.95
+w/o GNC (initial scale)
+27.47
+55.3
+23.55
+D. Exp 3 – Ablation Study
+We remove one component at a time and rerun the six
+phantom sequences. Table IV reports mean ATE, F-score and
+Chamfer distance for the following variants.
+• ORB instead of DINO matcher: we match ORB features in
+place of the DINOv3 descriptors of Sec. VI-A.
+• w/o TSDF map and ICP factor: instead of the ICP factor of
+Sec. VII-B, the graph contains the visual factors only.
+• Single-pass fusion: instead of optimising the graph again
+after adding the ICP factor, we add it and optimise at the
+next keyframe.
+• w/o GNC: instead of the schedule of Eq. (12), ICP uses the
+initial Welsch scale τ0 throughout.
+ORB breaks tracking: its matches on the smooth mucosa are
+too few, and every phantom halts at the first unstable keyframe.
+Among the ICP variants, removing GNC degrades the system
+the most, raising ATE from 6.1 to 27.5 mm and lowering
+F-score from 95.3 to 55.3 %. Without GNC, ICP converges
+in 30 % of attempts instead of 94 %, and only 355 factors
+are accepted against 1,094. Single-pass fusion integrates each
+keyframe into the TSDF at its uncorrected pose. It reaches
+18.9 mm while accepting almost as many ICP factors (1,063).
+Removing the TSDF map and ICP factor gives 16.3 mm and
+64.9 %. On B97 and B118, the two shortest branches, every
+ICP variant reaches at most 3.6 mm ATE; the means are driven
+by the other four.
+E. Exp 4 – Validation on Real Bronchoscopy
+We first compare against the baselines on two held-out ex
+vivo sequences. Neither has a ground truth pose, so we report
+no ATE or F-score and inspect them qualitatively. We then
+evaluate the trajectory on the ex vivo sequences that carry
+EMT ground truth. Beyond the ventilation already noted, the
+ex vivo sequences add moving specular highlights from the
+co-located illumination, motion blur, appearance differences
+between specimens, and mucus and vasculature absent from
+the renderings.
+No baseline recovers a usable endoluminal reconstruction
+on these sequences, as Fig. 8 shows. ORB-SLAM3 does not
+initialise on the low-texture mucosa: it retains no map point
+and writes an empty trajectory. MASt3R-SLAM and VGGT-
+SLAM 2.0 return dense but degenerate geometry, with the
+lumen collapsed into a single frontal sheet. ViSTA-SLAM
+fragments the airway into disconnected pieces, and its own
+confidence threshold rejects every pixel of the fused cloud. The
+panel therefore shows its output with that threshold relaxed
+to keep the most confident half of its predictions. Endo3R
+recovers a tubular structure but leaves a diffuse cloud around
+it. Of the methods compared, only ours returns a coherent
+lumen that keeps its diameter.
+
+
+11
+Fig. 7. Qualitative comparison of airway-surface reconstruction. Ground truth (GT) surface points and reconstructions from our method and four dense
+SLAM baselines, on the six CT-derived airways (rows: synthetic airways rendered from the CT scans of Patients 1 to 6, all ATM’22 cases [17]; Sec. IX-A).
+We register predicted clouds to GT rigidly, and every method keeps the same projection and scale. We crop each panel to the ground truth depth range and
+mark a method with nothing left inside it accordingly. We omit ORB-SLAM3 for the reconstruction evaluation because of its sparse map.
+Fig. 9 shows the reconstructions from the camera’s view-
+point. The per-keyframe point cloud (centre panel) reproduces
+the lumen geometry visible in the input RGB frame, and the
+fused TSDF mesh (right panel) joins those local observations
+into one continuous surface.
+Comparison against electromagnetic tracking. On the ex
+vivo sequences with EMT ground truth, we evaluate the
+windows in which the scope travels at least 54 mm in the
+anatomy frame, measured on the EMT reference.
+Because these traversals contain no revisits, we evaluate
+them as odometry. We fit a similarity transform on the initial
+portion of each window and then apply it unchanged, so
+downstream drift stays visible. Fig. 10 shows five windows
+under this protocol, coloured by per-sample deviation. Fig. 11
+shows the corresponding reconstructions on real tissue, to
+compare with the synthetic surfaces of Fig. 7.
+The electromagnetic sensor and the camera sit on either
+side of the actuated bending section, which gives them a
+non-rigid offset, and the reference is the sensor origin. The
+specimen is also mechanically ventilated, and the reference
+contains a respiratory oscillation that the camera, which moves
+with the tissue, does not observe. We band-stop the measured
+TABLE V
+NOVEL-VIEW SYNTHESIS, PER SEQUENCE. A 3D GAUSSIAN SPLATTING
+MODEL TRAINED FROM THE ESTIMATED POSES OF EACH EMT SEQUENCE.
+HELD-OUT VIEWS ARE EXCLUDED FROM TRAINING ON A GLOBAL INDEX.
+Sequence
+Views
+Segments
+PSNR train
+PSNR held out
+1
+647
+21
+35.18
+33.86
+2
+270
+9
+35.33
+34.70
+3
+270
+9
+35.43
+34.53
+4
+337
+11
+35.55
+33.98
+Mean
+35.37
+34.27
+ventilation frequency before comparison.
+F. Exp 5 – Photorealistic Rendering
+The optimised poses also support appearance reconstruc-
+tion: we train a 3D Gaussian Splatting model [40] offline
+on the four EMT sequences, seeding Gaussians from the
+depth-backprojected keyframe cloud with per-segment SE(3)
+pose refinement. Rendering held-out views tests whether the
+estimated poses are mutually consistent.
+
+
+12
+Fig. 8.
+Reconstruction comparison on ex vivo tissue. Each panel is framed on its own extent because real sequences carry no ground truth pose and
+monocular scale is free. The comparison therefore judges structural coherence. An empty panel is itself the result.
+Fig. 9.
+From bronchoscope frame to endoluminal surface. Left: input
+RGB frame from an ex vivo bronchoscopy sequence. Centre: dense point
+cloud obtained by back-projecting the DA3 depth at the SLAM-estimated
+pose. Right: corresponding region of the fused TSDF surface after marching-
+cubes extraction and light smoothing.
+Every eighth view is held out. Fig. 12 shows observed
+frames beside renderings of the same held-out views. Held-
+out PSNR averages 34.3 dB against 35.4 dB on training views
+(Table V), within 0.5 dB of that mean on every sequence, for
+sequences of 270–647 keyframes.
+G. Computational Performance
+We report per-keyframe timings on a single NVIDIA RTX
+4090, averaged over the 1,132 keyframes of the six CT-derived
+airway runs of Exp. 2, which select every third frame of 30 fps
+video. A keyframe is processed synchronously: its pose is
+published once tracking, registration and the graph update have
+finished. Tracking takes 277 ms (depth preprocessing 61 ms,
+matching 60 ms, landmark association 80 ms, PnP 76 ms), ICP
+against the local submap 168 ms, and the graph update with
+landmark birth 263 ms, of which both iSAM2 passes take
+200 ms. Each keyframe is also processed on a copy of the
+map state, which replaces the committed state only after it
+is validated; the copy takes 1.86 s. A keyframe takes 2.98 s in
+total (median 2.87 s, 95th percentile 5.38 s), so the system runs
+slower than real time on these sequences. DINOv3 descriptors
+are read from a precomputed cache in these runs; extracting
+them online adds 200 ms per frame.
+H. Limitations
+Heavily specular or textureless mucosa weakens both front-
+end signals at once. DA3 flags most pixels as unreliable,
+which leaves ICP with too few source points against the local
+submap, and the DINO matcher finds too few correspondences
+to support the projection factors. ICP is also weakest over
+the first few keyframes, before the submap holds enough
+surface. Diagnosing the ICP Hessian lets the system discard
+a degenerate registration, and the visual factors alone then
+constrain the pose.
+The system performs no loop closure, and each evalu-
+ated sequence traverses a single branch without revisiting
+it. Exploratory bronchoscopy that withdraws and re-enters a
+different branch would revisit mapped geometry, and closing
+those loops is required before the system can cover a full
+airway tree in one session.
+On the ex vivo sequences no ground truth depth is available,
+so we can check the inherited metric scale only for internal
+consistency. We reconstruct under a rigid-scene assumption,
+which holds exactly for the static synthetic sequences. The ex
+vivo lungs are ventilated and breathe during acquisition, but
+the video shows little deformation of the airways, so we do
+not model it. We target the proximal-to-subsegmental airways,
+from the primary bronchi down to the 2–4 mm subsegmental
+branches, and have not tested larger tidal volumes or the distal
+airways, where deformation is likely larger. Modelling the
+deformation [22]–[24], or reconstructing at a fixed phase of
+the breathing cycle, would address this.
+X. CONCLUSION
+We introduced a monocular SLAM system that recovers
+both the bronchoscope trajectory and a dense reconstruction of
+the inner airway surface, without depth sensors or preoperative
+scans. It combines a bronchoscopy-tuned depth predictor for
+metric scale, a dense matcher for texture-poor mucosa, and
+a two-pass factor graph that fuses those visual measurements
+with a dense ICP constraint against the system’s own recon-
+struction.
+On six CT-derived airways, ours has the most accurate
+surface of the six systems, with 77.47 % mean F-score against
+74.17 % for the strongest baseline, and a mean ATE of
+26.13 mm against 22.02 mm for MASt3R-SLAM.
+Our results demonstrate that accurate camera pose and a
+dense endoluminal surface can therefore be recovered from
+bronchoscopy video alone, with no added hardware and no
+preoperative volumetric prior.
+APPENDIX A
+A. Metric Depth Predictor Training
+Architecture and parameterisation. We fine-tune the nested
+DA3 variant, which pairs the pretrained any-view geometry
+branch (DA3NESTED-GIANT-LARGE-1.1) with a metric
+dense prediction transformer (DPT) head. The metric head
+regresses depth in the canonical form Dc = M D f c/f,
+
+
+13
+Fig. 10. Estimated trajectory against electromagnetic-tracking ground truth, evaluated as odometry. Five acquisition windows, each projected onto its
+dominant plane (u, v). Dashed grey is the EMT reference over its longest continuous valid stretch. We align the estimate with a similarity transform fitted
+on the start of each window (Sec. IX-E), and the colour (shared bar, mm) shows the drift accumulated since the start.
+Fig. 11. Endoluminal reconstruction on ex vivo tissue. Graph-optimised sparse landmark maps for four of the five EMT windows of Fig. 10, metrically
+scaled and rendered as depth-ordered surfels; colour is the observed mucosal appearance and the scale bar is 10 mm. The maps recover a continuous lumen
+with visible cartilage ridging and bifurcation openings.
+Fig. 12. Novel-view synthesis from the estimated trajectory. For each of
+the four sequences, an observed frame above the rendering of that same held-
+out view; the yellow box marks a detailed region, magnified in the inset. See
+the supplementary video for a closer look.
+with canonical focal f c = 300 px and a fixed multiplier
+M = 100; deployment inverts this, D = Dc f/(f cM), so
+predictions carry absolute millimetre scale under the target
+camera’s calibrated intrinsics. Depths are supervised up to
+200 mm, the working range of the bronchoscope.
+Data and supervision. Training uses over one million photo-
+realistic airway renderings with per-pixel ground truth depth,
+sampled as clips of 4 frames at stride 6 so the loss sees the
+temporal context the deployed predictor is given. Supervision
+is metric: an L1 term on canonical depth against raw ground
+truth, combined with a ray-direction term inherited from the
+any-view branch that regularises the implied camera geometry.
+Optimisation. AdamW, weight decay 0.05, with separate rates
+for the pretrained backbone (5 × 10−6) and the metric head
+(5 × 10−5), 8000 warm-up steps, and one clip per step with
+gradient accumulation over 8, for 4.1×104 steps. Colour jitter
+on 80 % of samples and spatially correlated sensor noise keep
+the predictor from tuning to the renderer’s noise-free statistics.
+Uncertainty channel. The metric head emits a second channel
+alongside depth, carrying a Laplace scale in log-depth. Its
+activation is exp(·)+1, so the log-scale parameter is recovered
+exactly as log b = log(c−1) from the emitted value c, clamped
+to [−12, 4] and multiplied by a metric temperature fitted once
+at calibration. Because the Laplace lives in log-depth, the 95 %
+interval on depth is D exp(±q95b) with q95 = −ln 0.05, and
+we report the standard deviation St as the Gaussian-equivalent
+width of that interval,
+St = D e q95b −e−q95b
+2 × 1.960
+.
+(22)
+Two auxiliary heads supply the per-frame validity mask,
+one predicting whether a pixel falls inside the trained depth
+range and one rejecting background; pixels failing either are
+discarded before Eq. (2) is evaluated.
+B. Cross-Attention Matcher Training
+The DINO feature matcher of Sec. VI-A maps the DINOv3
+patch descriptors of a source and a target frame into a 256-
+D matching space and predicts coarse patch assignments and
+a sub-pixel offset, supervised on frame pairs with known
+correspondences.
+Supervision. Ground truth correspondences come from frame
+pairs with known dense flow: pairs are precomputed once, each
+patch of the source frame carrying either a target location, an
+explicit invalid label where the surface leaves the field of view,
+or an ignore label where the correspondence is occluded or
+
+
+14
+uncertain. The third state matters: the mucosa self-occludes at
+every fold, and a two-state formulation would train the matcher
+to guess there. The loss excludes occluded patches.
+Losses. We consider a cross-entropy over coarse patch assign-
+ment; a Charbonnier regression on the sub-pixel offset, eval-
+uated on valid patches only; and a forward-backward cycle-
+consistency term (weight 0.5) that penalises correspondences
+which do not return to their origin. These terms are applied
+in both directions for each pair.
+Optimisation. Descriptors are precomputed with the frozen
+backbone, which makes large batches affordable: AdamW,
+batch size 64, learning rate 3 × 10−4, weight decay 0.01, one
+warm-up epoch, on 400 px crops. Training runs to a maximum
+of 20 epochs with early stopping (patience 4 epochs, minimum
+improvement 0.5 %); the deployed checkpoint is the best of 15
+completed epochs.
+ACKNOWLEDGMENTS
+This work was supported by a UKRI Turing AI World
+Leading Researcher Fellowship on AI for Person-Centred
+and Teachable Autonomy (grant EP/Z534833/1) and Baillie
+Gifford Pandemic Science Hub.
+REFERENCES
+[1] I. A. Du Rand et al., “British thoracic society guideline for diagnostic
+flexible bronchoscopy in adults,” Thorax, vol. 68, no. Suppl 1, pp. i1–
+i44, 2013.
+[2] A. L. James and S. Wenzel, “Clinical relevance of airway remodelling
+in airway diseases,” European Respiratory Journal, vol. 30, no. 1, pp.
+134–155, 2007.
+[3] J. C. Hogg, “Pathophysiology of airflow limitation in chronic obstructive
+pulmonary disease,” The Lancet, vol. 364, no. 9435, pp. 709–721, 2004.
+[4] R. C. Boucher, “Airway surface dehydration in cystic fibrosis: Patho-
+genesis and therapy,” Annual Review of Medicine, vol. 58, no. 1, pp.
+157–170, 2007.
+[5] A. Ernst, D. Feller-Kopman, H. D. Becker, and A. C. Mehta, “Central
+airway obstruction,” American Journal of Respiratory and Critical Care
+Medicine, vol. 169, no. 12, pp. 1278–1297, 2004.
+[6] Intuitive Surgical, Inc., “Ion robotic bronchoscopy: about the system,”
+https://www.intuitive.com/en-us/patients/ion-robotic-bronchoscopy/
+about-the-system, accessed: Oct. 9, 2026.
+[7] T. R. Gildea et al., “Electromagnetic navigation diagnostic bron-
+choscopy: A prospective study,” American Journal of Respiratory and
+Critical Care Medicine, vol. 174, no. 9, pp. 982–989, 2006.
+[8] D. J. Brenner and E. J. Hall, “Computed tomography — an increasing
+source of radiation exposure,” New England Journal of Medicine, vol.
+357, no. 22, pp. 2277–2284, 2007.
+[9] J. Zhang et al., “AI co-pilot bronchoscope robot,” Nature Communica-
+tions, vol. 15, no. 1, p. 241, 2024.
+[10] J. Deng et al., “Feature-based visual odometry for bronchoscopy: A
+dataset and benchmark,” in IEEE/RSJ International Conference on
+Intelligent Robots and Systems (IROS), 2023, pp. 6557–6564.
+[11] N. Mahmoud et al., “Live tracking and dense reconstruction for handheld
+monocular endoscopy,” IEEE Transactions on Medical Imaging, vol. 38,
+no. 1, pp. 79–89, 2019.
+[12] J. Morlana, J. D. Tard´os, and J. M. M. Montiel, “Topological SLAM in
+colonoscopies leveraging deep features and topological priors,” in Med-
+ical Image Computing and Computer Assisted Intervention (MICCAI),
+2024, pp. 733–743.
+[13] A. Dunn Beltran et al., “Stop holding your breath: CT-informed
+Gaussian
+splatting
+for
+dynamic
+bronchoscopy,”
+arXiv
+preprint
+arXiv:2604.28179, 2026.
+[14] O. G. Grasa et al., “Visual SLAM for handheld monocular endoscope,”
+IEEE Transactions on Medical Imaging, vol. 33, no. 1, pp. 135–146,
+2014.
+[15] P. Mountney, D. Stoyanov, and G.-Z. Yang, “Three-dimensional tissue
+deformation recovery and tracking,” IEEE Signal Processing Magazine,
+vol. 27, no. 4, pp. 14–24, 2010.
+[16] J. Zhang, M. Kaess, and S. Singh, “On degeneracy of optimization-
+based state estimation problems,” in IEEE International Conference on
+Robotics and Automation (ICRA), 2016, pp. 809–816.
+[17] M. Zhang et al., “Multi-site, multi-domain airway tree modeling,”
+Medical Image Analysis, vol. 90, p. 102957, 2023.
+[18] C. Campos et al., “ORB-SLAM3: An accurate open-source library for
+visual, visual-inertial and multi-map SLAM,” IEEE Transactions on
+Robotics, vol. 37, no. 6, pp. 1874–1890, 2021.
+[19] J. Engel, T. Sch¨ops, and D. Cremers, “LSD-SLAM: Large-scale di-
+rect monocular SLAM,” in European Conference on Computer Vision
+(ECCV), 2014, pp. 834–849.
+[20] J. Engel, V. Koltun, and D. Cremers, “Direct sparse odometry,” IEEE
+Transactions on Pattern Analysis and Machine Intelligence, vol. 40,
+no. 3, pp. 611–625, 2018.
+[21] X. Liu et al., “Dense depth estimation in monocular endoscopy with self-
+supervised learning methods,” IEEE Transactions on Medical Imaging,
+vol. 39, no. 5, pp. 1438–1447, 2020.
+[22] J. Lamarca, S. Parashar, A. Bartoli, and J. M. M. Montiel, “DefSLAM:
+Tracking and mapping of deforming scenes from monocular sequences,”
+IEEE Transactions on Robotics, vol. 37, no. 1, pp. 291–303, 2021.
+[23] J. J. G´omez Rodr´ıguez, J. M. M. Montiel, and J. D. Tard´os, “NR-SLAM:
+Non-rigid monocular SLAM,” IEEE Transactions on Robotics, vol. 40,
+pp. 4252–4264, 2024.
+[24] J. Song et al., “MIS-SLAM: Real-time large-scale dense deformable
+SLAM system in minimal invasive surgery based on heterogeneous
+computing,” IEEE Robotics and Automation Letters, vol. 3, no. 4, pp.
+4068–4075, 2018.
+[25] Y. Zhang et al., “Structure-to-shape aortic 3-D deformation reconstruc-
+tion for endovascular interventions,” IEEE Transactions on Robotics,
+vol. 39, no. 4, pp. 2954–2972, 2023.
+[26] O. Sim´eoni et al., “DINOv3,” arXiv preprint arXiv:2508.10104, 2025.
+[27] H. Lin et al., “Depth anything 3: Recovering the visual space from any
+views,” arXiv preprint arXiv:2511.10647, 2025.
+[28] J. Wang et al., “VGGT: Visual geometry grounded transformer,” in
+IEEE/CVF Conference on Computer Vision and Pattern Recognition
+(CVPR), 2025, pp. 5294–5306.
+[29] Z. Teed and J. Deng, “DROID-SLAM: Deep visual SLAM for monoc-
+ular, stereo, and RGB-D cameras,” Advances in Neural Information
+Processing Systems, 2021.
+[30] R. Murai, E. Dexheimer, and A. J. Davison, “MASt3R-SLAM: Real-time
+dense SLAM with 3D reconstruction priors,” in IEEE/CVF Conference
+on Computer Vision and Pattern Recognition (CVPR), 2025, pp. 16 695–
+16 705.
+[31] D. Maggio and L. Carlone, “VGGT-SLAM 2.0: Real-time dense feed-
+forward scene reconstruction,” in Robotics: Science and Systems (RSS),
+2026.
+[32] G. Zhang, S. Qian, X. Wang, and D. Cremers, “ViSTA-SLAM: Visual
+SLAM with symmetric two-view association,” in International Confer-
+ence on 3D Vision (3DV), 2026.
+[33] J. Guo et al., “Endo3R: Unified online reconstruction from dynamic
+monocular endoscopic video,” in International Conference on Medical
+Image Computing and Computer-Assisted Intervention (MICCAI), 2025.
+[34] M. Kaess et al., “iSAM2: Incremental smoothing and mapping using the
+Bayes tree,” International Journal of Robotics Research, vol. 31, no. 2,
+pp. 216–235, 2012.
+[35] R. A. Newcombe et al., “KinectFusion: Real-time dense surface map-
+ping and tracking,” in IEEE International Symposium on Mixed and
+Augmented Reality (ISMAR), 2011.
+[36] H. Yang, P. Antonante, V. Tzoumas, and L. Carlone, “Graduated non-
+convexity for robust spatial perception: From non-minimal solvers to
+global outlier rejection,” IEEE Robotics and Automation Letters, vol. 5,
+no. 2, pp. 1127–1134, 2020.
+[37] A. Knapitsch, J. Park, Q.-Y. Zhou, and V. Koltun, “Tanks and temples:
+Benchmarking large-scale scene reconstruction,” ACM Transactions on
+Graphics, vol. 36, no. 4, pp. 1–13, 2017.
+[38] D. P. Huttenlocher, G. A. Klanderman, and W. J. Rucklidge, “Comparing
+images using the Hausdorff distance,” IEEE Transactions on Pattern
+Analysis and Machine Intelligence, vol. 15, no. 9, pp. 850–863, 1993.
+[39] A. A. Taha and A. Hanbury, “Metrics for evaluating 3D medical image
+segmentation: Analysis, selection, and tool,” BMC Medical Imaging,
+vol. 15, no. 1, p. 29, 2015.
+[40] B. Kerbl, G. Kopanas, T. Leimk¨uhler, and G. Drettakis, “3D Gaussian
+splatting for real-time radiance field rendering,” ACM Transactions on
+Graphics, vol. 42, no. 4, pp. 1–14, 2023.

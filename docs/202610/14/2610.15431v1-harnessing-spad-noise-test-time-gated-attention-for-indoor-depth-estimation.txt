@@ -1,0 +1,455 @@
+Title: Harnessing SPAD Noise: Test-Time Gated Attention for Indoor Depth Estimation
+
+URL Source: https://arxiv.org/pdf/2610.15431v1
+
+Published Time: Wed, 14 Oct 2026 01:36:27 GMT
+
+Number of Pages: 13
+
+Markdown Content:
+# Harnessing SPAD Noise: Test-Time Gated Attention for Indoor Depth Estimation 
+
+## Yiquan Gao Heriot-Watt University 
+
+## Abstract 
+
+Monocular depth estimation (MDE) has emerged as a cost-effective alternative to hardware-dependent 3D sens-ing modalities, yet predicting precise metric depth remains a persistent challenge due to intrinsic scale ambiguity, edge bleeding, and limited zero-shot generalization in unseen en-vironments. Recent multi-modal approaches incorporate 1D/3D Single-Photon Avalanche Diode (SPAD) data to re-solve these ambiguities, but they mainly treat SPAD noise as a harmful artifact required for denoising or leave the noise ignored. In this paper, we present an essentially dif-ferent insight: native SPAD noise is an informative prior that implicitly encodes deterministic environmental char-acteristics. Driven by this paradigm shift, we introduce a novel, lightweight Test-Time Gated Attention framework by Harnessing SPAD Noise, therefore dubbed HSN. Tailored for indoor scenarios, HSN leverages the synergistic combi-nation of 1D SPAD histograms and Gate Adapters (GAs). Through three complementary optimization phases, it gen-erates channel-wise gated attention vectors to dynamically adjust encoder feature maps at inference time, effectively resolving ambiguous scale and boundary challenges with-out the heavy computational overhead or dense 3D modal-ities that other TTA methods suffer from. Extensive exper-iments on challenging real-world indoor benchmarks show that HSN achieves state-of-the-art metric depth accuracy in in-domain settings, while exhibiting even greater potential under zero-shot generalization to unfamiliar environments. Code will be made publicly available. 
+
+## 1. Introduction 
+
+Although hardware-based 3D sensing modalities like Li-DAR, stereo vision, time-of-flight, and structured light are widely used, monocular depth estimation (MDE) has emerged as a compelling solution requiring only a single camera. By eliminating expensive and bulky hardware de-pendencies, MDE provides a versatile alternative for diverse fields, including indoor navigation [44], robotics [7], aug-mented reality [10], and AI-generated content (AIGC) [25]. While MDE excels at capturing relative depth cues, predict-ing precise metric depth (i.e., absolute distances) remains a persistent bottleneck. This limitation primarily stems from the scale ambiguity intrinsic to monocular vision, alongside severe edge bleeding at boundaries and structural artifacts within object surfaces. Furthermore, these challenges be-come seriously exacerbated during zero-shot generalization in unseen environments. To tackle these issues, recent works have incorporated various modalities, such as 3D SPAD volumes [23, 33], 3D point clouds [26], IMU [37], and 1D SPAD histograms [20, 27], focusing on either multimodal feature fusion during full training or rescaling at test-time adaptation. Compared to other modalities, 1D SPAD histograms are acquired via a single-pixel time-resolved detector with a low-power pulsed light source, which renders them the most cost-effective yet highly noisy data form, offering the least amount of infor-mation. Confronted with SPAD noise, existing 3D SPAD depth networks [23, 28, 33] predominantly focus on denois-ing to eliminate these fluctuations as destructive artifacts. Meanwhile, current 1D SPAD methods either integrate the histograms into deep multimodal feature fusion during full training [20], or restrict their utility to test-time histogram matching [27]. As a result, they completely bypass raw noise processing, leaving the statistical properties of the 1D SPAD noise unexploited. Departing from all these existing tracks, we present a fundamentally different perspective: this native noise is not merely a pure corruption, but rather an informative prior that implicitly encodes deterministic environmental charac-teristics. To realize this, our work introduces a novel Test-Time Gated Attention framework named HSN that explic-itly harnesses the SPAD noise prior inherently embedded within 1D SPAD histograms. Specifically, this framework aims at refining depth perception for indoor scenarios dur-ing test time, since 1D SPAD signals suffer from severe am-bient light interference outdoors but maintain a relatively stable noise structure indoors. In the indoor setting, HSN uses the noise as a guidance signal to yield a channel-wise gated attention vector that dynamically calibrates the cor-responding encoder maps, thereby effectively addressing arXiv:2610.15431v1 [cs.CV] 11 Oct 2026 the ambiguous scale and boundary challenges in monoc-ular metric depth estimation. By building upon the effi-cient combination of 1D SPAD and MLPs, HSN achieves a highly lightweight TTA solution that thrives under ex-tremely sparse data regimes, which avoids heavy TTA de-signs such as the diffusion overhead of MfH [43] and the reliance on dense 3D point clouds in DR-LiDAR [26]. Our main contributions can be summarized as follows: • A Novel Noise-Driven Paradigm: We challenge the con-vention of viewing SPAD noise solely as a destructive artifact destined for denoising. Instead, we introduce a paradigm shift by repurposing the 1D SPAD noise signal as an informative prior that correlates with environmental characteristics to enable geometric and scale calibration for indoor monocular metric depth estimation. • Lightweight Test-Time Adaptation Framework: We propose an efficient framework named Test-Time Gated Attention by Harnessing SPAD Noise (HSN), along with the design of three complementary optimizations: statisti-cal distribution alignment, physically-constrained losses, and a stability audit mechanism. By exploiting the syn-ergy between 1D SPAD histograms and Gate Adapters, HSN yields channel-wise gated attention vectors to adap-tively calibrate encoder feature maps at inference time, eliminating the heavy computational overhead and dense 3D modalities common in competitive TTA methods. • Superior In-Domain and Zero-Shot Generalization: 
+
+As a generic plug-and-play TTA framework for encoder– decoder MDE architectures, HSN is validated via exten-sive experiments on challenging indoor benchmarks in-volving real-world data. While achieving state-of-the-art metric depth accuracy for the in-domain setting, it ex-hibits even more profound potential in zero-shot gener-alization across unseen scenes. 
+
+## 2. Related Work 
+
+Monocular Metric Depth Estimation. Conventional ab-solute depth perception methods heavily rely on stereo vi-sion or expensive active sensors like LiDAR to resolve real-world dimensions. To circumvent these hardware con-straints, recent deep neural networks formulate Monocu-lar Metric Depth Estimation (MMDE) as a direct map-ping from single RGB images to physical distances, typ-ically by fitting unknown camera intrinsics onto canoni-cal camera spaces. Despite notable progress on specific datasets, existing MMDE networks, including regression models [8, 9], discrete bin classification models [3, 4] and depth foundation models [5, 35, 36], still struggle with scale ambiguity [8, 15] when transferring global scene scales to unseen, zero-shot scenarios with varying camera intrin-sics and environmental factors. Multimodal feature fu-sion [20, 33, 42, 46], large-scale data mixture [31, 38], and camera-depth disentanglement [29, 30] enable train-ing models across multiple modalities or domains simul-taneously, which significantly extends the generalization capabilities for zero-shot MMDE. Nevertheless, when en-countering exceptionally challenging open-world domains, these models commonly require targeted finetuning to re-solve severe out-of-distribution gaps due to their lack of test-time scale alignment. However, downstream finetuning is both computationally prohibitive and highly inflexible for practical deployment. Therefore, our HSN provides a gen-eral plug-and-play TTA framework for various categories of MMDE networks, contingent upon their utilization of an encoder-decoder architecture. 
+
+Test-Time Adaptation for Depth Perception. Deploying a pre-trained MMDE model into unobserved domains of-ten induces massive performance degradation due to dis-tribution shifts in sensor intrinsics, illumination conditions, and environmental variations. To alleviate this without re-triggering expensive offline finetuning, Test-Time Adapta-tion (TTA) focuses on dynamically adjusting model weights or recalibrating output distributions during the inference stage. Although TTA for zero-shot MMDE remains heavily under-explored, the few existing approaches mainly lever-age cross-modal visual clues or domain-specific priors to bridge domain gaps. For instance, MfH [43] adopts a ’generate-and-estimate’ paradigm via diffusion-based hu-man inpainting, while SurgDepth [34] adapts pre-trained decoders exclusively for medical endoscopy using surgical self-supervised signals. However, these methods either in-troduce a heavy generative loop or require repetitive online optimization, incurring severe computational bottlenecks during TTA. Another line of work, such as DR-LiDAR [26], utilizes hardware-dependent dense 3D points from sensors to rescale an affine-invariant disparity map, yet its require-ment for explicit 3D coordinates leads to substantial com-putational and financial overhead, restricting its deployment on low-cost commodity robots. In contrast, we present a cost-effective TTA design by leveraging extremely sparse 1D SPAD inputs coupled with a compact MLP architec-ture, ensuring a versatile solution with highly competitive performance for robust metric depth adaptation in zero-shot MMDE. 
+
+Exploiting Noise in Learning. Noise can manifest in var-ious forms and is generally regarded as a harmful arti-fact that needs to be removed in numerous applications, such as license plate detection [11], EEG analysis [19], point cloud denoising [45], and time series forecasting [40]. This denoising practice dominates the Single-Photon Avalanche Diode (SPAD) field, since raw SPAD acquisi-tions frequently suffer from unavoidable environmental in-terference (e.g., clutter from complex background objects and unpredictable ambient light especially outdoors) and intrinsic sensor disturbances like dark count rates (DCR). Consequently, SPAD-based MDE methods [23, 28, 33] pri-oritize raw 3D dense volume denoising as an indispens-able prerequisite. However, existing studies regarding the noise handling of the 1D sparse SPAD representation re-main absent [20, 27], leaving its significantly higher noise completely untouched. Contemporary works like BadCLIP [2] and BAPLE [14] emerge to show how learnable noise can backdoor VLMs, TNT [18] shifts this utility toward TTA for zero-shot im-age classification, proving that such noise-based optimiza-tion within input space can serve as an efficient tool to handle unpredictable distribution shifts. Inspired by this philosophy, we present a distinct insight against conven-tional SPAD processing: rather than a destructive artifact to be filtered out, native SPAD noise constitutes an informa-tive prior that implicitly encodes deterministic environmen-tal characteristics. To this end, we propose the Test-Time Gated Attention framework by harnessing SPAD noise to address zero-shot MMDE, marking the first attempt to ex-ploit noise learning for test-time depth adaptation. 
+
+## 3. HSN: Test-Time Gated Attention 
+
+We propose a Test-Time Gated Attention framework dubbed HSN to refine monocular depth predictions by 
+
+Harnessing SPAD Noise, as illustrated in Fig. 1 and de-tailed in Alg. 1. During inference, the pre-trained encoder-decoder network θ remains frozen to preserve its general structural priors. HSN only optimizes a specific subset of parameters within the Gate Adapter (GA) modules ϕ at test time. This test-time adaptation (TTA) process com-prises three distinct phases: statistical distribution align-ment, physically-constrained optimization, and a robustness audit to ensure reliability. Before dissecting these three phases, we first elaborate on the structural design of the GA modules and the overall workflow that governs their online adaptation. 
+
+3.1. Gate Adapter and TTA Workflow 
+
+As shown in Fig. 1(a), the depth estimation network Fθ,ϕ 
+
+maps an input RGB I ∈ RH×W ×3 to the corresponding depth D∗ ∈ RH×W ×1. This mapping is refined by em-bedding test-time updated GA modules, which adjust the selected encoder maps via a gated attention mechanism be-fore the decoder layers. Fθ,ϕ is parameterized by two dis-tinct weight sets: a frozen set θ retaining the pre-trained geometric representation of the encoder-decoder backbone, and a trainable set ϕ within the GA modules optimized by the HSN framework during inference. Notably, the GA modules only process the selected encoder maps that are routed directly to their corresponding decoder layers. Therefore, the parameter set ϕ is formalized as the collec-tion of weights across these specific routing paths: 
+
+ϕ = {ϕl}l∈L , (1) where ϕl represents the internal trainable weights of the GA module embedded at the l-th encoder-decoder routing pair, and L denotes the set of indices corresponding to the se-lected routing connections. Furthermore, Fig. 1(b) depicts the architecture and test-time loop for each module ϕl ∈ ϕ. Firstly, the SPAD tem-poral histogram S ∈ RN ×1 corresponding to I is converted into a noise level indicator ω ∈ R as follows: 
+
+ω = −1ln N + ϵ
+
+> N
+
+X
+
+> i=1
+
+pi ln( pi + ϵ) (2) where pi = Si/(PNk=1 Sk + ϵ) represents the normalized temporal probability of the i-th bin, N denotes the total number of temporal bins, and ϵ = 10 −9 ensures numerical stability. Under this formulation, the noise scalar is strictly bounded within the interval ω ∈ [0 , 1] . Intuitively, a value close to 1 indicates a noise-dominant histogram with scat-tered background photons, whereas a value approaching 0 represents a sharp, clean signal peak. Subsequently, the noise scalar ω serves as an auxiliary input to each GA module ϕl:
+
+Fout = Fin ⊗ (γ · σ (MLP (ω))) (3) where Fin , F out ∈ RCl×Hl×Wl denote the input and output spatial features of the l-th module respectively. Channel-wise gated attention vector g is the output of γ·σ (MLP (ω)) ,where σ(·) represents the Sigmoid function, γ is a scal-ing coefficient, and ⊗ denotes the Hadamard product with broadcasting. For notation simplicity, we omit the index 
+
+l for the internal parameters of MLP (·). To ensure test-time efficiency, it adopts a lightweight bottleneck design (1 → Cl 
+
+> 4
+
+→ Cl): MLP (ω) = W2 · ReLU (W1 · ω + b1) + b2 (4) where W1 ∈ R Cl 
+
+> 4×1
+
+, W2 ∈ RCl× Cl 
+
+> 4
+
+, b1 ∈ R Cl 
+
+> 4
+
+, and b2 ∈
+
+RCl .Crucially, the final parameters {W2, b 2} are zero-initialized, ensuring MLP (ω) = 0 regardless of the input 
+
+ω at the inception of TTA. By setting γ = 2 , the initial modulation factor becomes strictly 2 · σ(0) = 1 , guaran-teeing that the GA module fully preserves the pre-trained baseline features at the start of inference. As TTA pro-gresses, this mechanism adaptively scales the feature maps within a flexible range of (0 , γ), which dynamically mod-ulates the spatial feature representations conditioned on the temporal noise statistics derived from the SPAD histogram, thereby effectively calibrating the model’s sensitivity and robustness to geometric variations while mitigating depth ambiguity. During adaptation, only the parameters of ϕl,specifically {W1, W 2} and {b1, b 2}, are optimized across three sequential phases: statistical distribution alignment, physically-constrained optimization, and stability auditing, which are described below. Noise   
+
+> Prior
+> ……
+> …… σ( ⋅)*γ
+
+⊗
+
+> Enc. Feat.
+> Gated Enc. Feat.
+> Dec. Feat.
+
+(b)      
+
+> SPAD
+> N x 1
+> Hist. Entropy Estimation
+> Selected Enc. Feat.
+> Skipped Enc. Feat.
+> Dec. Feat.
+> Frozen
+> Trainable ⊗Hadamard Product
+> σSigmoid Function
+> γScaling Coefficient
+> Encoder GA 1
+> Decoder
+> GA 2
+> GA 3
+> Gate Adapter
+> GA N-1
+> …
+> GA N
+
+(a) 
+
+> RGB
+> H x W x 3
+> Depth
+> H x W x 1
+> Physical-Fidelity Losses
+> Test-time Update
+> Statistical Distribution Alignment
+> Stability Audit Mechanism
+
+Figure 1. Overview of the proposed Test-Time Gated Attention framework (HSN). (a) illustrates how Gate Adapter (GA) modules are embedded between the selected encoder map and its corresponding decoder map, where the targeted encoder map is routed to the subsequent decoding layer. Conversely, encoder maps not routed to decoding layers bypass GA modulation entirely. (b) details the architectural design of the GA module and the TTA workflow. During inference, the pre-trained encoder-decoder network θ remains frozen to preserve its inherent structural priors, restricting optimization strictly to the GA parameters ϕ. These modules leverage the SPAD noise signal to dynamically generate a channel-wise gated attention vector g, thereby calibrating the selected encoder maps prior to decoding. 
+
+3.2. Statistical Distribution Alignment 
+
+Given an input image I and its corresponding SPAD tempo-ral histogram S, we first perform an initial forward pass to obtain Dinit = Fθ,ϕ (I, S ). To address the systematic do-main gaps often encountered in unseen data, we introduce a Zero-order Distribution Alignment (ZoDA) scheme. We first derive the physical depth expectation μs from the SPAD histogram S:
+
+μs =
+
+PBi=1 Si · zi
+
+PBi=1 Si + ϵs
+
+(5) where Si denotes the photon count of the i-th bin, and zi
+
+represents the corresponding depth value uniformly sam-pled from the depth interval [dmin , d max ]. ϵs is a small con-stant for numerical stability. The initial prediction is then refined via a damped global offset to align its distribution center with the physical prior μs:
+
+Dbase = clamp (Dinit + κ · (μs − ¯Dinit ), d min , d max ) (6) where ¯Dinit is the spatial mean of Dinit , and κ = 0 .65 is an empirical attenuation factor for unseen data. For in-domain data where the initial geometry is reliable, we set κ = 0 to preserve the original scale. An adaptive constraint modulation strategy is applied to the hyperparameter set P = {λf , γ, ϵ }, dynamically updat-ing the parameters across both unseen and in-domain sce-narios to maintain an optimal equilibrium between aggres-sive correction and structural preservation. For unseen data, we enforce a conservative adaptation trajectory by assign-ing a fixed, high-intensity fidelity weight λf = 1 .5 × 10 6,a stringent reliability threshold γ = 0 .995 , and a restrictive gradient clipping threshold ϵ = 0 .02 . This configuration ensures that the optimization remains heavily anchored to the aligned baseline, preventing structural distortions in un-familiar domains. Conversely, for in-domain data, we introduce a noise-aware scaling to facilitate precision refinement, which is inspired by the data uncertainty concept in illumination en-hancement [12]. Specifically, the fidelity weight λf is adap-tively scaled according to the noise level ω of the SPAD histogram in Eq. 2 using an exponential kernel: 
+
+λf = clamp (C1 · exp( α · ω), λ min , λ max ) (7) where C1 = 4 × 10 5 and α = 2 .5 are empirically set to modulate the exponential sensitivity to ω while balanc-ing numerical stability. This formulation allows the opti-mizer to perform surgical residual corrections in high-SNR (Signal-to-Noise Ratio) scenarios while remaining conser-vative in the presence of heavy ambient noise. To accom-modate these subtle refinements, the reliability threshold is relaxed to γ = 0 .998 and the gradient clipping threshold is elevated to ϵ = 0 .05 , granting the optimizer sufficient flexibility to polish the final depth map. Furthermore, we perform a pre-optimization evaluation by computing the initial loss Linit using the physical loss function in Sec. 3.3. If Linit < τ exit , indicating the ini-tial state is already physically consistent, an early exit is triggered to directly yield D∗ via Ψ( ·) in Eq. 15, thereby bypassing redundant iterations. 
+
+3.3. Physically-Constrained Optimization 
+
+To adapt the model Fθ,ϕ to the SPAD signal characteris-tics and the spatial geometry between the input RGB I and output depth Dbase , we devise a joint physical-fidelity ob-jective LT T A and minimize it over T iterations to fine-tune the GA parameters ϕ:
+
+LT T A = ω · (λpLphy + λf Lf id ) (8) where Lphy enforces consistency with the physical SPAD measurements and Lf id maintains structural fidelity relative to I and Dbase . λp = 0 .05 and λf ∈ P are loss adjusting coefficients, with ω acting as the noise-aware control. The physical consistency loss Lphy is defined as the Poisson negative log-likelihood: 
+
+Lphy =
+
+> N
+
+X
+
+> i=1
+
+ˆλ(i) − S(i) log ˆλ(i)
+
+
+
+, (9) where S is the observed SPAD histogram. The estimated photon count ˆλ(i) at time bin i is calculated by:         
+
+> ˆλ(i) = sphy ·
+> "
+> 1
+> HsWsHsWsX
+> j=1
+> exp
+> 
+> −(zi−dj)2
+> 2β2
+> #
+> +ϵ, (10)
+
+where zi is the depth value of bin i, β = 0.03 , ϵ =10 −6, and dj is the j-th pixel value of the downsampled evolving prediction d =↓ (Dtta ) ∈ RHsWs . To re-solve amplitude ambiguity, the stop-gradient scale factor is defined as sphy = PNi=1 S(i)/
+
+PNi=1 ˆλraw (i) + 10 −9
+
+
+
+,where ˆλraw (i) denotes the unscaled spatial-averaged inten-sity value at bin i from Eq. 10. In practice, Eq. 10 acts as a virtual SPAD simulator. The Gaussian kernel mimics the temporal photon scatter-ing caused by real-world laser pulse widths, while the spa-tial average simulates the low-resolution hardware charac-teristics. To eliminate amplitude ambiguity, sphy scales the unscaled probability curve to approximate the actual pho-ton count. Guided by the Poisson distribution, minimizing 
+
+Lphy in Eq. 9 enables cross-modal signal alignment, forcing the simulated and observed histograms to closely overlap. The geometric fidelity loss Lf id is formulated to bal-ance edge-guided spatial smoothness with global structural alignment: 
+
+Lf id = λ1Lsmooth + λ2Lhuber (11) Here, Lsmooth penalizes the absolute spatial differences of the bilinearly upsampled depth map ˆDtta , where the penalty is exponentially attenuated by the absolute spatial differ-ences of the image luminance:           
+
+> Lsmooth = mean
+> 
+> ∆xˆDtta ·e−α∆xgr( I)+ ∆ yˆDtta ·e−α∆ygr( I)
+> 
+
+(12) Concurrently, Lhuber leverages a robust Huber estimator Huber δ (·) [24] to maintain consistency between the evolv-ing prediction Dtta and the aligned prediction Dbase at their original resolution: 
+
+Lhuber = mean ( Huber δ (Dtta − Dbase )) (13) where ∆x and ∆y denote the absolute horizontal and ver-tical first-order spatial difference operators, gr( ·) denotes the RGB-to-GRAY conversion operator, λ1 = 10 3 and 
+
+λ2 = 10 2 are loss balancing weights, α = 20 .0 is the sharpness factor, and δ = 0 .1 is the Huber threshold. Func-tionally, Lsmooth clears up depth artifacts within homoge-neous object regions without blurring the sharp depth edges at geometric boundaries. Meanwhile, Lhuber enforces a strict quadratic penalty on small depth variations to stabi-lize the global structure, but uses a robust linear penalty for large depth corrections to avoid gradient explosions dur-ing TTA. This joint objective effectively preserves sharp geometric boundaries while reinforcing global robustness against structural outliers. During each iteration t, the GA parameters ϕ are up-dated using the Adam optimizer: ϕt+1 = ϕt − η ·
+
+Adam (∇ϕLT T A ), where η = 0 .002 is the learning rate. To ensure training stability and prevent divergence in unfa-miliar domains, we apply gradient norm clipping with the threshold ϵ ∈ P (in Sec. 3.2). 
+
+3.4. Stability Audit Mechanism 
+
+To prevent negative adaptation, a phenomenon where test-time optimization overfits to ambient noise in unseen domains, we implement a Stability Audit (SA) mecha-nism. Upon completing T iterations, the final physical loss 
+
+Lf inal = Lphy (Dtta , S ) is verified against the initial state 
+
+Linit = Lphy (Dbase , S ) via a relative improvement crite-rion: 
+
+Lf inal < γ · L init (14) where γ is the scenario-dependent reliability threshold de-fined in Sec. 3.2. As specified in our modulation strategy, we apply the stringent γ = 0 .995 for unseen data to man-date an assured error reduction, while the relaxed γ = 0 .998 
+
+is utilized for in-domain data to permit subtle geometric re-finements. If the criterion is met, the optimized map is accepted (Dsel = Dtta ); otherwise, the framework reverts to the aligned baseline ( Dsel = Dbase ) to guarantee robustness against divergence. Finally, the selected depth map is re-covered via a post-processing operator Ψ( ·) to produce the final output: 
+
+D∗ = Ψ( Dsel , I ) (15) where Ψ abstracts the model-specific refinement protocols of the base model (e.g., range-clamping or spatial rescaling) to align the output prediction with the target image resolu-tion. 
+
+## 4. Experiments 
+
+4.1. Datasets 
+
+NYU Depth V2 (with SPAD Simulation): This indoor benchmark is evaluated using the standard Eigen parti-tion [8], which comprises 120K training images and 654 test images of 640 ×480 pixels. Following Nishimura et al . [27], single-pixel SPAD histograms are synthesized from dense RGB-D data by modeling pixel-wise albedo and inverse-square depth decay. The resulting macro-scale signal is then modulated by a stochastic Poisson process alongside simu-lated hardware jitter and background dark counts, where the signal-to-background ratio (SBR) is set to 100 and the his-togram dimension N is set to 1024. During depth inference, the canonical Eigen crop is applied to filter out unaligned boundary artifacts, adhering to conventional evaluation pro-tocols. This dataset serves as a comprehensive benchmark for both in-domain and zero-shot evaluations. 
+
+RGB-SPAD Dataset: This real-world indoor benchmark, released by Nishimura et al . [27], is employed to rigorously evaluate the practical generalization capability of different depth networks. Captured at a resolution of 640 × 480 
+
+pixels, it consists of aligned RGB images and authentic, hardware-captured single-pixel SPAD transient histograms from various indoor environments and target objects, paired with corresponding ground-truth depth maps. The his-togram dimension N is kept to 1024. Characterized by genuine multi-path interference and severe hardware noise 
+
+Algorithm 1 Test-Time Gated Attention framework (HSN) 
+
+Require: Image I, SPAD S, Model Fθ,ϕ , Iterations T
+
+Ensure: Optimized Depth Map D∗
+
+▷ Sec. 3.2: Statistical Distribution Alignment 
+
+Dinit ← F θ,ϕ (I, S ) ▷ Initial baseline inference 
+
+if Data is Unseen then ▷ Unseen data mode 
+
+Dbase ← ZoDA (Dinit , S ) ▷ Eq. 5–6: Zero-order distribution alignment Configure Pun = {λf , γ, ϵ } ▷ Set conservative modulation 
+
+else ▷ In-domain data mode 
+
+Dbase ← Dinit ▷ Maintain native distribution Compute λf via noise scalar ω ▷ Eq. 7: Noise-aware scaling Configure Pin = {λf , γ, ϵ } ▷ Set refinement modulation 
+
+end if 
+
+Linit ← L phy (Dbase , S ) ▷ Pre-optimization evaluation 
+
+if Linit < τ exit then D∗ ← Ψ( Dbase , I ); return D∗
+
+end if ▷ Early exit if converged 
+
+▷ Sec. 3.3: Physically-Constrained Optimization for t = 1 to T do ▷ Optimization phase Compute LT T A via Eq. 8 ▷ Joint physical-fidelity objective 
+
+ϕ ← Adam (∇ϕLT T A , ϵ ) ▷ Update ϕ with gradient clipping ϵ
+
+end for 
+
+Dtta ← F θ,ϕ new (I, S ) ▷ Adapted inference 
+
+Lf inal ← L phy (Dtta , S ) ▷ Post-optimization evaluation 
+
+▷ Sec. 3.4: Stability Audit Mechanism if Lf inal < γ · L init then ▷ Reliability check 
+
+Dsel ← Dtta ▷ Verify Eq. 14 
+
+else ▷ Rollback mechanism 
+
+Dsel ← Dbase ▷ Revert to aligned baseline 
+
+end if 
+
+D∗ ← Ψ( Dsel , I ); return D∗ ▷ Eq. 15: Post-processing under low signal-to-background ratios (SBR), this dataset serves as a strict zero-shot evaluation benchmark to verify the model’s effectiveness in resolving monocular scale am-biguity under real-world scenarios. 
+
+4.2. Evaluation Metrics 
+
+To quantitatively assess the performance of depth estima-tion models, we adopt six standard and widely accepted metrics following the evaluation protocol established in [8]. Let M denote the total number of valid pixels evaluated across the test dataset. For a specific pixel i, let di and ˆdi
+
+represent the ground-truth depth value and the correspond-ing predicted depth value, respectively. The evaluation cri-teria are formally defined as follows: • Threshold Accuracy ( δk): This metric computes the per-centage of pixels whose maximum ratio between the pre-dicted depth and the ground truth falls below a predefined threshold base τ = 1 .25 :
+
+δk = 1
+
+M
+
+> M
+
+X
+
+> i=1
+
+I max di
+
+ˆdi
+
+, ˆdi
+
+di
+
+!
+
+< τ k
+
+!
+
+(16) where I(·) denotes the indicator function. Following stan-dard practice, we report the threshold accuracy at three progressive levels: δ1 (τ < 1.25 ), δ2 (τ < 1.25 2), and δ3
+
+(τ < 1.25 3). Higher values ( ↑) indicate a more precise local alignment. • Absolute Relative Error (Abs Rel): This error index measures the average relative deviation by normalizing the absolute pixel-wise discrepancy with the ground-truth depth value: Abs Rel = 1
+
+M
+
+> M
+
+X
+
+> i=1
+
+di − ˆdi
+
+di
+
+(17) • Root Mean Squared Error (RMSE): This metric evalu-ates the global structural alignment by squaring the resid-ual errors, making it highly sensitive to large outliers: RMSE =
+
+vuut 1
+
+M
+
+> M
+
+X
+
+> i=1
+
+
+
+di − ˆdi
+
+2
+
+(18) • Mean log 10 Error ( log 10 ): To mitigate the scale domi-nance of distant pixels and focus on the logarithmic error scale, the average absolute difference in the log 10 space is formulated as: 
+
+log 10 = 1
+
+M
+
+> M
+
+X
+
+> i=1
+
+log 10 di − log 10 ˆdi (19) For all error-based metrics including Abs Rel (17), RMSE (18), and log 10 (19), lower values ( ↓) denote supe-rior depth estimation accuracy and higher structural fidelity. 
+
+4.3. Implementation Details 
+
+We set the number of optimization steps to T = 2 with a learning rate of η = 0 .002 for updating our HSN frame-work across all datasets. As detailed in Section 3.2, two strategies are employed to handle in-domain and unseen data, respectively, each featuring its own distinct distri-bution alignment and adaptive constraint modulation suite 
+
+P = {λf , γ, ϵ }, unless otherwise mentioned in the model configuration. For in-domain experiments, the models are pre-trained on the training split of the target domain prior 
+
+Table 1. Quantitative in-domain comparison on NYU Depth V2. re 
+
+indicates our re-evaluation using the official codes and same envi-ronments as our method for a fair TTA comparison. ”N” indicates that the model is fine-tuned on NYU Depth V2, and ”L” denotes the Large backbone version. Bold and underline indicate the best and second best results respectively.                                                                                                                                           
+
+> Method δ1↑δ2↑δ3↑Abs Rel ↓RMSE ↓log 10 ↓
+> Baselines
+> Eigen et al . [8] 0.769 0.950 0.988 0.158 0.641 –DORN [9] 0.828 0.965 0.992 0.115 0.509 0.051 Hu et al . [16] 0.866 0.975 0.993 0.115 0.530 0.050 BTS [21] 0.885 0.978 0.994 0.110 0.392 0.047 LocalBins [4] 0.907 0.987 0.998 0.099 0.357 0.042 NeWCRFs [39] 0.922 0.992 0.998 0.095 0.334 0.041 DepthFormer(LR) [22] 0.923 0.989 0.997 0.094 0.329 0.040 DST(w/DenseDepth) [27] 0.926 0.983 0.995 0.081 0.346 0.035 ScaleDepth-N [46] 0.957 0.994 0.999 0.074 0.267 0.032 DAV2-N-L [36] 0.984 0.998 1.000 0.056 0.206 0.024 SPADnet(Linear) [33] 0.970 0.993 0.998 0.031 0.347 –SPADnet(Log) [33] 0.996 0.999 0.999 0.010 0.144 –
+> Ours
+> AdaBins re [3] 0.901 0.983 0.997 0.104 0.366 0.044 AdaBins-HSN 0.903 0.983 0.997 0.102 0.364 0.044 PhoMoNet re [20] 0.952 0.991 0.997 0.073 0.287 0.031 PhoMoNet-HSN 0.952 0.991 0.997 0.073 0.287 0.031 ZoeD-M12-N re [5] 0.954 0.995 0.999 0.075 0.270 0.032 ZoeD-M12-N-HSN 0.957 0.995 0.999 0.071 0.264 0.031 DAV1-N-L re [35] 0.984 0.998 1.000 0.056 0.206 0.024 DAV1-N-L-HSN 0.984 0.998 1.000 0.052 0.200 0.023
+
+to evaluation. Conversely, in zero-shot experiments, we evaluate the models directly on entirely unseen target do-mains without any domain-specific fine-tuning. All com-parative depth networks follow their original practices and settings. HSN is applicable to a wide range of MDE net-works with encoder–decoder architectures. To validate the generality of HSN, we integrate it with depth estimation networks of various architectures and scales, including the relatively lightweight AdaBins [3], the RGB+SPAD mul-timodal PhoMoNet [20], and large-scale pretrained mod-els such as ZoeD-M12 [5], DAV1 [35], DAV2 [36], Depth-Pro [6], and UniDepthV2 [30]. ”N” and ”H” indicate mod-els fine-tuned on NYU Depth V2 [8] and Hypersim [32], while ”S”, ”B”, and ”L” represent the Small, Base, and Large backbone scales, respectively. We conduct the ex-periments using PyTorch on a single NVIDIA RTX 3090 GPU, whereas baseline results are either locally reproduced using their official code or directly adopted from the origi-nal literature. 
+
+4.4. Comparison with State-of-the-Art 
+
+In-domain comparison on NYU Depth V2: We compare our four depth model variants equipped with HSN to 16 benchmark models, which involves three mainstream cat-egories in monocular depth estimation. For lightweight net-works with specific structural designs, we evaluate against Eigen et al . [8], DORN [9], Hu et al . [16], BTS [21], NeWCRFs [39], AdaBins [3], and LocalBins [4] that focus on computational efficiency and discrete bin optimization. For Transformer-based and large vision foundation mod-Table 2. Zero-shot performance comparison on NYU Depth V2 dataset. Bold and underline indicate the best and second best re-sults respectively.                                                                               
+
+> Method δ1↑Abs Rel ↓RMSE ↓
+> Baseline Zero-shot
+> HG-Depth [41] 0.350 0.513 1.457 DepthCLIP [42] 0.394 0.388 1.167 DAV2-H-S [36] 0.700 0.208 0.509 DAV2-H-B [36] 0.704 0.205 0.510 DAV2-H-L [36] 0.714 0.201 0.505 ZeroDepth [13] 0.926 0.081 0.338 Metric3D [38] 0.944 0.083 0.310 Metric3D V2 [17] 0.975 0.063 0.251 DepthPro [6] 0.942 0.090 0.265 UniDepthV2-S [30] 0.944 0.085 0.240 UniDepthV2-B [30] 0.956 0.077 0.219 UniDepthV2-L [30] 0.971 0.063 0.198 UniDepthV2-N-L [30] 0.988 0.047 0.180 TTA Zero-shot
+> MfH [43] 0.832 0.137 0.487 DR-LiDAR1 [26] 0.939 0.063 0.652 DR-LiDAR16 [26] 0.976 0.039 0.454 DR-LiDAR32 [26] 0.974 0.040 0.461
+> Ours
+> DAV2-H-S-HSN 0.796 0.149 0.391 DAV2-H-B-HSN 0.827 0.139 0.368 DAV2-H-L-HSN 0.811 0.147 0.370 DepthPro-HSN 0.948 0.084 0.255 UniDepthV2-S-HSN 0.961 0.075 0.230 UniDepthV2-B-HSN 0.973 0.064 0.200 UniDepthV2-L-HSN 0.980 0.056 0.186
+
+Table 3. Zero-shot evaluation on real-world RGB-SPAD dataset. 
+
+Bold and underline indicate the best and second best results re-spectively.                                                    
+
+> Method δ1↑Abs Rel ↓RMSE ↓
+> Baselines
+> DepthFormer(MS) [1] 0.242 0.596 1.450 AdaBins [3] 0.424 0.347 1.103 PhoMoNet [20] 0.840 0.154 0.508 ZoeD-M12-N [5] 0.842 0.216 0.518 DAV1-N-L [35] 0.879 0.232 0.529 DAV2-H-L [36] 0.757 0.770 1.195 DAV2-H-B [36] 0.676 0.726 1.186 DAV2-H-S [36] 0.751 0.286 0.621
+> Ours
+> AdaBins-HSN 0.689 0.282 0.842 PhoMoNet-HSN 0.860 0.141 0.474
+> ZoeD-M12-N-HSN 0.842 0.213 0.513 DAV1-N-L-HSN 0.879 0.231 0.527 DAV2-H-L-HSN 0.756 0.571 1.049 DAV2-H-B-HSN 0.691 0.592 1.064 DAV2-H-S-HSN 0.773 0.214 0.543
+
+els, we compare with DepthFormer(LR) [22], ScaleDepth-N [46], ZoeD-M12-N [5], and DAV1 [35]/DAV2 [36]-N-L that leverage large backbones for open-world general-ization. For sensor-fused networks, we include SPADnet (Linear/Log) [33] and PhoMoNet [20] which explicitly re-solve scale ambiguity by coupling RGB imagery respec-tively with 3D dense or 1D sparse physical SPAD data. This extensive evaluation across diverse architectures validates the efficacy and compatibility of our proposed HSN frame-work as a plug-and-play solution for TTA. As summarized in Table 1, several vital observations can be derived from the quantitative results. First, our HSN framework demonstrates robust architectural adaptability, consistently yielding stable performance gains across three out of the four baseline networks ( i.e ., AdaBins, ZoeD-M12-N, and DAV1-N-L). Note that for PhoMoNet, since it already explicitly feeds 1D active SPAD measurements for deep feature fusion with 2D images during the full end-to-end training phase, its baseline weights heavily encode the 1D physical information, thereby saturating the spa-tial layout and leaving negligible margin for subsequent HSN-driven geometric optimization during inference. Sec-ond, our framework achieves top-tier SOTA dominance in terms of overall metrics. Specifically, our strongest vari-ant (DAV1-N-L-HSN) achieves a superior RMSE of 0.200, surpassing 15 out of the 16 competitive SOTA networks. Meanwhile, our second-strongest variant (ZoeD-M12-N-HSN) records an RMSE of 0.264, outperforming 13 out of 16 SOTA baselines and notably beating advanced archi-tectures such as ScaleDepth-N. Finally, we notice a cru-cial performance advantage over the 3D dense network with RGB-SPAD sensor fusion. Compared against the 3D dense SPADnet (Linear), our TTA design of 1D SPAD guidance effectively suppresses fatal large distance estimation errors, slashing the RMSE metric by a massive 42.4% (0.200 vs .0.347). This remarkable gap highlights that our framework can secure much higher absolute metric precision while uti-lizing active SPAD sensing signals of significantly lower di-mensions. 
+
+Zero-shot generalization on NYU Depth V2: Our seven HSN variants are evaluated against 17 zero-shot depth benchmarks, consisting of one CNN model (HG-Depth [41]), 12 depth foundation models, and four recent TTA counterparts. Additionally, UniDepthV2-N-L [30] (fine-tuned on the target domain) serves as a performance upper bound (Oracle). As reported in Table 2, HSN yields universal, synchronous improvements across all metrics and architectures. Specifically, for depth foundation models, HSN shatters their zero-shot performance ceilings; e.g., it pushes DepthPro [6] to δ1 = 0 .948 and UniDepthV2-L [30] to a remarkable δ1 = 0 .980 , achieving an 11.1% relative error reduction in Abs Rel. On lighter baselines like DAV2-H-B [36], HSN delivers a massive 17.5% absolute gain in 
+
+δ1 and cuts the Abs Rel by 32.2%. Crucially, as a TTA framework, HSN offers superior efficiency over existing counterparts. Unlike MfH [43]’s heavy diffusion computation or DR-LiDAR [26]’s reliance on dense 3D point clouds, HSN maintains a lightweight design and operates under extremely sparse regimes by utilizing only 1D SPAD signals. Despite HSN’s com-pact architecture and data sparsity, our advanced variants (e.g., UniDepthV2-B/L-HSN) competitively match or out-perform these heavy TTA methods, particularly across δ1
+
+and RMSE indicators. Strikingly, without any target-domain training, our UniDepthV2-L-HSN ( δ1 = 0.980 ,RMSE = 0 .186 ) closely approaches the fully-supervised Oracle ( δ1 = 0 .988 , RMSE = 0 .180 ), demonstrating its immense practical benefit for zero-shot metric depth esti-mation. Notably, this evaluation reveals that HSN brings significantly more pronounced improvements to zero-shot scenarios than to in-domain settings, firmly validating that HSN primarily excels at bridging cross-domain generaliza-tion gaps rather than merely providing marginal refinements to in-domain setups. 
+
+Real-world evaluation on RGB-SPAD Dataset: To as-sess the zero-shot performance of our HSN towards real-world indoor scenes, we conduct extensive TTA experi-ments across our seven variants compared to eight MDE baselines. Table 3 shows that without any training on the target domain, our HSN framework consistently yields notable performance gains across almost all architectures. Specifically, PhoMoNet-HSN achieves the state-of-the-art (SOTA) overall performance, significantly reducing the Abs Rel from 0.154 to 0.141 and the RMSE from 0.508 to 0.474 .Meanwhile, DAV1-N-L-HSN maintains the highest δ1 ac-curacy of 0.879 while suppressing the Abs Rel and RMSE. Notably, HSN effectively boosts PhoMoNet [20] in unseen realistic scenarios relative to its in-domain setting, allow-ing it to even outperform the acknowledged strong baseline DAV1-N-L [35] in terms of overall error metrics. Crucially, our HSN framework exhibits substantial improvements on weaker baselines (e.g., AdaBins [3] and the DAV2-H fam-ily [36]), demonstrating its remarkable robustness. These results strongly prove that HSN serves as a generic, plug-and-play TTA framework that effectively mitigates domain shifts on the fly and unlocks the zero-shot potential of di-verse architectures in real-world applications. 
+
+Visual analysis: As illustrated in Fig. 2 (left), AdaBins-HSN effectively suppresses all the erroneous depth artifacts (the red regions) that trouble its baseline counterpart, and even surpasses PhoMoNet-HSN in challenging scenarios, such as those in Row 2 and Row 5. Nevertheless, from an overall perspective, PhoMoNet-HSN exhibits a closer align-ment with the ground truth than the other two models due to its inherent cross-modal feature fusion. Regarding Fig. 2 (right), AdaBins-HSN addresses most of the ambiguous boundary transitions and scale issues that its baseline suffers from. Furthermore, PhoMoNet-HSN outperforms them by showing sharper structural edges and more consistent global depth layouts. It is worth noting that PhoMoNet-HSN is the only model that predicts a depth sub-stantially close to the planar ground truth for the most chal-lenging poster in Row 5, whereas other methods are misled by its rich objects and textures. 
+
+4.5. Ablation Study                                                             
+
+> Table 4. Effect of HSN components on AdaBins inference. Ad-abins is trained on NYU-Depth-v2 (Train). In-Domain perfor-mance is evaluated on NYU-Depth-v2 (Test), while zero-shot gen-eralization (Unseen) is evaluated on the RGB-SPAD dataset. Bold
+> and underline indicate the best and second best results respec-tively.
+> Modification In-Domain Unseen
+> δ1↑Abs Rel ↓RMSE ↓δ1↑Abs Rel ↓RMSE ↓
+> Baseline (Original) 0.901 0.104 0.366 0.424 0.347 1.103 w/o ω0.903 0.102 0.364 0.688 0.282 0.842 only Lphy 0.906 0.101 0.361 0.687 0.284 0.841
+> only Lf id 0.903 0.103 0.366 0.687 0.283 0.841
+> w/o ZoDA ---0.427 0.332 1.080 w/o SA 0.879 0.119 0.413 0.458 0.339 1.075
+> Full Proposed 0.903 0.102 0.364 0.689 0.282 0.842
+
+Effect of HSN components: To investigate the effect of different components, we conduct an extensive ablation study categorized into loss formulations and structural mod-ules, as shown in Table 4. Regarding the loss variants (w/o 
+
+ω to only Lf id ), removing the noise-aware control (w/o ω)impacts cross-domain robustness, while evaluating the indi-vidual sub-losses reveals their distinct characteristics. No-tably, while only Lphy yields the optimal in-domain pre-cision ( δ1 = 0 .906 ), both sub-losses independently boost zero-shot generalization (driving the unseen δ1 from 0.424 to 0.687) and exhibit a complementary synergy that peaks at 0.689 in our full method. Regarding structural components, the elimination of either the Zero-order Distribution Align-ment (ZoDA) or the Stability Audit Mechanism (SA) incurs severe performance degradation, particularly in zero-shot generalization. For instance, removing ZoDA causes a sub-stantial drop in the unseen δ1 (down to 0.427), demonstrat-ing its critical role in cross-domain transfer, while stripping SA leads to noticeable accuracy drops across both testing scenarios. Ultimately, our full proposed method strikes a better balance, unlocking superior cross-dataset generaliza-tion ( δ1 = 0 .689 on RGB-SPAD) while preserving highly comparable in-domain performance. 
+
+Necessity of Domain-Specific Data Strategies: To val-idate the necessity of our domain-specific configurations, we conduct a cross-strategy evaluation by interchanging two schemes of distribution alignment and adaptive con-straint modulation P between the in-domain and unseen Figure 2. Comparison on the NYU Depth V2 (left) and RGB-SPAD (right) datasets. Only the last sample on the right is a poster; all other samples are captured scenes. Table 5. Cross-strategy evaluation of data domains using AdaBins. We evaluate the compatibility between domain-specific strategies and data distributions across multiple depth metrics. Bold values indicate optimal matching, and arrows ( ↑ for δ1, ↓ for others) de-note the preferred metric directions, where performance degrada-tion occurs under strategy-data mismatch.                                
+
+> Strategy In-Domain data Unseen data
+> δ1↑Abs Rel ↓RMSE ↓δ1↑Abs Rel ↓RMSE ↓
+> Baseline (Original) 0.901 0.104 0.366 0.424 0.347 1.103 In-Domain Strategy 0.903 0.102 0.364 0.427 0.333 1.081 Unseen Strategy 0.811 0.129 0.436 0.689 0.282 0.842
+
+settings. Crucially, these two strategies differ in their de-sign: the in-domain strategy disables ZoDA while employ-ing its refinement set Pin = {λf , γ, ϵ }, whereas the unseen domain strategy activates ZoDA combined with a conser-vative set Pun = {λf , γ, ϵ }. As observed in Table 5, en-forcing these mismatched strategy configurations onto op-posite domains leads to severe performance degradation. The results demonstrate that while the unseen strategy sig-nificantly boosts performance in unseen scenarios by bridg-ing the global domain bias ( δ1 = 0 .689 ), applying it to in-domain data leads to over-correction, crashing the in-domain δ1 to 0.811. Conversely, forcing the in-domain strategy on unseen data fails to generalize ( δ1 = 0 .427 ). This distinct performance asymmetry firmly justifies that both the conditional utilization of ZoDA and their respec-tive adaptive parameter sets are uniquely and optimally tai-1 2 3 4 5        
+
+> Steps
+> 0.1020 0.1022 0.1024 0.1026 0.1028 0.1030
+> Abs Rel
+> Metrics vs. Steps on NYU-Depth-V2
+> Abs Rel
+> 1
+> 0.9020 0.9022 0.9024 0.9026 0.9028 0.9030
+> 112345
+> Steps
+> 0.2820 0.2822 0.2824 0.2826 0.2828 0.2830
+> Abs Rel
+> Metrics vs. Steps on RGB-SPAD
+> Abs Rel
+> 1
+> 0.685 0.690 0.695 0.700
+> 1
+
+Figure 3. Metric curves vs. optimization steps for NYU-Depth-V2 (left) and RGB-SPAD (right). We apply our method on AdaBins to observe the performance across 1 to 5 optimization steps. 
+
+lored to their target distributions. 
+
+Effect of optimization steps: We apply HSN to Ad-aBins to investigate its in-domain and zero-shot perfor-mance across 1 to 5 optimization steps. Fig. 3 (left) demon-strates that optimal performance for in-domain inference is achieved at 2 steps, while Fig. 3 (right) indicates that 3 steps provide the best trade-off for unseen domains. This discrep-ancy suggests that zero-shot adaptation inherently requires more optimization to align unfamiliar feature distributions compared to in-domain inference. Considering both accu-racy and computational efficiency, we choose 2 optimiza-tion steps for our default setting, unless otherwise specified. 5. Conclusion 
+
+In this work, we have established a novel noise-driven paradigm for monocular metric depth estimation by shift-ing the perception of SPAD noise from a pure corruption to a valuable environmental prior. Through the develop-ment of our HSN framework, we demonstrated that the na-tive noise signal can be naturally exploited via GA modules to enforce accurate geometric and scale calibration during inference, thereby bypassing the severe latency overhead or dense 3D data dependencies that typically bottleneck competitive TTA counterparts in resource-constrained plat-forms. The proposed test-time gated attention mechanism performs dynamic attention allocation across hierarchical encoder feature representations in an interpretable manner that aligns with the theories of hierarchical representation robustness. Our extensive experiments on real-world indoor bench-marks featuring synthetic and realistic SPAD histograms validate the efficacy of this framework, showcasing not only state-of-the-art in-domain precision but also remarkable adaptability under zero-shot generalization to unfamiliar environments. Moving forward, this work highlights the un-tapped potential of raw sensor noise in sparse data regimes, opening new possibilities for building highly efficient, multi-modal perception systems across broader applica-tions such as robotics, AR, and autonomous navigation. 
+
+## References 
+
+[1] Ashutosh Agarwal and Chetan Arora. Depthformer: Multi-scale vision transformer for monocular depth estimation with global local information fusion. In 2022 IEEE international conference on image processing (ICIP) , pages 3873–3877. IEEE, 2022. 8 [2] Jiawang Bai, Kuofeng Gao, Shaobo Min, Shu-Tao Xia, Zhifeng Li, and Wei Liu. Badclip: Trigger-aware prompt learning for backdoor attacks on clip. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 24239–24250, 2024. 3 [3] Shariq Farooq Bhat, Ibraheem Alhashim, and Peter Wonka. Adabins: Depth estimation using adaptive bins. In Proceed-ings of the IEEE/CVF conference on computer vision and pattern recognition , pages 4009–4018, 2021. 2, 7, 8, 9 [4] Shariq Farooq Bhat, Ibraheem Alhashim, and Peter Wonka. Localbins: Improving depth estimation by learning local dis-tributions. In European Conference on Computer Vision ,pages 480–496. Springer, 2022. 2, 7 [5] Shariq Farooq Bhat, Reiner Birkl, Diana Wofk, Peter Wonka, and Matthias M¨ uller. Zoedepth: Zero-shot trans-fer by combining relative and metric depth. arXiv preprint arXiv:2302.12288 , 2023. 2, 7, 8 [6] Alexey Bochkovskiy, Ama¨ el Delaunoy, Hugo Germain, Marcel Santos, Yichao Zhou, Stephan Richter, and Vladlen Koltun. Depth pro: Sharp monocular metric depth in less than a second. In The Thirteenth International Conference on Learning Representations . 7, 8 [7] Xingshuai Dong, Matthew A Garratt, Sreenatha G Ana-vatti, and Hussein A Abbass. Towards real-time monocular depth estimation for robotics: A survey. IEEE Transactions on Intelligent Transportation Systems , 23(10):16940–16961, 2022. 1 [8] David Eigen, Christian Puhrsch, and Rob Fergus. Depth map prediction from a single image using a multi-scale deep net-work. Advances in neural information processing systems ,27, 2014. 2, 6, 7 [9] Huan Fu, Mingming Gong, Chaohui Wang, Kayhan Bat-manghelich, and Dacheng Tao. Deep ordinal regression net-work for monocular depth estimation. In Proceedings of the IEEE conference on computer vision and pattern recogni-tion , pages 2002–2011, 2018. 2, 7 [10] Ashkan Ganj, Yiqin Zhao, Hang Su, and Tian Guo. Mobile ar depth estimation: Challenges & prospects. In Proceedings of the 25th International Workshop on Mobile Computing Sys-tems and Applications , pages 21–26, 2024. 1 [11] Yiquan Gao. Implementation of licensed plate detection and noise removal in image processing. International Journal of Advance Research in Science and Engineer-ing , 7(2):678–690, 2018. Also available as arXiv preprint arXiv:2603.01016. 2 [12] Yiquan Gao and John See. Data relativistic uncertainty framework for low-illumination anime scenery image en-hancement. In 2026 7th International Conference on Pattern Recognition and Machine Learning (PRML) , pages 62–70. IEEE, 2026. 5 [13] Vitor Guizilini, Igor Vasiljevic, Dian Chen, Rares , Ambrus , ,and Adrien Gaidon. Towards zero-shot scale-aware monocu-lar depth estimation. In Proceedings of the IEEE/CVF Inter-national Conference on Computer Vision , pages 9233–9243, 2023. 8 [14] Asif Hanif, Fahad Shamshad, Muhammad Awais, Muza-mmal Naseer, Fahad Shahbaz Khan, Karthik Nandakumar, Salman Khan, and Rao Muhammad Anwer. Baple: Back-door attacks on medical foundational models using prompt learning. In International Conference on Medical Image Computing and Computer-Assisted Intervention , pages 443– 453. Springer, 2024. 3 [15] Richard Hartley, Andrew Zisserman, et al. Multiple view geometry in computer vision . Cambridge university press Cambridge, 2003. 2 [16] Junjie Hu, Mete Ozay, Yan Zhang, and Takayuki Okatani. Revisiting single image depth estimation: Toward higher resolution maps with accurate object boundaries. In 2019 IEEE winter conference on applications of computer vision (WACV) , pages 1043–1051. IEEE, 2019. 7 [17] Mu Hu, Wei Yin, Chi Zhang, Zhipeng Cai, Xiaoxiao Long, Hao Chen, Kaixuan Wang, Gang Yu, Chunhua Shen, and Shaojie Shen. Metric3d v2: A versatile monocular geomet-ric foundation model for zero-shot metric depth and surface normal estimation. IEEE Transactions on Pattern Analysis and Machine Intelligence , 46(12):10579–10596, 2024. 8 [18] Raza Imam, Asif Hanif, Jian Zhang, Khaled Waleed Da-woud, Yova Kementchedjhieva, and Mohammad Yaqub. Noise is an efficient learner for zero-shot vision-language models. In 2025 IEEE/CVF International Conference on Computer Vision Workshops (ICCVW) , pages 5879–5888. IEEE, 2025. 3 [19] Chi Qin Lai, Haidi Ibrahim, Mohd Zaid Abdullah, Jafri Ma-lin Abdullah, Shahrel Azmin Suandi, and Azlinda Azman. Artifacts and noise removal for electroencephalogram (eeg): A literature review. In 2018 IEEE Symposium on Computer Applications & Industrial Electronics (ISCAIE) , pages 326– 332. IEEE, 2018. 2 [20] Hongjae Lee, Jinbum Park, Wooseok Jeong, and Seung-Won Jung. Monocular depth estimation network with single-pixel depth guidance. Optics letters , 48(3):594–597, 2023. 1, 2, 3, 7, 8, 9 [21] Jin Han Lee, Myung-Kyu Han, Dong Wook Ko, and Il Hong Suh. From big to small: Multi-scale local planar guidance for monocular depth estimation. arXiv preprint arXiv:1907.10326 , 2019. 7 [22] Zhenyu Li, Zehui Chen, Xianming Liu, and Junjun Jiang. Depthformer: Exploiting long-range correlation and local in-formation for accurate monocular depth estimation. Machine Intelligence Research , 20(6):837–854, 2023. 7, 8 [23] David B Lindell, Matthew O’Toole, and Gordon Wetzstein. Single-photon 3d imaging with deep sensor fusion. ACM Trans. Graph. , 37(4):113, 2018. 1, 2 [24] Po-Ling Loh. A theoretical review of modern robust statis-tics. Annual Review of Statistics and Its Application , 12(1): 477–496, 2025. 5 [25] Zihang Lyu, Zhuoyuan Li, Cong Zhang, Yun Li, and Kin-Man Lam. Depth spectral fingerprints: Ai-generated image detection via compact depth representations. Pattern Recog-nition Letters , 2026. 1 [26] R´ emi Marsal, Alexandre Chapoutot, Philippe Xu, and David Filliat. A simple yet effective test-time adaptation for zero-shot monocular metric depth estimation. In 2025 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , pages 7858–7865. IEEE, 2025. 1, 2, 8, 9 [27] Mark Nishimura, David B Lindell, Christopher Metzler, and Gordon Wetzstein. Disambiguating monocular depth esti-mation with a single transient. In European Conference on Computer Vision , pages 139–155. Springer, 2020. 1, 3, 6, 7 [28] Jiayong Peng, Zhiwei Xiong, Xin Huang, Zheng-Ping Li, Dong Liu, and Feihu Xu. Photon-efficient 3d imaging with a non-local neural network. In European Conference on Com-puter Vision , pages 225–241. Springer, 2020. 1, 2 [29] Luigi Piccinelli, Yung-Hsu Yang, Christos Sakaridis, Mattia Segu, Siyuan Li, Luc Van Gool, and Fisher Yu. Unidepth: Universal monocular metric depth estimation. In Proceed-ings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 10106–10116, 2024. 2 [30] Luigi Piccinelli, Christos Sakaridis, Yung-Hsu Yang, Mat-tia Segu, Siyuan Li, Wim Abbeloos, and Luc Van Gool. Unidepthv2: Universal monocular metric depth estimation made simpler. IEEE Transactions on Pattern Analysis and Machine Intelligence , 2025. 2, 7, 8 [31] Ren´ e Ranftl, Katrin Lasinger, David Hafner, Konrad Schindler, and Vladlen Koltun. Towards robust monocular depth estimation: Mixing datasets for zero-shot cross-dataset transfer. IEEE transactions on pattern analysis and machine intelligence , 44(3):1623–1637, 2020. 2 [32] Mike Roberts, Jason Ramapuram, Anurag Ranjan, Atulit Kumar, Miguel Angel Bautista, Nathan Paczan, Russ Webb, and Joshua M Susskind. Hypersim: A photorealistic syn-thetic dataset for holistic indoor scene understanding. In 
+
+2021 IEEE/CVF International Conference on Computer Vi-sion (ICCV) , pages 10892–10902. IEEE, 2021. 7 [33] Zhanghao Sun, David B Lindell, Olav Solgaard, and Gordon Wetzstein. Spadnet: deep rgb-spad sensor fusion assisted by monocular depth estimation. Optics express , 28(10):14948– 14962, 2020. 1, 2, 7, 8 [34] Shengyao Wang, Junpei Xue, Xincong Zhong, Yihang Bao, Lingfeng Yao, Jinze Yu, Miao Pan, and Jiang Liu. Surgdepth: Test-time adaptation of depth foundation models for surgical scene understanding. IEEE Transactions on Medical Imag-ing , 2026. 2 [35] Lihe Yang, Bingyi Kang, Zilong Huang, Xiaogang Xu, Jiashi Feng, and Hengshuang Zhao. Depth anything: Unleashing the power of large-scale unlabeled data. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , pages 10371–10381, 2024. 2, 7, 8, 9 [36] Lihe Yang, Bingyi Kang, Zilong Huang, Zhen Zhao, Xiao-gang Xu, Jiashi Feng, and Hengshuang Zhao. Depth any-thing v2. Advances in Neural Information Processing Sys-tems , 37:21875–21911, 2024. 2, 7, 8, 9 [37] Steven Yang, Xiaoyu Tian, Kshitij Goel, and Wennie Tabib. Zero-shot metric depth estimation via monocular visual-inertial rescaling for autonomous aerial navigation. arXiv preprint arXiv:2509.08159 , 2025. 1 [38] Wei Yin, Chi Zhang, Hao Chen, Zhipeng Cai, Gang Yu, Kaixuan Wang, Xiaozhi Chen, and Chunhua Shen. Metric3d: Towards zero-shot metric 3d prediction from a single image. In Proceedings of the IEEE/CVF international conference on computer vision , pages 9043–9053, 2023. 2, 8 [39] Weihao Yuan, Xiaodong Gu, Zuozhuo Dai, Siyu Zhu, and Ping Tan. Neural window fully-connected crfs for monocu-lar depth estimation. In Proceedings of the IEEE/CVF con-ference on computer vision and pattern recognition , pages 3916–3925, 2022. 7 [40] Da Zhang, Bingyu Li, Zhiyuan Zhao, Feiping Nie, Junyu Gao, and Xuelong Li. Fusad: Time-frequency fusion with adaptive denoising for general time series analysis. In 2026 IEEE 42nd International Conference on Data Engineering (ICDE) , pages 1334–1348. IEEE, 2026. 2 [41] Mingliang Zhang, Xinchen Ye, Xin Fan, and Wei Zhong. Unsupervised depth estimation from monocular videos with hybrid geometric-refined loss and contextual attention. Neu-rocomputing , 379:250–261, 2020. 8 [42] Renrui Zhang, Ziyao Zeng, Ziyu Guo, and Yafeng Li. Can language understand depth? In Proceedings of the 30th ACM International Conference on Multimedia , pages 6868–6874, 2022. 2, 8 [43] Yizhou Zhao, Hengwei Bian, Kaihua Chen, Pengliang Ji, Liao Qu, Shao-yu Lin, Weichen Yu, Haoran Li, Hao Chen, Jun Shen, et al. Metric from human: Zero-shot monocular metric depth estimation via test-time adaptation. 
+
+Advances in Neural Information Processing Systems , 37: 104724–104753, 2024. 2, 8, 9 [44] Haokun Zheng, Sidhant Rajadnya, and Avideh Zakhor. Monocular depth estimation for drone obstacle avoidance in indoor environments. In 2024 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , pages 10027–10034. IEEE, 2024. 1 [45] Lang Zhou, Guoxing Sun, Yong Li, Weiqing Li, and Zhiyong Su. Point cloud denoising review: from classical to deep learning-based approaches. Graphical Models , 121:101140, 2022. 2 [46] Ruijie Zhu, Chuxin Wang, Ziyang Song, Li Liu, Tianzhu Zhang, and Yongdong Zhang. Scaledepth: Decomposing metric depth estimation into scale prediction and relative depth estimation. arXiv preprint arXiv:2407.08187 , 2024. 2, 7, 8
