@@ -48,17 +48,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-10-14</span>
+      <span class="dpr-home-dashboard-kicker">2026-10-15</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 5 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 2 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>3</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>0</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>2</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-10-14 22:41:26 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-10-15 22:39:56 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -69,10 +69,7 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日共生成 5 篇推荐（精读 3 篇，速读 2 篇）</p>
-<p>精读：《Harnessing SPAD Noise: Test-Time Gated Attention for Indoor Depth Estimation》（9.0/10）, 《The Midas Touch for Metric Depth: Interpretable Metricization for Generalizable Depth Perception》（9.0/10）</p>
-<p>速读：《UniMetric: Universal Metric Scale Recovery for Visual Geometry Foundation Models》（7.0/10）, 《Dense Endoluminal Mapping and Localisation from Monocular Bronchoscopy》（6.0/10）</p>
-<p>这些结果覆盖了当下较热的方向，建议先看精读区论文的关键问题与方法。</p>
+<p>2026-10-15 日报：今日无精读，速读两篇语义分割论文，聚焦域泛化与多模态融合。最值得看的是《Sparse All-Layer Connector for Domain Generalised Semantic Segmentation》（7.0分），关注用稀疏全层连接器提升跨域分割表现，其次是 RGB 与互补模态融合方向（6.0分）。普通读者可优先了解“域泛化”思路，看模型换场景后是否仍稳。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -81,12 +78,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">3 篇</strong>
+    <strong class="dpr-home-dashboard-count">0 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Harnessing SPAD Noise: Test-Time Gated Attention for Indoor Depth Estimation">Harnessing SPAD Noise: Test-Time Gated Attention for Indoor Depth Estimation</span></li><li><span class="dpr-home-dashboard-paper-title" title="The Midas Touch for Metric Depth: Interpretable Metricization for Generalizable Depth Perception">The Midas Touch for Metric Depth: Interpretable Metricization for Generalizable Depth Perception</span></li><li><span class="dpr-home-dashboard-paper-title" title="OpenDepth: Repurposing Image Editing Priors for Robust Open-World Monocular Depth Estimation">OpenDepth: Repurposing Image Editing Priors for Robust Open-World Monocular Depth Estimation</span></li></ul>
+<p class="dpr-home-dashboard-empty">今日暂无推荐。</p>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">mono-depth <strong>3</strong></span></div>
+
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -97,9 +94,9 @@
     <strong class="dpr-home-dashboard-count">2 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="UniMetric: Universal Metric Scale Recovery for Visual Geometry Foundation Models">UniMetric: Universal Metric Scale Recovery for Visual Geometry Foundation Models</span></li><li><span class="dpr-home-dashboard-paper-title" title="Dense Endoluminal Mapping and Localisation from Monocular Bronchoscopy">Dense Endoluminal Mapping and Localisation from Monocular Bronchoscopy</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Sparse All-Layer Connector for Domain Generalised Semantic Segmentation">Sparse All-Layer Connector for Domain Generalised Semantic Segmentation</span></li><li><span class="dpr-home-dashboard-paper-title" title="Multimodal Fusion of RGB and Complementary Modalities for Semantic Segmentation">Multimodal Fusion of RGB and Complementary Modalities for Semantic Segmentation</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">mono-depth <strong>2</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">seg <strong>2</strong></span></div>
 </section>
 </div>
 
