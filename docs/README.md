@@ -48,17 +48,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-10-15</span>
+      <span class="dpr-home-dashboard-kicker">2026-10-16</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 2 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 3 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>0</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>2</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>3</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-10-15 22:39:56 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-10-16 22:37:08 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -69,7 +69,7 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>2026-10-15 日报：今日无精读，速读两篇语义分割论文，聚焦域泛化与多模态融合。最值得看的是《Sparse All-Layer Connector for Domain Generalised Semantic Segmentation》（7.0分），关注用稀疏全层连接器提升跨域分割表现，其次是 RGB 与互补模态融合方向（6.0分）。普通读者可优先了解“域泛化”思路，看模型换场景后是否仍稳。</p>
+<p>今日速读 3 篇图像分割论文，聚焦区域注意力、标签噪声抑制与缺失模态融合。最值得关注 Region Aware Squeeze-and-Excitation 在分割中的区域感知增强，以及 FuseAdapt 面向缺失模态的参数高效多模态融合。普通读者可优先从这两篇切入，理解分割模型如何更省参数、更抗噪声。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -91,12 +91,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">2 篇</strong>
+    <strong class="dpr-home-dashboard-count">3 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Sparse All-Layer Connector for Domain Generalised Semantic Segmentation">Sparse All-Layer Connector for Domain Generalised Semantic Segmentation</span></li><li><span class="dpr-home-dashboard-paper-title" title="Multimodal Fusion of RGB and Complementary Modalities for Semantic Segmentation">Multimodal Fusion of RGB and Complementary Modalities for Semantic Segmentation</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Region Aware Squeeze-and-Excitation Networks for Image Segmentation">Region Aware Squeeze-and-Excitation Networks for Image Segmentation</span></li><li><span class="dpr-home-dashboard-paper-title" title="Hybrid supervised instance segmentation by learning label noise suppression">Hybrid supervised instance segmentation by learning label noise suppression</span></li><li><span class="dpr-home-dashboard-paper-title" title="FuseAdapt: Parameter-Efficient Multimodal Fusion for Semantic Segmentation with Missing Modalities">FuseAdapt: Parameter-Efficient Multimodal Fusion for Semantic Segmentation with Missing Modalities</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">seg <strong>2</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">seg <strong>3</strong></span></div>
 </section>
 </div>
 

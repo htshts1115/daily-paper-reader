@@ -1,0 +1,54 @@
+{
+  "label": "2026-10-16",
+  "date": "2026-10-16",
+  "generated_at": "2026-10-16T22:37:10",
+  "count": 3,
+  "papers": [
+    {
+      "paper_id": "202610/16/2610.15079v1-region-aware-squeeze-and-excitation-networks-for-image-segmentation",
+      "section": "quick",
+      "title_en": "Region Aware Squeeze-and-Excitation Networks for Image Segmentation",
+      "authors": "Jack Roberts, Praneeth Tummala, Kavi Sarna, Jeova Farias Sales Rocha Neto",
+      "date": "2026-10-10",
+      "pdf": "https://arxiv.org/pdf/2610.15079v1",
+      "score": "6.0",
+      "evidence": "区域感知通道重校准改进图像分割网络",
+      "tldr": "传统SE用全局平均池化建模通道依赖，但将空间结构压缩为单一描述子，限制其在图像分割等密集预测中的效果。本文提出区域感知SE，以空间引导池化替代全局池化，含BASE、SPASE、MAPSE和PLEASE四种互补模块，为每通道在每个区域生成门控，使像素注意力反映区域归属。在CUB、DUTS、ECSSD、PASCAL VOC 2012、ADE20K和mini-ImageNet上，多数基准超越SE及空间-通道注意力变体，并取得大部分最优结果。",
+      "tags": "query:seg",
+      "abstract_en": "Squeeze-and-Excitation (SE) modules improve convolutional networks by modeling channel-wise dependencies, but global average pooling collapses spatial structure into a single per-channel descriptor, limiting their effectiveness for dense prediction tasks such as image segmentation. We generalize SE by replacing global pooling with spatially guided pooling, enabling region-aware channel recalibration through four modules with complementary cost profiles. BASE formalizes Tiled Squeeze-and-Excite using a regular grid; SPASE pools over SLIC superpixels for image-adaptive regions; MAPSE obtains regions from semantic maps produced by a frozen, general-purpose network; and PLEASE learns soft region assignments end-to-end through a lightweight assignment network. Each channel receives one gate per region, so attention at each pixel reflects its region membership, bridging channel and spatial attention. PLEASE also produces its soft assignments as a byproduct of the forward pass, providing structured spatial interpretability without post-hoc analysis. The modules offer complementary computational tradeoffs: some add essentially no parameters, while others add no measurable latency. Across binary segmentation on CUB, DUTS, and ECSSD, semantic segmentation on PASCAL VOC 2012 and ADE20K, and classification on mini-ImageNet, our modules outperform SE and related spatial-channel attention variants on most benchmarks, achieving the majority of best results.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202610/16/2610.20412v1-hybrid-supervised-instance-segmentation-by-learning-label-noise-suppression",
+      "section": "quick",
+      "title_en": "Hybrid supervised instance segmentation by learning label noise suppression",
+      "authors": "Linwei Chen, Ying Fu, Shaodi You, Hongzhe Liu",
+      "date": "2026-10-14",
+      "pdf": "https://arxiv.org/pdf/2610.20412v1",
+      "score": "6.0",
+      "evidence": "学习标签噪声抑制的混合监督实例分割",
+      "tldr": "实例分割通常依赖大规模像素级标注，标注成本高；弱/半监督方法虽用边界框或图像级标签降低成本，但性能明显下降。本文提出混合监督流程，同时利用经济边界框标签与少量精确像素标签，通过两个辅助模型抑制前景/背景及实例间误标噪声，生成高质量伪像素标签。还引入类别感知空间注意力、类别与实例约束及自学习训练提升伪标签精度。在PASCAL VOC 2012和Cityscapes上以更低标注成本取得有竞争力性能。",
+      "tags": "query:seg",
+      "abstract_en": "To reach top accuracy, current fully supervised instance segmentation methods severely rely on large-scale pixel-wise labeled datasets. They are usually expensive and time-consuming to obtain. Though weakly or semi-supervised methods utilize cheap bounding box labeled, image-level labeled or unlabeled samples to save the labeling cost, their performance is largely sacrificed. To save labeling cost without losing much performance, in this paper, we present a pipeline that can utilize economical bounding box labels and accurate pixel-wise labels in a hybrid way. Specifically, we design two ancillary models to learn label noise suppression and obtain accurate pseudo pixel-wise labels from bounding box labels for training. One is designed to suppress mislabeling between foreground and background, and the other is designed to suppress noise from mislabeling of instances. Moreover, we exploit category-aware spatial attention module, category constraint module, instance constraint module, and self-learning training approach to improve the accuracy of pseudo labels. Experiments on the PASCAL VOC 2012 and the Cityscapes datasets show that our method can achieve competitive performance with much less labeling cost.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202610/16/2610.21779v1-fuseadapt-parameter-efficient-multimodal-fusion-for-semantic-segmentation-with-missing-modalities",
+      "section": "quick",
+      "title_en": "FuseAdapt: Parameter-Efficient Multimodal Fusion for Semantic Segmentation with Missing Modalities",
+      "authors": "Xin Zhang, Robby T. Tan",
+      "date": "2026-10-15",
+      "pdf": "https://arxiv.org/pdf/2610.21779v1",
+      "score": "6.0",
+      "evidence": "缺失模态下的多模态语义分割",
+      "tldr": "多模态语义分割在测试时模态缺失或退化下性能易骤降，现有专用融合模块或多分支编码器鲁棒性不足。FuseAdapt在冻结视觉基础模型的适配空间内融合：各模态独立轻量分支，Q/V低秩适配私有，仅跨模态路由FFN低秩残差。训练时以预测式模态建模PMM由可见模态重建被掩蔽模态嵌入，且不增加推理开销。在MCubeS、DELIVER、MUSES上，完整与缺失模态分割均提升，最高+3.01与+12.56 mIoU。",
+      "tags": "query:seg",
+      "abstract_en": "Multi-modal semantic segmentation benefits from complementary sensors, but this benefit is fragile when some modalities are degraded or missing at test time. Many existing methods rely on dedicated fusion modules or multi-branch cross-modal encoders, and the fusion often becomes unreliable when modalities are absent, leading to substantial performance drops. We propose \\textbf{FuseAdapt}, a parameter-efficient framework that performs fusion within the adaptation space of a frozen vision foundation model (VFM), exploring whether VFM priors can serve as an effective shared backbone for multi-modal segmentation. Instead of attaching a standalone fusion network, FuseAdapt assigns each modality a lightweight adaptation branch and performs \\emph{adaptation-space fusion} by keeping Q/V low-rank adaptation private to each modality and routing only FFN low-rank residual activations across modalities inside the frozen backbone. The pretrained VFM remains fixed while modality-specific corrections and explicit cross-modal interaction are learned through the adaptation paths. To handle missing modalities, we further introduce \\textbf{Predictive Modality Modeling (PMM)}, a direct representation-level objective for cross-modal redundancy. During training, PMM masks a target modality and predicts its embedding from the visible ones, supervised by a teacher target computed under full-modality input. PMM is used only during training and adds no inference-time overhead. Across three multi-modal segmentation benchmarks (MCubeS, DELIVER, MUSES), FuseAdapt consistently improves both modality-complete and modality-incomplete segmentation with a small trainable budget, yielding up to +3.01 mIoU under full modalities and +12.56 mIoU under missing modalities over prior state-of-the-art. Project page: https://devinxzhang.github.io/FuseAdapt-Page/.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    }
+  ],
+  "errors": []
+}
