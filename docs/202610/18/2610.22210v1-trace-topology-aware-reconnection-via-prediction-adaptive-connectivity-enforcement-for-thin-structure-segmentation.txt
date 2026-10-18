@@ -1,0 +1,440 @@
+Title: TRACE: Topology-Aware Reconnection via Prediction-Adaptive Connectivity Enforcement for Thin-Structure Segmentation
+
+URL Source: https://arxiv.org/pdf/2610.22210v1
+
+Published Time: Fri, 16 Oct 2026 01:50:51 GMT
+
+Number of Pages: 11
+
+Markdown Content:
+# TRACE: Topology-Aware Reconnection via Prediction-Adaptive Connectivity Enforcement for Thin-Structure Segmentation 
+
+## Junho Moon Hanyang University Seoul, Republic of Korea 
+
+jhmoon6807@hanyang.ac.kr 
+
+## Ikbeom Jang *
+
+## Hankuk University of Foreign Studies Yongin, Republic of Korea 
+
+ijang@hufs.ac.kr 
+
+## Abstract 
+
+Thin, elongated structures are particularly sensitive to con-nectivity errors, as even a few local segmentation mistakes can disrupt otherwise continuous paths. Existing skeleton-based objectives typically supervise fixed centerline loca-tions and do not account for alternative local routes that may restore connectivity. We propose TRACE, a topology-aware, prediction-adaptive objective that uses a target skele-ton to define required local connections. For each connec-tion, TRACE identifies the easiest valid reconnection under the current prediction and jointly supervises its bottleneck with the corresponding skeleton point. The supervision thus adapts to the evolving prediction rather than remaining fixed to the centerline. We further introduce a topology-aware skeleton carrier that preserves both foreground and class-specific topology, enabling reliable definition of these con-nections. Extensive experiments across six 2D and 3D bench-marks show that TRACE improves connectivity and topology while maintaining strong segmentation accuracy with low training overhead. Code will be released upon acceptance. 
+
+## 1. Introduction 
+
+Segmentation of thin, elongated structures is particularly vulnerable to connectivity errors, as even a few misclassified pixels or voxels can break an otherwise continuous struc-ture. This issue arises in retinal vessels [21], cerebral vessels [26, 27], hepatic vessels [2], pavement cracks [15], and road networks [7], where continuity is essential to structural in-tegrity. Such local errors can fragment a single structure into multiple components while producing only minor changes in conventional region-overlap metrics [20]. Reliable thin-structure segmentation therefore requires preserving connec-tivity in addition to accurate region and boundary prediction. Prior work preserves connectivity through centerline or skeleton supervision, global topological constraints, and lo-            
+
+> *Corresponding author. Result Conventional Target Skeleton
+> # of Class
+> components: 2(a) # : 1
+> Ground truth
+> Candidate 1
+> (c) Error: 0.4 (d) Error: 0.2
+> Candidate 2 Proposed
+> (b) # : 2
+> Target Skeleton
+
+Figure 1. Conventional target-skeleton supervision [13] relies on fixed skeleton locations and can alter the ground-truth topology (a). 
+
+TRACE preserves it (b), selects the easiest valid reconnection among candidates (c, d), and supervises its bottleneck (d). 
+
+cal relational objectives. Centerline- and skeleton-based losses [1, 19, 20] provide direct structural supervision and may additionally incorporate boundary or width information. Target-only methods [13] avoid skeletonizing the prediction, reducing training-time computation and memory overhead. Their supervision, however, remains confined to fixed sup-port derived from the ground truth. More broadly, skeleton-based support depends on the chosen skeletonization pro-cedure [17], and even topology-preserving support may not identify the prediction error responsible for a connectivity break. Global objectives based on persistent homology or component graphs [3, 11, 16, 22] constrain connected com-ponents, loops, and cavities, yet provide limited guidance for repairing a specific local break. Neighbor-, affinity-, and path-based objectives [10, 24, 25, 28] provide localized su-pervision through individual neighbors, selected point pairs, or graph paths. These formulations organize connectivity around individual relations or pairwise paths, leaving un-resolved how to jointly reconnect all same-class branches affected by a local break under the current prediction. 1arXiv:2610.22210v1 [cs.CV] 15 Oct 2026 We propose TRACE, a topology-aware objective that ex-tends skeleton supervision from a fixed target to guidance for adaptive reconnection. TRACE uses a topology-preserving skeleton to identify neighboring same-class branches that should remain connected. Based on the current prediction, it identifies the easiest valid local reconnection and jointly supervises the skeleton point with the bottleneck limiting this reconnection. To support this formulation, we further in-troduce a Topology-Aware Skeleton Carrier (TASC), which preserves both foreground and class-specific topology while defining local connectivity requirements. We identify the reconnection bottleneck through an exact local search us-ing centered logit-margin scores derived directly from stan-dard semantic logits. The proposed objective avoids costly prediction-side skeletonization and requires no architectural modifications, enabling efficient plug-and-play integration into existing segmentation pipelines. Our contributions are as follows: • We introduce TRACE, a prediction-adaptive connectivity objective that uses a skeleton to define required connec-tions and supervises the easiest reconnection bottleneck. • We present TASC, a class-labeled skeleton that preserves both foreground and class-specific topology while identi-fying same-class branches that should remain connected. • Across six 2D and 3D thin-structure benchmarks, TRACE improves connectivity and topology while maintaining strong region-overlap and boundary accuracy. • We further demonstrate that TRACE is computationally efficient, generalizes across segmentation backbones, and complements existing topology-aware methods. 
+
+## 2. Related Work 
+
+Centerline and skeleton supervision. Centerline- and skeleton-based objectives promote connectivity by supervis-ing thin structural representations derived from the predic-tion, target, or both. clDice [20] measures reciprocal overlap between the prediction and target using differentiable soft skeletons. Menten et al. [17] developed topology-preserving differentiable skeletonization for gradient-based losses. clCE [1] applies cross-entropy at centerline locations to improve topology while preserving region accuracy. cbDice [19] in-corporates boundary and radius cues to preserve geometry across varying widths. Skeleton Recall Loss (SkelRecall) [13] uses a dilated, class-labeled target skeleton and avoids prediction-side skeletonization. These methods, however, tie structural supervision to centerline or skeleton support and do not explicitly identify the prediction error that blocks a valid reconnection. TRACE addresses this gap with a topology-preserving carrier that defines the local same-class branches to be connected and extends pointwise supervision to the bottleneck of their easiest valid reconnection. 
+
+Global topology supervision. Global topology objectives constrain connected components, loops, and cavities across the segmentation. TopoLoss [11] uses persistent homology to identify predictions associated with topological errors. Betti Matching [22] matches topological features between the prediction and target while accounting for their spatial correspondence. Subsequent extensions support multiclass segmentation [3]. Topograph [16] represents prediction– target component relations as a graph to provide efficient binary and multiclass constraints. Whereas these methods constrain global or component-level topology, TRACE tar-gets a required local reconnection and directly supervises its prediction-dependent bottleneck. 
+
+Pairwise and path supervision. Pairwise- and path-based objectives supervise connectivity through neighboring el-ements, point pairs, or graph paths. MALIS [24] assigns pairwise connectivity errors to the weakest edge along a maximin path in an affinity graph. CAPE [10] penalizes shortest-path costs between selected target-graph nodes on a predicted distance map. SCNP [25] adjusts semantic log-its according to the weakest same-class neighbor. WPRF [28] optimizes widest-path reachability between sampled point pairs on a target-derived support graph using a separate affinity prediction. In contrast, TRACE defines each local reconnection on a class-labeled carrier that preserves the topology of both the foreground union and each semantic class. Removing a carrier point exposes all neighboring same-class branches, which we jointly reconnect via an ex-act search over at most 9 candidate points in 2D or 27 in 3D, using a centered logit margin computed directly from standard multiclass semantic logits. 
+
+## 3. Method 
+
+TRACE turns target-skeleton supervision from fixed-point enforcement into prediction-adaptive local reconnection by identifying and supervising the bottleneck of the easiest valid reconnection under the current prediction. We first formulate local reconnection as a connectivity bottleneck problem that requires a connected set of target-class points to reach all neighboring branches (Sec. 3.1). We then construct TASC, a thin class-labeled carrier that encodes these connectivity requirements while preserving both foreground and class-specific topology (Sec. 3.2). Next, we define a centered logit-margin score that ranks candidate points by their rival-to-target margin relative to the carrier average (Sec. 3.3). Finally, we combine the pointwise and connectivity penalties into a structural objective (Sec. 3.4). 
+
+3.1. Local Connectivity Bottleneck Supervision 
+
+We first formalize the local reconnection event supervised by TRACE, as illustrated in Figure 2. Throughout, a point 
+
+denotes a pixel or voxel, and all quantities are defined on a single output grid. Let d ∈ { 2, 3}, let Ω ⊂ Zd be the grid, and let C ≥ 2 be the number of semantic classes, including background. The target labeling is Y : Ω → { 0, . . . , C − 1}.2Step 1)  Remove carrier point  
+
+> Carrier point Skeleton carrier Target structure
+
+Step 3)  Bottleneck Selection and Supervision    
+
+> 4
+> 5
+> 2
+> τ= 0
+> τ: Reconnection threshold
+> 4
+> 5
+> 2
+> τ= 1
+> 4
+> 5
+> 2
+> τ= 2
+> Selected bottleneck
+
+Step 2)  Define valid reconnection candidates            
+
+> Candidate point
+> Candidate 1 Candidate 2 Candidate 3
+> Local neighborhood Figure 2. Prediction-adaptive local reconnection in TRACE. Step 1)
+> Removing a carrier point exposes neighboring same-class branches that should remain connected. Step 2) Valid local reconnections reaching all exposed branches are considered. Step 3) Candidates are activated in ascending order of centered logit-margin score until a valid reconnection forms; the point activated at this threshold is the supervised bottleneck. The carrier is TASC (Sec. 3.2), numbers indicate gc(x)(Sec. 3.3), and τdenotes the activation threshold.
+
+We represent the target connectivity to be preserved using a class-labeled carrier S : Ω → { 0, . . . , C − 1} derived from Y ; its construction is described in Sec. 3.2. The carrier is a thin representation that preserves both foreground and class-specific topology, and its local branches define the connectivity requirements that TRACE supervises. For each foreground class c, define 
+
+Kc = {x ∈ Ω | S(x) = c}, K =
+
+> C−1
+
+[
+
+> c=1
+
+Kc, (1) where Kc denotes the class-c carrier and K is the union of all foreground carriers. Removing a carrier point v ∈ Kc
+
+reveals the neighboring same-class branches that should remain connected. For each x ∈ Ω with Y (x) = c, let gc(x)
+
+denote the centered logit-margin score defined in Sec. 3.3, which ranks each target point by its rival-to-target margin relative to the carrier average. Let ∼d denote 8-connectivity for d = 2 and 26-connectivity for d = 3 . For a carrier point v ∈ Kc, define its local 3d neighborhood as 
+
+N (v) = {x ∈ Ω | ∥ x − v∥∞ ≤ 1}. (2) Let Pv1, . . . , P vm v be the connected components of (Kc ∩N (v)) \ { v} under ∼d; these are the neighboring same-class branches . When mv ≥ 2, these branches define a local reconnection event: the target requires a connected set of class-c points within N (v) that reaches every branch. Carrier points with mv < 2 do not define a reconnection event. Define the local class-c target support Tv = {x ∈ N (v) |
+
+Y (x) = c} and the family of valid local reconnections 
+
+Rv = {R ⊆ Tv | R is connected under ∼d,R ∩ Pvk ̸ = ∅, ∀ k ∈ { 1, . . . , m v }} .
+
+(3) The local connectivity bottleneck is then 
+
+rv = min 
+
+> R∈R v
+
+max  
+
+> x∈R
+
+gc(x). (4) For mv = 2 , each R ∈ R v contains a same-class path connecting the two branches; at a junction, one connected re-connection reaches all branches simultaneously. Thus, rv is the lowest achievable bottleneck score among valid local re-connections. A large rv means that every valid reconnection contains a point with a large rival-to-target margin relative to the carrier average. Eq. (4) has an equivalent threshold-connectivity form that enables exact bottleneck selection. For τ ≥ 0, let Tv (τ ) = 
+
+{x ∈ Tv | gc(x) ≤ τ } and let Cv (τ ) denote the connected components of Tv (τ ) under ∼d. Then 
+
+rv = min τ ≥ 0 : ∃Q ∈ C v (τ ),Q ∩ Pvk ̸ = ∅, ∀ k ∈ { 1, . . . , m v } .
+
+(5) This characterization in Eq. (5) yields an exact finite solver. We activate at most 3d points in Tv in nondecreasing order of gc, with ties resolved by a fixed local order, and merge adjacent active components until a component reaches every branch. If x⋆v is the last activated point, then rv = gc(x⋆v ).We perform the combinatorial search using detached scores to select x⋆v , while propagating gradients through the corre-sponding non-detached score gc(x⋆v ). Because the carrier means in Eq. (7) remain differentiable, this update includes a direct contribution at x⋆v and the associated mean-centering correction over K.
+
+3.2. Topology-Aware Skeleton Carrier 
+
+TASC constructs a thin, class-labeled carrier whose local branches encode same-class connectivity requirements while preserving the digital topology of both the foreground union and each semantic class. Starting from S = Y , consider 3Algorithm 1 Topology-aware skeleton carrier construction                                                                   
+
+> Require: Target Y, thinning order ≺, predicates Simple and Ist 1
+> 1: S←Y;A ← ∅
+> 2: repeat
+> 3: deleted ←false
+> 4: for all foreground points v / ∈ A in order ≺do
+> 5: c←S(v)
+> 6: U← { x:S(x)>0};Uc← { x:S(x) = c}
+> 7: if Ist 1(v;U)∨Ist 1(v;Uc)then
+> 8: A ← A ∪ { v}
+> 9: else if Simple (v;U)∧Simple (v;Uc)then
+> 10: S(v)←0
+> 11: deleted ←true
+> 12: end if
+> 13: end for
+> 14: until deleted = false
+> 15: return S
+
+a foreground candidate point v in the current carrier, with class c = S(v), and define 
+
+U (S) = {x ∈ Ω | S(x) > 0},Uc(S) = {x ∈ Ω | S(x) = c}. (6) We use two standard digital-topology predicates: simple-point deletion for topology-preserving thinning [5] and 1-isthmus detection for retaining curve-like structures exposed during thinning [4, 6]. TASC preserves topology by protecting 1-isthmuses and deleting a candidate only when it is simple in both the fore-ground union and its class-specific support. Let Simple (v; A)
+
+indicate that deleting v is simple in the binary set A, and let Ist 1(v; A) indicate that v is a 1-isthmus of A. A candi-date is permanently protected if it is a 1-isthmus in either 
+
+U (S) or Uc(S); otherwise, delete it only if it is simple in both. Each accepted deletion therefore preserves the topol-ogy of the foreground union and class c, while leaving all other class supports unchanged. Because the predicates are evaluated on the current carrier, deletions may expose ad-ditional 1-isthmuses, which we protect when we encounter them later. We apply these predicates using the 8/4 fore-ground/background adjacency pair in 2D and 26 /6 in 3D. In 2D, the 1-isthmus predicate holds when the proper neighbor-hood contains exactly two 8-connected foreground compo-nents; in 3D, we use the audited DGtal 26 /6 predicate [8]. Algorithm 1 summarizes the construction. The returned car-rier preserves the labels of all retained points and satisfies 
+
+S(x) ∈ { 0, Y (x)} for every x ∈ Ω. For architectures with deep supervision [12], we construct TASC directly from the target at each output resolution to avoid resampling-induced topological changes. 
+
+3.3. Centered Logit Margin for Local Connectivity 
+
+The local reconnection search ranks candidate target points using a centered logit-margin score gc(x). Let zj (x) denote the logit for class j ∈ { 0, . . . , C − 1} at x. We center each logit channel by its mean over the union carrier K, so that the score expresses local rival-to-target margins relative to the carrier. For each class channel j and each foreground target point x with Y (x) = c, define 
+
+¯zj = 1
+
+|K|
+
+X
+
+> u∈K
+
+zj (u), ezj (x) = zj (x) − ¯zj ,gc(x) = 
+
+
+
+max  
+
+> ℓ̸=c
+
+ezℓ(x) − ezc(x)
+
+
+
+> +
+
+.
+
+(7) Here, [a]+ = max {a, 0}. Equivalently, gc(x) is the largest positive difference between a local rival-to-target margin and the corresponding carrier-average margin. This score ranks reconnection candidates, while Lseg supervises the overall class prediction. In binary segmentation, the only rival is background; in multiclass segmentation, the maximization also considers other foreground classes. 
+
+3.4. Pointwise-Connectivity Penalty Integration 
+
+We combine the pointwise centered logit-margin score and local connectivity bottleneck into a bounded structural penalty at each carrier point. For a > 0, define 
+
+b(a) = 2 arcsin 
+
+
+
+tanh a
+
+2
+
+
+
+, ϕ(a) = 
+
+√2 a b (a)
+
+pa2 + b(a)2 . (8) We define ϕ(0) = 0 by continuity. The mapping is increas-ing, has unit slope at the origin, and approaches the finite limit √2π. It therefore preserves sensitivity to small scores while limiting the influence of large ones. For each carrier point v ∈ Kc, let pv = ϕ(gc(v)) . When 
+
+mv ≥ 2, additionally let tv = ϕ(rv ). We define the struc-tural penalty at v as 
+
+qv =
+
+r p2 
+
+> v
+
++ t2
+
+> v
+
+2 , mv ≥ 2,pv , mv < 2.
+
+(9) For mv ≥ 2, qv is the root mean square of the pointwise and connectivity penalties, so qv = pv = tv whenever pv = tv .In particular, if x⋆v = v, then rv = gc(v), and the same local score is not double-counted. To prevent classes with larger carriers from receiv-ing greater weight, we average the penalties within each nonempty class carrier and normalize over the C − 1 fore-ground classes: 
+
+LTRACE = 1
+
+C − 1
+
+> C−1
+
+X 
+
+> c=1
+> Kc̸=∅
+
+1
+
+|Kc|
+
+X
+
+> v∈Kc
+
+qv . (10) The overall training objective is 
+
+L = Lseg + λLTRACE , (11) 4where Lseg denotes a standard segmentation loss, such as Dice loss, cross-entropy, or their combination, and λ controls the relative weight of LTRACE .
+
+## 4. Experiments 
+
+4.1. Datasets and Evaluation Metrics 
+
+Datasets. We evaluate TRACE on six thin-structure segmen-tation benchmarks spanning 2D and 3D data, including bi-nary and multiclass tasks. DRIVE [21] is used for retinal ves-sel segmentation and contains 40 RGB fundus images, split into 20/10/10 for training/validation/testing. DeepCrack [15] contains 537 RGB images for surface-crack segmentation (270/30/237), while DeepGlobe Roads [7] contains 6,226 RGB satellite images for road segmentation (4,980/622/624). For DSCA [27], we convert 224 cerebral digital subtraction angiography sequences, annotated for the main arterial trunk and bifurcated vessels, into 2D minimum-intensity projec-tions and use a 144/36/44 split. MSD Hepatic Vessel [2] contains 303 portal-venous-phase 3D CT scans with hepatic vessel and tumor annotations; we treat tumor voxels as back-ground for binary vessel segmentation and use a 243/30/30 split. TopCoW [26] contains 125 3D CT angiography scans with multiclass annotations for 13 Circle of Willis vessel segments, split into 100/12/13 cases. 
+
+Metrics. We evaluate segmentation quality using com-plementary metrics for connectivity, topology, boundary accuracy, and region overlap. We first report clDice [20] to measure centerline consistency and connectivity preser-vation. We also report the absolute Betti number error, 
+
+β = |∆β0| + |∆β1| [22], to quantify topological errors associated with structural connectivity. The 95th-percentile Hausdorff distance (HD95) [23] assesses boundary accuracy by measuring spatial disagreement while limiting outlier sensitivity. Finally, Dice [9] measures region overlap and assesses whether improved structural consistency is achieved without sacrificing overall segmentation accuracy. We com-pute each metric independently for each foreground class in every test sample. For multiclass datasets, we average the class-wise values to obtain one score per metric per sample, then average these per-sample scores over the entire test set. 
+
+4.2. Main Comparison Setup 
+
+Baselines. Our primary focus is connectivity preservation; therefore, we conduct extensive comparisons with represen-tative skeleton-based losses, including clDice [20], clDice with topology-preserving skeletonization (Topo-clDice) [17], clCE [1], cbDice [19], and SkelRecall [13]. We also include the recent multiclass extension of Betti Matching [3] as a consistent global-topology reference across binary and mul-ticlass benchmarks, using the projection-based protocol of [14] for 3D volumes. To isolate the effects of the train-ing objective, the main benchmark evaluates representative methods using standard semantic outputs while keeping the prediction head and inference pipeline fixed. We exclude methods that require alternative output formulations, aux-iliary or correction modules, or post-processing from this controlled comparison. 
+
+Training protocol. We use a common nnU-Net [12] train-ing setup for all methods to ensure a controlled comparison. Following Eq. (11), we use Dice loss combined with cross-entropy loss (Dice + CE), the default nnU-Net objective, as Lseg , and replace LTRACE with each compared struc-tural loss while keeping all other training settings fixed. For TRACE and the skeleton-based losses, we select λ
+
+from {0.10 , 0.30 , 0.60 , 1.00 } based on the validation Dice score. Betti Matching is tuned separately because exces-sive topological weighting can degrade segmentation perfor-mance [22]; its weight is selected on the validation set from 
+
+{0.00001 , 0.0001 , 0.001 , 0.01 }.
+
+4.3. Topology Preservation and Training Efficiency 
+
+Topology preservation. We assess whether each method’s target-side skeleton representation preserves topology across deep-supervision scales. We use clDice [20] as a representa-tive differentiable soft-skeletonization method, Topo-clDice [17] as its topology-preserving counterpart, and SkelRecall [13] as a target skeleton-based method. At each active scale, we construct the skeleton from the corresponding training target using each method and record a topology violation if the Betti numbers change for the foreground union or any present semantic class. We report the percentage of target–scale pairs exhibiting at least one violation. 
+
+Training efficiency. We evaluate the training overhead of TRACE against the same representative methods under an identical nnU-Net setup, with Dice + CE as the reference. We report training time per epoch and peak process GPU memory on an NVIDIA H200 (140 GB); runs exceeding the available GPU memory are reported as out of mem-ory (OOM). Topology preservation can still be evaluated in OOM cases, whereas training efficiency cannot be assessed without a completed epoch. 
+
+4.4. Backbone Transfer and Method Compatibility 
+
+We evaluate TRACE’s plug-and-play capability in two set-tings: transfer to a different segmentation backbone and integration with another topology-aware method. 
+
+Transfer to CS 2-Net [18]. We integrate TRACE with CS 2-Net to assess its generalization performance across segmen-tation architectures. We compare TRACE against the stan-dard training objective and representative structural losses on DeepCrack and DRIVE. 
+
+Integration with SCNP [25]. We further investigate whether TRACE provides complementary connectivity su-pervision when combined with an existing topology-aware approach. Specifically, we compare Dice + CE applied to 5Table 1. Comparison of training objectives on four 2D thin-structure datasets spanning binary and multiclass tasks under the same nnU-Net setup. Results are mean ± standard deviation over test samples. Bold and underlined values indicate the best and second-best results. 
+
+Method DRIVE [21] DSCA [27] clDice ↑ β ↓ HD95 ↓ Dice ↑ clDice ↑ β ↓ HD95 ↓ Dice ↑
+
+Dice + CE [12] 81.43 ±3.56 115.90 ±18.51 4.00 ±2.05 82.04 ±1.40 87.03 ±14.95 62.07 ±52.24 49.50 ±161.24 86.62 ±15.74 
+
++ clDice [20] 81.97 ±3.69 97.80 ±27.52 4.00 ±2.19 82.22 ±1.37 87.71 ±12.69 53.81 ±47.27 29.01 ±111.52 87.25 ±13.56 
+
++ Topo-clDice [17] 81.99 ±3.60 82.50 ±18.26 3.82 ±2.22 82.10 ±1.41 — Out of memory — + clCE [1] 81.88 ±3.45 106.90 ±18.81 4.09 ±2.33 82.18 ±1.31 87.53 ±12.51 65.91 ±55.25 41.77 ±153.70 87.33 ±13.36 
+
++ cbDice [19] 81.65 ±3.62 109.70 ±24.70 4.06 ±2.22 82.10 ±1.37 87.52 ±13.28 61.86 ±54.68 41.62 ±153.59 87.09 ±14.00 
+
++ SkelRecall [13] 81.89 ±3.50 97.00 ±22.78 4.00 ±2.35 82.18 ±1.27 87.88 ±12.81 56.42 ±47.61 41.75 ±153.69 87.47 ±13.58 
+
++ Betti Matching [3] 81.60 ±3.59 103.70 ±19.37 4.30 ±2.30 82.11 ±1.30 87.42 ±13.87 56.63 ±50.92 44.80 ±149.36 87.12 ±14.21 
+
++ TRACE (ours) 82.65 ±3.50 79.30 ±20.51 3.45 ±1.77 82.38 ±1.32 89.18 ±10.56 55.49 ±50.45 25.29 ±111.20 88.78 ±11.06 
+
+Method DeepCrack [15] DeepGlobe Roads [7] clDice ↑ β ↓ HD95 ↓ Dice ↑ clDice ↑ β ↓ HD95 ↓ Dice ↑
+
+Dice + CE [12] 89.48 ±9.58 5.21 ±5.64 11.48 ±16.80 82.49 ±11.20 81.09 ±14.40 11.76 ±12.92 139.63 ±187.50 74.24 ±12.94 
+
++ clDice [20] 89.72 ±8.92 5.57 ±5.96 11.02 ±16.71 82.85 ±10.09 82.32 ±14.26 10.27 ±12.70 127.55 ±187.12 74.69 ±13.19 
+
++ Topo-clDice [17] — Out of memory — 81.96 ±14.83 9.68 ±17.36 123.40 ±197.72 74.78 ±14.44 
+
++ clCE [1] 89.96 ±8.59 5.65 ±6.35 11.38 ±23.92 83.48 ±9.78 81.88 ±14.39 11.74 ±14.41 129.75 ±184.46 74.67 ±13.00 
+
++ cbDice [19] 89.67 ±9.17 6.18 ±7.40 13.06 ±24.94 82.80 ±10.73 81.23 ±14.95 11.33 ±14.26 128.27 ±181.19 73.80 ±13.96 
+
++ SkelRecall [13] 90.42 ±8.59 5.10 ±5.53 12.04 ±24.95 83.89 ±10.21 81.40 ±14.80 11.51 ±13.19 137.48 ±195.13 74.37 ±12.73 
+
++ Betti Matching [3] 90.44 ±8.56 6.11 ±7.24 11.62 ±22.94 84.28 ±10.22 81.69 ±14.10 9.10 ±11.48 137.66 ±189.81 74.30 ±12.62 
+
++ TRACE (ours) 90.60 ±8.46 4.95 ±6.19 11.02 ±17.60 84.53 ±9.73 82.03 ±14.94 9.13 ±12.22 117.06 ±163.55 74.88 ±13.22 
+
+Table 2. Comparison of training objectives on two 3D vessel datasets spanning binary and multiclass tasks under the same nnU-Net setup. Results are mean ± standard deviation over test samples. Bold and underlined values indicate the best and second-best results. 
+
+Method MSD Hepatic Vessel [2] TopCoW [26] clDice ↑ β ↓ HD95 ↓ Dice ↑ clDice ↑ β ↓ HD95 ↓ Dice ↑
+
+Dice + CE [12] 67.00 ±16.61 40.90 ±24.44 39.41 ±34.79 58.90 ±15.66 86.32 ±9.39 0.32 ±0.25 8.31 ±6.00 80.57 ±7.12 
+
++ clDice [20] 68.73 ±16.87 38.57 ±22.26 28.09 ±25.15 59.70 ±16.11 85.49 ±6.96 0.36 ±0.26 7.97 ±5.61 81.20 ±5.45 
+
++ Topo-clDice [17] 68.92 ±16.82 35.67 ±20.56 23.40 ±27.98 62.83 ±16.28 — Out of memory — + clCE [1] 68.38 ±16.57 32.13 ±20.32 28.84 ±28.20 60.25 ±15.51 86.27 ±7.64 0.29 ±0.21 7.71 ±6.75 80.79 ±6.08 
+
++ cbDice [19] 67.61 ±15.87 33.77 ±22.43 23.33 ±22.54 61.70 ±15.96 86.19 ±7.56 0.30 ±0.28 7.30 ±5.36 81.20 ±6.76 
+
++ SkelRecall [13] 68.83 ±17.10 33.90 ±20.56 23.64 ±32.22 62.30 ±16.29 85.70 ±9.00 0.30 ±0.26 8.05 ±7.66 81.00 ±7.89 
+
++ Betti Matching [3] 66.95 ±15.28 33.47 ±21.12 24.77 ±24.40 61.36 ±14.94 87.07 ±8.28 0.31 ±0.20 5.73 ±7.03 82.31 ±6.90 
+
++ TRACE (ours) 69.08 ±16.75 30.77 ±20.47 21.36 ±34.91 63.83 ±16.80 87.35 ±7.75 0.26 ±0.23 5.42 ±5.21 82.42 ±5.69 
+
+the SCNP-transformed logits with the same objective aug-mented by TRACE. We conduct experiments on DRIVE and DSCA using nnU-Net. 
+
+4.5. Ablation Study 
+
+We perform a cumulative ablation to assess the contribu-tion of TRACE’s main components. We compare six con-figurations: the Dice + CE baseline (DCE) used in nnU-Net [12]; conventional target-skeleton recall (Skel) [13]; its scale-native TASC replacement (TASC); TASC with the centered logit-margin score (TASC-R); an unbounded recon-nection variant with ϕ(a) = a (TRACE-U); and the full ob-jective incorporating exact local reconnection and bounded penalty integration (TRACE). We evaluate all configurations on DRIVE. 
+
+## 5. Result and Discussion 
+
+Main comparison. TRACE consistently outperforms com-peting methods across all six benchmark datasets. As shown in Tabs. 1 and 2, it achieves the best or near-best results in both 2D and 3D settings, covering binary and multi-class segmentation tasks. The qualitative results in Fig. 3 further support these findings: compared with competing 6+ Topo -clDice  + clCE  + cbDice  + Betti  Matching  + Ours Ground truth segmentation  Dice + CE  + clDice  + SkellRecall 
+
+> DRIVE DSCA
+> Out of memory
+> DeepCrack
+> Out of memory
+> DeepGlobe
+> Roads
+> MSD
+> Hepatic Vessel TopCoW
+> Out of memory
+
+Figure 3. Qualitative comparison across six 2D and 3D thin-structure datasets. Each row shows the ground truth, an enlarged region, and predictions from the compared methods. Yellow arrows highlight representative breaks, missing branches, and incorrect connections. Table 3. Backbone-transfer evaluation of TRACE using CS 2-Net on DeepCrack and DRIVE. Results are averaged over test samples; bold and underlined values indicate the best and second-best results. 
+
+Dataset Method clDice ↑ β ↓ HD95 ↓ Dice ↑
+
+DeepCrack [15] Dice + CE 89.03 6.16 16.46 82.78 + clDice [20] 90.42 5.06 15.75 84.58 + SkelRecall [13] 90.07 4.74 15.68 84.26 
+
++ TRACE 91.10 3.69 15.04 85.20 
+
+DRIVE [21] Dice + CE 82.19 88.80 4.56 82.27 + clDice [20] 82.58 73.90 4.04 82.64 
+
++ SkelRecall [13] 82.93 60.00 3.71 82.62 
+
++ TRACE 84.07 39.10 3.63 82.39 methods, TRACE produces more continuous local structures with fewer visible discontinuities while preserving the over-all geometry and semantic extent of the predictions. This agreement between quantitative and qualitative results indi-cates that prediction-adaptive bottleneck supervision effec-tively improves structural connectivity. In particular, the pro-posed approach places structural supervision at prediction-dependent reconnection bottlenecks rather than repeatedly enforcing it at fixed skeleton locations. 
+
+Topology preservation and training efficiency. TRACE preserves target topology across output scales while main-taining practical training efficiency. As shown in Fig. 4, 
+
+Table 4. Effect of adding TRACE to SCNP on DRIVE and DSCA under the same nnU-Net setup. Results are averaged over test samples; bold values indicate the better result within each dataset. 
+
+Dataset Method clDice ↑ β ↓ HD95 ↓ Dice ↑
+
+DRIVE [21] Dice + CE w/ SCNP [25] 80.10 98.20 6.90 81.54 
+
++ TRACE 81.48 90.20 4.60 81.99 
+
+DSCA [27] Dice + CE w/ SCNP [25] 87.25 46.17 29.39 87.40 
+
++ TRACE 88.44 38.47 27.01 88.07 
+
+Table 5. Cumulative ablation of TRACE components on DRIVE. Results are averaged over test samples; bold and underlined values indicate the best and second-best results. 
+
+Dataset Variant clDice ↑ β ↓ HD95 ↓ Dice ↑
+
+DRIVE [21] DCE [12] 81.43 115.90 4.00 82.04 Skel [13] 81.89 97.00 4.00 82.18 TASC 82.01 93.40 3.82 82.24 TASC-R 82.23 86.70 3.58 82.31 TRACE-U 82.48 82.60 3.51 82.35 
+
+TRACE 82.65 79.30 3.45 82.38 
+
+TASC exhibits no observed topology violations on any benchmark, whereas the compared skeleton constructions 740 60 80 100 Target topology violation rate                                                   
+
+> 70 79 78 60 91 64 36 58 55 71 85 57 83 74
+> DRIVE DSCA DeepCrack DeepGlobe MSD TopCoW 010000000000
+> 1k 1.7k Training time per epoch
+> NVIDIA H200 (140 GB)
+> 1k 1.6k 876 OOM OOM OOM
+> 120 140 125
+> DRIVE DSCA DeepCrack DeepGlobe MSD TopCoW 020 40 26 10 11 40 17 20 30 13 14 37 15 17 44 21 22 40 37
+> 130 140 GPU memory consumption during training
+> NVIDIA H200 (140 GB) 137
+> OOM OOM OOM
+> 60 100 52 70 103
+> DRIVE DSCA DeepCrack DeepGlobe MSD TopCoW 010 20
+> 43320 8814 7795520 7710 10
+> Epoch Time (s) Peak GPU Memory (GB)  Violation Rate (%)
+> Dice + CE clDice Topo-clDice SkelRecall Ours
+
+Figure 4. Topology preservation and training efficiency across six datasets. Target topology violation rate across deep-supervision scales (top); per-epoch training time and peak GPU memory on an NVIDIA H200 (middle/bottom). OOM denotes out of memory. 
+
+can alter the original target topology. Topo-clDice pre-serves the topology of individual classes; however, indepen-dently skeletonizing each class can alter the topology of the foreground union. The efficiency results further show that TRACE requires substantially less training time and GPU memory than differentiable soft-skeletonization alternatives, while remaining close to lightweight target-only supervision. This efficiency stems from constructing TASC solely from the target and restricting reconnection search to a small local neighborhood, making TRACE practical for routine use. 
+
+Backbone transfer and method compatibility. TRACE is a plug-and-play objective that transfers across segmenta-tion backbones and complements existing topology-aware supervision. The CS 2-Net results in Tab. 3 show improved connectivity and topology over the standard objective and compared structural losses. In Tab. 4, adding TRACE to SCNP improves all reported metrics, demonstrating com-plementary benefits beyond SCNP’s weakest-neighbor su-pervision. Because TRACE operates directly on standard semantic logits and target labels, it integrates into existing training pipelines without modifying the prediction head or inference procedure. 
+
+Ablation. The ablation study shows that the main com-Ground truth segmentation  TASC 
+
+> DRIVE DeepCrack
+
+Figure 5. Annotation-induced artifacts in TASC. Small isolated re-gions and local irregularities in the ground-truth masks (arrows) are retained as isolated points or short loops because TASC preserves the annotated topology. 
+
+ponents of TRACE provide complementary improvements. As shown in Tab. 5, replacing the conventional target skele-ton with TASC improves structural consistency, while the centered logit-margin score further improves topology and boundary accuracy. Prediction-adaptive reconnection pro-vides additional gains, and the bounded penalty integration in the full TRACE yields the best performance. These re-sults suggest that topology-aware supervision, class-aware scoring, and adaptive reconnection each improve structural accuracy. 
+
+Limitation and future work. TRACE shows consistent per-formance across diverse thin-structure segmentation tasks. Nevertheless, its structural supervision depends on the topol-ogy encoded in the ground-truth annotations. Small an-notation errors may introduce isolated fragments, spurious branches, or local loops, which TASC preserves because removing them would alter the annotated topology, as il-lustrated in Fig. 5. A promising direction is to combine TASC with uncertainty-aware filtering or consistency-based refinement to suppress unreliable topological annotations. 
+
+## 6. Conclusion 
+
+We propose TRACE, an efficient topology-aware objective that reframes skeleton supervision as prediction-adaptive lo-cal reconnection. TASC provides a class-labeled topological carrier that preserves foreground and class-specific topology while identifying same-class branches that should remain connected. Based on this representation, TRACE identifies the easiest valid reconnection under the current prediction and supervises its critical bottleneck. Across six 2D and 3D benchmarks covering binary and multiclass segmentation, TRACE improves connectivity and topology while maintain-ing region-overlap and boundary accuracy. It also preserves target topology across deep-supervision scales, introduces only modest training overhead, and requires no architectural 8or inference-time modifications. Its transferability across backbones and compatibility with existing topology-aware methods further demonstrate that TRACE is a practical plug-and-play approach for thin-structure segmentation. 9References 
+
+[1] Cesar Acebes, Abdel Hakim Moustafa, Oscar Camara, and Adrian Galdran. The centerline-cross entropy loss for vessel-like structure segmentation: Better topology consistency with-out sacrificing accuracy. In Medical Image Computing and Computer Assisted Intervention – MICCAI 2024 , pages 710– 720, 2024. 1, 2, 5, 6 [2] Michela Antonelli, Annika Reinke, Spyridon Bakas, Key-van Farahani, Annette Kopp-Schneider, Bennett A. Landman, Geert Litjens, Bjoern Menze, Olaf Ronneberger, Ronald M. Summers, et al. The medical segmentation decathlon. Nature Communications , 13:4128, 2022. 1, 5, 6 [3] Alexander H. Berger, Laurin Lux, Nico Stucki, Vincent B¨ urgin, Suprosanna Shit, Anna Banaszak, Daniel Rueckert, Ulrich Bauer, and Johannes C. Paetzold. Topologically faith-ful multi-class segmentation in medical images. In Medical Image Computing and Computer Assisted Intervention – MIC-CAI 2024 , pages 721–731, 2024. 1, 2, 5, 6 [4] Gilles Bertrand and Michel Couprie. Two-dimensional paral-lel thinning algorithms based on critical kernels. Journal of Mathematical Imaging and Vision , 31(1):35–56, 2008. 4 [5] Michel Couprie and Gilles Bertrand. New characterizations of simple points in 2d, 3d, and 4d discrete spaces. IEEE Transactions on Pattern Analysis and Machine Intelligence ,31(4):637–648, 2008. 4 [6] Michel Couprie and Gilles Bertrand. Asymmetric parallel 3d thinning scheme and algorithms based on isthmuses. Pattern Recognition Letters , 76:22–31, 2016. 4 [7] Ilke Demir, Krzysztof Koperski, David Lindenbaum, Guan Pang, Jing Huang, Saikat Basu, Forest Hughes, Devis Tuia, and Ramesh Raskar. DeepGlobe 2018: A challenge to parse the earth through satellite images. In Proceedings of the IEEE Conference on Computer Vision and Pattern Recogni-tion Workshops , pages 172–181, 2018. 1, 5, 6 [8] DGtal Team. DGtal: Digital geometry tools and algorithms library. Software library and documentation, 2024. 4 [9] Lee R Dice. Measures of the amount of ecologic association between species. Ecology , 26(3):297–302, 1945. 5 [10] Elyar Esmaeilzadeh, Ehsan Garaaghaji, Farzad Hallaji Azad, and Doruk Oner. CAPE: Connectivity-aware path enforce-ment loss for curvilinear structure delineation. In Medical Image Computing and Computer Assisted Intervention – MIC-CAI 2025 , pages 183–193, 2025. 1, 2 [11] Xiaoling Hu, Fuxin Li, Dimitris Samaras, and Chao Chen. Topology-preserving deep image segmentation. In Advances in Neural Information Processing Systems , 2019. 1, 2 [12] Fabian Isensee, Paul F. Jaeger, Simon A. A. Kohl, Jens Petersen, and Klaus H. Maier-Hein. nnU-Net: A self-configuring method for deep learning-based biomedical image segmentation. Nature Methods , 18(2):203–211, 2021. 4, 5, 6, 7[13] Yannick Kirchhoff, Maximilian R. Rokuss, Saikat Roy, Balint Kovacs, Constantin Ulrich, Tassilo Wald, Maximilian Zenk, Philipp Vollmuth, Jens Kleesiek, Fabian Isensee, and Klaus H. Maier-Hein. Skeleton recall loss for connectivity conserving and resource efficient segmentation of thin tubular structures. In European Conference on Computer Vision , pages 218–234, 2024. 1, 2, 5, 6, 7 [14] Jialu Liu, Yue Cui, and Shan Yu. Ag-tal: Anatomically-guided topology-aware loss for multiclass segmentation of the circle of willis using large-scale multi-center datasets. 
+
+arXiv preprint arXiv:2604.27357 , 2026. 5 [15] Yahui Liu, Jian Yao, Xiaohu Lu, Renping Xie, and Li Li. Deepcrack: A deep hierarchical feature learning architecture for crack segmentation. Neurocomputing , 338:139–153, 2019. 1, 5, 6, 7 [16] Laurin Lux, Alexander H. Berger, Alexander Weers, Nico Stucki, Daniel Rueckert, Ulrich Bauer, and Johannes C. Paet-zold. Topograph: An efficient graph-based framework for strictly topology preserving image segmentation. In Inter-national Conference on Learning Representations , 2025. 1, 2[17] Martin J. Menten, Johannes C. Paetzold, Veronika A. Zimmer, Suprosanna Shit, Ivan Ezhov, Robbie Holland, Monika Probst, Julia A. Schnabel, and Daniel Rueckert. A skeletonization algorithm for gradient-based optimization. In Proceedings of the IEEE/CVF International Conference on Computer Vision ,pages 21394–21403, 2023. 1, 2, 5, 6 [18] Lei Mou, Yitian Zhao, Huazhu Fu, Yonghuai Liu, Jun Cheng, Yalin Zheng, Pan Su, Jianlong Yang, Li Chen, Alejandro F. Frangi, Masahiro Akiba, and Jiang Liu. CS 2-Net: Deep learning segmentation of curvilinear structures in medical imaging. Medical Image Analysis , 67:101874, 2021. 5 [19] Pengcheng Shi, Jiesi Hu, Yanwu Yang, Zilve Gao, Wei Liu, and Ting Ma. Centerline boundary dice loss for vascular segmentation. In Medical Image Computing and Computer Assisted Intervention – MICCAI 2024 , pages 46–56, 2024. 1, 2, 5, 6 [20] Suprosanna Shit, Johannes C. Paetzold, Anjany Sekuboy-ina, Ivan Ezhov, Alexander Unger, Andrey Zhylka, Josien P. W. Pluim, Ulrich Bauer, and Bjoern H. Menze. clDice: A novel topology-preserving loss function for tubular structure segmentation. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 16560– 16569, 2021. 1, 2, 5, 6, 7 [21] Joes Staal, Michael D. Abr` amoff, Meindert Niemeijer, Max A. Viergever, and Bram van Ginneken. Ridge-based vessel seg-mentation in color images of the retina. IEEE Transactions on Medical Imaging , 23(4):501–509, 2004. 1, 5, 6, 7 [22] Nico Stucki, Johannes C. Paetzold, Suprosanna Shit, Bjo-ern H. Menze, and Ulrich Bauer. Topologically faithful image segmentation via induced matching of persistence barcodes. In Proceedings of the 40th International Conference on Ma-chine Learning , pages 32698–32727, 2023. 1, 2, 5 [23] Abdel Aziz Taha and Allan Hanbury. Metrics for evaluating 3d medical image segmentation: Analysis, selection, and tool. 
+
+BMC Medical Imaging , 15:29, 2015. 5 [24] Srinivas C. Turaga, Kevin L. Briggman, Moritz Helmstaedter, Winfried Denk, and H. Sebastian Seung. Maximin affinity learning of image segmentation. In Advances in Neural In-formation Processing Systems , pages 1865–1873, 2009. 1, 2[25] Juan Miguel Valverde, Dim P. Papadopoulos, Rasmus Larsen, and Anders Bjorholm Dahl. Towards high-quality image 
+
+10 segmentation: Improving topology accuracy by penalizing neighbor pixels. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 13123– 13133, 2026. 1, 2, 5, 7 [26] Kaiyuan Yang, Fabio Musio, Yihui Ma, Norman Juchler, Jo-hannes C Paetzold, Rami Al-Maskari, Luciano H¨ oher, Hong-wei Bran Li, Ibrahim Ethem Hamamci, Anjany Sekuboyina, et al. The topcow challenge—topology-aware circle of willis segmentation for ct and mr angiography. NEJM AI , 3(8): AIdbp2500994, 2026. 1, 5, 6 [27] Jiong Zhang, Qihang Xie, Lei Mou, Dan Zhang, Da Chen, Caifeng Shan, Yitian Zhao, Ruisheng Su, and Mengguo Guo. DSCA: A digital subtraction angiography sequence dataset and spatio-temporal model for cerebral artery segmentation. 
+
+IEEE Transactions on Medical Imaging , 44(6):2515–2527, 2025. 1, 5, 6, 7 [28] Youcheng Zong, Runda Jia, Minxuan Hu, Weilan Su, and Dakuo He. Widest-path reachability fields for connectivity-preserving slender structure segmentation. arXiv preprint arXiv:2607.07123 , 2026. 1, 2 
+
+11
