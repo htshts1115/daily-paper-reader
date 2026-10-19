@@ -1,0 +1,54 @@
+{
+  "label": "2026-10-19",
+  "date": "2026-10-19",
+  "generated_at": "2026-10-19T23:12:33",
+  "count": 3,
+  "papers": [
+    {
+      "paper_id": "202610/19/2610.23297v1-flashrefocus-interactive-image-refocusing-in-seconds",
+      "section": "deep",
+      "title_en": "FlashReFocus: Interactive Image Refocusing in Seconds",
+      "authors": "Ching-Heng Cheng, Chia-Ming Lee, Ming-Ching Chang, Xin Li, Yu-Lun Liu, Chih-Chung Hsu",
+      "date": "2026-10-16",
+      "pdf": "https://arxiv.org/pdf/2610.23297v1",
+      "score": "8.0",
+      "evidence": "依据深度与焦平面进行重聚焦模糊渲染",
+      "tldr": "单图重聚焦需要交互式反复调整焦点与景深，但现有生成方法每次编辑都重跑大扩散模型，速度慢。FlashReFocus 每张照片只运行一次扩散：一步扩散去模糊器加解码精修恢复全清晰图，再用轻量渲染器结合显式散焦图与散焦偏置注意力快速生成模糊。它在 EBB! 与新建 3CReal 基准上取得最佳零样本散景感知保真度，比 GenRefocus 快 148.3 倍，后续每次编辑约半秒、快 462 倍。该工作把难恢复与易渲染解耦，实现秒级交互重聚焦。",
+      "tags": "query:neural-bokeh",
+      "abstract_en": "Single-image refocusing changes the focal plane and depth of field of a photograph after capture. It is inherently interactive: users try many focal points and blur strengths on one image, so each edit should be fast and change only the blur. Recent generative methods, however, rerun large diffusion models for every edit. We observe that the two sub-problems differ in kind: recovering the all-in-focus image is ill-posed and needs a generative prior, whereas rendering blur is largely determined by depth and the focal plane. We therefore propose FlashReFocus, which runs diffusion once per photograph and renders every edit with a lightweight network. To address the ill-posed restoration, a one-step diffusion deblurrer with a decoder refiner recovers fine detail efficiently while balancing fidelity and perceptual quality. For precise control, the renderer is conditioned on an explicit defocus map and uses defocus-bias attention, which lets pixels at similar defocus share information without interference from pixels at other depths; in-focus content stays unchanged, and editing the map yields tilt-shift and two focal planes. To further test generalization to unseen cameras, we collect 3CReal, a three-camera benchmark of 89 pairs. FlashReFocus achieves the best perceptual fidelity for zero-shot bokeh rendering on EBB! and 3CReal, refocuses 148.3x faster than GenRefocus, and takes about half a second per further edit, 462x faster.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202610/19/2610.23600v1-learning-to-discriminate-scene-structures-makes-self-supervised-depth-learning-scalable",
+      "section": "deep",
+      "title_en": "Learning to Discriminate Scene Structures Makes Self-Supervised Depth Learning Scalable",
+      "authors": "Mengtan Zhang, Yuchuan Cui, Yu Ma, Zizhan Guo, Wei Ye, Rui Fan",
+      "date": "2026-10-16",
+      "pdf": "https://arxiv.org/pdf/2610.23600v1",
+      "score": "8.0",
+      "evidence": "可扩展到多样场景的自监督单目深度估计",
+      "tldr": "自监督单目深度估计本应随无标注数据扩展，但现有方法在多样场景联合训练时易学到数据集特有结构偏差，导致跨域优化冲突。作者提出MaSS框架，将结构表征通路与上下文特征显式解耦，并用场景结构判别目标学习可泛化的布局感知结构表征以辅助深度解码。在四个数据集单独及联合训练中，MaSS显著优于先前自监督方法，并首次稳定受益于混合域训练；在八个额外数据集的零样本评测中也表现突出。该工作提升了自监督深度学习的可扩展性与跨域泛化能力。",
+      "tags": "query:mono-depth",
+      "abstract_en": "Self-supervised monocular depth estimation is appealing for its potential to scale with unlabeled data, yet existing methods often degrade when trained on diverse scenes. This study finds that, under self-supervision, models tend to encode dataset-specific structural biases rather than transferable scene geometry, leading to cross-domain optimization conflicts. To address this issue, this study proposes the MaSS framework, aiming to make self-supervised depth learning scalable to diverse data. MaSS introduces a dedicated structural representation pathway explicitly decoupled from contextual features, which is guided by a novel scene-structure discrimination objective to learn generalized, layout-aware structural representations for depth decoding. Trained and evaluated on four diverse datasets, both individually and jointly, MaSS substantially outperforms prior self-supervised methods and is the first to consistently benefit from mixed-domain training. Zero-shot evaluation on eight additional datasets further demonstrates its remarkable generalizability, particularly on those entirely out-of-distribution scenes. The source code is publicly available at https://mias.group/MaSS.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202610/19/2610.22921v1-maskmerge-structure-aware-token-merging-for-efficient-instance-segmentation",
+      "section": "quick",
+      "title_en": "MaskMerge: Structure-aware Token Merging for Efficient Instance Segmentation",
+      "authors": "Bavesh Balaji, Letian Jiang, Alexander Wong, David Clausi, Sirisha Rambhatla",
+      "date": "2026-10-16",
+      "pdf": "https://arxiv.org/pdf/2610.22921v1",
+      "score": "6.0",
+      "evidence": "实例感知令牌合并，在实例分割中保留实例边界",
+      "tldr": "现有 token 合并方法主要依赖特征相似度来决定合并对象，在实例分割中容易把同类相邻实例误合并，即跨实例 token 融合。为此，作者提出 MaskMerge，利用粗粒度中间掩码预测约束基于特征的合并，从而保留实例边界。在 PanNuke 和 iSAID 上，相比 ALGM，mAP 分别提升至 32.1 和 36.2，同时计算量下降、速度提升约 1.2 倍。该方法说明实例感知合并能在外观相似不可靠时支持更激进的压缩。",
+      "tags": "query:seg",
+      "abstract_en": "Token merging improves the efficiency of Vision Transformers by combining redundant tokens, but existing methods largely rely on feature similarity to determine which tokens to merge. This criterion is effective for semantic segmentation, yet can fail in instance segmentation, where adjacent objects of the same class often have highly similar features. We identify this failure mode as cross-instance token fusion. We introduce MaskMerge, an instance-aware token merging method that uses coarse intermediate mask predictions to constrain feature-based merging and preserve instance boundaries. We evaluate MaskMerge on two diverse instance segmentation domains characterized by high inter-instance visual similarity: PanNuke and iSAID. Against the SOTA token merging method ALGM, MaskMerge improves mAP from 30.1 to 32.1 on PanNuke while reducing computation from 229 to 153 GFLOPs and running 1.18x faster, and from 33.1 to 36.2 on iSAID while reducing computation from 198 to 182 GFLOPs and running 1.23x faster. Additionally, we also test it on Cityscapes and match ALGM's performance while using fewer FLOPs. The gains also transfer to an MAE pretrained backbone, demonstrating that instance-aware merging enables more aggressive compression when appearance similarity alone cannot reliably preserve object identity.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    }
+  ],
+  "errors": []
+}
