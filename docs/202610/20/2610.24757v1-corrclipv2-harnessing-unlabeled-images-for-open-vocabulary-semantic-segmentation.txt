@@ -1,0 +1,589 @@
+Title: CorrCLIPv2: Harnessing Unlabeled Images for Open-Vocabulary Semantic Segmentation
+
+URL Source: https://arxiv.org/pdf/2610.24757v1
+
+Published Time: Tue, 20 Oct 2026 01:01:03 GMT
+
+Number of Pages: 25
+
+Markdown Content:
+# CorrCLIPv2: Harnessing Unlabeled Images for Open-Vocabulary Semantic Segmentation 
+
+## Dengke Zhang 1, Fagui Liu 1,2* , Quan Tang 2* , C. L. Philip Chen 1
+
+1School of Computer Science and Engineering, South China University of Technology, Guangzhou, 510006, China. 
+
+2Department of New Network, Pengcheng Laboratory, Shenzhen, 518000, China. *Corresponding author(s). E-mail(s): fgliu@scut.edu.cn; tangq@pcl.ac.cn; Contributing authors: csdk@mail.scut.edu.cn; Philip.Chen@ieee.org; 
+
+Abstract 
+
+Open-vocabulary semantic segmentation aims to classify pixels without being restricted to a fixed set of categories. Although Contrastive Language-Image Pre-training (CLIP) demonstrates remarkable potential for open-vocabulary recognition, its segmentation capability is impaired by noisy inter-class patch interactions. To this end, this work proposes a unified training-free object-centric framework, named CorrCLIPv2, from three complementary aspects of patch correlation, feature representation, and output regularization. Specifically, for patch correlation, we leverage class-agnostic mask genera-tors to explicitly disentangle inter-class interactions. Moreover, we utilize spatially-coherent features from self-supervised models to compute attention scores to mitigate mask inaccuracies. Regard-ing feature representation, we devise a refinement mechanism to simultaneously strengthen spatial details and semantic representation. Within the output space, we unify predictions via voting in each mask to enhance spatial consistency. To mitigate contextual bias and enhance prediction accu-racy of objects, we further extend the framework by incorporating a cross-image object retrieval paradigm, which incurs minimal computational overhead. We build a memory bank of CorrCLIP-enhanced features from unlabeled images and implement a regime of multi-CLIP ensemble. By aggregating semantically consistent object features across diverse contexts retrieved from the mem-ory bank, CorrCLIPv2 mitigates context-induced interference and obtains more robust predictions. Extensive experiments demonstrate that our approach establishes a new state-of-the-art on 10 stan-dard benchmarks. Remarkably, it even surpasses fully supervised open-vocabulary methods across 22 multi-domain datasets. Code is available at: https://github.com/zdk258/CorrCLIP. 
+
+Keywords: Open-vocabulary semantic segmentation; Vision foundation model; Correlation reconstruction; Unlabeled images 
+
+> This preprint has not undergone peer review (when appli-cable) or any post-submission improvements or corrections. The Version of Record of this article is published in Interna-tional Journal of Computer Vision, and is available online at https://doi.org/10.1007/s11263-026-03027-3.
+
+# 1 Introduction 
+
+Open-vocabulary semantic segmentation (OVSS) (Zhao et al. 2017; Ghiasi et al. 2022; Yuan et al. 2024) performs dense prediction by assigning semantic labels to image regions based on an open 1arXiv:2610.24757v1 [cs.CV] 17 Oct 2026 1% 5% 10% 20% 23 26 29 32 35 
+
+> mIoU(%)
+> Intra-Class Intra-Object Previous SOTA
+> Lowest Highest
+
+Fig. 1 Impact of intra-class and intra-object correla-tions and different proportions of inter-class correlations on CLIP’s segmentation performance on COCO Stuff. “Lowest” and “Highest” denote the interactions with the least and most similar inter-class patches, respectively. Intra-Class and Intra-Object correlations achieve superior performance. In contrast, reintroducing inter-class inter-actions, even with high similarity, results in consistent degradation 
+
+set of textual descriptions. In recent years, the Contrastive Language-Image Pre-training (CLIP) (Radford et al. 2021) model has emerged as a predominant paradigm for this task. Lever-aging massive-scale supervision from image-text pairs, CLIP demonstrates unprecedented zero-shot generalization capabilities, thereby serving as a foundational backbone for contemporary OVSS frameworks. Adapting CLIP to OVSS requires a fine-grained alignment between localized image patches and category embeddings. However, afundamental discrepancy arises from CLIP’s contrastive pre-training, which prioritizes global information. As a result, distinct patches tend to share overly similar representations, under-mining local discriminability. To enhance such local discriminability while preserving the pre-trained alignment with the textual feature space, training-free methods typically limit their inter-vention to the final Vision Transformer (ViT) (Dosovitskiy et al. 2021) layer. Within this layer, the self-attention mechanism serves as the pri-mary conduit for feature aggregation. Therefore, reshaping the attention patterns to restore local discriminability becomes the key challenge. Existing methods aim to enhance segmenta-tion primarily by adjusting attention maps heuris-tically. Specifically, SCLIP (Wang et al. 2024) and ClearCLIP (Lan et al. 2024a) substitute the con-ventional query-key interaction with query-query or key-key attention, enabling patches to focus more strongly on themselves to preserve local fea-ture distinctiveness. Alternatively, SC-CLIP (Bai VOC21 VOC20 PC60 PC59 Object Stuff ADE150 City ADE847 PC459     
+
+> 82.3 82.2 76.7 93.6 93.2 91.8 51.1 44.9 44.6 56.8 53.1 50.8 58.0 49.4 48.2 39.1 34.0 33.2 36.5 30.7 28.2 59.2 59.0 51.1 14.9 13.5 11.2 18.6 15.8 14.4
+> CorrCLIPv2 CorrCLIP Previous SOTA
+
+Fig. 2 Comparison of OVSS performance on ten stan-dard benchmarks. CorrCLIP shows promising results. Cor-rCLIPv2 further improves it and sets a new state-of-the-art across all benchmarks 
+
+et al. 2025) and ResCLIP (Yang et al. 2025) observe that lower layer attentions exhibit supe-rior coherence compared to the final layer, and thus leverage these shallower patterns to refine the noisy attention maps in the final block. Moreover, ProxyCLIP (Lan et al. 2024b) and Trident (Shi et al. 2025) bypass CLIP’s internal inconsisten-cies by computing attention maps using features from other Visual Foundation Models (VFMs) that possess higher coherence. Critically, these methods do not explicitly identify which types of patch correlations degrade segmentation perfor-mance, thereby limiting their potential for further improvement. To analyze this issue in depth, we conduct a breakdown analysis. For the segmentation task, ideal patch correlations in CLIP should maintain feature discriminability across classes and aggre-gate semantic information for semantic alignment. We categorize correlations into intra-class and inter-class types. Intuitively, intra-class correla-tions inherently satisfy both objectives. However, the impact of inter-class correlations presents a complex ambiguity. On one hand, aggregating information from distinct categories may intro-duce noise that compromises discriminability. On the other hand, it may provide useful contex-tual cues that facilitate alignment. To resolve this ambiguity, we conduct a controlled investigation starting from a restricted setting of pure intra-class correlations. The empirical results are shown in Fig. 1, suggesting a substantial improvement in CLIP’s segmentation performance, which confirms 2the efficacy of intra-class aggregation. Addition-ally, intra-object correlations achieve results com-petitive with intra-class correlations. In contrast, we observe consistent degradation as inter-class correlations are reintroduced. Notably, even the most semantically similar inter-class patches are detrimental. These results suggest that, in the con-text of dense prediction, inter-class correlations primarily act as noise rather than providing useful contextual information. Motivated by the aforementioned observation, we contend that explicitly regulating the interac-tion scope is imperative. To this end, we propose Scope Reconstruction that utilizes object masks generated by class-agnostic mask generators (Kir-illov et al. 2023; Ravi et al. 2024; Qi et al. 2023) to strictly confine patch interactions within objects, thereby minimizing inter-class correla-tions. Furthermore, to avoid potential multi-class ambiguities in masks, we introduce Value Recon-struction to refine similarity measures via coher-ent features of Self-Supervised Learning (SSL) VFMs (Oquab et al. 2023; Sim´ eoni et al. 2025; Heinrich et al. 2025), further suppressing the weight of irrelevant correlations. Beyond optimiz-ing patch correlations, we present Feature Refine-ment, which introduces a spatial branch to recover spatial details from lower layers and a semantic branch utilizing mask class tokens to consolidate regional semantics. Finally, in the output space, we introduce Map Correction to unify predictions via voting in each mask, ensuring spatial con-sistency. These mechanisms effectively establish a robust object-centric framework, which recon-structs patch correlations, refines feature represen-tations, and unifies prediction outputs within each object instance. While this framework improves object classification accuracy, inherent contextual bias may still cause object representations to devi-ate from their intrinsic semantics, leading to mis-classification. This issue stems from the necessity of global contextual interaction in the preceding ViT layers of CLIP. Unlike the final layer where we can strictly confine the scope, early layers must aggregate information globally to form seman-tic concepts. Consequently, an object’s embedding may be susceptible to interference from its sur-rounding context (e.g., a “cat” in a dark cage may be embedded closer to “fence”). In such cases, relying solely on information from a single input image is insufficient to correct this semantic drift. To this end, we extend our framework to a cross-image object retrieval paradigm, Cor-rCLIPv2, which incurs only marginal inference overhead. The core insight is that the feature rep-resentation of a single object instance may fluctu-ate due to contextual bias. In contrast, a semantic prototype distilled from multiple instances of the same class across diverse environments is more robust and reliable. Following this insight, we first construct an offline memory bank populated with CorrCLIP-enhanced features from a large collec-tion of unlabeled data. A key challenge here is accurately linking the query object to semanti-cally consistent support objects. To address this challenge, we introduce VFM-Indexed Semantic Retrieval (VISR). Unlike CLIP, SSL-based VFMs produce visually discriminative representations at the fine-grained object level, where intra-class fea-tures maintain high affinity, whereas inter-class features are well-separated. By utilizing VFM features as a stable anchor to retrieve a visual support set and aggregating their corresponding CorrCLIP features, VISR effectively marginal-izes out the context-induced variance, stabilizing predictions under complex backgrounds. Moreover, we exploit the decoupled design of our retrieval mechanism to enable a scal-able approach for open-ended model integration, proposing a Decoupled Multi-CLIP Ensemble strategy. Unlike traditional ensembles that incur linear computational costs with each added model, our framework decouples the costly feature encod-ing of different CLIP variants, which is performed offline, from the online inference stage. Conse-quently, we can effectively fuse complementary knowledge dimensions from multiple pre-trained models with negligible marginal inference over-head, improving robustness without compromis-ing efficiency. Our contributions are summarized as follows: 
+
+• We conduct a breakdown analysis revealing that inter-class correlations predominantly manifest as destructive noise rather than constructive context in CLIP-based segmentation. 
+
+• Based on the above observation, we propose a unified training-free object-centric framework that reconstructs intrinsic patch correlations, refines feature representations, and unifies pre-diction outputs within each object instance. 3• To further enhance prediction accuracy, we extend our framework to a cross-image object retrieval paradigm, leveraging external support to mitigate contextual bias and incurring only marginal inference overhead. 
+
+• We index a large-scale memory bank using SSL-based VFMs to retrieve semantically consistent objects, and develop a decoupled multi-CLIP ensemble strategy that integrates diverse pre-trained models efficiently. 
+
+• Extensive experiments demonstrate the efficacy of CorrCLIPv2. It sets a new state-of-the-art on 10 standard benchmarks as shown in Fig. 2 and outperforms fully supervised open-vocabulary counterparts on the multi-domain MESS bench-mark comprising 22 datasets. This work extends our preliminary study, CorrCLIP (Zhang et al. 2025), which has been accepted as an oral paper at ICCV’25. We evolve CorrCLIP into a cross-image paradigm with mini-mal inference overhead. The major improvements include: (1) a retrieval-augmented framework that leverages unlabeled images to rectify contextual bias; (2) the integration of SSL-based VFMs to construct a robust index, enabling the effective retrieval of semantically consistent support fea-tures; (3) a decoupled ensemble strategy designed to efficiently leverage diverse pre-trained CLIP models; (4) a substantial expansion of experi-ments on two challenging large-vocabulary bench-marks (ADE20K-847 (Zhou et al. 2017), Pascal Context-459 (Mottaghi et al. 2014)) and the MESS benchmark (Blumenstiel et al. 2023) with 22 multi-domain datasets, ensuring a more rigor-ous assessment. 
+
+# 2 Related Work 
+
+## 2.1 Open-Vocabulary Semantic Segmentation 
+
+Diverging from traditional semantic segmenta-tion (Chen et al. 2017; Cheng et al. 2022; Tang et al. 2025) methods that operate within a closed set of predefined labels, OVSS aims to seg-ment images based on an open set of textual descriptions. The rapid evolution of this field is largely attributed to the emergence of Vision-Language Models (VLMs). Generally, existing OVSS methods can be categorized into training-based and training-free approaches. Training-based approaches require additional fine-tuning using various forms of supervision, including mask annotations (Cho et al. 2024; Xu et al. 2023b; Liang et al. 2023; Li et al. 2025a), image-level labels (Wysocza´ nska et al. 2024; Kim et al. 2025b), or image-text pairs (Barsellotti et al. 2025; Jose et al. 2025). While these methods often yield supe-rior performance on specific benchmarks, they tend to compromise the inherent generalization ability of VLMs as demonstrated in (Sun et al. 2024). Conversely, training-free methods circum-vent the need for further training, thereby preserv-ing the original zero-shot capabilities of VLMs. Within the training-free landscape, a promi-nent research direction involves changing the attention mechanisms of CLIP. Several works (Zhou et al. 2022; Wang et al. 2024; Li et al. 2023; Lan et al. 2024a; Hajimiri et al. 2025; Li et al. 2025b) modify the final layer’s attention, transitioning from a query-key interaction to a self-self mechanism to encourage patches to focus more on themselves. Others (Liu et al. 2025; Yang et al. 2025; Bai et al. 2025; Sun et al. 2025) observe that lower layers often exhibit higher spa-tial coherence, thereby utilizing these layers to refine the noisy attention maps of the final layer. Despite these innovations, performance remains bottlenecked by CLIP’s incoherent features stem-ming from its fundamental training objective. To address this, recent studies (Lan et al. 2024b; Kim et al. 2025a; Sun et al. 2025; Shi et al. 2025; Barsellotti et al. 2024; Kang and Cho 2024) have integrated auxiliary foundation models to bol-ster CLIP’s segmentation capabilities. However, existing methods fail to explicitly regulate patch correlations. In this work, we introduce correlation reconstruction to explicitly reduce inter-class cor-relations, thereby significantly improving CLIP’s segmentation performance. 
+
+## 2.2 Vision-Language Pre-training 
+
+Vision-language pre-training (VLP) has emerged as a dominant paradigm for learning joint cross-modal representations. By harnessing weakly 4supervised learning on vast collections of image-text pairs, VLP enables models to capture intrin-sic semantic associations between visual con-tent and linguistic descriptions. While pioneer-ing studies demonstrated the potential of this approach, their capabilities were inevitably lim-ited by the scarcity of training data. A paradigm shift occurred with the advent of large-scale web-crawled datasets, enabling recent frameworks (Radford et al. 2021; Jia et al. 2021) to learn sig-nificantly more robust and transferable represen-tations. Among these, CLIP (Radford et al. 2021) has established itself as the de facto standard. By leveraging contrastive learning to align visual and textual feature spaces, CLIP achieves remark-able zero-shot generalization. Building upon this foundation, a wave of subsequent research (Cherti et al. 2023; Xu et al. 2024; Bolya et al. 2025; Fang et al. 2023) has further advanced the field by refining data curation strategies and optimizing training protocols. While CLIP lays the founda-tion for open-vocabulary semantic segmentation, its global image-text alignment objective is not inherently compatible with the pixel-level granu-larity required for segmentation, thereby requiring specific adaptations to bridge this gap. 
+
+## 2.3 Vision Foundation Models 
+
+The primary objective of VFMs is to learn uni-versal visual representations from large-scale data. Many VFMs build on self-supervised learning, which leverages data without human annotations. Early methods such as MAE (He et al. 2022) rely on reconstructive objectives that capture struc-tural cues, while DINO (Caron et al. 2021) intro-duces self-distillation to obtain stronger semantic features. This line of work is significantly advanced by DINOv2 (Oquab et al. 2023), whose large-scale curated training and improved optimiza-tion produce representations that capture intrin-sic, high-level semantics. The recently developed DINOv3 (Sim´ eoni et al. 2025) further strengthens this paradigm through enhanced data scaling and training stability, yielding consistently stronger generalization across recognition and dense pre-diction tasks. Building on these advances, RADIO (Heinrich et al. 2025) distills knowledge from strong teacher models such as DINOv2 and CLIP, allowing it to inherit rich semantic representa-tions and local details. Benefiting from the global semantic coherence and local fine-grained details of SSL-based VFMs, we employ their features to suppress irrelevant correlations and construct indices to retrieve semantically consistent support features to stabilize predictions. 
+
+## 2.4 Class-Agnostic Mask Generator 
+
+Semantic segmentation jointly learns category recognition and pixel-level delineation, requiring models to decide both what and where. This reliance on fixed label spaces limits generaliza-tion to open-world scenarios. Class-agnostic mask generators, by contrast, focus solely on mask pre-diction without semantic classification, making them easier to train and inherently more robust to unseen categories. Large-scale vision models have recently advanced this paradigm. The Segment Anything Model (SAM) (Kirillov et al. 2023; Ravi et al. 2024) learns from a massive image–mask corpus and employs a promptable architecture to produce high-quality, zero-shot masks, establish-ing a general foundation for open-world segmen-tation. EntitySeg (Qi et al. 2023, 2022) similarly targets the segmentation of generic entities rather than predefined classes, using strong visual priors to achieve class-agnostic object extraction. Based on these advanced open-world mask generators, we construct a training-free object-centric OVSS framework and further extend it to a cross-image object retrieval paradigm. 
+
+## 2.5 Memory Bank for OVSS 
+
+Memory bank has recently emerged as a promis-ing paradigm to enhance OVSS. However, exist-ing methods predominantly construct memory banks heavily anchored to textual guidance. For instance, FreeDA (Barsellotti et al. 2024) relies on predefined categories from COCO Captions (Chen et al. 2015), ReME (Xuan et al. 2025) utilizes Large Language Models to generate textual labels, and PGSeg (Zhang et al. 2023a) depends on mas-sive image-text pair datasets. A critical limitation of these approaches is that they are inherently bounded by a fixed set of text vocabularies dur-ing construction. This contradicts the objective of OVSS. Text-anchored memory banks force con-tinuous visual features into predefined semantic bins, inevitably overfitting to the taxonomy and granularity of the construction dataset. In con-trast, our method decouples the memory bank 5construction from language and naturally accom-modates the open-ended nature of OVSS. This language-free design elegantly circumvents vocab-ulary overfitting, unleashing the true potential of memory banks for infinite-category scenarios. 
+
+# 3 Method 
+
+In this section, we elaborate on the proposed Cor-rCLIPv2. We begin by establishing the necessary preliminaries in Sect. 3.1. Subsequently, Sect. 3.2 revisits the core architecture of the conference version, CorrCLIP, detailing its four integral mod-ules: Scope Reconstruction, Value Reconstruction, Feature Refinement, and Map Correction. The overall framework is shown in Fig. 3. Build-ing upon this framework, Sect. 3.3 introduces the advanced extensions proposed in this journal version, which are designed to mitigate contex-tual bias through cross-image retrieval-augmented mechanisms. 
+
+## 3.1 Preliminary 
+
+Our method leverages the pre-trained ViT visual encoder from CLIP. The input image is initially serialized into a token sequence XC ∈ RN ×d
+
+augmented with positional encodings, where N
+
+and d denote the sequence length and embedding dimension, respectively. Prior to the final layer, the sequence propagates through stacked stan-dard transformer blocks, each processing features via multi-head self-attention and feed-forward net-works with residual connections. In this work, our modifications primarily focus on the final layer of the encoder to tailor the features for segmentation tasks. Within this last layer, the input token sequence XC is mapped to generate the query, key, and value embed-dings, formally denoted as QC , KC , and VC ∈
+
+RN ×d, respectively. For brevity and clarity of notation, we formulate the subsequent operations based on single-head attention. Departing from the standard attention mechanism, the similarity matrix S ∈ RN ×N is calculated by the dot prod-uct between query embeddings themselves, rather than between queries and keys. As demonstrated in ClearCLIP (Lan et al. 2024a), this self-query correlation significantly improves coherence: 
+
+S = QC QT 
+
+> C
+
+, (1) where S explicitly represents the patch-to-patch correlations, capturing the semantic affinity across different patches of the image. The computation of S is pivotal, as it serves as the foundation for enhancing CLIP’s dense prediction capabilities. In the subsequent subsections, we will elaborate on our methodology to reconstruct these patch corre-lations for improving segmentation performance. To derive the final attention weights, a row-wise softmax operation is applied to the scaled similarity matrix. These weights are then used to aggregate the semantic information from VC . Fol-lowing the insights from ClearCLIP (Lan et al. 2024a), we remove both the residual connections and the feed-forward network in this final layer to reduce the noise and yield cleaner segmenta-tion results. Consequently, the value embeddings aggregated by the attention map yield the final image representations Fimg ∈ RN ×d:
+
+A = Softmax 
+
+ S
+
+√d
+
+
+
+, (2) 
+
+Fimg = AV C . (3) In parallel with the visual stream, the tex-tual branch processes semantic category infor-mation. We construct category descriptions by combining C distinct class names with stan-dard ImageNet prompt templates (Radford et al. 2021). These descriptions are encoded by CLIP’s textual encoder to yield the class embeddings 
+
+Ftxt ∈ RC×d. To enable zero-shot segmentation, the image patch features Fimg are projected into a common feature space aligned with Ftxt . Finally, the segmentation logits P ∈ RN ×C are generated by treating the class embeddings as the weights of a linear classifier: 
+
+P = Fimg F T
+
+> txt
+
+. (4) The final semantic labels are obtained via an argmax operation on P .
+
+## 3.2 CorrCLIPv1: Correlation Reconstruction in Single Image 
+
+3.2.1 Scope Reconstruction 
+
+Although the self-query attention mechanism improves segmentation performance, it remains constrained by the intrinsic incoherence of CLIP’s 6horse bird cow ... sky Textual Encoder Class Embeddings     
+
+> Visual Encoder …Mask Generator Feature Extractor Classifier
+> Value Embeddings Similarity Matrix Region Masks Patch Embeddings Feature Map
+> Map
+> Correction
+> Feature
+> Refinement
+> Scope Reconstruction Value Reconstruction
+> Overall Pipeline
+> Image Image Region Masks Image Class Names
+> Masked Softmax Outer Product CLIP
+> MatMul
+> Spatial Branch Semantic Branch Segmentation Map
+> Scope Confine Fig. 3 The overall framework of CorrCLIP. CLIP’s visual encoder processes the image to obtain value embeddings of image patches, while CLIP’s textual encoder encodes class names to produce class embeddings. A mask generator creates region masks and a feature extractor derives coherent patch embeddings to compute the similarity matrix for value reconstruction. Applying the region masks to the similarity matrix achieves scope reconstruction. The feature map is further refined via spatial and semantic branches, and the refined features are compared with class embeddings to generate the segmentation map, which is finally updated using the region masks
+
+patch embeddings, which inevitably leads to unde-sirable inter-class correlations. To address this, we propose Scope Reconstruction, which explicitly reconstructs the interaction scope to disentangle inter-class propagation. Specifically, we leverage a class-agnostic mask generator to provide structural priors. The gener-ator produces a set of binary region masks M =[m1, m2, ..., mZ ] ∈ RZ×N , where mi ∈ { 0, 1}N
+
+denotes the i-th region mask and Z is the num-ber of masks. The union of pixels not covered by any specific region mask forms the background mask m0. Unlike the previous conference ver-sion using complex clustering to merge masks, we directly utilize these raw region masks to define the scope of patch interactions, which avoids the computational overhead of clustering. To define the interaction scope, we construct a binary matrix E ∈ RN ×N , where Ei,j = 1 allows attention between patch i and j, and Ei,j = 0 inhibits it. For patches falling within a specific region mk (k > 0), interactions are strictly con-fined to that region. For the background region 
+
+m0, where semantic boundaries are less defined, we apply a dynamic thresholding strategy based on the global mean of the similarity matrix to filter out weak connections. Formally, the interaction matrix is defined as: 
+
+E = I S > ¯S ⊙ (m0 ⊗ m0) + 
+
+> Z
+
+X
+
+> k=1
+
+mk ⊗ mk, (5) where ⊗ denotes the outer product, ⊙ is the element-wise product, ¯S is the mean of S, and I(·)is the indicator function. Consequently, the stan-dard softmax in Eq. (2) is replaced by a Masked Softmax, which enforces the structural constraints defined by E:
+
+A = Masked Softmax 
+
+ S
+
+√d , E
+
+
+
+. (6) This operation effectively zeros out attention scores where Ei,j = 0, ensuring that feature aggre-gation occurs exclusively within coherent regions. 
+
+3.2.2 Value Reconstruction 
+
+While Scope Reconstruction explicitly reduces inter-class patch correlations, it relies on the qual-ity of the generated masks. A critical issue arises when the mask generator produces inaccurate masks which encompass multiple distinct semantic categories. In such cases, the binary constraint of 7Scope Reconstruction fails to prevent correlations between these distinct classes. To mitigate the adverse effects of such mask inaccuracies, we introduce Value Reconstruction. The objective is to refine the internal affinity mea-sure within the permitted scope, ensuring that patches only aggregate information from semanti-cally consistent neighbors when the spatial mask is imperfect. SSL-based VFMs possess a more intrinsic understanding of fine-grained semantic layouts compared to CLIP, whose visual features lack local discriminability. Therefore, we lever-age a VFM to reconstruct the similarity matrix. Let Fvf m ∈ RN ×d′
+
+denote the feature sequence from the final layer of the VFM. Unlike the con-ference version, which relies on DINO’s internal query and key embeddings, we instead employ the final output features. This modification ensures broader applicability, as the exceptional semantic alignment inherent in DINO’s internal spaces does not necessarily generalize to other VFMs. The reconstructed similarity matrix S is computed as: 
+
+S = Fvf m F T
+
+> vf m
+
+∥Fvf m ∥2 . (7) This VFM-derived similarity acts as a soft semantic filter. Even if a mask erroneously per-mits interaction between two different objects, the high discriminative power of the VFM fea-tures ensures that their similarity in S remains low. Consequently, the contribution of these irrel-evant patches is suppressed during aggregation. The final attention mechanism combines the hard structural constraint of the mask E with the soft semantic guidance of S:
+
+A = Masked Softmax 
+
+ S
+
+τ , E
+
+
+
+, (8) where τ < 1 is a temperature coefficient used to sharpen the attention distribution. 
+
+3.2.3 Feature Refinement 
+
+With the correlation reconstruction, we obtain the aggregated image features. To further bol-ster the discriminative power of these features, we introduce a dual-branch Feature Refinement strat-egy comprising a Semantic Branch and a Spatial Branch. The class token in CLIP aggregates informa-tion across the entire image, which dilutes region-specific semantics. To enrich the region-specific semantic information, we introduce a Semantic Branch incorporating Mask Class Tokens (MCT). Specifically, we append Z class tokens Tmask ∈
+
+RZ×d to the input sequence, corresponding to the 
+
+Z regions. During the forward pass, these tokens exclusively attend to image tokens within their assigned masks, effectively aggregating a global representation for each region. Subsequently, we obtain the dense feature map by redistributing these region-level representations back to patch-level: 
+
+XM CT = M TTmask . (9) Additionally, motivated by recent findings (Bai et al. 2025; Yang et al. 2025; Sun et al. 2025) indicating that the lower layers of CLIP preserve superior spatial coherence compared to the final layer, we incorporate these lower layer features to restore spatial details. Specifically, to align these features with the final feature space, we project the token sequence from the preceding lay-ers using the value projection of the final layer. This operation results in spatially discriminative value embeddings V ′ 
+
+> C
+
+.Finally, image features Fimg are updated as a weighted fusion of the main branch, the spatial branch, and the semantic branch: 
+
+Fimg = AV C + αAV ′ 
+
+> C
+
++ βXM CT , (10) where α and β are hyperparameters balancing the contributions of spatial details and semantic con-text, empirically set to 1 .0 and 0 .5, respectively. 
+
+3.2.4 Map Correction 
+
+Pixel-wise predictions from CLIP can exhibit high variance, resulting in noise or inconsistent labels within a single object. Since our Scope Recon-struction already leverages mask priors, we extend this logic to the output space. We assume that pixels belonging to the same generic mask likely belong to the same semantic category. Therefore, we perform a majority voting operation within each mask region mk (k > 0) to unify the predictions: 
+
+P [mk] ← Mode( P [mk]) . (11) 8PAS-20 PAS-59 COCO-80  
+
+> 50 60 70 80 90 100
+> mIoU (%)
+> 95.4 61.6 70.0 100.0 92.8 97.7
+> CorrCLIP (Single-Image) CorrCLIPv2 (Oracle Cross-Image)
+
+Fig. 4 Oracle study on cross-image semantic aggregation. We compare the single-image CorrCLIP baseline against an Oracle CorrCLIPv2 variant that aggregates features from a ground-truth support set. The substantial performance leap, particularly on challenging datasets (e.g., +31.2% on PAS-59 and +27.7% on COCO-80), confirms that semantic prototype distilled from multiple instances effectively mit-igates context-induced interference 
+
+Note that in this context, P denotes the predicted segmentation map. This map correction step effec-tively regularizes the prediction using geometric priors, smoothing out outliers and ensuring spa-tially consistent segmentation results. 
+
+## 3.3 CorrCLIPv2: Cross-Image Retrieval-Augmented Paradigm 
+
+3.3.1 Empirical Analysis and Design Rationale 
+
+While CorrCLIP effectively mitigates inter-class interference in the final attention layer, the preced-ing ViT blocks in CLIP inherently rely on global interactions. Consequently, the feature representa-tion of a local object is inevitably entangled with its surrounding context. This dependency causes objects to exhibit semantic drift when appearing in complex or ambiguous backgrounds, leading to misclassification. We hypothesize that while indi-vidual object representations are susceptible to specific contextual bias, the semantic prototype distilled from multiple instances of the same cate-gory is robust. Theoretically, aggregating features from diverse contexts can marginalize out context-induced variance, thereby stabilizing the semantic representation and prediction. To validate this hypothesis, we conduct a controlled Oracle Study .PAS-20 PAS-59 COCO-80     
+
+> 40 60 80 100
+> 1-NN Retrieval Acc. (%)
+> 77.4 33.7 41.3 90.6 57.5 55.9 95.7 66.8 75.8 96.9 64.5 77.7
+> CLIP CorrCLIP DINOv3 C-RADIOv3
+
+Fig. 5 Evaluation of feature discriminability of different models. We report the 1-NN retrieval accuracy to quantify how well different models maintain semantic consistency. While CorrCLIP improves upon the original CLIP, SSL-based VFMs exhibit significantly higher accuracy across all benchmarks. This observation justifies our design choice of utilizing VFMs as the index to ensure robust and accurate support set retrieval 
+
+Oracle Validation 
+
+We construct an ideal feature bank using ground-truth class masks. Specifically, we extract Cor-rCLIP features for all objects in a dataset and group them by category. During inference, for each target object, we randomly sample a support set from the corresponding category bank and aver-age them with the target feature. As illustrated in Fig. 4, this oracle aggregation yields a substantial performance improvement over the single-image baseline. This result empirically confirms that accessing a semantically consistent support set can effectively mitigate feature context-induced inter-ference. Motivated by this, CorrCLIPv2 aims to approximate this oracle behavior in an unsuper-vised, open-vocabulary setting via retrieval. 
+
+VFM-Based Indexing Strategy 
+
+The efficacy of the retrieval mechanism hinges on the quality of the index. An optimal index should ensure that the nearest neighbors of a query object belong to the same semantic cat-egory, independent of background variations. To identify the most suitable feature space for index-ing, we conduct a 1-Nearest Neighbor (1-NN) retrieval consistency analysis. We extract features for all ground-truth objects using four models: the original CLIP, our CorrCLIP, DINOv3 (Sim´ eoni et al. 2025) and C-RADIOv3 (Heinrich et al. 2025). We then measure the accuracy that an object’s nearest neighbor shares the same class label. As shown in Fig. 5, original CLIP exhibits 9CorrCLIP Visual Encoder VFM Feature Extractor MAP 
+
+> Memory Bank
+> CorrCLIP Feature Maps VFM Feature Maps Region Masks
+> Mask Generator Populate
+> Source Dataset
+> ……
+> VFM Index CorrCLIP Features
+
+Fig. 6 Construction of the offline feature memory bank. For each image in the unlabeled collection, we extract object embeddings by applying Mask Average Pooling (MAP) to both VFM and CorrCLIP features across the generated region masks. The resulting embeddings popu-late the bank where VFM features as indexing keys and CorrCLIP features as semantic values 
+
+poor retrieval consistency due to its lack of local discriminability. While CorrCLIP promotes con-sistency by reconstructing patch correlations, it still falls short of SSL-based VFMs, which demon-strate superior discriminability, achieving near-perfect consistency on VOC (Everingham et al. 2010) and significant leads on complex datasets like COCO (Caesar et al. 2018). 
+
+3.3.2 VFM-Indexed Semantic Retrieval 
+
+Based on the aforementioned insights, we utilize SSL-based VFMs as the indexing keys to accu-rately locate the support set, while storing the open-vocabulary CorrCLIP features as the seman-tic values. This strategy effectively combines the fine-grained discriminability of VFMs with the text-alignment capabilities of CLIP. 
+
+Offline Memory Bank Construction 
+
+As illustrated in Fig. 6, we first build a mem-ory bank using a large-scale unlabeled dataset 
+
+D = {Ii}|D| 
+
+> i=1
+
+. For each image I ∈ D , we gener-ate a set of class-agnostic binary masks Mb =[mbank  
+
+> 1
+
+, . . . , mbank Z′ ] ∈ RZ′×N to define object proposals. To populate the bank, each image is processed through two parallel encoding paths. First, in the index path (key generation), we employ the same VFM encoder used in the Value Reconstruction to extract a dense feature map 
+
+F bank vf m ∈ RN ×d′
+
+. Simultaneously, in the semantic path (value generation), the image is processed by MAP  
+
+> VFM Feature Map Region Masks
+> Query Features
+> ……Top-K Top-K Top-K Mean Mean Mean Search Search Search Retrieve Retrieve Retrieve
+> VFM Index CorrCLIP Features Support Set
+> Memory Bank
+
+Fig. 7 Illustration of the retrieval process during infer-ence. The generated region masks are applied to the VFM feature map via Mask Average Pooling (MAP) to extract object embeddings. For each query embedding, we identify the Top-K nearest neighbors in the VFM bank to obtain the corresponding indices. Then the associated CorrCLIP features are retrieved and averaged to construct the sup-port set 
+
+our CorrCLIP visual encoder to yield the semantic feature map F bank clip ∈ RN ×d. To construct object-centric entries for the bank, we aggregate these dense features within each mask region using Mask Average Pooling (MAP). For the j-th object mask 
+
+mbank j , the indexing key embedding kj and the semantic value embedding vj are derived as: 
+
+kj = MAP( F bank vf m , mbank j ),
+
+vj = MAP( F bank clip , mbank j ). (12) By iterating over the entire dataset D, we col-lect all object pairs to form the VFM index bank 
+
+Bvf m = {kn}Ntotal  
+
+> n=1
+
+and the CorrCLIP feature bank Bclip = {vn}Ntotal  
+
+> n=1
+
+, where Ntotal denotes the total number of object instances. 
+
+Inference and Retrieval 
+
+During the inference phase, as depicted in Fig. 7, we leverage the pre-computed memory bank to mitigate contextual bias in the target image. Crucially, this retrieval can be seamlessly inte-grated into CorrCLIP pipeline without any addi-tional computations. We directly utilize the region masks M obtained from Scope Reconstruction (Sect. 3.2.1) and the VFM feature map Fvf m gen-erated during Value Reconstruction (Sect. 3.2.2). Using these pre-existing representations, we derive the query set Q = {q1, . . . , qZ } for the target image, where: 
+
+qj = MAP( Fvf m , mj ). (13) 10 For each query qj , we perform a Top-K
+
+search within Bvf m to identify semantically con-sistent instances. To ensure scalability and effi-ciency given the large size of Ntotal , we employ Inverted File with Product Quantization (IVFPQ) for approximate nearest neighbor search: 
+
+Ij = IVFPQ( qj , Bvf m , K ), (14) where Ij represents the indices of the Top-K
+
+retrieved neighbors. Subsequently, we fetch the corresponding semantic features from Bclip using these indices. The support feature sj for the j-th region is computed by averaging these retrieved features: 
+
+sj = 1
+
+K
+
+X
+
+> i∈I j
+
+Bclip [i]. (15) Collecting the support vectors for all regions yields the support set Vsupp = [s1, . . . , sZ ] ∈
+
+RZ×d. We then redistribute these region-level support features back to the dense patch-level: 
+
+Fsupp = M TVsupp , (16) where Fsupp ∈ RN ×d represents the retrieved support feature map. Finally, the segmentation prediction is refined by fusing the original single-image logits with the retrieval-augmented support logits: 
+
+P = θ(Fimg F T
+
+> txt
+
+) + (1 − θ)( Fsupp F T
+
+> txt
+
+), (17) where θ is a hyperparameter to balance the origi-nal inference and the semantic support retrieval. 
+
+3.3.3 Decoupled Multi-CLIP Ensemble 
+
+Ensembling diverse CLIP variants (Cherti et al. 2023; Xu et al. 2024; Fang et al. 2023) enhances robustness but incurs prohibitive computational costs. Our framework addresses this by decou-pling the expensive feature encoding of diverse CLIP variants from the online inference process. Since retrieval is governed by a shared VFM-based index, we can pre-populate the memory bank with CorrCLIP-enhanced features from multiple CLIP models. Consequently, auxiliary representations are simply retrieved and fused during inference, achieving the benefits of ensembling with negligi-ble computational overhead. Let F ′ 
+
+> supp
+
+and F ′ 
+
+> txt
+
+denote the retrieved sup-port feature map and the text embeddings cor-responding to the auxiliary CLIP model, respec-tively. The final segmentation prediction aggre-gates the primary model’s single-image inference with the multi-source semantic support: 
+
+P = θ(Fimg F T
+
+> txt
+
+)+(1 −θ)( Fsupp F T 
+
+> txt
+
++ F ′
+
+> supp
+
+F ′T
+
+> txt
+
+2 ).
+
+(18) 
+
+# 4 Experiments 
+
+## 4.1 Datasets and Evaluation Metrics 
+
+We conduct comprehensive evaluations on ten standard benchmarks and a massive multi-domain benchmark. 
+
+Standard Benchmarks. We utilize the val-idation sets of five datasets, which constitute ten specific benchmarks. Pascal VOC (Ever-ingham et al. 2010) (1,449 images) is evalu-ated on V20 (20 classes) and V21 (w/ back-ground). Pascal Context (Mottaghi et al. 2014) (5,104 images) supports three benchmarks: PC59 (59 classes), PC60 (w/ background), and fine-grained PC459 (459 classes). COCO (Caesar et al. 2018) (5,000 images) is divided into COCO-Stuff (171 classes) and COCO-Object (81 classes). 
+
+ADE20K (Zhou et al. 2017) (2,000 images) is evaluated on the standard A150 (150 classes) and the large-vocabulary A847 (847 classes). 
+
+Cityscapes (Cordts et al. 2016) (500 images) focuses on urban scenes with 19 classes. 
+
+MESS Benchmark. To verify open-vocabulary robustness across distinct distributions, we employ the Multi-Domain Evaluation of Semantic Segmentation (MESS) benchmark (Blumenstiel et al. 2023). It com-prises 22 datasets spanning five diverse domains: General, Earth Monitoring, Medical Sciences, Engineering, and Agriculture & Biology. 
+
+Memory Bank Source. We construct our offline feature memory bank using the COCO training set (Caesar et al. 2018), which contains approximately 118k images. Crucially, we utilize only the raw images to extract visual features, without accessing any ground-truth annotations or semantic labels. 11 Following standard protocols, we report the mean Intersection over Union (mIoU) for all experiments. 
+
+## 4.2 Implementation Details 
+
+We instantiate our framework with two vari-ants based on model capacity: CorrCLIPv2-B and CorrCLIPv2-L, which utilize the CLIP-ViT-B/16 and CLIP-ViT-L/14 architectures, respectively. Unless otherwise specified, we employ the weights from MetaCLIP (Xu et al. 2024) as the primary backbone. For the Decoupled Multi-CLIP Ensem-ble, we additionally leverage the DFN (Fang et al. 2023) as the auxiliary backbone to incorporate diverse pre-training priors. For the class-agnostic mask generator, we employ EntitySeg (Qi et al. 2023) implemented with the Mask2Former (Cheng et al. 2022) architecture and a Hornet-L (Rao et al. 2022) backbone. For VFM, we utilize C-RADIOv3 (Heinrich et al. 2025) with a ViT-L/16 backbone. The VFM-Indexed Semantic Retrieval is implemented using the FAISS-GPU library (John-son et al. 2019). To balance efficiency and accuracy on large-scale databases, we utilize the IVFPQ index. During inference, we adopt a sliding win-dow strategy to handle high-resolution inputs while preserving local details. The temperature coefficient τ for the similarity calculation is set to 0.25. The balancing hyperparameter θ is set to 0.5. 
+
+## 4.3 Comparison With State-of-the-Art Methods 
+
+4.3.1 Comparison on Ten Standard Benchmarks 
+
+Table 1 presents a comprehensive comparison between our proposed framework and state-of-the-art OVSS methods across 10 standard bench-marks. We provide a detailed analysis to elucidate the structural superiority of our approach. Among the training-free methods, those rely-ing solely on CLIP’s internal attention modifica-tions exhibit significantly lower performance com-pared to VFM-assisted methods, indicating that CLIP’s intrinsic incoherence cannot be resolved by self-correction alone. More importantly, while our base model, CorrCLIP, achieves an average mIoU of 45.7%, it significantly outperforms other multi-model synthesis approaches such as Trident (Shi et al. 2025) (41.0% mIoU) and TestRe-gion (Xiao et al. 2025) (41.6% mIoU), which utilize combinations of CLIP, SAM, and DINO. This substantial margin demonstrates that our performance gains stem from a superior architec-tural design—specifically, the explicit correlation reconstruction—rather than the mere brute-force aggregation of powerful pre-trained models. We note that some recent training-free meth-ods, such as FreeDA (Barsellotti et al. 2024) (36.7% mIoU) and ReME (Xuan et al. 2025) (46.6% mIoU), also employ offline memory or pro-totype bank mechanisms. However, these meth-ods tightly anchor their memory construction to language priors (e.g., FreeDA uses COCO cap-tions, and ReME relies on Large Language Mod-els). Our approach, CorrCLIPv2 (51.0% mIoU), significantly surpasses them by decoupling the memory bank from text. This demonstrates that our novel language-free design avoids vocabulary overfitting and is fundamentally more suited for open-vocabulary scenarios. The superiority is par-ticularly evident on datasets with large semantic shifts from the source dataset, such as A150 and A847, where CorrCLIPv2 outperforms ReME by 8.3% and 6.1% in mIoU, respectively. To thoroughly justify our memory mechanism and prove its efficiency, we benchmark against state-of-the-art fully supervised methods (e.g., SAN (Xu et al. 2023a), CAT-Seg (Cho et al. 2024), CLIPSelf (Wu et al. 2023), SED++ (Zhu et al. 2025)). Although our memory bank uti-lizes the same 118k images from the COCO dataset, it operates in a purely unsupervised, forward-pass manner without any ground-truth mask annotations or backpropagation. Remark-ably, CorrCLIPv2 drastically narrows the per-formance gap with fully supervised models. On out-of-distribution datasets with large vocabu-laries (A150 and A847), CorrCLIPv2 even out-performs fully supervised methods like SAN and CLIPSelf. This validates that conventional training-based models inevitably suffer from over-fitting to their predefined taxonomies, whereas our memory-augmented, training-free framework effectively preserves and scales the core visual representations of foundation models. We also compare our method against weakly supervised approaches that attempt to distill or 12 Table 1 Comparison with state-of-the-art OVSS methods on 10 standard benchmarks. We report the best performance for each method. The best and second-best training-free methods are highlighted in bold and underlined, respectively 
+
+Method V21 V20 PC60 PC59 Object Stuff A150 City A847 PC459 Mean 
+
+Training-based (Fully Supervised) 
+
+SAN (Xu et al. 2023a) - 95.4 - 57.7 - - 32.1 - 12.4 15.7 -CLIPSelf (Wu et al. 2023) - - - 62.3 - - 34.5 - 12.4 - -CAT-Seg (Cho et al. 2024) 82.5 97.0 - 63.3 - - 37.9 - 16.0 23.8 -SED++ (Zhu et al. 2025) - 95.9 - 61.0 - - 38.4 - 16.0 24.1 -
+
+Training-based (Weakly Supervised) 
+
+CLIP-DINOiser (Wysocza´ nska et al. 2024) 62.1 80.9 32.4 35.9 34.8 24.6 20.0 31.7 7.1 8.4 -dino.txt (Jose et al. 2025) - 62.1 - 30.9 - 20.9 20.6 32.1 - - -Talk2DINO (Barsellotti et al. 2025) 65.8 88.5 37.7 42.4 45.1 30.2 22.5 38.1 - - -Seg4Diff (Kim et al. 2025b) - 89.8 - 51.2 - - 35.2 26.0 - - -
+
+Training-free (CLIP Only) 
+
+CLIP (Radford et al. 2021) 11.5 41.9 4.4 9.2 1.6 4.4 2.9 5.0 0.8 1.3 8.3 CaR (Sun et al. 2024) 67.6 91.4 30.5 39.5 36.6 11.2 17.7 15.1 5.0 11.5 32.6 GEM (Bousselham et al. 2024) 46.2 73.0 33.0 35.1 33.7 24.2 15.6 30.8 6.2 11.2 30.9 CLIPtrase (Shao et al. 2024) 53.0 81.2 30.8 34.9 44.8 24.1 17.0 21.1 5.9 9.9 32.3 SCLIP (Wang et al. 2024) 61.7 83.5 31.5 36.1 32.1 23.9 17.8 34.1 5.9 6.7 33.3 ClearCLIP (Lan et al. 2024a) 51.8 80.9 32.6 35.9 33.0 23.9 16.7 30.0 6.2 7.8 31.9 NACLIP (Hajimiri et al. 2025) 64.1 83.0 35.0 38.4 36.2 25.7 19.1 38.3 6.5 9.0 35.5 CDAM (Kang et al. 2025) 58.7 75.2 30.6 35.5 35.2 24.8 17.2 24.8 6.4 7.3 31.6 ResCLIP (Yang et al. 2025) 61.1 86.0 33.5 36.8 35.0 24.7 18.0 35.9 6.7 7.7 34.5 SFP (Jin et al. 2025) 63.9 84.5 37.2 39.9 37.9 26.4 20.8 41.1 7.5 8.0 36.7 FreeCP (Chen et al. 2025) 64.5 81.5 35.7 39.3 36.9 26.1 18.9 34.4 6.7 8.2 35.2 SC-CLIP (Bai et al. 2025) 65.0 88.3 36.9 40.6 40.5 26.9 21.7 41.3 9.3 9.7 38.0 
+
+Training-free (VFM Based) 
+
+PnP-OVSS (Luo et al. 2024) 51.3 79.1 28.0 31.0 36.2 17.9 14.2 19.3 4.2 5.5 28.7 FreeDA (Barsellotti et al. 2024) 55.4 87.9 38.3 43.5 37.4 28.8 23.2 36.7 5.3 10.2 36.7 OVDiff (Karazija et al. 2024) 68.4 80.9 31.2 32.9 36.2 20.3 14.1 23.4 6.6 12.0 32.6 ProxyCLIP (Lan et al. 2024b) 65.0 83.3 35.4 39.6 38.6 26.8 24.2 42.0 11.1 9.8 37.6 LPOSS+ (Stojni´ c et al. 2025) 62.4 79.3 35.4 38.6 34.3 26.5 22.3 37.9 8.1 9.5 35.4 CASS (Kim et al. 2025a) 65.8 87.8 36.7 40.2 37.8 26.7 20.4 39.4 7.6 8.4 37.1 FSA (Chi et al. 2025) 67.9 85.7 36.3 40.5 40.2 27.3 24.5 43.6 11.2 10.0 38.7 Trident (Shi et al. 2025) 70.8 88.7 40.1 44.3 42.2 28.6 26.7 47.6 11.1 10.3 41.0 CLIPer (Sun et al. 2025) 72.2 89.8 39.5 44.6 44.7 30.4 25.0 42.5 9.4 14.7 41.3 ReME (Xuan et al. 2025) 82.2 93.2 44.6 53.1 48.2 33.2 28.2 59.0 8.8 15.8 46.6 TestRegion (Xiao et al. 2025) 73.1 89.5 41.2 46.1 40.6 31.2 27.3 47.0 10.8 9.5 41.6 
+
+CorrCLIP (Ours) 76.7 91.5 44.9 50.8 49.4 34.0 30.7 51.1 13.5 14.4 45.7 
+
+CorrCLIPv2 (Ours) 82.3 93.6 51.1 56.8 58.0 39.1 36.5 59.2 14.9 18.6 51.0 
+
+fine-tune VFMs using external image or text guid-ance, such as CLIP-DINOiser (Wysocza´ nska et al. 2024), dino.txt (Jose et al. 2025), Talk2DINO (Barsellotti et al. 2025), and the diffusion-based Seg4Diff (Kim et al. 2025b). CorrCLIPv2 signifi-cantly outpaces these methods across all metrics. This empirical evidence addresses the question of why a unified architecture like dino.txt falls short. It shows that dynamically reconstruct-ing patch correlations and fusing complementary multi-model priors in a training-free framework provides a more robust, scalable, and computa-tionally efficient solution for OVSS than weakly tuning a single foundation model. 
+
+4.3.2 Comparison on MESS Benchmark 
+
+To rigorously evaluate generalizability across vary-ing data distributions, we extend our assessment to the MESS benchmark (Blumenstiel et al. 2023), encompassing 22 datasets across five domains. The quantitative results are detailed in Table 2. Existing fully supervised methods, typically trained on the COCO-Stuff dataset, suffer from performance degradation when transferred to out-of-distribution scenarios. In contrast, our training-free framework demonstrates exceptional robust-ness. CorrCLIPv2 achieves an averaged mIoU of 43%, surpassing the state-of-the-art fully super-vised method DEDOS (Li et al. 2025a) by a13 Table 2 Comparison with state-of-the-art OVSS methods on the 22 datasets of the MESS benchmark. All methods use their base versions. The best methods are highlighted in bold                                                                                                                                                                                                                                                                                           
+
+> General Earth Monitoring Medical Sciences Engineering Agri. and Bio. BDD (Yu et al. 2020) D. Zurich (Sakaridis et al. 2019) MHP (Li et al. 2017) FoodSeg (Wu et al. 2021) ATLANTIS (Erfani et al. 2022) DRAM (Cohen et al. 2022) iSAID (Waqas Zamir et al. 2019) Potsdam (BSF Swissphoto 2012) W. Floods (Mateo-Garcia et al. 2021) FloodNet (Rahnemoonfar et al. 2021) UAVid (Lyu et al. 2020) Kvasir-I (Jha et al. 2021) CHASE (Fraz et al. 2012) CryoNu. (Mahbod et al. 2021) PAXRay (Seibold et al. 2022) Corrosion (Bianchi and Hebdon 2021) DeepCrack (Liu et al. 2019) PST (Shivakumar et al. 2020) ZW-f (Bashkirova et al. 2022) SUIM (Islam et al. 2020) CUB (Welinder et al. 2010) CWFID (Haug and Ostermann 2014) Mean
+> Training-based
+> X-Decoder (Zou et al. 2023) 48 25 4328 27 332 27 926 56 11 12 16 225 20 16 25 130 20 SAN (Xu et al. 2023b) 38 25 920 37 50 538 32 38 42 70 18 12 20 451 20 22 23 17 627 OVSeg (Liang et al. 2023) 46 23 717 34 54 931 32 36 39 72 22 14 23 717 22 12 39 14 34 27 OpenSeeD (Zhang et al. 2023b) 48 29 3919 30 232 31 24 40 60 47 34 38 14 48 3320 112 25 Gr.-SAM (Ren et al. 2024) 42 21 30 11 18 58 13 27 34 20 39 47 24 39 42 21 59 22 17 15 139 29 CAT-Seg (Cho et al. 2024) 47 29 24 27 41 66 20 46 36 38 42 49 17 16 32 13 32 20 18 45 11 43 32 DEDOS (Li et al. 2025a) 49 34 29 31 45 70 21 47 41 41 42 64 25 32 45 14 30 22 27 49 18 38 37
+> Training-free
+> ClearCLIP (Lan et al. 2024a) 32 16 27 24 26 50 18 31 37 33 34 59 34 20 45 22 62 21 23 29 10 42 32 ProxyCLIP (Lan et al. 2024b) 38 20 32 30 32 58 23 37 42 36 38 77 28 17 48 21 69 22 26 40 942 36 Trident (Shi et al. 2025) 39 18 30 31 33 423 35 43 38 38 77 24 15 42 21 69 23 25 43 12 40 33
+> CorrCLIP (ours) 48 23 37 24 38 73 22 42 38 40 43 79 22 15 39 21 73 23 27 46 12 43 38
+> CorrCLIPv2 (ours) 54 32 40 27 41 83 24 49 46 43 44 74 47 39 43 21 70 25 28 56 643 43
+
+remarkable margin of 6%. We attribute the supe-riority of CorrCLIPv2 over supervised methods to a fundamental divergence in knowledge rep-resentation. Supervised models, trained on the closed-set COCO-Stuff dataset with 171 cate-gories, inevitably develop a bias towards the predefined taxonomy, leading to poor generaliza-tion on test data with significant distributional shifts. In contrast, CorrCLIPv2 operates without reliance on any predefined labels. By indexing raw visual features directly, our approach captures intrinsic visual patterns whose richness extends far beyond the granularity of manual annotations. Consequently, CorrCLIPv2 retrieves semantically consistent support features for concepts that may not be explicitly labeled in the source dataset, thereby achieving superior performance. We observe slight performance drops on specific specialized datasets, such as Kvasir-Instrument, DeepCrack, and CUB-200. This is expected, as the generic imagery in the COCO memory bank lacks the specific visual instances required for these niche tasks. However, a distinct advantage of our paradigm is its data-efficient extensibility. Since CorrCLIPv2 relies solely on unlabeled images, which are readily accessible, the memory bank can be easily expanded without expensive retraining. As validated in our subse-quent ablation study in Fig. 12, simply populating the bank with domain-specific unlabeled data effectively rectifies these outliers. 
+
+4.3.3 Qualitative Comparison 
+
+We present a qualitative comparison of Cor-rCLIPv2 against training-free competitors in Fig. 8 across five standard benchmarks. ClearCLIP and ProxyCLIP tend to produce spu-rious artifacts and noisy predictions. In contrast, CorrCLIPv2 generates semantically consistent segmentation maps. The superiority of Cor-rCLIPv2 is particularly evident in complex scenes. In the A150 and City, Trident and SC-CLIP exhibit noticeable misclassifications (e.g., confus-ing the road with the sidewalk or misidentifying indoor furniture). CorrCLIPv2, however, accu-rately identifies these concepts. This is attributed to the cross-image object retrieval mechanism, which effectively mitigates contextual bias. Con-sequently, CorrCLIPv2 maintains high semantic fidelity in complex scenarios, aligning closely with the ground truth. 14 VOC21 Object PC60 ADE150 Image ClearCLIP ProxyCLIP SC-CLIP Trident CorrCLIPv2 GT City Fig. 8 Qualitative comparison with state-of-the-art training-free methods. While competitors often exhibit fragmentation or misclassifications, CorrCLIPv2 generates spatially coherent and semantically accurate segmentation maps, closely aligning with the Ground Truth (GT)                                                               
+
+> Table 3 Effectiveness of each component Method V21 PC60 Object A150 City Baseline 48.1 29.4 29.4 18.1 32.7 +SR 66.7 40.2 42.0 24.8 43.8 +VR 67.1 40.4 42.5 24.9 44.2 +FR 68.9 42.4 42.5 26.5 45.2 +MC 75.8 45.9 45.4 28.6 53.7 Table 4 Impact of mask resolution on Scope Reconstruction. The “Scale Factor” denotes the spatial scaling ratio relative to the size of CLIP feature map Scale Factor V21 PC60 Object A150 City No SR 48.1 29.4 29.4 18.1 32.7 162.6 38.1 39.0 23.3 40.8 266.7 40.2 42.0 24.8 43.8 368.0 40.8 42.7 25.1 44.8 469.2 41.4 43.5 25.6 45.6
+
+## 4.4 Ablation Study on CorrCLIP 
+
+We conduct ablation studies to validate the effi-cacy of each component of CorrCLIP. 
+
+4.4.1 Effectiveness of Each Component 
+
+We investigate the contribution of each proposed module: Scope Reconstruction (SR), Value Recon-struction (VR), Feature Refinement (FR), and Map Correction (MC). We employ ClearCLIP (Lan et al. 2024a) as the baseline, which removes the feed-forward networks and residual connec-tions in the final ViT layer. The results are summarized in Table 3. Introducing SR yields the most significant performance boost. This dominant gain empirically confirms that con-fining attention within objects to reduce inter-class correlations improves segmentation perfor-mance. Adding VR provides marginal yet consis-tent improvements across all datasets. This indi-cates that refining the similarity measures within the region masks helps further suppress irrele-vant correlations. FR further improves the feature representation by enhancing spatial details and region-specific semantics, while MC ensures spa-tial consistency. The integration of all components leads to the best performance, demonstrating their complementary nature. 15 Table 5 Effectiveness of the spatial branch and semantic branch Sem. Spa. V21 PC60 Object A150 City 67.1 40.4 42.5 24.9 44.2                 
+
+> ✓67.9 41.2 42.6 25.8 43.5
+> ✓68.1 41.9 41.9 25.9 45.8
+> ✓✓68.9 42.4 42.5 26.5 45.2
+
+4.4.2 Impact of Mask Size in Scope Reconstruction 
+
+A technical challenge in SR is the resolution mis-match between the high-resolution masks and the low-resolution CLIP feature maps. Downsampling masks inevitably introduces spatial quantization errors. We hypothesize that performing SR at higher resolutions mitigates this issue. To validate this, we upsample the feature map via interpo-lation to match larger masks. Table 4 shows a monotonic performance increase as the scale factor grows, demonstrating that reducing quantization artifacts in SR can further improve segmentation performance. Considering the trade-off between accuracy and computational overhead, we adopt a scale factor of 2 as the default setting. 
+
+4.4.3 Ablation for Feature Refinement 
+
+We examine the individual and combined effects of the Spatial Branch and Semantic Branch within the Feature Refinement module in Table 5. While both branches aim to enhance feature represen-tation, applying them in isolation yields mixed results. For instance, using only the Semantic Branch or Spatial Branch leads to slight perfor-mance drops on City or Object. This is attributed to potential misalignment, as modifying features with a single type of prior may disrupt the delicate alignment between visual and text embeddings. When combined, the two branches function syn-ergistically, resulting in improvements across all benchmarks. 
+
+## 4.5 Ablation Study on CorrCLIPv2 
+
+Here, we conduct comprehensive ablation studies to present the effectiveness of CorrCLIPv2. 
+
+4.5.1 Effectiveness of Semantic Retrieval and Ensemble Strategies 
+
+We evaluate the contributions of the proposed cross-image extension modules: VFM-Indexed Semantic Retrieval and Decoupled Multi-CLIP Ensemble. The breakdown of results is shown in Table 6. Integrating the retrieval mechanism yields substantial and consistent improvements across all ten benchmarks. For the CorrCLIP-B variant, this module boosts the averaged mIoU from 44.2% to 47.7%. This empirical evidence strongly supports our premise that aggregating semantically consistent instances from a diverse memory bank can distill a semantic prototype that rectifies the semantic drift. The trend holds for the larger CorrCLIP-L model, confirming the scalability of our retrieval paradigm. Additionally incorporating the Decoupled Multi-CLIP Ensemble further improves perfor-mance. For CorrCLIP-B, the averaged mIoU increases to 49.6%, and for CorrCLIP-L, it reaches a state-of-the-art 51.0%. This indicates that fus-ing representations from CLIP models pre-trained on different distributions enriches the semantic space, making the prediction more stable. Cru-cially, unlike traditional ensembles that double the computational cost, our decoupled strategy inte-grates these priors into the memory bank offline, achieving these gains with negligible marginal cost during inference. 
+
+4.5.2 Impact of Different Vision Foundation Models 
+
+The core of our retrieval mechanism lies in the quality of the feature space used to index the memory bank. We investigate the impact of dif-ferent VFMs. We categorize representative VFMs into three types: (1) Segmentation Models (SAM (Kirillov et al. 2023)); (2) SSL Models (DINO series (Caron et al. 2021; Oquab et al. 2023; Sim´ eoni et al. 2025)); and (3) Agglomerative Mod-els that fuse multiple priors (PE-Spatial (Bolya et al. 2025) and RADIO series (Heinrich et al. 2025)). The comparative results are detailed in Table 7. SAM performs poorly as its latent space prioritizes geometric primitives over semantic con-cepts, leading to inconsistent retrieval. PE-Spatial offers partial improvements by integrating SAM and CLIP but still falls short of SSL models. 16 Table 6 Effectiveness of VFM-Indexed Semantic Retrieval (VISR) and Decoupled Multi-CLIP Ensemble (DMCE) 
+
+Method V21 V20 PC60 PC59 Object Stuff A150 City A847 PC459 Mean CorrCLIP-B 75.8 89.9 45.9 50.8 45.4 32.6 28.6 53.7 10.5 11.8 44.2 +VISR 78.2 92.2 49.3 55.5 48.9 36.9 32.1 57.4 10.9 16.0 47.7 +DMCE 82.2 93.6 50.8 56.3 54.6 38.5 33.2 58.7 11.7 16.8 49.6 
+
+CorrCLIP-L 79.5 92.2 47.0 53.1 52.2 35.4 32.9 56.0 14.5 15.2 47.8 +VISR 81.3 93.0 49.8 56.2 56.1 37.4 35.4 58.1 14.8 17.9 50.0 +DMCE 82.3 93.2 51.1 56.8 58.0 39.1 36.5 59.2 14.9 18.6 51.0  
+
+> Table 7 Comparison of different VFMs used in CorrCLIPv2. DINOv2 and its distillates demonstrate superior performance due to their robust and generalizable representations
+
+VFM V21 V20 PC60 PC59 Object Stuff A150 City A847 PC459 Mean SAM 70.8 85.8 41.4 47.3 30.1 27.3 26.3 50.7 6.1 11.6 39.7 DINO 78.0 90.1 46.9 51.9 43.4 32.7 26.7 51.4 7.2 13.8 44.2 DINOv2 82.7 93.8 51.0 56.5 54.3 38.3 32.5 57.7 11.1 15.9 49.4 DINOv3 82.4 93.3 50.4 56.3 54.0 38.7 33.1 58.1 11.7 16.5 49.5 PE-Spatial 80.9 91.0 48.9 53.9 50.9 36.4 30.3 49.3 9.3 14.8 46.6 RADIOv2.5 82.0 93.4 50.6 56.0 54.9 38.7 33.3 59.3 12.0 16.0 49.6 C-RADIOv3 82.2 93.6 50.8 56.3 54.6 38.5 33.2 58.7 11.7 16.8 49.6 
+
+In the SSL models, DINOv2 significantly outper-forms the ImageNet-trained DINO, highlighting the importance of massive-scale pre-training for robust feature extraction. RADIO achieves the best results by distilling complementary priors from multiple models. The results demonstrate that SSL-based VFMs are most suitable for Cor-rCLIPv2. 
+
+4.5.3 Impact of Different Datasets for Memory Bank 
+
+We investigate the impact of the source dataset used to construct the memory bank on the final segmentation performance. We evaluate the per-formance of three distinct datasets: Pascal VOC, ADE20K, and COCO. As shown in Table 8, even smaller-scale datasets yield significant per-formance gains over the single-image baseline. This validates that the mechanism of cross-image retrieval is fundamentally robust, functioning effectively even with limited support data. 
+
+4.5.4 Impact of Different Mask Generators 
+
+The quality of mask proposals is foundational to our framework. We evaluate different class-agnostic mask generators in Table 9. EntitySeg (Qi et al. 2023) yields superior performance, signif-icantly outperforming prompt-based SAM. This advantage stems from the fact that EntitySeg is explicitly optimized for open-world entity segmen-tation, producing distinct, non-overlapping masks that perfectly satisfy the requirements of our framework. In contrast, SAM, which relies on grid-point prompting, inevitably generates redun-dant and overlapping masks, introducing ambigu-ity. EoMT (Kerssies et al. 2025) exhibits limited generalization capabilities. Substituting generated proposals with ground-truth masks yields sub-stantial performance gains. These results sug-gest that CorrCLIPv2 effectively capitalizes on high-quality proposals, and its performance will naturally scale with future advancements in class-agnostic segmentation. 
+
+4.5.5 Ablation Study on Retrieval Hyperparameters 
+
+We analyze two critical hyperparameters gov-erning the retrieval mechanism: the number of retrieved instances for each query ( K) and the fusion weight (θ), which controls the trade-off between the original object feature and the retrieved set. As shown in Fig. 10, segmenta-tion performance improves monotonically as K
+
+17 Table 8 Comparison of different datasets used to construct memory bank. We report the number of images (Imgs) and embeddings (Embs) in the memory bank 
+
+Dataset Statistics Performance # Imgs # Embs V21 PC60 Object Stuff A150 City A847 PC459 Baseline - - 75.8 45.9 45.4 32.6 28.6 53.7 10.5 11.8 Pascal 17k 0.3M 83.1 50.9 47.2 35.5 33.0 60.4 10.9 16.7 ADE20k 20k 0.6M 82.3 50.6 45.3 34.9 33.3 59.7 12.5 16.1 COCO 118k 2.9M 82.2 50.8 54.6 38.5 33.2 58.7 11.7 16.8 0.0 0.2 0.4 0.6 0.8 1.0                 
+
+> Weight of Original Features ( )
+> 34 36 38 40
+> mIoU (%)
+> (a) Stuff
+> 0.0 0.2 0.4 0.6 0.8 1.0
+> Weight of Original Features ( )
+> 54 55 56 57 58 59 60
+> mIoU (%)
+> (b) City
+> 0.0 0.2 0.4 0.6 0.8 1.0
+> Weight of Original Features ( )
+> 11 12 13 14 15
+> mIoU (%)
+> (c) ADE847
+> 0.0 0.2 0.4 0.6 0.8 1.0
+> Weight of Original Features ( )
+> 12 14 16 18
+> mIoU (%)
+> (d) PC459
+> CorrCLIPv2-B CorrCLIPv2-L
+
+Fig. 9 Impact of the fusion weight θ. The original and the retrieved support features are aggregated with weights θ and 1 − θ, respectively. The optimal performance is observed in the range of [0 .2, 0.8]. We set the default value to 0.5 
+
+Table 9 Impact of different mask generators Mask Generator V21 PC60 Object A150 City EoMT 81.9 51.0 56.5 29.2 56.5 SAM 79.7 47.6 51.2 30.2 53.5 SAM2 80.8 48.7 53.2 30.0 56.7 EntitySeg 82.2 50.8 54.6 33.2 58.7 
+
+Ground Truth 91.9 59.5 76.1 46.1 77.6 
+
+increases, benefiting from a more robust seman-tic prototype. The gain saturates around K = 20, which we adopt to balance accuracy and efficiency. The impact of θ is shown in Fig. 9. The opti-mal performance is observed within the range of [0 .2, 0.8]. We select θ = 0 .5 as the default to miti-gate contextual bias via retrieval while preserving necessary original object contexts. 
+
+4.5.6 Computational Costs 
+
+Table 10 presents a comprehensive comparison of computational costs. Despite its expanded archi-tecture, CorrCLIPv2 achieves lower latency than the original CorrCLIP, attributed to the effi-cient EntitySeg mask generator and the negligible 0 1 5 10 20 30 
+
+> Number of Retrieved Features Per Query (K)
+> 46 48 50 52 54 56 58 60
+> mIoU (%)
+> City PC59 Object
+
+Fig. 10 Impact of the number of retrieved instances for each query ( K). Performance generally improves with more support instances and saturates around K = 20 
+
+overhead of the retrieval extension. To address the increased memory footprint, we introduce CorrCLIPv2-fast, a variant utilizing lightweight alternatives (EoMT-S and C-RADIO-B). This version drastically reduces resource consumption while retaining impressive performance. Notably, it achieves an averaged mIoU of 46.6%, signif-icantly outperforming Trident and ProxyCLIP while running faster. This suggests that our frame-work’s superiority stems from its robust design logic rather than sheer model scaling. 18 CLIP OpenCLIP MetaCLIP DFN 15 20 25 30 35               
+
+> mIoU (%)
+> (a) Stuff
+> CLIP OpenCLIP MetaCLIP DFN 20 30 40 50 60
+> mIoU (%)
+> (b) City
+> CLIP OpenCLIP MetaCLIP DFN 6810 12 14
+> mIoU (%)
+> (c) ADE847
+> CLIP OpenCLIP MetaCLIP DFN 6810 12 14 16 18
+> mIoU (%)
+> (d) PC459
+> CorrCLIPv2-Base CorrCLIPv2-Large CorrCLIPv2-Huge ClearCLIP-Base ClearCLIP-Large ClearCLIP-Huge
+
+Fig. 11 Performance of CorrCLIPv2 across diverse CLIP backbones. We evaluate performance using various model capac-ities and pre-training sources. The consistent improvement over baselines across all configurations demonstrates that our framework is backbone-agnostic, effectively enhancing arbitrary CLIP models regardless of their specific pre-training priors 
+
+Table 10 Computational costs on RTX 4090 with FP16. Performance is mean mIoU across ten standard benchmarks. CorrCLIPv2-fast uses smaller mask generator and VFM Method Latency Memory Para. Perf. (ms) (GB) (M) (mIoU) ClearCLIP 19 0.7 150 31.9 ProxyCLIP 69 1.9 235 36.7 Trident 81 2.5 364 41.0 CorrCLIP 177 3.0 458 43.1 CorrCLIPv2 151 4.3 756 49.6 CorrCLIPv2-fast 54 2.0 335 46.6 
+
+4.5.7 Ablation Study on CLIP 
+
+We assess the generalizability of CorrCLIPv2 across various CLIP variants, differing in model capacity and pre-training data sources, without employing the ensemble strategy. As illustrated in Fig. 11, our framework consistently yields substantial performance gains over the baselines across all configurations. This confirms that our contributions are backbone-agnostic and scalable, effectively enhancing the discriminability of arbi-trary CLIP models regardless of their specific pre-training priors. 
+
+4.5.8 Extensibility of the Memory Bank 
+
+A distinct advantage of our retrieval-based paradigm is its flexible extensibility. Unlike training-based models that require retraining to absorb new data, our memory bank can be updated on-the-fly. To demonstrate this, we augment the base COCO memory bank Kvasir-Inst.    
+
+> 70 72 74 76 78 80
+> mIoU (%)
+> 78.9 73.6 80.1
+> DeepCrack
+> 60.0 62.5 65.0 67.5 70.0 72.5 72.4 69.7 73.4
+> CUB-200
+> 0510 15 11.5 5.6 14.8 CorrCLIP CorrCLIPv2 (COCO) CorrCLIPv2 (COCO+)
+
+Fig. 12 Demonstration of the memory bank’s dynamic extensibility. By simply augmenting the COCO index with domain-specific unlabeled images (COCO+), Cor-rCLIPv2 achieves immediate performance gains on special-ized benchmarks. This validates our framework’s efficient, plug-and-play adaptation capability 
+
+Table 11 Comparison of different semantic features for constructing the memory bank. Using CorrCLIP to extract semantic features yields the best results, validating the effectiveness of correlation reconstruction mechanism Method V21 PC60 Object A150 City CLIP 11.6 5.0 1.7 1.9 3.0 ClearCLIP 77.5 45.4 53.0 28.3 41.0 ProxyCLIP 78.5 46.8 54.5 30.5 51.1 CorrCLIP 82.1 50.8 56.9 33.4 58.3 
+
+with unlabeled images from the three special-ized datasets where performance drops: Kvasir-Instrument, DeepCrack, and CUB-200. As illus-trated in Fig. 12, incorporating domain-specific samples yields immediate and significant per-formance gains. This result validates that Cor-rCLIPv2 can adapt to highly specialized domains simply by adding relevant raw data, offering a flexible solution for continuous adaptation. 19 Table 12 Performance of CorrCLIPv2 under oracle text prompts Method PC59 Stuff A150 A847 PC459 CorrCLIPv2 56.8 39.1 36.5 14.9 18.6 Oracle Prompts 74.0 54.3 58.1 35.8 52.2 
+
+4.5.9 Ablation Study on Semantic Features in Memory Bank 
+
+We investigate how the quality of the seman-tic features stored in the memory bank affects the final performance. We vary the model used to extract the semantic features: standard CLIP (Radford et al. 2021), ClearCLIP (Lan et al. 2024a), ProxyCLIP (Lan et al. 2024b), and our CorrCLIP. The results in Table 11 reveal a clear hierarchy. Standard CLIP yields the lowest per-formance, as its incoherent patch features fail to provide accurate semantics. ClearCLIP and Prox-yCLIP achieve respectable gains, validating that our retrieval framework is fundamentally effective given reasonable support features. Crucially, Cor-rCLIP delivers the best performance. This demon-strates the superiority of CorrCLIP for improving CLIP’s features for segmentation. 
+
+## 4.6 Limitations and Future Work 
+
+In open-vocabulary settings, the presence of numerous irrelevant categories inevitably intro-duces noise and semantic ambiguity. We conduct an oracle prompt experiment where we restrict text queries exclusively to categories actually present in the image. As shown in Table 12, the significant performance gap between this ideal scenario and standard inference highlights the model’s susceptibility to semantic distractors from a massive open-ended vocabulary. Therefore, a critical avenue for future work is the develop-ment of robust image-level category pre-filtering strategies. Specifically, prior to pixel-level seg-mentation, we can employ auxiliary methods to determine which categories are likely present in the scene. This could be achieved by leverag-ing lightweight multi-label classification networks, calculating global image-text similarity scores, or prompting large vision-language models to gener-ate a set of candidate objects. By implementing such a recognize-then-segment paradigm, we can effectively prune irrelevant text queries, mitigate semantic distractors, and further narrow the gap toward oracle performance. 
+
+# 5 Conclusion 
+
+In this work, we reveal that inter-class patch cor-relations in CLIP primarily manifest as noise, hin-dering segmentation performance. To address this, we propose a unified, training-free object-centric framework, named CorrCLIPv2. By explicitly dis-entangling inter-class interactions, strengthening feature representations, and unifying intra-mask predictions, our approach significantly enhances CLIP’s segmentation capabilities. Furthermore, to mitigate contextual bias, we evolve our framework into a cross-image paradigm. We introduce VFM-indexed semantic retrieval to accurately access semantically consistent support features from a large-scale memory bank of unlabeled data. This retrieval mechanism, combined with our decou-pled multi-CLIP ensemble strategy, significantly enhances prediction accuracy with minimal infer-ence overhead. Extensive experiments demon-strate that CorrCLIPv2 sets a new state-of-the-art across ten standard benchmarks and notably out-performs fully supervised open-vocabulary coun-terparts on the MESS benchmark. We believe this work provides a scalable, robust foundation for open-vocabulary semantic segmentation. 
+
+# References 
+
+Bai S, Liu Y, Han Y, et al (2025) Self-calibrated clip for training-free open-vocabulary segmen-tation. IEEE TIP Barsellotti L, Amoroso R, Cornia M, et al (2024) Training-free open-vocabulary segmen-tation with offline diffusion-augmented proto-type generation. In: CVPR, pp 3689–3698 Barsellotti L, Bianchi L, Messina N, et al (2025) Talking to dino: Bridging self-supervised vision backbones with language for open-vocabulary segmentation. In: ICCV, pp 22025–22035 Bashkirova D, Abdelfattah M, Zhu Z, et al (2022) Zerowaste dataset: towards deformable object segmentation in cluttered scenes. In: CVPR, pp 21147–21157 20 Bianchi E, Hebdon M (2021) Corrosion condition state semantic segmentation dataset. University Libraries, Virginia Tech: Blacksburg, VA, USA Blumenstiel B, Jakubik J, K¨ uhne H, et al (2023) What a MESS: Multi-Domain Eval-uation of Zero-shot Semantic Segmentation. NeurIPS 36:73299–73311 Bolya D, Huang PY, Sun P, et al (2025) Percep-tion encoder: The best visual embeddings are not at the output of the network. arXiv preprint arXiv:250413181 Bousselham W, Petersen F, Ferrari V, et al (2024) Grounding everything: Emerging localization properties in vision-language transformers. In: CVPR, pp 3828–3837 BSF Swissphoto (2012) Isprs potsdam dataset within the isprs test project on urban classifi-cation, 3d building reconstruction and semantic labeling Caesar H, Uijlings J, Ferrari V (2018) Coco-stuff: Thing and stuff classes in context. In: CVPR, pp 1209–1218 Caron M, Touvron H, Misra I, et al (2021) Emerging properties in self-supervised vision transformers. In: ICCV, pp 9650–9660 Chen LC, Papandreou G, Kokkinos I, et al (2017) Deeplab: Semantic image segmentation with deep convolutional nets, atrous convolu-tion, and fully connected crfs. IEEE TPAMI 40(4):834–848 Chen Q, Yang L, Chen Y, et al (2025) Training-free class purification for open-vocabulary semantic segmentation. In: ICCV, pp 23124– 23134 Chen X, Fang H, Lin TY, et al (2015) Microsoft coco captions: Data collection and evaluation server. arXiv preprint arXiv:150400325 Cheng B, Misra I, Schwing AG, et al (2022) Masked-attention mask transformer for univer-sal image segmentation. In: CVPR, pp 1290– 1299 Cherti M, Beaumont R, Wightman R, et al (2023) Reproducible scaling laws for contrastive language-image learning. In: CVPR, pp 2818– 2829 Chi Z, Wu Y, Gu L, et al (2025) Plug-in feedback self-adaptive attention in clip for training-free open-vocabulary segmentation. In: ICCV, pp 22815–22825 Cho S, Shin H, Hong S, et al (2024) Cat-seg: Cost aggregation for open-vocabulary semantic segmentation. In: CVPR, pp 4113–4123 Cohen N, Newman Y, Shamir A (2022) Seman-tic segmentation in art paintings. In: Computer Graphics Forum, Wiley Online Library, pp 261– 275 Cordts M, Omran M, Ramos S, et al (2016) The cityscapes dataset for semantic urban scene understanding. In: CVPR, pp 3213–3223 Dosovitskiy A, Beyer L, Kolesnikov A, et al (2021) An image is worth 16x16 words: Transformers for image recognition at scale. In: ICLR Erfani SMH, Wu Z, Wu X, et al (2022) Atlantis: A benchmark for semantic segmentation of waterbody images. Environmental Modelling & Software 149:105333 Everingham M, Van Gool L, Williams CK, et al (2010) The pascal visual object classes (voc) challenge. IJCV 88:303–338 Fang A, Jose AM, Jain A, et al (2023) Data filter-ing networks. arXiv preprint arXiv:230917425 Fraz MM, Remagnino P, Hoppe A, et al (2012) An ensemble classification-based approach applied to retinal blood vessel segmentation. IEEE Transactions on Biomedical Engineering 59(9):2538–2548 Ghiasi G, Gu X, Cui Y, et al (2022) Scal-ing open-vocabulary image segmentation with image-level labels. In: ECCV, pp 540–557 Hajimiri S, Ben Ayed I, Dolz J (2025) Pay atten-tion to your neighbours: Training-free open-vocabulary semantic segmentation. In: WACV, 21 pp 5061–5071 Haug S, Ostermann J (2014) A crop/weed field image dataset for the evaluation of computer vision based precision agriculture tasks. In: ECCV, pp 105–116 He K, Chen X, Xie S, et al (2022) Masked autoen-coders are scalable vision learners. In: CVPR, pp 16000–16009 Heinrich G, Ranzinger M, Yin H, et al (2025) Radiov2. 5: Improved baselines for agglomera-tive vision foundation models. In: CVPR, pp 22487–22497 Islam MJ, Edge C, Xiao Y, et al (2020) Semantic segmentation of underwater imagery: Dataset and benchmark. In: IEEE/RSJ International Conference on Intelligent Robots and Systems, IEEE, pp 1769–1776 Jha D, Ali S, Emanuelsen K, et al (2021) Kvasir-instrument: Diagnostic and therapeu-tic tool segmentation dataset in gastrointesti-nal endoscopy. In: MultiMedia Modeling: 27th International Conference, MMM 2021, Prague, Czech Republic, June 22–24, 2021, Proceedings, Part II 27, pp 218–229 Jia C, Yang Y, Xia Y, et al (2021) Scaling up visual and vision-language representation learn-ing with noisy text supervision. In: ICML, pp 4904–4916 Jin S, Yu S, Zhang B, et al (2025) Feature purifi-cation matters: Suppressing outlier propagation for training-free open-vocabulary semantic seg-mentation. In: ICCV, pp 20291–20300 Johnson J, Douze M, J´ egou H (2019) Billion-scale similarity search with GPUs. IEEE Transac-tions on Big Data 7(3):535–547 Jose C, Moutakanni T, Kang D, et al (2025) Dinov2 meets text: A unified framework for image-and pixel-level vision-language align-ment. In: CVPR, pp 24905–24916 Kang D, Cho M (2024) In defense of lazy visual grounding for open-vocabulary semantic seg-mentation. In: ECCV, pp 143–164 Kang DU, Kim H, Chun SY (2025) Class distribution-induced attention map for open-vocabulary semantic segmentations. In: ICLR Karazija L, Laina I, Vedaldi A, et al (2024) Diffu-sion models for open-vocabulary segmentation. In: ECCV, pp 299–317 Kerssies T, Cavagnero N, Hermans A, et al (2025) Your vit is secretly an image segmentation model. In: CVPR, pp 25303–25313 Kim C, Ju D, Han W, et al (2025a) Distilling spectral graph for object-context aware open-vocabulary semantic segmentation. In: CVPR, pp 15033–15042 Kim C, Shin H, Hong E, et al (2025b) Seg4diff: Unveiling open-vocabulary semantic segmenta-tion in text-to-image diffusion transformers. In: NeurIPS Kirillov A, Mintun E, Ravi N, et al (2023) Segment anything. In: ICCV, pp 4015–4026 Lan M, Chen C, Ke Y, et al (2024a) Clearclip: Decomposing clip representations for dense vision-language inference. In: ECCV, pp 143– 160 Lan M, Chen C, Ke Y, et al (2024b) Proxy-clip: Proxy attention improves clip for open-vocabulary segmentation. In: ECCV, pp 70–88 Li F, Wang X, Wang X, et al (2025a) Images as noisy labels: Unleashing the potential of the diffusion model for open-vocabulary semantic segmentation. In: ICCV, pp 24255–24265 Li J, Zhao J, Wei Y, et al (2017) Multiple-human parsing in the wild. arXiv preprint arXiv:170507206 Li K, Liu R, Cao X, et al (2025b) Segearth-ov: Towards training-free open-vocabulary segmen-tation for remote sensing images. In: CVPR, pp 10545–10556 Li Y, Wang H, Duan Y, et al (2023) Clip surgery for better explainability with enhance-ment in open-vocabulary tasks. arXiv preprint arXiv:230405653 22 Liang F, Wu B, Dai X, et al (2023) Open-vocabulary semantic segmentation with mask-adapted clip. In: CVPR, pp 7061–7070 Liu Y, Yao J, Lu X, et al (2019) Deepcrack: A deep hierarchical feature learning architec-ture for crack segmentation. Neurocomputing 338:139–153 Liu Y, Wang G, Zhang J, et al (2025) Unveiling the knowledge of clip for training-free open-vocabulary semantic segmentation. In: AAAI, pp 5649–5657 Luo J, Khandelwal S, Sigal L, et al (2024) Emer-gent open-vocabulary semantic segmentation from off-the-shelf vision-language models. In: CVPR, pp 4029–4040 Lyu Y, Vosselman G, Xia GS, et al (2020) Uavid: A semantic segmentation dataset for uav imagery. ISPRS journal of photogrammetry and remote sensing 165:108–119 Mahbod A, Schaefer G, Bancher B, et al (2021) Cryonuseg: A dataset for nuclei instance seg-mentation of cryosectioned h&e-stained his-tological images. Computers in biology and medicine 132:104349 Mateo-Garcia G, Veitch-Michaelis J, Smith L, et al (2021) Towards global flood mapping onboard low cost satellites with machine learn-ing. Scientific reports 11(1):7249 Mottaghi R, Chen X, Liu X, et al (2014) The role of context for object detection and semantic segmentation in the wild. In: CVPR, pp 891–898 Oquab M, Darcet T, Moutakanni T, et al (2023) Dinov2: Learning robust visual features without supervision. arXiv preprint arXiv:230407193 Qi L, Kuen J, Wang Y, et al (2022) Open world entity segmentation. IEEE TPAMI 45(7):8743– 8756 Qi L, Kuen J, Shen T, et al (2023) High quality entity segmentation. In: ICCV, pp 4024–4033 Radford A, Kim JW, Hallacy C, et al (2021) Learning transferable visual models from nat-ural language supervision. In: ICML, pp 8748– 8763 Rahnemoonfar M, Chowdhury T, Sarkar A, et al (2021) Floodnet: A high resolution aerial imagery dataset for post flood scene under-standing. IEEE Access 9:89644–89654 Rao Y, Zhao W, Tang Y, et al (2022) Hornet: Effi-cient high-order spatial interactions with recur-sive gated convolutions. NeurIPS 35:10353– 10366 Ravi N, Gabeur V, Hu YT, et al (2024) Sam 2: Segment anything in images and videos. arXiv preprint arXiv:240800714 Ren T, Liu S, Zeng A, et al (2024) Grounded sam: Assembling open-world models for diverse visual tasks. arXiv preprint arXiv:240114159 Sakaridis C, Dai D, Gool LV (2019) Guided curriculum model adaptation and uncertainty-aware evaluation for semantic nighttime image segmentation. In: ICCV, pp 7374–7383 Seibold C, Reiß S, Sarfraz S, et al (2022) Detailed annotations of chest x-rays via ct projec-tion for report understanding. arXiv preprint arXiv:221003416 Shao T, Tian Z, Zhao H, et al (2024) Explore the potential of clip for training-free open vocab-ulary semantic segmentation. In: ECCV, pp 139–156 Shi Y, Dong M, Xu C (2025) Harnessing vision foundation models for high-performance, training-free open vocabulary segmentation. In: ICCV, pp 23487–23497 Shivakumar SS, Rodrigues N, Zhou A, et al (2020) Pst900: Rgb-thermal calibration, dataset and segmentation network. In: IEEE international conference on robotics and automation, IEEE, pp 9441–9447 Sim´ eoni O, Vo HV, Seitzer M, et al (2025) Dinov3. arXiv preprint arXiv:250810104 23 Stojni´ c V, Kalantidis Y, Matas J, et al (2025) Lposs: Label propagation over patches and pix-els for open-vocabulary semantic segmentation. In: CVPR, pp 9794–9803 Sun L, Cao J, Xie J, et al (2025) Cliper: Hierar-chically improving spatial representation of clip for open-vocabulary semantic segmentation. In: ICCV, pp 23199–23209 Sun S, Li R, Torr P, et al (2024) Clip as rnn: Seg-ment countless visual concepts without training endeavor. In: CVPR, pp 13171–13182 Tang Q, Liu C, Liu F, et al (2025) Rethinking feature reconstruction via category prototype in semantic segmentation. IEEE TIP 34:1036– 1047 Wang F, Mei J, Yuille A (2024) Sclip: Rethinking self-attention for dense vision-language infer-ence. In: ECCV, pp 315–332 Waqas Zamir S, Arora A, Gupta A, et al (2019) isaid: A large-scale dataset for instance segmen-tation in aerial images. In: CVPR, pp 28–37 Welinder P, Branson S, Mita T, et al (2010) Caltech-ucsd birds 200. Tech. Rep. CNS-TR-2010-001, California Institute of Technology Wu S, Zhang W, Xu L, et al (2023) Clip-self: Vision transformer distills itself for open-vocabulary dense prediction. arXiv preprint arXiv:231001403 Wu X, Fu X, Liu Y, et al (2021) A large-scale benchmark for food image segmentation. In: ACM MM, pp 506–515 Wysocza´ nska M, Sim´ eoni O, Ramamonjisoa M, et al (2024) Clip-dinoiser: Teaching clip a few dino tricks. In: ECCV, pp 320–337 Xiao Y, Fu Q, Tao H, et al (2025) Textregion: Text-aligned region tokens from frozen image-text models. Transactions on Machine Learning Research Xu H, Xie S, Tan XE, et al (2024) Demystifying clip data. In: ICLR Xu M, Zhang Z, Wei F, et al (2023a) San: side adapter network for open-vocabulary seman-tic segmentation. IEEE TPAMI 45(12):15546– 15561 Xu M, Zhang Z, Wei F, et al (2023b) Side adapter network for open-vocabulary semantic segmen-tation. In: CVPR, pp 2945–2954 Xuan X, Deng Z, Ma KL (2025) Reme: Adata-centric framework for training-free open-vocabulary segmentation. In: ICCV, pp 20954– 20965 Yang Y, Deng J, Li W, et al (2025) Resclip: Resid-ual attention for training-free dense vision-language inference. In: CVPR, pp 29968–29978 Yu F, Chen H, Wang X, et al (2020) Bdd100k: A diverse driving dataset for heterogeneous multitask learning. In: CVPR, pp 2636–2645 Yuan H, Li X, Zhou C, et al (2024) Open-vocabulary sam: Segment and recognize twenty-thousand classes interactively. In: ECCV, pp 419–437 Zhang D, Liu F, Tang Q (2025) Corrclip: Recon-structing patch correlations in clip for open-vocabulary semantic segmentation. In: ICCV, pp 24677–24687 Zhang F, Zhou T, Li B, et al (2023a) Uncov-ering prototypical knowledge for weakly open-vocabulary semantic segmentation. NeurIPS 36:73652–73665 Zhang H, Li F, Zou X, et al (2023b) A simple framework for open-vocabulary segmentation and detection. In: ICCV, pp 1020–1031 Zhao H, Puig X, Zhou B, et al (2017) Open vocab-ulary scene parsing. In: ICCV, pp 2002–2010 Zhou B, Zhao H, Puig X, et al (2017) Scene parsing through ade20k dataset. In: CVPR, pp 633–641 Zhou C, Loy CC, Dai B (2022) Extract free dense labels from clip. In: ECCV, pp 696–712 24 Zhu W, Xie B, Cao J, et al (2025) Sed++: A simple encoder-decoder for improved open-vocabulary semantic segmentation. IEEE TPAMI Zou X, Dou ZY, Yang J, et al (2023) General-ized decoding for pixel, image, and language. In: CVPR, pp 15116–15127 25
