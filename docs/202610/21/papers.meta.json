@@ -1,0 +1,39 @@
+{
+  "label": "2026-10-21",
+  "date": "2026-10-21",
+  "generated_at": "2026-10-21T23:06:20",
+  "count": 2,
+  "papers": [
+    {
+      "paper_id": "202610/21/2610.27199v1-which-depth-estimator-for-jetson-agx-orin-a-2026-benchmark-of-monocular-and-stereo-methods",
+      "section": "deep",
+      "title_en": "Which Depth Estimator for Jetson AGX Orin? A 2026 Benchmark of Monocular and Stereo Methods",
+      "authors": "Leaf Jiang",
+      "date": "2026-10-19",
+      "pdf": "https://arxiv.org/pdf/2610.27199v1",
+      "score": "8.0",
+      "evidence": "在嵌入式硬件上评测 Depth Anything V2/V3、Depth Pro 等单目深度基础模型",
+      "tldr": "Jetson AGX Orin 是机器人与车辆常用计算平台，但现有深度估计方法在其上的精度、速度与能耗缺乏实测数据。本文在 Orin 上以 TensorRT FP16 引擎或原生 CUDA 代码基准测试九类单目与立体方法，覆盖最多三种输入尺寸直至 5.7MP。结果显示立体方法精度远超单目：30fps 下 NVIDIA ESS 达 0.70% AbsRel、耗时 8.6ms，Fast-FoundationStereo 达 0.33%。作者按帧率预算给出选型建议并开源全部代码、逐场景结果与引擎构建脚本。",
+      "tags": "query:mono-depth",
+      "abstract_en": "The Jetson AGX Orin is a common computer for robots and vehicles, yet measured accuracy, speed and energy of current depth estimators on it are hard to find. We benchmark nine model families as of October 2026: the monocular Depth Anything V2 and 3, Depth Pro, MoGe-2, Metric3D v2 and UniDepth V2, and the stereo methods libSGM, NVIDIA ESS and Fast-FoundationStereo. Every method runs on the Orin as a TensorRT FP16 engine or native CUDA code at up to three input sizes, up to the full 5.7 MP, and is scored for metric accuracy against Middlebury 2014 ground truth (non-occluded pixels of the 10 scenes whose disparity stays below 256 px), GPU time, energy and licence. Stereo is far more accurate. At 30 fps, NVIDIA's ESS reaches 0.70% AbsRel in 8.6 ms and libSGM 0.73% in 25 ms; with more compute, Fast-FoundationStereo reaches 0.33%. The best monocular models reach 12% with the true focal length (Depth Anything 3 Metric-L in 33 ms, Depth Pro in 803 ms), and 3.8-4.0% only with an oracle per-image scale (MoGe-2-L, UniDepth V2-B, Metric3D v2-L). Stereo error falls as the input resolution grows; no monocular model improves, and the metric scale of most drifts away from the truth outside their training resolution. At depth discontinuities, which AbsRel barely registers, the monocular models scatter 17-46% of the edge points between foreground and background, learned stereo 2-9% and libSGM at full resolution 1%. We give recommendations per frame-rate budget and release all code, per-scene results and engine build scripts.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202610/21/2610.24405v1-zerodss-semantic-segmentation-from-class-names-alone",
+      "section": "quick",
+      "title_en": "ZeroDSS: Semantic Segmentation from Class Names Alone",
+      "authors": "Tian Ming, Marzi Heidari, Yuhong Guo",
+      "date": "2026-10-17",
+      "pdf": "https://arxiv.org/pdf/2610.24405v1",
+      "score": "7.0",
+      "evidence": "仅用类别名称和合成监督实现无数据语义分割",
+      "tldr": "语义分割依赖像素级标注的真实图像，跨域部署受密集监督制约。ZeroDSS面向仅给类别集合的任务特定无数据场景，用LLM引导的组合提示构建合成图像-掩码，并以两阶段闭环反馈自适应重平衡类别、细化掩码，最后用教师-学生EMA迭代提升分割器。仅用合成数据，在MS COCO上达35.0% mIoU，在PASCAL VOC上DeepLabV3与Mask2Former分别达66.3%和63.5% mIoU。结果表明显式构建并迭代精炼合成监督分布能显著缩小合成到真实的密集预测差距。",
+      "tags": "query:seg",
+      "abstract_en": "Semantic segmentation depends heavily on real images with pixel-level annotations, making dense supervision a major obstacle to deployment in new domains. We study task-specific data-free semantic segmentation, where training uses generic pretrained generative priors but has access to no target-domain images, masks, or captions--only a predefined category set. We introduce Zero-Data Semantic Segmentation (ZeroDSS), a feedback-driven approach that treats synthetic supervision as an adaptively controllable training distribution rather than a direct surrogate for real data. ZeroDSS constructs a semantically structured prompt distribution through LLM-guided compositional generation and adaptive class rebalancing, then converts the prompts into image-mask pairs using diffusion attention. Its feedback-driven distribution refinement consists of a two-phase closed-loop training procedure with a single loop-back step. In Phase I, a segmenter is trained using confidence-weighted supervision and dual-scale consistency. In Phase II, model feedback is used to adaptively target underperforming categories and refine diffusion-derived masks using model predictions. After this refined initial training, a teacher-student framework is utilized in the final phase to iteratively improve the fused supervision and segmenter through exponential moving average (EMA) updates. Using synthetic training data only, ZeroDSS achieves 35.0% mIoU on MS COCO with DeepLabV3, and 66.3% and 63.5% mIoU on PASCAL VOC with DeepLabV3 and Mask2Former, respectively. These results show that explicitly constructing and iteratively refining the synthetic supervision distribution can substantially reduce the synthetic-to-real gap in dense prediction.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    }
+  ],
+  "errors": []
+}

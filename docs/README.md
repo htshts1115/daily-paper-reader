@@ -48,17 +48,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-10-20</span>
+      <span class="dpr-home-dashboard-kicker">2026-10-21</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 4 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 2 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>3</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>1</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>1</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-10-20 22:56:52 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-10-21 23:06:18 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -69,9 +69,7 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日日报聚焦4篇视觉论文，重点拆解单目深度估计与视频抠图两篇9分精读，并速读图像分层编辑。</p>
-<p>最值得看的是SAP-Depth的场景自适应自监督单目深度框架，以及VideoMaMa++用“保留-精炼”Token提升视频抠图时序一致性。</p>
-<p>普通读者可先读这两篇9分工作，抓住“场景自适应”和“时序一致”两条主线，再用6分分层编辑文扩展图像复用思路。</p>
+<p>2026-10-21 精选 2 篇：1 篇精读评估 Jetson AGX Orin 深度估计器，1 篇速读关注 ZeroDSS 零标注语义分割。最值得关注的是，这篇 2026 年基准横评单目与双目深度方法（8.0/10），以及仅凭类名实现语义分割的 ZeroDSS（7.0/10）。如果你关心边缘部署，建议先看深度基准的选型结论；如果你关心少标注分割，可跟踪 ZeroDSS 思路。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -80,12 +78,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">3 篇</strong>
+    <strong class="dpr-home-dashboard-count">1 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="SAP-Depth: Scene-Adaptive Probability Framework for Self-Supervised Monocular Depth Estimation">SAP-Depth: Scene-Adaptive Probability Framework for Self-Supervised Monocular Depth Estimation</span></li><li><span class="dpr-home-dashboard-paper-title" title="VideoMaMa++: Temporally Consistent Video Matting via Preserve-and-Refine Token">VideoMaMa++: Temporally Consistent Video Matting via Preserve-and-Refine Token</span></li><li><span class="dpr-home-dashboard-paper-title" title="CorrCLIPv2: Harnessing Unlabeled Images for Open-Vocabulary Semantic Segmentation">CorrCLIPv2: Harnessing Unlabeled Images for Open-Vocabulary Semantic Segmentation</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Which Depth Estimator for Jetson AGX Orin? A 2026 Benchmark of Monocular and Stereo Methods">Which Depth Estimator for Jetson AGX Orin? A 2026 Benchmark of Monocular and Stereo Methods</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">matting <strong>1</strong></span><span class="dpr-home-dashboard-tag">mono-depth <strong>1</strong></span><span class="dpr-home-dashboard-tag">seg <strong>1</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">mono-depth <strong>1</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -96,9 +94,9 @@
     <strong class="dpr-home-dashboard-count">1 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Editing Images into Reusable Layers via Compositional Edit-Prior Distillation">Editing Images into Reusable Layers via Compositional Edit-Prior Distillation</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="ZeroDSS: Semantic Segmentation from Class Names Alone">ZeroDSS: Semantic Segmentation from Class Names Alone</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">matting <strong>1</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">seg <strong>1</strong></span></div>
 </section>
 </div>
 

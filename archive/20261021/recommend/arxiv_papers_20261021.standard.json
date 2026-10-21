@@ -1,0 +1,100 @@
+{
+  "mode": "standard",
+  "generated_at": "2026-10-21T23:05:16.523150+00:00",
+  "stats": {
+    "mode": "standard",
+    "tag_count": 4,
+    "deep_divecandidates": 1,
+    "deep_cap": 9,
+    "deep_selected": 1,
+    "quick_candidates": 1,
+    "quick_skim_target": 14,
+    "quick_selected": 1
+  },
+  "deep_dive": [
+    {
+      "id": "2610.27199v1",
+      "source": "arxiv",
+      "title": "Which Depth Estimator for Jetson AGX Orin? A 2026 Benchmark of Monocular and Stereo Methods",
+      "abstract": "The Jetson AGX Orin is a common computer for robots and vehicles, yet measured accuracy, speed and energy of current depth estimators on it are hard to find. We benchmark nine model families as of October 2026: the monocular Depth Anything V2 and 3, Depth Pro, MoGe-2, Metric3D v2 and UniDepth V2, and the stereo methods libSGM, NVIDIA ESS and Fast-FoundationStereo. Every method runs on the Orin as a TensorRT FP16 engine or native CUDA code at up to three input sizes, up to the full 5.7 MP, and is scored for metric accuracy against Middlebury 2014 ground truth (non-occluded pixels of the 10 scenes whose disparity stays below 256 px), GPU time, energy and licence. Stereo is far more accurate. At 30 fps, NVIDIA's ESS reaches 0.70% AbsRel in 8.6 ms and libSGM 0.73% in 25 ms; with more compute, Fast-FoundationStereo reaches 0.33%. The best monocular models reach 12% with the true focal length (Depth Anything 3 Metric-L in 33 ms, Depth Pro in 803 ms), and 3.8-4.0% only with an oracle per-image scale (MoGe-2-L, UniDepth V2-B, Metric3D v2-L). Stereo error falls as the input resolution grows; no monocular model improves, and the metric scale of most drifts away from the truth outside their training resolution. At depth discontinuities, which AbsRel barely registers, the monocular models scatter 17-46% of the edge points between foreground and background, learned stereo 2-9% and libSGM at full resolution 1%. We give recommendations per frame-rate budget and release all code, per-scene results and engine build scripts.",
+      "authors": [
+        "Leaf Jiang"
+      ],
+      "primary_category": "cs.RO",
+      "categories": [
+        "cs.RO",
+        "cs.CV"
+      ],
+      "published": "2026-10-19T19:34:27+00:00",
+      "link": "https://arxiv.org/pdf/2610.27199v1",
+      "tags": [
+        "keyword:matting",
+        "keyword:mono-depth",
+        "keyword:neural-bokeh",
+        "query:mono-depth",
+        "query:neural-bokeh"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "Benchmarks monocular depth foundation models such as Depth Anything V2/V3 and Depth Pro on embedded hardware",
+      "llm_evidence_cn": "在嵌入式硬件上评测 Depth Anything V2/V3、Depth Pro 等单目深度基础模型",
+      "llm_evidence": "在嵌入式硬件上评测 Depth Anything V2/V3、Depth Pro 等单目深度基础模型",
+      "canonical_evidence": "在嵌入式硬件上评测 Depth Anything V2/V3、Depth Pro 等单目深度基础模型",
+      "llm_tldr_en": "Benchmarks nine depth estimator families, including Depth Anything V2/V3 and Depth Pro, on Jetson AGX Orin, reporting metric accuracy, GPU time and energy to guide lightweight deployment.",
+      "llm_tldr_cn": "针对 Jetson AGX Orin 上缺乏实测精度、速度与能耗数据的问题，本文系统评测了 Depth Anything V2/V3、Depth Pro、MoGe-2、Metric3D v2、UniDepth V2 等单目模型与三种双目方法。所有方法以 TensorRT FP16 引擎运行，输入最高达 5.7MP，并以 Middlebury 2014 真值评估度量精度，同时记录 GPU 时间、能耗与许可。结果显示双目方法精度显著更高，30fps 下 NVIDIA ESS 误差极低。该基准为移动与嵌入式平台的深度模型选型提供了可复现的实测依据。",
+      "llm_tldr": "针对 Jetson AGX Orin 上缺乏实测精度、速度与能耗数据的问题，本文系统评测了 Depth Anything V2/V3、Depth Pro、MoGe-2、Metric3D v2、UniDepth V2 等单目模型与三种双目方法。所有方法以 TensorRT FP16 引擎运行，输入最高达 5.7MP，并以 Middlebury 2014 真值评估度量精度，同时记录 GPU 时间、能耗与许可。结果显示双目方法精度显著更高，30fps 下 NVIDIA ESS 误差极低。该基准为移动与嵌入式平台的深度模型选型提供了可复现的实测依据。",
+      "llm_tags": [
+        "query:mono-depth"
+      ],
+      "matched_query_tag": "query:mono-depth",
+      "matched_query_text": "lightweight depth model for mobile devices",
+      "matched_requirement_id": "req-8",
+      "selection_source": "fresh_fetch"
+    }
+  ],
+  "quick_skim": [
+    {
+      "id": "2610.24405v1",
+      "source": "arxiv",
+      "title": "ZeroDSS: Semantic Segmentation from Class Names Alone",
+      "abstract": "Semantic segmentation depends heavily on real images with pixel-level annotations, making dense supervision a major obstacle to deployment in new domains. We study task-specific data-free semantic segmentation, where training uses generic pretrained generative priors but has access to no target-domain images, masks, or captions--only a predefined category set. We introduce Zero-Data Semantic Segmentation (ZeroDSS), a feedback-driven approach that treats synthetic supervision as an adaptively controllable training distribution rather than a direct surrogate for real data. ZeroDSS constructs a semantically structured prompt distribution through LLM-guided compositional generation and adaptive class rebalancing, then converts the prompts into image-mask pairs using diffusion attention. Its feedback-driven distribution refinement consists of a two-phase closed-loop training procedure with a single loop-back step. In Phase I, a segmenter is trained using confidence-weighted supervision and dual-scale consistency. In Phase II, model feedback is used to adaptively target underperforming categories and refine diffusion-derived masks using model predictions. After this refined initial training, a teacher-student framework is utilized in the final phase to iteratively improve the fused supervision and segmenter through exponential moving average (EMA) updates. Using synthetic training data only, ZeroDSS achieves 35.0% mIoU on MS COCO with DeepLabV3, and 66.3% and 63.5% mIoU on PASCAL VOC with DeepLabV3 and Mask2Former, respectively. These results show that explicitly constructing and iteratively refining the synthetic supervision distribution can substantially reduce the synthetic-to-real gap in dense prediction.",
+      "authors": [
+        "Tian Ming",
+        "Marzi Heidari",
+        "Yuhong Guo"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV",
+        "cs.AI"
+      ],
+      "published": "2026-10-17T03:14:33+00:00",
+      "link": "https://arxiv.org/pdf/2610.24405v1",
+      "tags": [
+        "keyword:matting",
+        "keyword:mono-depth",
+        "keyword:neural-bokeh",
+        "keyword:seg",
+        "query:matting",
+        "query:mono-depth",
+        "query:neural-bokeh",
+        "query:seg"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "data-free semantic segmentation trained only from class names via synthetic supervision",
+      "llm_evidence_cn": "仅用类别名称和合成监督实现无数据语义分割",
+      "llm_evidence": "仅用类别名称和合成监督实现无数据语义分割",
+      "canonical_evidence": "仅用类别名称和合成监督实现无数据语义分割",
+      "llm_tldr_en": "ZeroDSS addresses data-free semantic segmentation by using LLM-guided compositional prompts and diffusion-generated image-mask pairs, treating synthetic supervision as an adaptive training distribution instead of real data.",
+      "llm_tldr_cn": "该文针对语义分割依赖真实图像像素级标注、难以部署到新域的问题，研究仅给定类别名称的任务特定无数据语义分割。方法用大语言模型引导构建语义结构化提示分布，并结合自适应类别重平衡，将提示经扩散模型转为图像-掩码对进行训练。该框架把合成监督视为可自适应控制的训练分布，为无目标域图像和标注的语义分割提供了新思路。",
+      "llm_tldr": "该文针对语义分割依赖真实图像像素级标注、难以部署到新域的问题，研究仅给定类别名称的任务特定无数据语义分割。方法用大语言模型引导构建语义结构化提示分布，并结合自适应类别重平衡，将提示经扩散模型转为图像-掩码对进行训练。该框架把合成监督视为可自适应控制的训练分布，为无目标域图像和标注的语义分割提供了新思路。",
+      "llm_tags": [
+        "query:seg"
+      ],
+      "matched_query_tag": "query:seg",
+      "matched_query_text": "semantic segmentation",
+      "matched_requirement_id": "req-23",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    }
+  ]
+}

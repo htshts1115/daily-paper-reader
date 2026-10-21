@@ -1,0 +1,527 @@
+Title: ZeroDSS: Semantic Segmentation from Class Names Alone
+
+URL Source: https://arxiv.org/pdf/2610.24405v1
+
+Published Time: Tue, 20 Oct 2026 00:33:42 GMT
+
+Number of Pages: 24
+
+Markdown Content:
+# ZeroDSS: Semantic Segmentation from Class Names Alone 
+
+Tian Ming, Marzi Heidari, and Yuhong Guo 
+
+School of Computer Science, Carleton University, Ottawa, Canada 
+
+Abstract. Semantic segmentation depends heavily on real images with pixel-level annotations, making dense supervision a major obstacle to deployment in new domains. Recent diffusion-based methods reduce annotation costs by gen-erating synthetic image–mask pairs from text prompts and cross-attention maps. However, they often rely on dataset-aligned captions or image-specific textual supervision, and degrade when only category names are available. We study task-specific data-free semantic segmentation, where training uses generic pre-trained generative priors but has access to no target-domain images, masks, or captions—only a predefined category set. We introduce Zero-Data Semantic Seg-mentation (ZeroDSS), a feedback-driven approach that treats synthetic supervi-sion as an adaptively controllable training distribution rather than a direct surro-gate for real data. ZeroDSS constructs a semantically structured prompt distribu-tion through LLM-guided compositional generation and adaptive class rebalanc-ing, then converts the prompts into image–mask pairs using diffusion attention. Its feedback-driven distribution refinement consists of a two-phase closed-loop training procedure with a single loop-back step. In Phase I, a segmenter is trained using confidence-weighted supervision and dual-scale consistency. In Phase II, model feedback is used to adaptively target underperforming categories and re-fine diffusion-derived masks using model predictions. After this refined initial training, a teacher–student framework is utilized in the final phase to iteratively improve the fused supervision and segmenter through exponential moving aver-age (EMA) updates. Using synthetic training data only, ZeroDSS achieves 35.0% mIoU on MS COCO with DeepLabV3, and 66.3% and 63.5% mIoU on PASCAL VOC with DeepLabV3 and Mask2Former, respectively. These results show that explicitly constructing and iteratively refining the synthetic supervision distribu-tion can substantially reduce the synthetic-to-real gap in dense prediction. 
+
+# 1 Introduction 
+
+Semantic segmentation has advanced substantially through high-capacity architectures and large datasets with dense pixel annotations. Modern systems obtain strong results on curated real-image corpora such as PASCAL VOC [6] and MS COCO [15], with rep-resentative architectures including DeepLab [3]. This progress remains tightly coupled to access to real images and their dense pixel-level labels. In privacy-restricted applica-tions, proprietary data silos, or rapidly emerging categories, collecting and annotating such data can be costly or infeasible, making dense supervision a central obstacle to deployment. arXiv:2610.24405v1 [cs.CV] 17 Oct 2026 2 Tian Ming, Marzi Heidari, and Yuhong Guo 
+
+Generative models offer an alternative source of supervision. GAN-based ap-proaches such as DatasetGAN and BigDatasetGAN synthesize pixel labels with limited additional annotation [12, 37], but are constrained by object-centric genera-tion and limited compositional diversity. Text-to-image diffusion models provide a more scalable route: their token-level cross-attention maps encode spatial–semantic correspondence and can be converted into synthetic image–mask pairs [19, 24, 33]. Existing diffusion pipelines, however, usually depend on dataset-aligned prompts derived from real captions or caption surrogates to approximate the target distribution. When only class names are available, naive prompt sampling produces biased category frequencies, implausible combinations, and unstable attention masks, increasing both semantic and visual mismatch with real data. We therefore study class-name-only data-free semantic segmentation. Training may use generic pretrained language and generative models as semantic priors, but receives no task-specific real images, pixel annotations, or dataset-aligned captions. This setting shifts the key question from how to imitate individual real examples to how to construct an effective synthetic training distribution without observing the target domain. To address this problem, we introduce Zero-Data Semantic Segmentation (Ze-roDSS), which treats synthetic supervision as a distribution to construct, optimize under, and iteratively refine based on feedback rather than a direct proxy for real data. LLM-guided compositional validation and adaptive class rebalancing first shape a structured prompt distribution, which is instantiated as image–mask pairs through diffusion attention. Phase I learns an initial segmenter with confidence-weighted supervision and dual-scale consistency regularization. Phase II uses model feedback to identify underperforming categories, generate targeted samples, and refine diffusion-derived masks using model predictions. The updated training data are then fed back into Phase I for further segmentation model training. Phase III performs class-balanced teacher-student self-training to improve the segmenter: a fixed teacher supplies predictions for fusion with the original attention masks, while iterative EMA updates progressively improve the teacher without introducing real-domain supervision. The key contributions of this work are summarized as follows: 
+
+– We formulate class-name-only data-free segmentation around explicit construction and adaptive refinement of the synthetic training distribution. 
+
+– We develop LLM-guided compositional validation, adaptive class-frequency bal-ancing, and segmentation-oriented prompting for structured synthetic supervision. 
+
+– We combine confidence-weighted consistency training, feedback-driven category and mask refinement, and EMA teacher–student self-training. 
+
+– ZeroDSS reaches 35.0% mIoU on COCO and 66.3/63.5% mIoU on VOC with DeepLabV3/Mask2Former, improving the Phase I–II models by 3.8, 4.6, and 3.2 points; the Phase I–II loop-back also supports novel category expansion. 
+
+# 2 Related Work 
+
+2.1 Synthetic Data for Semantic Segmentation 
+
+Synthetic data has long been used to reduce the cost of dense annotation. GAN-based methods such as DatasetGAN and BigDatasetGAN project lightweight segmentation ZeroDSS: Semantic Segmentation from Class Names Alone 3
+
+heads onto generative feature spaces to obtain pixel supervision [12, 37]; related work extracts semantic structure from generative representations without explicit labels [18, 32]. These approaches establish the value of generative priors, but their object-centric biases restrict scene diversity and large-scale distribution control. Simulator-rendered datasets such as GTA5 and SYNTHIA instead provide exact pixel labels directly from graphics engines [23, 25] and are widely used for synthetic-to-real adaptation [8, 30, 31, 36]. Their scene layouts, co-occurrence patterns, and class frequencies are predefined, however, and changing them generally requires modifying the simulator. Recent work shows that downstream segmentation depends not only on annotation quality but also on synthetic–real distribution alignment [2, 26]. ZeroDSS addresses this issue by con-structing and adapting the distribution through prompts rather than relying on a fixed generator or simulator. 
+
+2.2 Diffusion-based Pixel-level Annotation 
+
+Diffusion models support dense prediction in two distinct ways. SegDiff, DDP, DiffusionInst, and MaskDiff formulate semantic, instance, or panoptic segmentation as supervised denoising [1, 7, 9, 10]; diffusion is the predictor itself, and training requires ground-truth masks. A separate line repurposes pretrained text-to-image models as synthetic supervision engines. Stable Diffusion exposes token-level cross-attention maps [24], which DiffuMask and Dataset Diffusion aggregate into pixel-level pseudo-labels aligned with generated images [19, 33]. This removes the need for ground-truth segmentation masks, but the prompts commonly come from real captions or caption surrogates. ZeroDSS follows the attention-derived supervision paradigm while replacing dataset-aligned text with an explicitly constructed class-name-only prompt distribution. 
+
+2.3 Semi-supervised and Self-training Segmentation 
+
+Pseudo-labeling [11], consistency regularization, and teacher–student methods such as Mean Teacher, FixMatch, and CPS [4, 27, 29] exploit unlabeled data by convert-ing model predictions into training targets. Segmentation-specific approaches including ST++, ReCo, and ClassMix further improve structural reliability through confidence selection, representation consistency, or class-aware mixing [16, 21, 35]. These meth-ods generally assume access to unlabeled real images from the target domain. ZeroDSS instead self-trains exclusively on generated images. Moreover, its teacher predictions do not simply replace the available labels: they are fused class-wise with the origi-nal diffusion attention masks and confidence-filtered before supervising a continuously trained student. The method therefore adopts iterative teacher–student refinement while preserving the class-name-only data-free protocol. 
+
+2.4 Prompt Construction and Language-guided Data Generation 
+
+Text prompts are the main control interface for text-to-image generation, so their formu-lation directly shapes the semantics and composition of synthetic images. Dataset Diffu-sion uses ground-truth captions or BLIP-generated surrogates to retain dataset-specific 4 Tian Ming, Marzi Heidari, and Yuhong Guo  
+
+> Fig. 1: ZeroDSS constructs a structured synthetic distribution from class names through LLM-guided prompts and diffusion attention. Phase I trains with confidence-weighted supervision and dual-scale consistency. Phase II regenerates deficient categories, fuses diffusion masks with model predictions, and loops back to Phase I for continued training on the refined distribution. Phase III further enhance the model using a teacher-student framework, where the fixed teacher is updated by EMA between iterative rounds.
+
+scene statistics [13, 19]. Rule-based templates such as “a photo of a {class}” [20, 24] require less information but offer limited control over co-occurrence, frequency, and ob-ject visibility. Grounded and compositional generation methods provide stronger spatial control [14, 34], but do not explicitly build a task-level distribution from class names alone. ZeroDSS uses an LLM [22] as a semantic prior to validate category combina-tions, regulate class balance, and realize concise segmentation-oriented scenes. Prompt-ing is treated as distribution construction rather than only instance-level description. 
+
+# 3 Problem Setting 
+
+We study data-free semantic segmentation in which the only task-specific information available during training is a predefined foreground category set C = {1, . . . , C }; cate-gory 0 is reserved for background. Unlike supervised or semi-supervised settings, train-ing has access to no target-domain images, pixel-level annotations, or dataset-aligned captions. Generic pretrained language and generative models are allowed as reusable semantic priors, but they are not supplied with examples from the target segmentation dataset. Starting from C, LLM-generated prompts condition a text-to-image diffusion model to produce a synthetic dataset Dsyn = {(ˆ xi, ˆmi)}Ni=1 , where ˆxi is a generated image and ˆmi ∈ { 0, . . . , C }H×W is its attention-derived mask. The real evaluation set Dreal = {(xj , mj )}Mj=1 remains strictly unavailable during training. A segmenter 
+
+fθ : RH×W ×3 → [0 , 1] H×W ×(C+1) assigns each pixel a probability vector over C
+
+foreground classes and background. It is optimized only on Dsyn and evaluated only afterward on Dreal . The objective is therefore not merely to fit synthetic masks, but to generalize across a distribution shift that affects appearance, context, category co-occurrence, object scale, and mask reliability. Because the real distribution cannot be observed, ZeroDSS must improve both synthetic coverage and supervision quality us-ing signals derived entirely from its generated data and trained segmenter. ZeroDSS: Semantic Segmentation from Class Names Alone 5
+
+# 4 Method 
+
+ZeroDSS treats synthetic supervision as an adaptivelly controllable training distri-bution rather than a direct proxy for real data. Without real images, captions, or co-occurrence statistics, naive class-name prompting can produce compositional bias, se-vere class imbalance, and brittle attention masks. ZeroDSS therefore constructs a se-mantically structured prompt distribution with compositional and frequency control, then instantiates it into image–mask pairs through diffusion attention. Training pro-ceeds through two phases of closed-loop refinement with a single loop-back, followed by a third phase of model improvement. Phase I learns a robust initial segmenter under noisy synthetic supervision, while Phase II uses model feedback to regenerate under-covered categories, refine their masks, and continue optimization on the updated distri-bution. Phase III iteratively improves fused pseudo-labels and segmenter through EMA teacher–student self-training. Figure 1 summarizes the framework. 
+
+4.1 Prompt Generation: Synthetic Distribution Shaping in Semantic Space 
+
+Without target-domain category co-occurrence statistics, the synthetic distribution must be designed rather than inherited. Independently sampled categories can create implau-sible scenes and unstable attention supervision. ZeroDSS therefore uses an LLM as a semantic prior to control category composition, frequency, and prompt realization. 
+
+Compositional Sparsity Control Natural images usually contain only a few salient categories. We model this sparsity by sampling the group size k ∼
+
+Categorical( r1, r 2, r 3) for one-, two-, or three-category scenes, limiting implau-sible density and stabilizing attention masks while retaining multi-object diversity. 
+
+Adaptive Category Frequency Rebalancing To counter category dominance, we maintain a frequency nc and sample category c with the following weight 
+
+wc = 1(nc/τ c + ϵ)α , (1) where ϵ > 0 ensures numerical stability, α ∈ (0 , 1] controls rebalancing strength, and 
+
+τc specifies a target frequency reflecting semantic centrality. Categories that naturally anchor scenes may receive larger τc without dominating the dataset. A group g ⊆ C ,
+
+|g| = k, is sampled without replacement in proportion to {wc}, after which the fre-quency counts are updated: nc ← nc + 1 for c ∈ g. Repeated updates gradually balance effective supervision while preserving diverse category combinations. 
+
+Semantic Coherence Enforcement via Language Priors Frequency balance alone does not ensure scene plausibility. The LLM filters sampled groups according to whether their categories can naturally coexist in one spatio-temporal context and viewpoint. Retained groups form G = {g1, . . . , g N }, preventing balanced but logically inconsistent compositions from becoming supervision. 6 Tian Ming, Marzi Heidari, and Yuhong Guo  
+
+> Category Group
+> person, skateboard
+> Prompt
+> A person jumping on a skateboard on a playground.
+> Category Group
+> clock, book
+> Prompt
+> A book in the bookshelf with one clock beside it.
+> Category Group
+> pizza, knife
+> Prompt
+> A knife beside a pizza on a dining table.
+> Fig. 2: Examples of segmentation-oriented prompts generated by the LLM and the corresponding attention-derived masks.
+
+Segmentation-Oriented Prompt Realization For each gi ∈ G , the LLM fLLM gen-erates a scene description Si, which is concatenated with the category list to form a prompt: 
+
+Ti = [ Si; gi], Si = fLLM (gi, I), (2) where I is a structured instruction template for prompt generation. Rather than request-ing generic captions, it asks for short and literal scenes in which target objects are visible, spatially separable, and minimally occluded. Simple relations such as “next to” or “on a table” are preferred over crowded scenes, complex interactions, or descrip-tive background clutter. These constraints preserve semantic diversity while making diffusion cross-attention easier to convert into reliable masks. Examples of generated prompts are shown in Figure 2. To facilitate future synthetic mask generation with diffusion cross-attention, we also account for token-position bias in diffusion cross-attention for segmentation-oriented prompt realization: Stable Diffusion often assigns stronger attention to objects men-tioned earlier. Visually complex or segmentation-critical objects are therefore placed earlier when possible in the prompts. The rule is applied conservatively; if reordering would produce unnatural phrasing or disrupt an interaction, the original relation is re-tained. This balances attention stability with scene coherence. The resulting Tprompt = {T1, . . . , T N } defines the semantic distribution used for training data synthesis. 
+
+4.2 Data Generation: Synthetic Visual Instantiation 
+
+The structured semantic distribution constructed through the prompts Tprompt is instan-tiated with the pretrained Stable Diffusion model fsd . For each T ∈ T prompt , the model generates an image ˆx, while cross-attention aggregation yields its aligned mask ˆm [19]. Denoting this process by fsyn gives 
+
+Dsyn = {(ˆ xi, ˆmi)}Ni=1 = fsyn (fsd , T ). (3) Our contribution lies in semantic distribution shaping rather than generative archi-tecture modification. We therefore retain the mask extraction pipeline of Dataset Dif-ZeroDSS: Semantic Segmentation from Class Names Alone 7
+
+fusion [19], isolating the effects of prompt construction and adaptive refinement from changes to the diffusion backbone. 
+
+4.3 Feedback-Driven Synthetic Distribution Refinement 
+
+ZeroDSS treats segmentation model optimization and synthetic data distribution re-finement as a coupled process, aiming to promote generalizability. This closed-loop adaptive segmentation training framework involves two phases. Phase I learns a sta-ble segmenter under noisy synthetic supervision. Phase II then targets underperforming categories and unreliable masks to adaptively reshape the synthetic distribution. 
+
+Phase I: Regularized Training under Synthetic Supervision Phase I trains fθ ex-clusively on Dsyn . Attention-derived masks may be incomplete, fragmented, or weakly aligned with object boundaries, making uniform empirical risk minimization sensitive to noisy pixels. We therefore use a confidence-weighted cross-entropy loss: 
+
+Lseg (θ) = E(ˆ x, ˆm)∈D syn 
+
+"
+
+1
+
+P 
+
+> u,v
+
+ωu,v ( ˜ m)
+
+X
+
+> u,v
+
+ωu,v ( ˜ m) ℓce ( ˆ mu,v , f θ (ˆ x)u,v )
+
+#
+
+. (4) Here, ℓce (·, ·) denotes the standard cross-entropy loss function, and ˜m is the normalized cross-attention response before discretization into ˆm. The pixel-wise confidence weight 
+
+ωu,v ∈ [0 , 1] is derived from the synthetic mask and defined as the maximum response across foreground class categories: 
+
+ωu,v ( ˜ m) = max  
+
+> k∈C
+
+˜m[u,v,k ]. (5) The confidence weights modulate each pixel’s contribution to the overall loss, allowing uncertain or noisy regions in the synthetic mask ˆm to exert proportionally less influ-ence on the optimization dynamics. This formulation treats synthetic supervision as soft guidance, stabilizing early training dynamics. Training only on generated images can overfit to diffusion-specific textures, light-ing, and prompt-induced regularities. To encourage semantic rather than appearance-specific features, ZeroDSS enforces dual-scale consistency–pixel-level consistency and image-level consistency–to assist segmenter training. Let ˆx′ be a weak, semantics-preserving augmentation of ˆx. The pixel-level consis-tency enforces local prediction stability under augmenting perturbation via symmetric KL regularization: 
+
+Lpix cons (θ) = Eˆx∈D syn Eu,v 
+
+12
+
+h
+
+KL( fθ (ˆ x)u,v ∥fθ (ˆ x′)u,v ) + KL( fθ (ˆ x′)u,v ∥fθ (ˆ x)u,v )
+
+i
+
+.
+
+(6) This term penalizes spatially localized prediction drift at corresponding pixels. Because the divergence is symmetric, neither view is treated as a fixed target. Local agreement alone, however, does not prevent a global shift in predicted class proportions. The 8 Tian Ming, Marzi Heidari, and Yuhong Guo 
+
+image-level consistency regularization term therefore aligns spatially averaged class distributions: 
+
+Limg cons (θ) = Eˆx∈D syn 
+
+12
+
+
+
+KL 
+
+
+
+Eu,v (fθ (ˆ x)u,v ) Eu,v (fθ (ˆ x′)u,v )
+
+
+
++ KL 
+
+
+
+Eu,v (fθ (ˆ x′)u,v ) Eu,v (fθ (ˆ x)u,v )
+
+
+
+,
+
+(7) where Eu,v (·) = 1
+
+> HW
+
+P 
+
+> u,v
+
+(·).These two consistency terms are complementary: pixel consistency preserves local structure, whereas image consistency stabilizes the overall semantic composition of the prediction. Together they form the dual-scale consistency loss Lcons (θ) = Lpix cons +
+
+Limg cons . The overall training objective for Phase I is 
+
+L(θ) = Lseg + λLcons , (8) where λ > 0 controls the trade-off between cross-entropy and consistency regular-ization. Together, confidence weighting limits the influence of noisy masks and con-sistency regularization discourages synthetic-specific solutions, yielding the Phase I checkpoint used for feedback-driven refinement. 
+
+Phase II: Feedback-Driven Synthetic Distribution Refinement Although Phase I is trained on a balanced synthetic distribution, its construction remains heuristic: some categories can still lack sufficient scale, context, or appearance diversity. Phase II uses model feedback to identify these under-covered semantic regions and refine the syn-thetic distribution. Let IoU c be the class-wise IoU measure of the Phase I model for class c on a held-out synthetic set Dsyn val generated in the same way as Dsyn . We define a performance-deficiency score for class c as rc = (1 − IoU c) + γ κ c, where κc is a fixed LLM-derived category-level prior obtained by grouping foreground categories into easy, average, and hard scale-difficulty levels and assigning the predefined scores, and γ denotes the trade-off hyperparameter. The first term captures empirical segmenta-tion error under the synthetic distribution, while the second introduces a complementary prior on real-world scale-induced difficulty. The prior is a heuristic category-level cue, not a measured difficulty score from real target-domain images. The computed category deficiency scores provide feedback to drive synthetic distribution refinement through targeted deficient category expansion. 
+
+Targeted Deficient Category Expansion. Let Cdef ⊆ C denote the set of performance-deficient categories selected as the top-K foreground categories with largest rc, defining where the synthetic distribution should be expanded. For the selected deficient cate-gories, we employ LLM-guided prompt generation to enhance reliability and diversity. In particular, we generate new prompts using two complementary instruction templates to control scene complexity. The first template encourages simple scenes with a single large object and minimal context, producing images where object boundaries are clearly visible. These samples provide reliable attention-derived masks and help the model learn accurate object contours and basic shape cues. The second template encourages ZeroDSS: Semantic Segmentation from Class Names Alone 9
+
+more complex scenes involving contextual clutter, occlusion, multi-object interactions, and small-scale instances, better approximating realistic visual configurations in the tar-get domain. Newly generated samples are then added into the synthetic dataset to form an expanded training dataset ˜Dsyn for model retraining. By expanding the performance-deficient categories, we redistribute the probability mass of the training data toward difficult semantic regions. This procedure can be viewed as distribution-level hard-example mining, operating in data space rather than feature space. It increases support around model-identified weaknesses instead of perturbing intermediate features. 
+
+Mask Fusion and Continued Training under the Refined Distribution. The expanded training set ˜Dsyn follows a refined distribution ˜psyn . However, diffusion derived masks provide prompt-aligned localization but can omit valid regions or contain fragmented components, whereas the trained segmenter often predicts more coherent object struc-ture. Therefore, for continued training on the refined distribution, we perform class-wise mask fusion to combine the complementary signals from the cross-attention supervision and segmentation model predictions, selecting the more reliable label and confidence for each class. The fusion details are provided in the appendix. A single loop-back step is then conducted by returning to Phase I for continued segmentation model training, expecting to improve the segmenter with the refined training set and mask supervision. 
+
+4.4 Teacher-Student Based Self-Training 
+
+In addition to the feedback-driven single loop-back refinement procedure, Phase III further enhances the segmenter using a teacher-student framework. It initializes teacher and student networks from the refined model obtained from the single loop-back based two-phase refinement procedure, such as θT ← θII and θS ← θII , but returns to the original diffusion derived attention-masks rather than the Phase II refined masks. The student network is updated using a sampled class-balanced subset in each round, while the teacher remains fixed during the update of the student network, providing stable pseudo-label targets for the student network. Specifically, the teacher prediction and the original attention mask are fused in a class-wise manner to induce a pseudo-label yi for each pixel. Given the teacher and student prediction distributions pTi and pSi for pixel i,the label confidence ci is set as the largest probability based on the teacher’s prediction, 
+
+ci = max k pTi (k). Only the confident pixels in Ω = {i : ci > τ st }, determined by a threshold τst = 0 .6, are used for student network update: 
+
+Lst (θS ) = − 1
+
+|Ω|
+
+X
+
+> i∈Ω
+
+ci log pSi (yi). (9) Diffusion attention and teacher predictions contribute complementary spatial evidence, while confidence filtering and weighting limit the influence of uncertain teacher regions. The teacher network is then updated in an EMA (exponential moving averaged) manner from the student model parameters between rounds: 
+
+θT ← μθ T + (1 − μ)θS , (10) 10 Tian Ming, Marzi Heidari, and Yuhong Guo 
+
+where μ is the decay coefficient. Updating the teacher network only between rounds separates pseudo-label generation from student optimization; the new EMA teacher labels the next subset. The final teacher network is returned as the model for evaluation. 
+
+# 5 Experiments 
+
+5.1 Experimental Setup 
+
+Datasets. We evaluate ZeroDSS on PASCAL VOC 2012 [6] and MS COCO 2017 [15], containing 20 and 80 foreground categories, respectively. Real images and annotations are strictly reserved for synthetic-to-real evaluation. Stable Diffusion v2.1-base [24] generates approximately 40k VOC and 80k COCO image–mask pairs at 512 × 512 
+
+resolution with guidance scale 7.5. One-, two-, and three-category prompts are sampled with probabilities (r1, r 2, r 3) = (0 .7, 0.2, 0.1) . For frequency balancing, we set α =0.3, ϵ = 10 −6, and τc = 1 except for person , where τc = 2 . We additionally generate 1k synthetic validation images per dataset for Phase II deficiency estimation. 
+
+Implementation Details. For synthetic data construction, prompts are generated us-ing GPT-4.1 accessed via OpenRouter with moderate sampling temperature to encour-age semantic diversity. Following prior synthetic segmentation baselines [19], we use DeepLabV3 [3] with a ResNet-50 backbone and no auxiliary head. AdamW uses learn-ing rate 10 −4, weight decay 0.01 , backbone multiplier 0.1, a polynomial schedule with exponent 0.9, batch size 8, and 40k Phase I iterations; the consistency coefficient is 
+
+λ = 0 .2. Phase II fixes γ = 0 .5, selects the top K = 10 deficient categories, generates 200 additional images per category. Phase III uses 10 rounds, approximately 25 im-ages per foreground category per round, confidence threshold is set as 0.6, and an EMA cosine schedule from 0.999 to 0.9999; the final EMA teacher is evaluated. Additional generation and training details are provided in the appendix. All experiments report the results in terms of the mean Intersection over Union (mIoU). 
+
+5.2 Comparison Results 
+
+We compare ZeroDSS against prior approaches from three training regimes: real ground-truth supervision, prompt-aligned synthetic training, and open-vocabulary models. Evaluation is conducted on MS COCO and PASCAL VOC using DeepLabV3 and Mask2Former backbones pre-trained on ImageNet. All synthetic methods are trained solely on synthetic data (80k samples for COCO and 40k for VOC) and evalu-ated on the corresponding real validation sets. Dataset Diffusion [19], DiffuMask [33], and SDS [28] are included as prompt-aligned synthetic baselines that use real dataset captions. Table 1 presents the main comparison results. Under full real supervision, models trained on ground-truth annotations achieve 48.9% mIoU on COCO and 79.3/78.8% mIoU on VOC using DeepLabV3 and Mask2Former respectively, establishing the up-per bound for synthetic-to-real transfer. The foundational models, CLIPSeg [17] and MaskCLIP [5], instead rely on strong open-vocabulary segmentation priors at inference ZeroDSS: Semantic Segmentation from Class Names Alone 11 
+
+Table 1: Comparison across supervision settings (mIoU). ZeroDSS uses approximately 82k COCO or 42k VOC synthetic training pairs after Phase II expansion and is evaluated on real validation sets. † denotes reproduced results; open-vocabulary methods retain their original ar-chitectures.                                 
+
+> Training Setting Method COCO(DLV3) VOC(DLV3) VOC(M2F)
+> Fully Supervised Reference: Real Images & Annotations GT training 48.9 79.3 78.8
+> Open-Vocabulary Segmentation Models CLIPSeg [17] 23.4 54.2 MaskCLIP [5] 25.1 56.9
+> Synthetic Data with Real Dataset Captions Dataset Diffusion †[19] 28.6 58.0 57.8 DiffuMask [33] ––57.4 SDS [28] 31.0 60.4 59.8
+> Synthetic Data with Class Names Only CE baseline 26.2 57.4 57.6 ZeroDSS (Phase I–II) 31.2 61.7 60.3
+> ZeroDSS (full) 35.0 66.3 63.5
+
+and are included to contextualize the transfer enabled by pretrained vision-language representations. Among methods that train a conventional segmenter on synthetic pairs, SDS is the strongest baseline with dataset-caption supervision, reaching 31.0% on COCO and 60.4/59.8% on VOC, and outperforming Dataset Diffusion and DiffuMask. DiffuMask is designed for single-object segmentation; therefore we report its VOC re-sult with Mask2Former from the original paper. In contrast, ZeroDSS operates in the fully synthetic setting, using only class names without access to real-image captions or dataset-specific semantic descriptions. Despite this substantially weaker supervi-sion signal, ZeroDSS, even with only the Phase I-II parts, reaches 31.2% mIoU on COCO and 61.7/60.3% on VOC with DeepLabV3/Mask2Former, exceeding the real-caption-aligned synthetic baselines despite operating with weaker task-specific infor-mation. With phase III, the full ZeroDSS further advances the performance to 35.0% and 66.3/63.5% on COCO and VOC, respectively. This suggests the teacher predictions can provide structural cues complementary to diffusion attention, while class-wise mask fusion and confidence filtering reduce the effect of incomplete or uncertain masks dur-ing student optimization. The consistent gains across DeepLabV3 and Mask2Former backbones indicate that the refined supervision is not tied to a single segmentation ar-chitecture. Overall, ZeroDSS substantially improves synthetic-only segmentation and eliminates reliance on real-domain prompts, narrowing the gap to real supervision while maintaining a data-free training protocol. 
+
+5.3 Ablation Studies Ablation of the Learning Objective. Unless marked as the full model or Phase III study, all ablations, including novel category expansion, use the ZeroDSS variant with only Phase I-II. Table 2 reports the ablation results on COCO over the regulariza-tion terms of the learning objective. Without any regularization terms, the confidence-weighted segmentation loss Lseg obtains a performance of 28.5% in terms of mIoU. With image-level consistency regularization, the performance reaches 30.4% (mIoU) 12 Tian Ming, Marzi Heidari, and Yuhong Guo                              
+
+> Table 2: Phase I–II loss ablation on COCO (mIoU).
+> Lseg Limg cons Lpix cons mIoU (%)
+> ✓28.5(+0)
+> ✓✓30.4(+1.9)
+> ✓✓29.4(+0.9)
+> ✓✓✓31.2(+2.7) Table 3: Prompt construction ablation on COCO (mIoU). Val., Bal., and Aug. de-note group validation, category balancing, and segmentation-oriented augmentation. Val. Bal. Aug. mIoU (%) 26.6
+> ✓29.1
+> ✓✓30.5
+> ✓✓✓31.2
+
+by stabilizing the spatially averaged class distribution, while adding pixel-level con-sistency reaches 29.4% by enforcing local invariance at corresponding locations. With both regularization terms, it achieves 31.2% mIoU, confirming that global semantic composition and local boundary stability constrain different failure modes rather than duplicating one another. 
+
+Ablation of LLM-guided Prompt Construction. Table 3 presents the ablation results of our LLM-guided prompt construction pipeline on COCO. LLM validation provides the largest gain (+2.5% mIoU) by replacing random combinations with category groups that can plausibly coexist in one scene. This result supports using the language model as a semantic filter rather than merely as a caption generator. Without balancing, dom-inant classes such as person exceed the next most frequent class by more than 10k instances; adaptive frequency control adds +1.4 points by redistributing effective su-pervision toward less frequent categories. Segmentation-oriented prompt augmentation with category list contributes a further +0.7 points by increasing contextual diversity while preserving visible, separable targets.      
+
+> Table 4: Effect of the Phase III pseudo-label source on COCO with DeepLabV3-R50. All variants evaluate the final EMA teacher. Pseudo-label source mIoU(%) Original attention mask only 33.5 Teacher prediction only 34.4 Class-wise fusion 35.0
+
+Ablation of Phase III Mask Fusion– Pseudo-Label Strategy. We evaluate the effect of mask fusion in Phase III on COCO with DeepLabV3-R50, while keeping Phase I-II fixed. The class-wise fusion strategy adopted for Phase III pro-duces pseudo-labels for the student net-work by fusing the diffusion derived at-tention mask with the teacher predic-tions. Table 4 reports the ablation results by isolating these pseudo-label sources for Phase III. Original attention masks alone reach 33.5% mIoU, whereas teacher pre-dictions alone reach 34.4%. Their class-wise fusion achieves 35.0%, improving over the individual sources by 1.5 and 0.6 points. Diffusion attention retains prompt-aligned localization, while the teacher contributes more coherent structures learned by the seg-menter; their complementary evidence explains the benefit of fusion. ZeroDSS: Semantic Segmentation from Class Names Alone 13 
+
+Table 5: Effect of mask fusion and feedback-driven regeneration on COCO (mIoU). Mask Fusion Prompt Regeneration mIoU 29.7 
+
+✓ 30.8 
+
+✓ ✓ 31.2 Table 6: Class-wise performance before and after refinement on COCO (mIoU). Category Set Before After All Classes ( |C| = 81 ) 29.7 31.2 Non-deficient ( C \ C def ) 32.5 33.8 Deficient ( Cdef ) 9.6 12.8 
+
+Table 7: Novel category expansion with ZeroDSS(Phase I-II) model (mIoU (%)). Extra COCO categories are added to VOC without real training images. VOC + 5 Novel VOC + 10 Novel Subset Dataset Diffusion CLIPSeg ZeroDSS (Phase I-II) Subset Dataset Diffusion CLIPSeg ZeroDSS (Phase I-II) VOC (21) 58.1 55.0 60.5 VOC (21) 57.5 55.8 59.9 Novel(5) 1.02 23.3 27.1 Novel(10) 0.38 21.9 25.9 All(26) 47.1 49.0 54.7 All(31) 39.1 44.9 48.9 
+
+5.4 Effect of Mask Fusion and Prompt Refinement in Phase I-II 
+
+We evaluate the impact of mask fusion and feedback-driven prompt regeneration in Ta-ble 5 for the Phase I and II training. Applying mask fusion alone improves performance from 29.7% to 30.8% mIoU, indicating that refining the synthetic masks ˆm enhances supervision reliability by correcting structural artifacts before retraining. When regen-eration over the performance-deficient category set Cdef is additionally introduced, per-formance further increases to 31.2 mIoU. This confirms that redistributing synthetic probability mass toward categories with high difficulty score rc improves overall seg-mentation quality. Table 6 provides a class-wise analysis before and after refinement. While overall performance across C increases from 29.7% to 31.2% mIoU, the im-provement is substantially larger for categories in Cdef (+3.25% mIoU) than for those in 
+
+C \ C def (+1.27% mIoU). This behavior is consistent with the design of the refinement stage. Regeneration explicitly increases the conditional sampling probability ˜psyn (c)
+
+for c ∈ C def , thereby expanding synthetic support in underperforming semantic regions without degrading well-modeled categories. 
+
+5.5 Novel Category Expansion under Synthetic Supervision. 
+
+Table 7 evaluates category expansion under synthetic supervision. Starting from the standard VOC category set, we introduce additional COCO categories during synthetic data generation without using any real images for the newly added classes. Performance is reported separately on the original VOC categories, the newly introduced categories, and the combined label space. Dataset Diffusion maintains competitive performance on the original VOC cate-gories but collapses on the newly introduced classes, suggesting limited category scal-ability beyond caption-aligned supervision. Because its generation process depends on dataset-specific image-caption statistics, it struggles to construct reliable supervision 14 Tian Ming, Marzi Heidari, and Yuhong Guo 
+
+for categories absent from the original corpus. CLIPSeg benefits from pretrained open-vocabulary segmentation priors and achieves substantially stronger performance on the novel categories. However, its performance on the original VOC categories remains be-low that of ZeroDSS. In contrast, ZeroDSS directly incorporates new categories through structured prompt construction and synthetic segmentation training. It achieves 27.1% and 25.9% mIoU on the five- and ten-category extensions, respectively, while maintain-ing stable performance on the original VOC classes. These results suggest that struc-tured synthetic supervision can support flexible category expansion under extremely weak task-specific supervision. 
+
+# 6 Conclusion 
+
+In this paper, we presented ZeroDSS for semantic segmentation in the class-name-only data-free setting. Rather than treating generated samples as a fixed surrogate for real data, the method constructs and progressively refines a synthetic supervision dis-tribution in a model feedback driven manner. LLM-guided prompt generation con-trols semantic composition and class frequency. The single loop-back based two-phase loop performs feedback-driven automatic synthetic distribution refinement and seg-menter retraining. An additional Phase III further improves the model through class-balanced EMA teacher-student self-training. Without target-domain images, masks, or captions, the full model reaches 35.0% mIoU on COCO and 66.3/63.5% on VOC with DeepLabV3/Mask2Former, improving the corresponding Phase I–II models by 3.8, 4.6, and 3.2 points. The Phase I–II model also supports novel category expansion while re-taining performance on the original classes. These results indicate that synthetic-to-real transfer depends not only on generative image quality, but also on principled control of what is generated, how uncertain masks are used, and how supervision is updated during training. 
+
+# References 
+
+> 1. Amit, T., Shaharbany, T., Nachmani, E., Wolf, L.: Segdiff: Image segmentation with diffusion probabilistic models. arXiv preprint arXiv:2112.00390 (2021) 2. Azizi, S., Kornblith, S., Saharia, C., Norouzi, M., Fleet, D.J.: Synthetic data from diffusion models improves imagenet classification. arXiv preprint arXiv:2304.08466 (2023) 3. Chen, L.C., Papandreou, G., Schroff, F., Adam, H.: Rethinking atrous convolution for seman-tic image segmentation. In: IEEE Conference on Computer Vision and Pattern Recognition (CVPR) (2017) 4. Chen, X., Zhan, Y., Wang, M.M., Xie, B., Shen, C.: Semi-supervised semantic segmentation with cross pseudo supervision. In: CVPR (2021) 5. Ding, Z., Wang, J., Tu, Z., et al.: Open-vocabulary universal image segmentation with maskclip. In: ICML (2023) 6. Everingham, M., Eslami, S.M.A., Van Gool, L., Williams, C.K.I., Winn, J., Zisserman, A.: The pascal visual object classes challenge: A retrospective. International Journal of Com-puter Vision (IJCV) (2015) 7. Gu, Z., Chen, H., Xu, Z., Lan, J., Meng, C., Wang, W.: Diffusioninst: Diffusion model for instance segmentation. arXiv preprint arXiv:2212.02773 (2022)
+
+ZeroDSS: Semantic Segmentation from Class Names Alone 15 8. Hoffman, J., Tzeng, E., Park, T., Zhu, J.Y., Isola, P., Saenko, K., Efros, A.A., Darrell, T.: Cycada: Cycle-consistent adversarial domain adaptation. In: ICML (2018) 9. Ji, Y., Chen, Z., Xie, E., Hong, L., Liu, X., Liu, Z., Lu, T., Li, Z., Luo, P.: Ddp: Diffusion model for dense visual prediction. arXiv preprint arXiv:2303.17559 (2023) 10. Le, M.Q., Nguyen, T.V., Le, T.N., Do, T.T., Do, M.N., Tran, M.T.: Maskdiff: Modeling mask distribution with diffusion probabilistic model for few-shot instance segmentation. arXiv preprint arXiv:2303.05105 (2023) 11. Lee, D.H.: Pseudo-label: The simple and efficient semi-supervised learning method for deep neural networks. In: ICML Workshop on Challenges in Representation Learning (2013) 12. Li, D., Ling, H., Kim, S.W., Kreis, K., Barriuso, A., Fidler, S., Torralba, A.: Bigdatasetgan: Synthesizing imagenet with pixel-wise annotations. In: CVPR (2022) 13. Li, J., Li, D., Xiong, C., Hoi, S.: Blip: Bootstrapping language-image pre-training for uni-fied vision-language understanding and generation. In: International Conference on Machine Learning (ICML) (2022) 14. Li, Z., Zhou, Q., Zhang, X., Zhang, Y., Wang, Y., Xie, W.: Guiding text-to-image diffusion model towards grounded generation. arXiv preprint arXiv:2301.05221 (2023) 15. Lin, T.Y., Maire, M., Belongie, S., Hays, J., Perona, P., Ramanan, D., Dollár, P., Zitnick, C.L.: Microsoft coco: Common objects in context. In: European Conference on Computer Vision (ECCV) (2014) 16. Liu, S., Zhan, Y., Wang, M.M., Shen, C.: Reco: Regional contrast for weakly-supervised semantic segmentation. In: ICLR (2022) 17. L"uddecke, T., Ecker, A.: Image segmentation using text and image prompts. In: CVPR (2022) 18. Melas-Kyriazi, L., Rupprecht, C., Laina, I., Vedaldi, A.: Finding an unsupervised image segmenter in each of your deep generative models. arXiv preprint arXiv:2105.08127 (2021) 19. Nguyen, Q., Vu, T., Tran, A., Nguyen, K.: Dataset diffusion: Diffusion-based synthetic data generation for pixel-level semantic segmentation. In: Advances in Neural Information Pro-cessing Systems (NeurIPS) (2023) 20. Nichol, A., Dhariwal, P., Ramesh, A., Shyam, P., Mishkin, P., McGrew, B., Sutskever, I., Chen, M.: Glide: Towards photorealistic image generation and editing with text-guided dif-fusion models. ICML (2022) 21. Olsson, V., Tranheden, W., Pinto, J., Svensson, L.: Classmix: Segmentation-based data aug-mentation for semi-supervised learning. In: WACV (2021) 22. OpenAI: Gpt-4 technical report. arXiv preprint arXiv:2303.08774 (2023) 23. Richter, S., Vineet, V., Roth, S., Koltun, V.: Playing for data: Ground truth from computer games. In: ECCV (2016) 24. Rombach, R., Blattmann, A., Lorenz, D., Esser, P., Ommer, B.: High-resolution image syn-thesis with latent diffusion models. In: IEEE/CVF Conference on Computer Vision and Pat-tern Recognition (CVPR) (2022) 25. Ros, G., Sellart, L., Materzynska, J., Vazquez, D., Lopez, A.: The synthia dataset: A large collection of synthetic images for semantic segmentation of urban scenes. In: CVPR (2016) 26. Roy, A., Shah, A., Shah, K., Roy, A., Chellappa, R.: Diffalign: Few-shot learning using diffusion-based synthesis and alignment. arXiv preprint arXiv:2212.05404 (2022) 27. Sohn, K., Berthelot, D., Li, C.L., Zhang, Z., Carlini, N., Cubuk, E.D., Kurakin, A., Zhang, H., Raffel, C.: Fixmatch: Simplifying semi-supervised learning with consistency and confidence. In: NeurIPS (2020) 28. Tang, H., Yu, S., Pang, J., Zhang, B.: A training-free synthetic data selection method for semantic segmentation. arXiv preprint (2025) 29. Tarvainen, A., Valpola, H.: Mean teachers are better role models: Weight-averaged consis-tency targets improve semi-supervised deep learning results. In: NeurIPS (2017) 16 Tian Ming, Marzi Heidari, and Yuhong Guo 30. Tranheden, W., Olsson, V., Pinto, J., Svensson, L.: Dacs: Domain adaptation via cross-domain mixed sampling. In: WACV (2021) 31. Tsai, Y.H., Hung, W.C., Schulter, S., Sohn, K., Yang, M.H., Chandraker, M.: Learning to adapt structured output space for semantic segmentation. In: CVPR (2018) 32. Voynov, A., Morozov, S., Babenko, A.: Object segmentation without labels with large-scale generative models. arXiv preprint arXiv:2006.04988 (2020) 33. Wu, W., Zhao, Y., Shou, M.Z., Zhou, H., Shen, C.: Diffumask: Synthesizing images with pixel-level annotations for semantic segmentation using diffusion models. In: IEEE/CVF International Conference on Computer Vision (ICCV) (2023) 34. Xu, J., Liu, S., Vahdat, A., Byeon, W., Wang, X., De Mello, S.: Open-vocabulary panoptic segmentation with text-to-image diffusion models. arXiv preprint arXiv:2303.04803 (2023) 35. Yang, L., Zhou, W., Li, Y., Huang, W., Lin, L., Tian, Q.: St++: Make self-training work better for semi-supervised semantic segmentation. In: CVPR (2022) 36. Yang, Y., Soatto, S.: Fourier domain adaptation for semantic segmentation. In: CVPR (2020) 37. Zhang, Y., Ling, H., Gao, J., Yin, K., Lafleche, J.F., Barriuso, A., Torralba, A., Fidler, S.: Datasetgan: Efficient labeled data factory with minimal human effort. In: CVPR (2021) ZeroDSS: Semantic Segmentation from Class Names Alone 17 
+
+# A Instructions for Prompt Generation 
+
+The prompt-generation instruction is fixed throughout the synthetic data generation pro-cess and consists of several components designed to guide the large language model (LLM) toward producing segmentation-oriented captions. First, the instruction explic-itly specifies the task objective and requirements, informing the LLM that the gener-ated descriptions will be used for diffusion-based image synthesis for semantic seg-mentation. Second, it encourages realistic scene descriptions so that the prompts reflect natural visual situations rather than imaginative or fantasy-like compositions. Third, an attention-aware ordering strategy balances the placement of multiple objects in the sentence so that the diffusion cross-attention can focus more reliably on each target category. Fourth, lexical diversity is encouraged by using varied nouns for the same object types, which increases linguistic diversity without introducing additional prompt complexity. Finally, the instruction regulates the overall scene complexity, including object relations and background content, to avoid overly crowded compositions while maintaining natural interactions between objects. During Phase II, additional prompts are generated with different levels of scene complexity to expand the training distribution of performance-deficient categories. Sim-ple scenes emphasize clean spatial relations and minimal background clutter, which typically produce higher-quality cross-attention masks. In contrast, complex scenes in-troduce multiple objects, richer spatial relations, and more detailed backgrounds. These images better approximate the visual diversity of real-world scenes and therefore im-prove generalization. However, their cross-attention responses are often dispersed and therefore less confident. We retain these samples and their attention-derived masks dur-ing training: the confidence-weighted cross-entropy objective naturally assigns uncer-tain pixels less influence, without an explicit mask- or sample-level discard operation. Figure 3 presents the full instruction used for prompt generation, including the struc-tured guidance described above and the two complexity templates used in Phase II. 
+
+# B Qualitative Analysis of Prompt Construction 
+
+Figure 4 compares random category grouping with LLM-validated grouping and segmentation-oriented prompt augmentation. Random grouping can produce im-plausible co-occurrences, whereas semantic validation yields more coherent object combinations and spatial layouts. Prompt augmentation with categories further improves token ordering and descriptive clarity, facilitating diffusion generation and producing cleaner attention-derived masks. These qualitative trends agree with the quantitative prompt-construction ablation reported in the main paper. 
+
+# C Class-wise Mask Fusion 
+
+To improve the reliability of synthetic supervision, we refine diffusion-derived masks using segmentation model predictions in a class-wise manner. Diffusion attention often provides accurate category-conditioned localization but may omit valid regions or con-tain fragmented components, whereas model predictions usually produce more coherent 18 Tian Ming, Marzi Heidari, and Yuhong Guo 
+
+Fig. 3: Structure of the instruction used for segmentation-oriented prompt generation.             
+
+> (a) Random grouping: A zebra stand-ing beside a refrigerator in a kitchen.
+> (b) LLM grouping: A red jeep parked next to a zebra on a grassland.
+> (c) LLM grouping + augmentation: A
+> zebra on the grassland next to a red
+> jeep .
+
+Fig. 4: Effect of semantic grouping and token order on diffusion-based image generation and attention-derived masks. 
+
+object structures. We produce refined masks by fusing the diffusion-derived masks and the model predicted masks in the following way. For category c, let M att  
+
+> c
+
+and M pred 
+
+> c
+
+denote the diffusion-derived mask and model-predicted mask, respectively. Negligible isolated components are removed from both masks before fusion. Let C(Mc) be the set of connected components in Mc, and let τisl denote the island-size threshold. We define the structural-island indicator as 
+
+ψ(Mc) = 1(∃R ∈ C(Mc) s.t. |R| < τ isl ) , (11) ZeroDSS: Semantic Segmentation from Class Names Alone 19  
+
+> Fig. 5: Qualitative examples of mask refinement across four stages: (1) synthetic image, (2) diffu-sion cross-attention mask, (3) segmentation model prediction, and (4) fused mask after class-wise refinement. Each column corresponds to one example.
+
+where ψ(Mc) = 1 indicates that the mask contains at least one structural island. Given this definition, the fused mask is set as 
+
+M fus  
+
+> c
+
+=
+
+
+
+M att  
+
+> c
+
+, if ψ(M att  
+
+> c
+
+) = 0 , ψ (M pred  
+
+> c
+
+) = 1 ,M pred  
+
+> c
+
+, if ψ(M att  
+
+> c
+
+) = 1 , ψ (M pred  
+
+> c
+
+) = 0 ,M att  
+
+> c
+
+∪ M pred  
+
+> c
+
+, if ψ(M att  
+
+> c
+
+) = ψ(M pred  
+
+> c
+
+).
+
+(12) Thus, when only one mask contains structural islands, the island-free mask is retained; when both masks have the same structural status, their union preserves complementary object regions. Categories appearing only in the model prediction are removed to avoid introducing hallucinated classes. Ambiguous or discarded pixels are assigned to the 
+
+ignore label, followed by light post-processing to improve spatial coherence. In Phase II, M pred  
+
+> c
+
+is produced by the Phase I model for newly generated samples. In Phase III, it is produced by the current teacher and fused with the corresponding original diffusion attention mask. Figure 5 provides qualitative examples of the mask refinement process. Common failure modes of diffusion-derived masks include fragmented activations, missing ob-ject parts, and isolated background regions. In many cases, segmentation model predic-tions provide more coherent object structures, while diffusion masks preserve reliable 20 Tian Ming, Marzi Heidari, and Yuhong Guo 
+
+Algorithm 1 LLM-Guided Prompt and Synthetic Data Generation 
+
+1: Input : Category set C; prompt instruction I; diffusion model D; target sample number N
+
+2: Output : Synthetic dataset Dsyn 
+
+3: Initialize valid group set Gvalid = ∅
+
+4: while |G valid | < N do 
+
+5: Sample candidate group g from C
+
+6: Verify the semantic plausibility of g using the LLM and obtain v
+
+7: if v = 1 then 
+
+8: Gvalid ← G valid ∪ { g}
+
+9: end if 
+
+10: end while 
+
+11: Initialize Dsyn = ∅
+
+12: for each group g ∈ G valid do 
+
+13: Generate prompt T using LLM with instruction I 14: Generate synthetic image ˆx using diffusion model 15: Extract cross-attention maps from the diffusion process 16: Convert attention maps into segmentation mask ˆm
+
+17: Dsyn ← D syn ∪ { (ˆ x, ˆm)}
+
+18: end for 
+
+19: return Dsyn 
+
+localization cues. The fusion strategy combines these complementary strengths to pro-duce more complete masks. The train and wine glass examples show recovery of miss-ing regions and removal of isolated artifacts. The sofa and bird examples demonstrate the suppression of regions inconsistent with the generated image content. The chair ex-ample illustrates how small holes and fragmented regions can be filled after refinement. Despite these improvements, some challenging structures remain difficult to recover. Extremely thin or low-contrast object parts, such as bird legs or wine-glass stems, may still be partially missing, and ambiguous attention activations can occasionally lead to incorrect region merging. 
+
+# D Algorithm for LLM-Guided Data Generation Process 
+
+Algorithm 1 summarizes the synthetic data generation pipeline of our LLM-guided framework. The process consists of two stages: valid category-group construction and synthetic data generation. First, candidate category groups are sampled from the predefined category set C.Each sampled group is validated by the LLM to ensure semantic plausibility, i.e., whether the categories can naturally co-exist within a single scene. Only groups that pass this verification step are added to the valid group set Gvalid . This procedure continues until the desired number of valid groups is obtained. Next, for each valid group, the LLM generates a segmentation-oriented prompt us-ing the fixed instruction I as in Eq.(2). The prompt is then used by the diffusion model to synthesize an image. Cross-attention maps from the diffusion process are extracted and converted into pixel-level segmentation masks, producing paired synthetic samples ZeroDSS: Semantic Segmentation from Class Names Alone 21 
+
+Algorithm 2 ZeroDSS Phase I–II Adaptive Segmentation Training 
+
+1: Input : Synthetic dataset Dsyn ; synthetic validation set Dsyn val ; initial segmentation model fθ0 ;consistency weight λ
+
+2: Output : Trained model fθ
+
+3: Initialize θ ← θ0
+
+4: # Phase I: Initial Segmentation Training 
+
+5: for each minibatch B = {(ˆ xi, ˆmi)}Nb 
+
+> i=1
+
+∈ D syn do 
+
+6: Compute segmentation loss Lseg 
+
+7: Compute pixel consistency Lpix cons 
+
+8: Compute global consistency Limg cons 
+
+9: Compute total loss L(θ) = Lseg + λ  Lpix cons + Limg cons 
+
+
+
+10: Update θ using gradient descent 11: end for 
+
+12: # Phase II: Feedback-Driven Dataset Refinement 
+
+13: Compute deficiency scores rc = (1 − IoU c) + γκ c on Dsyn val 
+
+14: Select deficient categories Cdef (top-K by rc)15: Generate additional synthetic samples ˜Dsyn conditioned on Cdef using Alg. 1 16: Update dataset: Dsyn ← D syn ∪ ˜Dsyn 
+
+17: Predict segmentation masks for samples in ˜Dsyn using the Phase I model 18: Refine masks via class-wise mask fusion (Sec. C) 19: Replace masks in ˜Dsyn with the refined masks 20: # Final Training on Refined Dataset 
+
+21: Continue training θ from the Phase I checkpoint on the refined dataset Dsyn using the same optimization procedure as Phase I 22: return θ
+
+{(ˆ x, ˆm)}. The resulting image–mask pairs are accumulated to form the synthetic train-ing dataset Dsyn .The synthetic validation set used for Phase II refinement is also generated using the same pipeline described in Algorithm 1. 
+
+# E Algorithm for Adaptive Segmentation Training 
+
+Algorithm 2 summarizes the Phase I–II adaptive training procedure of ZeroDSS. Start-ing from the synthetic dataset Dsyn generated by the diffusion pipeline, the segmenta-tion model is first optimized using the confidence-weighted segmentation loss together with pixel-level and global consistency regularization (Phase I). The trained model is then evaluated on a synthetic validation set to estimate category-wise difficulty scores according to rc = (1 − IoU c) + γκ c. Since synthetic validation performance may not fully reflect real-domain difficulty, a lightweight category difficulty prior κc is introduced as an auxiliary signal. Specifically, categories are assigned into three difficulty groups (easy, medium, and hard) using LLM semantic reasoning, corresponding to prior scores of 0, 0.5, and 1, respectively. The prior is used only for category ranking and does not directly influence segmentation model optimization. The default γ = 0.5 is fixed throughout all reported experiments. Categories with poor performance are identified as performance-deficient classes, and 22 Tian Ming, Marzi Heidari, and Yuhong Guo       
+
+> Fig. 6: Effect of γon category selection quality. The y-axis reports the number of selected top-K
+> deficient categories that correspond to below-average categories on the real COCO validation set. Moderate values of γachieve the best alignment between synthetic-domain deficiency estimation and real-domain difficulty.
+> Fig. 7: Three examples of weak-category (fork, chair, necktie) regeneration in Phase II For each category, the left column shows the original synthetic sample and attention-derived mask, while the right column shows the regenerated sample and mask after adaptive refinement.
+
+additional synthetic samples are generated to improve the training distribution (Phase II). The newly generated samples are further refined through class-wise mask fusion before being incorporated into the training set. Finally, a single loop-back to Phase I is conducted, which continues training the segmenter on the augmented synethetic dataset using the training procedure of Phase I. To evaluate the influence of the difficulty prior, we perform a post-hoc sensitivity analysis by varying γ while keeping all other components unchanged. For each setting, we measure how many of the selected top-K deficient categories correspond to below-average performing categories on the real COCO validation set. As shown in Fig. 6, the category selection quality peaks at γ = 0 .5 and γ = 0 .6, indicating that a moderate contribution from the semantic prior helps compensate for bias in synthetic validation while avoiding over-reliance on prior knowledge. The fixed default therefore lies within the stable moderate range identified by this diagnostic analysis. ZeroDSS: Semantic Segmentation from Class Names Alone 23 
+
+Algorithm 3 ZeroDSS Phase III Teacher–Student Self-Training 
+
+1: Input : Original synthetic image–attention-mask dataset Dsyn ; Phase I-II parameters θII ;rounds R = 10 
+
+2: Settings : Images per foreground category q = 25 ; confidence threshold τst = 0 .6; EMA coefficients {μr }Rr=1 
+
+3: Output : Final EMA teacher fθT
+
+4: Initialize θT ← θII and θS ← θII 
+
+5: for r = 1 to R do 
+
+6: Sample a class-balanced subset Br ⊂ D syn with q images per foreground category 7: Freeze the teacher fθT for the current round 8: Predict teacher distributions pT = fθT (ˆ x) for ˆx ∈ B r
+
+9: Fuse teacher predictions with the corresponding original diffusion attention masks using class-wise mask fusion 10: Set ci = max k pTi (k) and retain pixels Ω = {i : ci > τ st }
+
+11: Optimize θS for exactly one epoch on the fused labels yi using confidence-weighted cross-entropy over i ∈ Ω, without augmentation and with the Phase I optimization settings 12: Update the teacher after the round: θT ← μr θT + (1 − μr )θS
+
+13: end for 
+
+14: return fθT
+
+Figure 7 presents representative examples of weak-category regeneration during Phase II. Depending on the identified failure mode, the regeneration process simpli-fies or enriches the scene composition. The examples shown here correspond to the complexity-reduction branch, where the target object becomes more visually promi-nent and less affected by surrounding clutter. As a result, diffusion attention becomes more concentrated on the target category, producing cleaner and more complete object masks for segmenter training. 
+
+# F Teacher-Student Self-Training Algorithm 
+
+Algorithm 3 summarizes Phase III of ZeroDSS. Both networks are initialized from the final Phase I-II model. Each round uses a class-balanced subset drawn using the original attention-mask rather than the masks refined in Phase I-II. Approximately 25 images are sampled per foreground category, and every selected image appears once during the round. The teacher remains fixed while the student is trained for one epoch without augmentation, using the same batch size, optimizer, and learning rate as in Phase II. The confidence threshold and the finite 10-round budget limit the accumulation of uncertain pseudo-labels. After each round, the teacher network is updated through EMA and its updated version generates predictions for the next round. No real-domain samples are introduced. The EMA coefficient follows a cosine schedule from 0.999 to 0.9999. The final EMA teacher is used for evaluation. 24 Tian Ming, Marzi Heidari, and Yuhong Guo    
+
+> Fig. 8: Sensitivity analysis of the consistency weight λon COCO (DeepLabV3-R50).
+
+# G Hyper-parameter Sensitivity Analysis 
+
+We analyze the effect of the consistency weighting coefficient λ used in the training objective described in the main paper: L(θ) = Lseg + λLcons . Figure 8 presents the analysis results by varying the λ value. Performance peaks at λ = 0 .2, indicating that a moderate contribution of the prediction-consistency term Lcons is sufficient to stabi-lize training under synthetic supervision. When λ is too small, the regularization effect is limited, reducing robustness to synthetic-specific artifacts. Conversely, larger val-ues of λ degrade performance, suggesting that excessive emphasis on Lcons suppresses informative gradients from Lseg and leads to underfitting. These results confirm that ZeroDSS benefits from balanced interaction between supervised risk minimization and distributional consistency regularization.
