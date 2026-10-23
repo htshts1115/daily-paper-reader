@@ -48,17 +48,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-10-22</span>
+      <span class="dpr-home-dashboard-kicker">2026-10-23</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 2 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 3 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>0</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>2</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>3</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-10-22 22:21:09 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-10-23 22:32:29 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -69,9 +69,7 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日速读 2 篇论文，精读 0 篇，重点放在测试时自适应和跨模态少样本分割这两个方向。</p>
-<p>最值得看的是评分 7.0 的《IntriAdapt》：它用内在引导的测试时自适应来提升度量几何估计的泛化能力；其次，6.0 的《Visual Memory and Textual Alignment》展示了视觉记忆与文本对齐相结合的跨模态少样本分割思路。</p>
-<p>普通读者可以先从 IntriAdapt 入手，了解“测试时自适应”如何在不重训模型的情况下应对新场景，再按兴趣跟进分割方向的跨模态对齐方法。</p>
+<p>今日速读 3 篇均分 6.0 的视觉论文，聚焦从 4D 人体对应、文本提示分割到统一视觉感知。最值得关注的是 Dense4D 的像素级 4D 人体对应和 LLMSeg 的免训练文本提示分割。建议普通读者先看这两篇的任务设定与效果对比，再决定是否深入。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -93,12 +91,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">2 篇</strong>
+    <strong class="dpr-home-dashboard-count">3 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="IntriAdapt: Generalizable Intrinsic-Guided Test-Time Adaptation for Metric Geometry Estimation">IntriAdapt: Generalizable Intrinsic-Guided Test-Time Adaptation for Metric Geometry Estimation</span></li><li><span class="dpr-home-dashboard-paper-title" title="Visual Memory and Textual Alignment for Cross-Modal Few-Shot Segmentation">Visual Memory and Textual Alignment for Cross-Modal Few-Shot Segmentation</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Dense4D: Pixel-Level 4D Human Correspondence">Dense4D: Pixel-Level 4D Human Correspondence</span></li><li><span class="dpr-home-dashboard-paper-title" title="LLMSeg: Training-Free Text-Prompted Image Segmentation with B-Splines">LLMSeg: Training-Free Text-Prompted Image Segmentation with B-Splines</span></li><li><span class="dpr-home-dashboard-paper-title" title="WeVisOne-VL: Unified Visual Perception from Objects to Pixels">WeVisOne-VL: Unified Visual Perception from Objects to Pixels</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">mono-depth <strong>1</strong></span><span class="dpr-home-dashboard-tag">seg <strong>1</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">matting <strong>1</strong></span><span class="dpr-home-dashboard-tag">mono-depth <strong>1</strong></span><span class="dpr-home-dashboard-tag">seg <strong>1</strong></span></div>
 </section>
 </div>
 

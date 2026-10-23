@@ -1,0 +1,54 @@
+{
+  "label": "2026-10-23",
+  "date": "2026-10-23",
+  "generated_at": "2026-10-23T22:32:31",
+  "count": 3,
+  "papers": [
+    {
+      "paper_id": "202610/23/2610.22325v1-dense4d-pixel-level-4d-human-correspondence",
+      "section": "quick",
+      "title_en": "Dense4D: Pixel-Level 4D Human Correspondence",
+      "authors": "Rıza Alp Güler",
+      "date": "2026-10-15",
+      "pdf": "https://arxiv.org/pdf/2610.22325v1",
+      "score": "6.0",
+      "evidence": "单目 RGB 深度与人体点图预测",
+      "tldr": "从单目RGB视频重建人体4D运动，需要在关节运动、衣物形变和遮挡变化下持续识别同一表面点。Dense4D是首个面向身体、衣物与头发的无模板前馈稠密4D对应模型，它联合预测Human Point Maps与每帧深度，从而在不需要相机位姿和大幅度场景位移的情况下完成跨帧匹配。实验显示，该方法在真实人体上跟踪更准确、与扫描表面更一致，并能把多帧点云组装成参考姿态下连贯的人体几何，为单目4D人体重建提供稠密一致的对应方案。",
+      "tags": "query:mono-depth",
+      "abstract_en": "Reconstructing human motion in 4D requires identifying the same surface points through articulation, deformation and changes in visibility. We introduce Dense4D, to our knowledge the first feed-forward model dedicated to dense 4D correspondence across the body, clothing and hair from a set of monocular RGB images, without a body template. Trained specifically for human geometry, Dense4D jointly processes person-centred crops with known image-to-crop transforms to predict Human Point Maps (HPMs) and depth for each image. An HPM assigns each person pixel the 3D position of its observed surface point at a common reference time. These maps support amodal correspondence: points hidden in the reference image can be localised from observations in other frames. Matching HPM coordinates across crops establishes correspondence without predicting camera poses or large scene displacements; per-image depth then lifts the matches into 3D tracks. Experiments on real people demonstrate substantially higher tracking accuracy and closer agreement with scanned surfaces than the evaluated baselines. Points from different frames assemble into coherent human geometry in the reference pose, providing visible evidence of consistent dense correspondence through articulation and clothing deformation. Additional qualitative results, videos, and an interactive viewer are available at https://alpguler.com/dense4d.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202610/23/2610.29409v1-llmseg-training-free-text-prompted-image-segmentation-with-b-splines",
+      "section": "quick",
+      "title_en": "LLMSeg: Training-Free Text-Prompted Image Segmentation with B-Splines",
+      "authors": "Abdullah Hamdi",
+      "date": "2026-10-21",
+      "pdf": "https://arxiv.org/pdf/2610.29409v1",
+      "score": "6.0",
+      "evidence": "免训练的文本提示开放词汇图像分割",
+      "tldr": "现有SAM 3等可提示分割模型依赖专用架构、大规模标注与任务训练，难以直接复用通用多模态大模型。LLMSeg提出免训练流程，将视觉大模型组织为检测、B样条描边与迭代精修三阶段，输出可检查的掩码几何。在ReasonSeg、RefCOCO系列及LVIS等任务上，它以Gemini-3.7-Flash为后端常可媲美甚至超过SAM 3，ReasonSeg val达71.5 cIoU。该工作证明无需分割头或重训即可让MLLM完成文本提示分割，并支持后端升级直接受益。",
+      "tags": "query:seg",
+      "abstract_en": "Promptable segmentation models such as SAM 3 achieve remarkable open-vocabulary performance but require dedicated architectures, large-scale annotation engines, and task-specific training. We ask a different question: can a general-purpose multimodal large language model (MLLM) segment images directly, without an added segmentation head, mask decoder, or training? We present LLMSeg, a training-free pipeline that turns a vision-capable LLM into a text-prompted image segmenter. LLMSeg decomposes segmentation into three LLM-driven stages. First, detect localizes all instances matching a free-form text query and describes their coarse morphology. Next, segment traces each instance using closed periodic B-splines confined to its detected box. These splines define an outer boundary and optional hole loops. Finally, refine iteratively proposes focus boxes around residual errors and retraces confined splines. The process ends when the mask stabilizes or the pass budget is exhausted. The output is a binary mask with inspectable intermediate geometry. We evaluate LLMSeg across ten referring and reasoning segmentation splits (ReasonSeg and RefCOCO/+/g). We also evaluate open-vocabulary instance segmentation (LVIS, COCO, and SA-Co), semantic segmentation, and zero-shot detection (ODinW13 and RF-100VL). With an off-the-shelf Gemini-3.7-Flash backend, LLMSeg is competitive with and often surpasses the specialist SAM 3 model on identical items. It reaches 71.5 cIoU on ReasonSeg val without additional segmentation-specific training. Backend model updates can improve accuracy without retraining the pipeline. The code is available at https://abdullahamdi.com/llmseg .",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202610/23/2610.31329v1-wevisone-vl-unified-visual-perception-from-objects-to-pixels",
+      "section": "quick",
+      "title_en": "WeVisOne-VL: Unified Visual Perception from Objects to Pixels",
+      "authors": "Tianming Liang, Junyi Pan, Yuxi Li, Canmiao Fu, Zhipeng Huang, Chong Sun, Chen Li, Jing Lyu",
+      "date": "2026-10-22",
+      "pdf": "https://arxiv.org/pdf/2610.31329v1",
+      "score": "6.0",
+      "evidence": "统一视觉语言模型支持分割与抠图并输出alpha蒙版",
+      "tldr": "现有视觉语言模型在细粒度感知上仍不可靠，难以统一对象级与像素级任务。WeVisOne-VL通过结构化下一词预测，并用<OBJ>令牌连接轻量像素解码器，实现从点、框到掩码和alpha matte的多粒度定位。模型经三阶段课程SFT与混合任务RL训练，在30余项基准上取得对象级和像素级任务领先，并能稳健拒识缺失目标。该工作开源模型，推动VLM从宽泛理解走向可靠感知部署。",
+      "tags": "query:matting",
+      "abstract_en": "Existing vision-language models (VLMs) remain unreliable for fine-grained visual perception. In this report, we present WeVisOne-VL (WeChat Vision All-in-One), a powerful VLM that unifies object-level and pixel-level perception through structured next-token prediction. It supports multiple visual tasks including object detection, referring localization, counting, OCR, segmentation, and matting, enabling localization at any user-specific granularity, from points and boxes to masks and alpha mattes. Architecturally, we integrate a lightweight pixel decoder into the VLM via a special <OBJ> token to generate instance-level pixel outputs. We train the model with a three-stage curriculum SFT followed by mixed-task RL. Across over 30 benchmarks, WeVisOne-VL demonstrates leading performance on both object-level and pixel-level tasks, while maintaining robust rejection for object-absent queries. By releasing WeVisOne-VL to the open-source community, we hope to advance VLMs from broad visual understanding toward truly reliable perception systems for real-world deployment.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    }
+  ],
+  "errors": []
+}
