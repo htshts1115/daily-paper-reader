@@ -48,17 +48,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-10-26</span>
+      <span class="dpr-home-dashboard-kicker">2026-10-27</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 2 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 4 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>1</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>1</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>2</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>2</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-10-26 23:05:05 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-10-27 23:05:09 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -69,7 +69,7 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日精读1篇、速读1篇，聚焦开放词汇语义分割与三维表征的特征提升。最值得关注的是精读文中通过区域语义和视觉原型优化开放词汇分割的思路，以及速读文探讨3D表征如何影响语义特征提升。普通读者可先看精读文了解分割精度提升方法，再借速读文补充三维表征视角。</p>
+<p>今天筛完 4 篇，精读 2 篇、速读 2 篇，重点落在高效视频抠像与假肢视觉感知。最值得看的是 9.0 分的 MatAnyone-E 稀疏记忆传播方案，以及 8.0 分的下肢假肢零样本单目深度估计。普通读者建议先读这两篇精读，速读的基础模型光流与 CLIP 查询时校准可留作背景扩展。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -78,12 +78,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">1 篇</strong>
+    <strong class="dpr-home-dashboard-count">2 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Refining Open-Vocabulary Semantic Segmentation via Regional Semantics and Visual Prototypes">Refining Open-Vocabulary Semantic Segmentation via Regional Semantics and Visual Prototypes</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="MatAnyone-E: Sparse Memory Propagation for Efficient High-Resolution Video Matting">MatAnyone-E: Sparse Memory Propagation for Efficient High-Resolution Video Matting</span></li><li><span class="dpr-home-dashboard-paper-title" title="Zero-Shot Monocular Depth Estimation for Visual Perception in Lower-Limb Prostheses">Zero-Shot Monocular Depth Estimation for Visual Perception in Lower-Limb Prostheses</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">seg <strong>1</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">matting <strong>1</strong></span><span class="dpr-home-dashboard-tag">mono-depth <strong>1</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -91,12 +91,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">1 篇</strong>
+    <strong class="dpr-home-dashboard-count">2 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="OV-Foam: How 3D Representations Shape Semantic Feature Lifting">OV-Foam: How 3D Representations Shape Semantic Feature Lifting</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Foundation Model Driven Optical Flow">Foundation Model Driven Optical Flow</span></li><li><span class="dpr-home-dashboard-paper-title" title="Query-Time Calibration of CLIP Features for Open-Vocabulary 3D Segmentation">Query-Time Calibration of CLIP Features for Open-Vocabulary 3D Segmentation</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">seg <strong>1</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">mono-depth <strong>1</strong></span><span class="dpr-home-dashboard-tag">seg <strong>1</strong></span></div>
 </section>
 </div>
 

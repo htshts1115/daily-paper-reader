@@ -1,0 +1,596 @@
+Zero-Shot Monocular Depth Estimation for Visual
+Perception in Lower-Limb Prostheses
+Ishi Vijayvergiya, Marc H¨olle, Youssef Dawoud, Amir El-Ghoussani, Michele De Vita, Rohan Asthana,
+Philipp Beckerle, and Vasileios Belagiannis
+Friedrich-Alexander-Universit¨at Erlangen-N¨urnberg
+Erlangen, Germany
+{ishi.vijayvergiya, marc.hoelle, youssef.dawoud, amir.el-ghoussani,
+michele.de.vita, rohan.asthana, philipp.beckerle, vasileios.belagiannis}@fau.de
+Abstract—Monocular depth estimation has advanced rapidly
+with the development of foundation models that demonstrate
+strong zero-shot generalisation across diverse visual domains.
+However, the applicability of these models to visual perception
+for lower-limb prosthetics remains largely unexplored. Reliable
+depth perception is particularly important for prosthesis users,
+who often experience significant challenges when navigating
+stairs, uneven terrain, and other complex environments. To
+address this gap, we introduce the Lower-Limb Prosthesis (LP)
+dataset, a benchmark designed to evaluate depth perception from
+an emulated knee-level prosthetic viewpoint. Using this dataset,
+we evaluate four state-of-the-art monocular depth estimation
+foundation models. Our results provide the first systematic
+benchmark of monocular depth estimation performance from
+a prosthetic viewpoint, while highlighting both the challenges
+and the potential of deploying foundation models in prosthetic
+perception systems. The code and dataset are available at
+https://github.com/Ishivijay/lp dataset.
+Index Terms—Monocular depth estimation, foundation models,
+zero-shot, medical prosthesis
+I. INTRODUCTION
+Visual perception is fundamental to autonomous navigation
+and environmental understanding. In the context of medical
+prosthetics, the ability to accurately perceive and interpret
+the surrounding environment is critical for safe and effective
+device operation. However, current lower-limb prostheses lack
+robust perceptual capabilities, leaving users at significantly
+increased risk of falls, particularly when navigating stairs,
+uneven terrain, and cluttered environments [1]. Integrating
+reliable depth perception into prosthetic systems could enable
+real-time hazard detection, adaptive gait planning, and en-
+hanced environmental awareness. By improving the ability to
+navigate complex environments safely, such capabilities could
+reduce fall risk, enhance mobility, and increase user confidence
+in daily activities.
+Computer vision approaches are increasingly being inte-
+grated into lower-limb wearable robotics to provide active
+environmental awareness. In lower-limb prosthetics, vision-
+in-the-loop control using gaze-tracking cues can be used to
+identify user intention and anticipate terrain transitions, pro-
+viding volitional control of active knee-ankle prostheses [2].
+The authors gratefully acknowledge the computing resources provided
+by the NHR@FAU HPC-Portal at Friedrich-Alexander-Universit¨at Erlangen-
+N¨urnberg.
+Fig. 1.
+LP dataset acquisition setup. The dataset was collected with a
+wearable camera mounted on the lower limb in four configurations: above or
+below the knee, on each leg. These configurations yield egocentric recordings
+from an emulated knee-level prosthetic viewpoint during locomotion across a
+diverse set of mounting positions.
+Visual-inertial odometry can be combined with 3D terrain
+reconstruction to classify locomotion [3]. Similarly, depth-
+aware pose estimation has also been integrated into lower-
+limb exoskeleton systems to enable real-time gait analysis and
+prevent asymmetric locomotion and falls [4], as well as to fa-
+cilitate gesture-driven control interfaces leveraging monocular
+depth features [5]. While these approaches demonstrate the
+value of vision, they generally rely on task-specific training,
+custom multicamera setups, or cooperative rehabilitation en-
+vironments.
+Monocular depth estimation has become an important ca-
+pability in the field of computer vision [6]. Recent founda-
+tion models have achieved impressive zero-shot generalisation
+across a variety of scenes. Models such as Marigold [7], Depth
+Anything V2 [8], Depth Pro [9], and VGGT [10] employ
+a range of training strategies to predict dense depth maps
+from single RGB images. However, these models are typically
+developed and benchmarked on conventional datasets featuring
+a standard eye-level perspective. These advances raise a natural
+question: Can state-of-the-art monocular depth estimation
+foundation models generalize zero-shot to the unique, highly
+dynamic, and knee-level perspective of a prosthesis-mounted
+1
+arXiv:2610.35018v1  [cs.CV]  26 Oct 2026
+
+
+camera?
+While prior datasets have captured egocentric or wearable
+camera images of locomotion environments, they focus mainly
+on RGB-based scene classification or activity recognition and
+do not provide paired ground-truth depth annotations. Existing
+depth estimation benchmarks, on the other hand, target indoor
+scenes NYUv2 [11], ScanNet [12], or autonomous driving
+KITTI [13], none of which reflect the specific viewing angle,
+motion patterns, and close-range stair navigation experienced
+by a prosthesis user. To our knowledge, no existing dataset
+provides paired RGB-depth data recorded from a lower-limb-
+mounted camera during locomotion, capturing the perspective
+of a lower-limb prosthesis.
+To address this gap, we introduce the Lower-limb Prosthesis
+(LP) dataset, the first dataset designed specifically for visual
+perception in medical prosthesis applications. The LP dataset
+consists of synchronized RGB-depth image pairs captured
+from a camera mounted on a lower-limb during stair ascent
+and descent across six recording sessions. The dataset covers
+a variety of scene elements, including staircases, corridors,
+landings, and doorways, all captured from an emulated knee-
+level prosthetic viewpoint during locomotion.
+Using this dataset, we carry out a comprehensive zero-shot
+evaluation of four state-of-the-art monocular depth estimation
+foundation models. This study provides the first empirical
+evidence on the robustness and limitations of modern depth
+estimation models when applied to data from a lower-limb-
+mounted camera emulating a prosthetic viewpoint, enabling
+novel research for visual perception in medical prostheses.
+The main contributions of this paper are:
+1) We introduce the LP dataset, the first dataset for visual
+depth perception for lower-limb prosthesis, comprising
+six stair-navigation sequences with ground-truth depth
+from a depth camera.
+2) We present a systematic zero-shot evaluation of four
+state-of-the-art monocular depth estimation foundation
+models (Marigold, Depth Anything V2, Depth Pro, and
+VGGT) on this novel domain.
+3) We provide a detailed analysis of model performance
+across different scene types and discuss the implications
+for integrating depth estimation into prosthetic percep-
+tion systems.
+II. RELATED WORK
+A. Monocular Depth Estimation
+Monocular depth estimation aims to infer scene depth
+from a single RGB image and has been extensively studied
+in computer vision. Early supervised approaches relied on
+paired RGB–depth datasets, such as NYU Depth V2 [11]
+and KITTI [13], and employed convolutional neural networks
+for depth prediction [14]. To reduce dependence on costly
+ground-truth depth annotations, self-supervised methods were
+subsequently introduced, leveraging photometric consistency
+across video frames or stereo image pairs as a supervisory
+signal [15]. More recently, research has shifted toward foun-
+dation models designed to generalize across diverse domains
+and visual environments. Depth Anything [16] and its suc-
+cessor, Depth Anything V2 [8], are trained at scale using a
+combination of labelled and unlabelled data. Marigold [7]
+repurposes the Stable Diffusion architecture for monocular
+depth estimation through a diffusion-based denoising frame-
+work. Depth Pro [9] combines a DINOv2 backbone with a
+dedicated focal-length estimation module, while VGGT [10]
+leverages vision transformers to achieve strong depth estima-
+tion accuracy and cross-domain generalisation. Despite their
+impressive performance on standard benchmark datasets, the
+robustness of these models under the unconventional camera
+viewpoints encountered in lower-limb prosthetic applications
+remains largely unexplored.
+B. Egocentric and Wearable Vision Datasets
+Several datasets have been developed using wearable or
+body-mounted cameras to support mobility and visual per-
+ception research. For example, the ExoNet database [17] pro-
+vides wearable-camera images of walkable environments for
+scene classification, while other datasets have been proposed
+for depth estimation using head-mounted or chest-mounted
+cameras. However, these datasets are primarily designed for
+general egocentric perception and do not capture the unique
+visual characteristics of a lower-limb prosthesis-mounted cam-
+era, including its low viewpoint, reduced camera height, and
+distinctive motion dynamics during locomotion and stair ne-
+gotiation. As a result, they provide limited insight into the
+performance of depth estimation models in prosthetic naviga-
+tion scenarios, highlighting the need for datasets specifically
+designed to evaluate perception from a prosthetic perspective.
+C. Visual Perception for Assistive Devices
+Research on intelligent lower-limb prostheses has tradi-
+tionally focused on mechanical design, control strategies,
+and electromyography (EMG)-based intent recognition [18].
+Recent work started incorporating environmental sensing to
+improve prosthetic functionality. Examples include the use of
+wearable-camera imagery for locomotion environment clas-
+sification [17] and the identification of walkable surfaces
+from egocentric images [19]. While these approaches provide
+valuable semantic information about the environment, they do
+not explicitly capture its geometric structure. Incorporating
+depth-aware perception into prosthetic systems could enable
+advanced capabilities such as obstacle detection, step-height
+estimation, terrain assessment, and real-time path planning.
+Despite these potential benefits, the application of monocular
+depth estimation to lower-limb prosthetic navigation remains
+largely unexplored.
+III. DATASET
+A. Dataset Acquisition and Setup
+The LP dataset comprises indoor scenes collected in a
+multi-storey building using an RGB camera and a co-located
+depth camera mounted on a participant’s knee to emulate the
+viewpoint of a knee-level prosthesis-mounted camera. Repre-
+sentative examples are shown in Fig. 2. Data were collected
+2
+
+
+TABLE I
+OVERVIEW OF THE SIX RECORDING SEQUENCES IN THE LP DATASET.
+Sequence
+Direction
+Images
+LA downstairs
+Down
+428
+LA upstairs
+Up
+629
+LB upstairs
+Up
+591
+RA downstairs
+Down
+375
+RA upstairs
+Up
+622
+RB downstairs
+Down
+499
+Total
+3,144
+under controlled conditions in a relatively uncluttered indoor
+setting to establish a clean baseline benchmark and avoid
+recording unconsented individuals; door thresholds, densely
+furnished spaces, other people, and moving animals were
+excluded. This initial collection focused on constant-speed
+walking in the selected indoor setting. In total three healthy
+male participants in their mid-twenties took part in the study.
+One participant was from Europe, and the other two were
+from Asia. The height of each individual varied from 1.7 m to
+1.87 m. All measurements were collected while participants
+walked at a constant speed. Data were acquired using four
+mounting configurations: left-above (LA), left-below (LB),
+right-above (RA), and right-below (RB), where the camera
+was positioned either above or below the left or right knee
+joint, as shown in Fig. 1. The sensor was secured to the
+participant’s leg using a mounting strap, with power and data
+transmitted via a USB Type-C 3.2 connection to a laptop
+carried by an accompanying person. The dataset contains
+3,144 synchronized RGB–depth image pairs distributed across
+six recording sequences encompassing stair ascent, stair de-
+scent, and corridor walking, as summarized in Table I. Data
+acquisition was performed using an Orbbec Femto Bolt depth
+camera, which operates on Microsoft’s Azure Kinect Time-
+of-Flight (ToF) technology. The device features a 1-megapixel
+indirect ToF (iToF) depth sensor configured in wide field-of-
+view (WFOV) mode, yielding a 120° × 120° field of view and
+producing depth maps at a resolution of 1024 × 1024 pixels.
+Co-registered RGB images were captured via the integrated
+4K RGB sensor and synchronized with the depth maps at the
+hardware level.
+B. Dataset Structure and Formats
+For each sequence, the dataset provides sharpened RGB
+images sharpen_rgb, raw depth maps raw_depth, col-
+orized depth visualizations colored_depth, temporally
+smoothed depth smooth_depth and transformed depth
+transformed_depth.
+IV. EXPERIMENTS
+We perform zero-shot inference using four state-of-the-
+art
+foundation
+models
+for
+monocular
+depth
+estimation:
+Marigold [7], Depth Anything V2 [8], Depth Pro [9], and
+VGGT [10]. To ensure a consistent comparison, all models
+were evaluated using the same three-stage pipeline: (1) zero-
+shot inference on raw RGB images, (2) post-processing and
+alignment of predicted depth maps with the spatial dimensions
+of the ground-truth depth data, and (3) quantitative evaluation
+using standard depth estimation metrics.
+1) Model Configurations: Marigold was evaluated using
+the pre-trained marigold-depth-v1-1 diffusion check-
+point [7], with half-precision (FP16) inference enabled. Depth
+Anything V2 was deployed with the large Vision Transformer
+encoder (ViT-L) configuration [8], and inference was config-
+ured to produce raw depth maps. Depth Pro was loaded using
+its official model factory, generating metric depth predictions
+in meters together with estimated camera focal lengths [9].
+VGGT, originally developed for multi-view 3D reconstruction,
+was adapted for single-image depth estimation using the
+VGGT-1B checkpoint (1 billion parameters) [10] obtained
+from Hugging Face. Input images were preprocessed using
+the official VGGT preprocessing pipeline in crop mode [10],
+and depth maps were extracted from the model outputs for
+evaluation.
+2) Evaluation Protocol: All models were evaluated on the
+complete set of sequences in the LP dataset under identical
+experimental conditions. When the spatial resolution of a pre-
+dicted depth map differed from that of the ground-truth depth
+map, bilinear interpolation was used to resize the prediction
+to the ground-truth dimensions.
+To enable fair comparison across models with differing scale
+and shift characteristics, a least-squares alignment procedure
+was applied per image. Specifically, a global scale factor s
+and shift term t were estimated by solving
+GT = s · pred + t,
+(1)
+where GT denotes the ground-truth depth map and pred
+denotes the predicted depth map [7]. The evaluation metrics
+included absolute relative error (Abs Rel), squared relative
+error (Sq Rel), root mean square error (RMSE), root mean
+square error in logarithmic space (RMSElog), and threshold
+accuracies δ1, δ2, and δ3. Both the least-squares alignment in
+Eq. 1 and all evaluation metrics were computed exclusively
+over valid ground-truth depth pixels (GT > 0), excluding
+unmeasured sensor dropout regions.
+V. DISCUSSION
+A. Quantitative Results
+Tables II and III summarize the zero-shot depth estimation
+performance of the four foundation models on the LP dataset
+following least-squares alignment. On the staircase scene (Ta-
+ble II), VGGT achieved the strongest performance, obtaining
+the best Abs Rel (0.1532), Sq Rel (0.0818), RMSE (0.3449),
+and δ1 (0.8099). On the corridor scene (Table III), Marigold
+outperformed all other models across every evaluation metric,
+achieving the lowest Abs Rel (0.1963), Sq Rel (0.0813),
+RMSE (0.3357), and RMSElog (0.2205), together with the
+highest threshold accuracies (δ1 = 0.7592, δ2 = 0.9371, and
+δ3 = 0.9669). Depth Pro and VGGT remained competitive
+across both scenes, whereas Depth Anything V2 consistently
+3
+
+
+Fig. 2. Qualitative comparison of zero-shot monocular depth estimation on the LP dataset. Nine representative scenes (rows), spanning corridors, staircases,
+landings, and doorways, are shown with, from left to right, the RGB input, the Ground truth and the depth predicted by Marigold, Depth Anything V2, Depth
+Pro, and VGGT. Depth is rendered with a colormap, where warm colors denote near and cool colors denote far surfaces. Black regions in the ground truth
+denote invalid sensor returns that are caused by surfaces beyond the operating range, grazing-angle specular reflections on floor tiles, or areas outside the
+depth field of view.
+produced the largest errors and lowest threshold accuracies.
+Despite differences in ranking, all models demonstrated ef-
+fective zero-shot generalisation to the emulated knee-level
+prosthetic viewpoint, with Marigold and VGGT exhibiting the
+strongest overall performance.
+B. Qualitative Results
+Figure 2 presents qualitative comparisons of the depth maps
+generated by the four foundation models. By visual inspection
+of Figure 2, all models successfully capture the global scene
+geometry and depth gradients, clearly distinguishing nearby
+structures from more distant regions. Depth Anything V2
+and VGGT generally produce smoother and more spatially
+coherent depth maps, preserving large-scale scene layouts
+across a variety of environments. Marigold also generates
+plausible depth estimates but appears more sensitive to local
+structures and depth discontinuities, resulting in finer-grained
+depth variations. Depth Pro produces metric depth predictions
+4
+
+
+TABLE II
+ZERO-SHOT DEPTH ESTIMATION RESULTS ON THE LP DATASET
+(STAIRCASE SCENE) WITH LEAST-SQUARES ALIGNMENT. LOWER IS
+BETTER FOR ↓METRICS; HIGHER IS BETTER FOR ↑METRICS. BEST IN
+BOLD.
+Metric
+Marigold
+DA-V2
+Depth Pro
+VGGT
+Abs Rel ↓
+0.1568
+0.2066
+0.1599
+0.1532
+Sq Rel ↓
+0.0858
+0.1158
+0.0829
+0.0818
+RMSE ↓
+0.3549
+0.3947
+0.3489
+0.3449
+RMSElog ↓
+0.1972
+0.2806
+0.2006
+0.2011
+δ1 ↑
+0.8075
+0.7179
+0.8008
+0.8099
+δ2 ↑
+0.9434
+0.8955
+0.9408
+0.9434
+δ3 ↑
+0.9756
+0.9489
+0.9754
+0.9755
+TABLE III
+ZERO-SHOT DEPTH ESTIMATION RESULTS ON THE LP DATASET
+(CORRIDOR SCENE) WITH LEAST-SQUARES ALIGNMENT. LOWER IS
+BETTER FOR ↓METRICS; HIGHER IS BETTER FOR ↑METRICS. BEST IN
+BOLD.
+Metric
+Marigold
+DA-V2
+Depth Pro
+VGGT
+Abs Rel ↓
+0.1963
+0.2739
+0.2219
+0.2477
+Sq Rel ↓
+0.0813
+0.1513
+0.0936
+0.1241
+RMSE ↓
+0.3357
+0.5067
+0.3595
+0.4084
+RMSElog ↓
+0.2205
+0.3980
+0.2483
+0.2898
+δ1 ↑
+0.7592
+0.5442
+0.6632
+0.6100
+δ2 ↑
+0.9371
+0.8119
+0.9184
+0.8824
+δ3 ↑
+0.9669
+0.9277
+0.9635
+0.9581
+with clear foreground–background separation, although its
+outputs are occasionally more over-smoothed than those of
+the other models. Despite the challenging knee-level cam-
+era viewpoint and motion characteristics of the lower-limb-
+mounted setup, all methods generate depth predictions that
+remain broadly consistent with the underlying scene struc-
+ture. These qualitative results demonstrate the strong zero-
+shot generalisation capabilities of contemporary monocular
+depth estimation foundation models in prosthetic perception
+scenarios.
+C. Future Work
+Although
+the
+examined
+zero-shot
+foundation
+models
+demonstrate strong generalisation, their large parameter sizes
+and high computational demands currently prevent them from
+being deployed directly on active prosthetic hardware. To
+address this limitation, future work should investigate two
+complementary directions. First, model compression, pruning,
+and quantization techniques should be explored to enable
+these large foundation models to run efficiently on resource-
+constrained hardware. Second, deploying lightweight monoc-
+ular depth architectures [20], [21] is necessary for real-time
+edge processing. Real-time gait adaptation requires visual
+feedback to be processed within the swing phase (typically
+under 400 ms). Future work should therefore focus on de-
+ploying both optimised foundation models and lightweight
+adapted networks on wearable edge accelerators. Furthermore,
+because prosthetic locomotion is safety-critical, integrating
+monocular depth uncertainty estimation [22] and pixel-wise
+out-of-distribution detection [23] is essential to identify unre-
+liable depth predictions and unexpected terrain hazards. In this
+context, the LP dataset provides a relevant benchmark for eval-
+uating the impact of such optimizations on depth estimation
+performance under prosthesis-specific operating conditions.
+VI. CONCLUSION
+In this study, we present the Lower-Limb Prosthesis (LP)
+dataset, a benchmark comprising synchronised RGB and
+ground-truth depth data collected from a knee-level camera
+mounted on healthy participants to emulate a lower-limb
+prosthesis. The dataset addresses a significant gap in prosthetic
+perception research by providing depth-aware visual data
+captured during stair navigation and indoor locomotion from
+this emulated prosthetic perspective. Using the LP dataset,
+we evaluated four state-of-the-art monocular depth estimation
+foundation models and found that, despite being trained on
+conventional benchmarks, they generalise effectively to this
+previously unexplored domain. These baseline results demon-
+strate the feasibility of using zero-shot foundation models to
+support downstream prosthetic applications such as obstacle
+detection, terrain assessment and adaptive gait planning. This
+opens up the possibility of advanced visual perception in
+intelligent lower-limb prostheses. By introducing a dedicated
+benchmark and establishing strong baseline performance, this
+work provides a foundation for future research into visual
+perception in lower-limb prostheses.
+REFERENCES
+[1] W. C. Miller, M. Speechley, and B. Deathe, “The prevalence and risk
+factors of falling and fear of falling among lower extremity amputees,”
+Archives of physical medicine and rehabilitation, vol. 82, no. 8, pp.
+1031–1037, 2001.
+[2] X. Chen, Z. Chen, Y. Wang, S. Yin, C. Chen, J. Huang, and C. Fu, “A
+gaze-guided human locomotion intention recognition and volitional con-
+trol method for knee-ankle prostheses,” IEEE Transactions on Cognitive
+and Developmental Systems, 2025.
+[3] S. Zhao, Z. Yu, Z. Wang, H. Liu, Z. Zhou, L. Ruan, and Q. Wang,
+“A learning-free method for locomotion mode prediction by terrain
+reconstruction and visual-inertial odometry,” IEEE Transactions on
+Neural Systems and Rehabilitation Engineering, vol. 31, pp. 3895–3905,
+2023.
+[4] Y. Wang, Z. Pei, C. Wang, and Z. Tang, “Depth-aware pose estimation
+using deep learning for exoskeleton gait analysis,” Scientific Reports,
+vol. 13, no. 1, p. 22681, 2023.
+[5] S. Qiu, Y. Liu, C. Wang, J. Zhang, W. Xian, and C. Chen, “Vision-
+based gesture-driven control method for rehabilitation lower extremity
+exoskeleton robots,” IEEE Sensors Journal, 2025.
+[6] I. Laina, C. Rupprecht, V. Belagiannis, F. Tombari, and N. Navab,
+“Deeper depth prediction with fully convolutional residual networks,”
+in 2016 Fourth international conference on 3D vision (3DV).
+IEEE,
+2016, pp. 239–248.
+[7] B. Ke, A. Obukhov, S. Huang, N. Metzger, R. C. Daudt, and
+K. Schindler, “Repurposing diffusion-based image generators for monoc-
+ular depth estimation,” in Proceedings of the IEEE/CVF conference on
+computer vision and pattern recognition, 2024, pp. 9492–9502.
+[8] L. Yang, B. Kang, Z. Huang, Z. Zhao, X. Xu, J. Feng, and H. Zhao,
+“Depth anything v2,” Advances in Neural Information Processing Sys-
+tems, vol. 37, pp. 21 875–21 911, 2024.
+[9] A. Bochkovskiy, A. Delaunoy, H. Germain, M. Santos, Y. Zhou,
+S. Richter, and V. Koltun, “Depth pro: Sharp monocular metric depth
+in less than a second,” in International Conference on Learning Repre-
+sentations, vol. 2025, 2025, pp. 75 602–75 637.
+5
+
+
+[10] J. Wang, M. Chen, N. Karaev, A. Vedaldi, C. Rupprecht, and D. Novotny,
+“Vggt: Visual geometry grounded transformer,” in Proceedings of the
+Computer Vision and Pattern Recognition Conference, 2025, pp. 5294–
+5306.
+[11] N. Silberman, D. Hoiem, P. Kohli, and R. Fergus, “Indoor segmentation
+and support inference from rgbd images,” in European conference on
+computer vision.
+Springer, 2012, pp. 746–760.
+[12] A. Dai, A. X. Chang, M. Savva, M. Halber, T. Funkhouser, and
+M. Nießner, “Scannet: Richly-annotated 3d reconstructions of indoor
+scenes,” in Proceedings of the IEEE conference on computer vision and
+pattern recognition, 2017, pp. 5828–5839.
+[13] A. Geiger, P. Lenz, and R. Urtasun, “Are we ready for autonomous
+driving? the kitti vision benchmark suite,” in 2012 IEEE conference on
+computer vision and pattern recognition.
+IEEE, 2012, pp. 3354–3361.
+[14] D. Eigen, C. Puhrsch, and R. Fergus, “Depth map prediction from a
+single image using a multi-scale deep network,” Advances in neural
+information processing systems, vol. 27, 2014.
+[15] C. Godard, O. Mac Aodha, M. Firman, and G. J. Brostow, “Digging
+into self-supervised monocular depth estimation,” in Proceedings of the
+IEEE/CVF international conference on computer vision, 2019, pp. 3828–
+3838.
+[16] L. Yang, B. Kang, Z. Huang, X. Xu, J. Feng, and H. Zhao, “Depth
+anything: Unleashing the power of large-scale unlabeled data,” in Pro-
+ceedings of the IEEE/CVF conference on computer vision and pattern
+recognition, 2024, pp. 10 371–10 381.
+[17] B. Laschowski, W. McNally, A. Wong, and J. McPhee, “Exonet
+database: Wearable camera images of human locomotion environments,”
+Frontiers in Robotics and AI, vol. 7, p. 562061, 2020.
+[18] M. R. Tucker, J. Olivier, A. Pagel, H. Bleuler, M. Bouri, O. Lambercy,
+J. d. R. Millan, R. Riener, H. Vallery, and R. Gassert, “Control strategies
+for active lower extremity prosthetics and orthotics: a review,” Journal
+of neuroengineering and rehabilitation, vol. 12, no. 1, p. 1, 2015.
+[19] B. Laschowski, W. McNally, A. Wong, and J. McPhee, “Environment
+classification for robotic leg prostheses and exoskeletons using deep
+convolutional neural networks,” Frontiers in Neurorobotics, vol. 15, p.
+730965, 2022.
+[20] J. Hornauer, L. Nalpantidis, and V. Belagiannis, “Visual domain adapta-
+tion for monocular depth estimation on resource-constrained hardware,”
+in IEEE/CVF International Conference on Computer Vision Workshops,
+ICCVW 2021, Montreal, QC, Canada, October 11-17, 2021.
+IEEE,
+2021, pp. 954–962.
+[21] M. Rudolph, Y. Dawoud, R. G¨uldenring, L. Nalpantidis, and V. Belagian-
+nis, “Lightweight monocular depth estimation through guided decoding,”
+in 2022 International Conference on Robotics and Automation (ICRA).
+IEEE, 2022, pp. 2344–2350.
+[22] J. Hornauer, A. El-Ghoussani, and V. Belagiannis, “Revisiting gradient-
+based uncertainty for monocular depth estimation,” IEEE Transactions
+on Pattern Analysis and Machine Intelligence, vol. 47, no. 6, pp. 4395–
+4408, 2025.
+[23] M. H¨olle, W. Kellermann, and V. Belagiannis, “Uncertainty-aware
+likelihood ratio estimation for pixel-wise out-of-distribution detection,”
+in 2025 IEEE/CVF International Conference on Computer Vision Work-
+shops (ICCVW).
+IEEE, 2025, pp. 783–793.
+6

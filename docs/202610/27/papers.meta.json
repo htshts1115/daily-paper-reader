@@ -1,0 +1,69 @@
+{
+  "label": "2026-10-27",
+  "date": "2026-10-27",
+  "generated_at": "2026-10-27T23:05:13",
+  "count": 4,
+  "papers": [
+    {
+      "paper_id": "202610/27/2610.35724v1-matanyone-e-sparse-memory-propagation-for-efficient-high-resolution-video-matting",
+      "section": "deep",
+      "title_en": "MatAnyone-E: Sparse Memory Propagation for Efficient High-Resolution Video Matting",
+      "authors": "Shuyun Wang, Shangchen Zhou, Peiqing Yang, Yuekun Dai, Xin Yu, Chen Change Loy",
+      "date": "2026-10-26",
+      "pdf": "https://arxiv.org/pdf/2610.35724v1",
+      "score": "9.0",
+      "evidence": "保留发丝与柔和透明的高分辨率视频抠图",
+      "tldr": "高分辨率视频抠像需保留发丝与透明细节并保持帧间一致，但基于记忆的匹配随分辨率升高成本剧增。MatAnyone-E 先做低分辨率传播，定位不确定区域及相关记忆候选，仅对这些区域执行高分辨率匹配，其余复用低分辨率结果。再用轻量解码器复现原解码器表征，降低高分辨率抠像生成成本。实验在保持接近 MatAnyone 2 质量的同时，估计推理加速 7.4 倍，4K 峰值显存降至 7.6%，单张 H200 上 1080p 达 73.07 FPS、4K 达 28.62 FPS。",
+      "tags": "query:matting",
+      "abstract_en": "High-resolution video matting requires preserving fine details, such as hair strands and soft transparency, while maintaining consistency across frames. Memory-based methods achieve strong matting quality by matching current-frame features with information stored from earlier frames, but this process becomes increasingly costly as resolution grows. We present MatAnyone-E, an efficient extension of MatAnyone 2 that focuses computation where it is most needed. Our approach first performs low-resolution propagation to identify uncertain regions that require closer inspection and the memory candidates most relevant to them. It then performs high-resolution matching only for these regions using the selected memory, while reusing low-resolution matching results elsewhere. This strategy reduces both the number of locations requiring detailed matching and the amount of memory searched, while preserving the information needed to produce a complete matte. We further reduce the cost of generating high-resolution mattes with a lightweight decoder designed around measured runtime bottlenecks and trained to reproduce the original decoder's representations. Experiments show that MatAnyone-E maintains matting quality comparable to MatAnyone 2 while achieving an estimated 7.4x inference speedup and reducing peak GPU memory usage to 7.6% of the usage of MatAnyone 2 at 4K. With compilation-enabled inference on a single NVIDIA H200 GPU, it reaches 73.07 FPS at 1080p and 28.62 FPS at 4K.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202610/27/2610.35018v1-zero-shot-monocular-depth-estimation-for-visual-perception-in-lower-limb-prostheses",
+      "section": "deep",
+      "title_en": "Zero-Shot Monocular Depth Estimation for Visual Perception in Lower-Limb Prostheses",
+      "authors": "Ishi Vijayvergiya, Marc Hölle, Youssef Dawoud, Amir El-Ghoussani, Michele De Vita, Rohan Asthana, Philipp Beckerle, Vasileios Belagiannis",
+      "date": "2026-10-26",
+      "pdf": "https://arxiv.org/pdf/2610.35018v1",
+      "score": "8.0",
+      "evidence": "评估零样本单目深度基础模型",
+      "tldr": "下肢假肢用户通过楼梯、不平地形等复杂环境时高度依赖可靠深度感知，但单目深度基础模型在膝高假肢视角下是否适用仍缺乏系统评估。作者构建LP数据集，从模拟假肢视角对四种先进单目深度估计基础模型进行零样本基准测试。实验给出首个假肢视角的系统性评测，揭示模型跨域泛化面临的困难与部署潜力。该工作公开数据与代码，为假肢视觉感知的模型选型和后续改进提供基准参考。",
+      "tags": "query:mono-depth",
+      "abstract_en": "Monocular depth estimation has advanced rapidly with the development of foundation models that demonstrate strong zero-shot generalisation across diverse visual domains. However, the applicability of these models to visual perception for lower-limb prosthetics remains largely unexplored. Reliable depth perception is particularly important for prosthesis users, who often experience significant challenges when navigating stairs, uneven terrain, and other complex environments. To address this gap, we introduce the Lower-Limb Prosthesis (LP) dataset, a benchmark designed to evaluate depth perception from an emulated knee-level prosthetic viewpoint. Using this dataset, we evaluate four state-of-the-art monocular depth estimation foundation models. Our results provide the first systematic benchmark of monocular depth estimation performance from a prosthetic viewpoint, while highlighting both the challenges and the potential of deploying foundation models in prosthetic perception systems. The code and dataset are available at https://github.com/Ishivijay/lp_dataset.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202610/27/2610.26690v1-foundation-model-driven-optical-flow",
+      "section": "quick",
+      "title_en": "Foundation Model Driven Optical Flow",
+      "authors": "Praroop Chanda, Suryansh Kumar",
+      "date": "2026-10-19",
+      "pdf": "https://arxiv.org/pdf/2610.26690v1",
+      "score": "6.0",
+      "evidence": "融合冻结的Depth Anything V2特征用于稠密匹配",
+      "tldr": "稠密光流常受限于特征表示与匹配效率，本文探索冻结视觉和深度基础模型与监督匹配网络的结合。方法融合DINOv2与Depth Anything V2特征，经DPT解码和单级由粗到细细化，训练Transformer匹配流程。在Sintel训练集Final pass取得2.37 EPE，优于所报FlowSeek(T)的2.52。RoCo-29.VSAI平衡分为1.1038，说明冻结基础骨干加一级细化可形成有竞争力的完整方案。",
+      "tags": "query:mono-depth",
+      "abstract_en": "We investigate how frozen pretrained visual and depth representations support dense optical flow when coupled with a supervised matching network. Building on TTSFlow, this paper studies Dense Prediction Transformer (DPT) feature decoding and one coarse-to-fine refinement stage. Our method fuses features from frozen DINOv2 and Depth Anything V2 models and estimates optical flow through a trainable transformer-based matching pipeline. After optical-flow training on FlyingChairs and FlyingThings3D, it achieves 2.37 endpoint error (EPE) on the Sintel training split, Final pass, compared with 2.52 for the FlowSeek (T) configuration reported here. Our RoCo-Spring 2026 entry, RoCo-29.VSAI, obtains a robustness-balanced score of 1.1038, Spring EPE of 1.411, and RobustSpring proxy EPE of 4.739, with a lower balanced score than seven of the twelve listed reference baselines. These results characterize the complete pipeline, which reuses frozen foundation backbones and performs one refinement stage. Code is available at: \\url{https://github.com/Visual-and-Spatial-AI-Lab/FFlow}",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202610/27/2610.30908v1-query-time-calibration-of-clip-features-for-open-vocabulary-3d-segmentation",
+      "section": "quick",
+      "title_en": "Query-Time Calibration of CLIP Features for Open-Vocabulary 3D Segmentation",
+      "authors": "Dominik Engel, Yousef Rajeh, Leon Sick, Ivan Viola",
+      "date": "2026-10-22",
+      "pdf": "https://arxiv.org/pdf/2610.30908v1",
+      "score": "6.0",
+      "evidence": "通过校准CLIP特征的开放词汇分割",
+      "tldr": "将CLIP特征提升到3D高斯重建可支持开放词汇分割，但单场景特征常呈强方向集中，原始余弦相似度忽略场景分布。本文提出查询时校准：部分减去共享场景方向，并用通用词参考词汇白化文本原型，结合软聚类与CSLS相关性边际完成多类和单查询预测。在7种提升方法和4个数据集上，该方法无需重训练或重提升即可稳定提升mIoU。结果表明场景条件化比较能更充分利用既有提升特征。",
+      "tags": "query:seg",
+      "abstract_en": "Lifting vision-language features such as CLIP into 3D Gaussian reconstructions enables open-vocabulary segmentation through natural-language queries. Although CLIP represents a broad range of semantic concepts, the lifted features of individual scenes can exhibit strong directional concentration, while raw cosine similarity does not account for the scene-specific feature distribution. We show that substantial segmentation gains can be obtained by changing how a fixed lifted feature field is compared with text. Our method partially subtracts a shared scene direction from visual features and text prototypes and whitens text prototypes using a fixed reference vocabulary of generic terms. It then uses soft clustering for multiclass prediction and CSLS with a relevance margin against the reference vocabulary for single-query prediction. Beyond reducing directional concentration, scene centering improves class-relative feature separation in every evaluated scene. Across seven lifting methods and four datasets, the resulting query-time calibration consistently improves mean intersection over union in both multiclass and single-query segmentation. These gains require no retraining, source-image re-encoding, or feature re-lifting, demonstrating the value of scene-conditioned comparison for making better use of existing lifted representations.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    }
+  ],
+  "errors": []
+}
