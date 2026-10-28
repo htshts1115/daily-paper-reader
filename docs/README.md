@@ -48,17 +48,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-10-27</span>
+      <span class="dpr-home-dashboard-kicker">2026-10-28</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 4 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 3 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>2</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>2</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>0</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>3</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-10-27 23:05:09 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-10-28 23:11:35 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -69,7 +69,7 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今天筛完 4 篇，精读 2 篇、速读 2 篇，重点落在高效视频抠像与假肢视觉感知。最值得看的是 9.0 分的 MatAnyone-E 稀疏记忆传播方案，以及 8.0 分的下肢假肢零样本单目深度估计。普通读者建议先读这两篇精读，速读的基础模型光流与 CLIP 查询时校准可留作背景扩展。</p>
+<p>今日速读 3 篇，重点集中在野生动物多传感器深度与跟踪数据集、几何生成助力空间推理，以及混合监督实例分割。最值得看的是 WildDepth-v2 的同步 RGB-LiDAR-Radar 基准（7.0 分），它适合关注野外动物监测与多模态感知的读者。普通读者可先翻看该数据集的采集设置与评测任务，再按需跟进后两篇的方法思路。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -78,12 +78,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">2 篇</strong>
+    <strong class="dpr-home-dashboard-count">0 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="MatAnyone-E: Sparse Memory Propagation for Efficient High-Resolution Video Matting">MatAnyone-E: Sparse Memory Propagation for Efficient High-Resolution Video Matting</span></li><li><span class="dpr-home-dashboard-paper-title" title="Zero-Shot Monocular Depth Estimation for Visual Perception in Lower-Limb Prostheses">Zero-Shot Monocular Depth Estimation for Visual Perception in Lower-Limb Prostheses</span></li></ul>
+<p class="dpr-home-dashboard-empty">今日暂无推荐。</p>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">matting <strong>1</strong></span><span class="dpr-home-dashboard-tag">mono-depth <strong>1</strong></span></div>
+
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -91,12 +91,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">2 篇</strong>
+    <strong class="dpr-home-dashboard-count">3 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Foundation Model Driven Optical Flow">Foundation Model Driven Optical Flow</span></li><li><span class="dpr-home-dashboard-paper-title" title="Query-Time Calibration of CLIP Features for Open-Vocabulary 3D Segmentation">Query-Time Calibration of CLIP Features for Open-Vocabulary 3D Segmentation</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="WildDepth-v2: A Synchronized RGB--LiDAR--Radar Dataset and Benchmark for Metric Depth, Motion, and Tracking of Wildlife">WildDepth-v2: A Synchronized RGB--LiDAR--Radar Dataset and Benchmark for Metric Depth, Motion, and Tracking of Wildlife</span></li><li><span class="dpr-home-dashboard-paper-title" title="Learning and Reasoning with Geometry: How Generation Helps Spatial Understanding">Learning and Reasoning with Geometry: How Generation Helps Spatial Understanding</span></li><li><span class="dpr-home-dashboard-paper-title" title="MixSIS: Mixed-supervised instance segmentation">MixSIS: Mixed-supervised instance segmentation</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">mono-depth <strong>1</strong></span><span class="dpr-home-dashboard-tag">seg <strong>1</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">mono-depth <strong>2</strong></span><span class="dpr-home-dashboard-tag">seg <strong>1</strong></span></div>
 </section>
 </div>
 
