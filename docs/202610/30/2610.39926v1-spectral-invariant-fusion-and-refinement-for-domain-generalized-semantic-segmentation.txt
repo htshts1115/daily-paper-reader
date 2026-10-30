@@ -1,0 +1,1595 @@
+IEEE TRANSACTIONS ON MULTIMEDIA, VOL. XX, NO. XX, MONTH YEAR
+1
+Spectral Invariant Fusion and Refinement for Domain Generalized
+Semantic Segmentation
+Yansong Bai, Yunzhi Zhuge, Xinzhuo Yu, Lu Zhang, Jin Zhan, Pingping Zhang, Huchuan Lu, Fellow IEEE
+Abstract—Domain generalized semantic segmentation is chal-
+lenging because it requires accurate dense prediction on unseen
+domains without any access to target-domain data during training.
+Existing methods improve transferability through data diversifi-
+cation, invariant learning, or direct use of foundation models, but
+they often struggle to simultaneously suppress domain-sensitive
+interference and preserve fine-grained spatial cues. In this work,
+we propose SIFR, a frequency-aware dual-stream framework that
+tackles domain shift at both the fusion and decoding stages. SIFR
+uses spectral modeling as a unified principle to regulate both
+heterogeneous prior interaction and dense decoder refinement.
+Instead of directly fusing frozen CLIP and DINOv2 features, SIFR
+performs spectral-guided invariant fusion to filter out domain-
+sensitive responses while preserving complementary semantic and
+structural information. In addition, SIFR incorporates a spectral
+decoder refinement module that stabilizes multi-scale decoder
+features through low-frequency statistics-based normalization and
+adaptive frequency selection, thereby reducing the propagation of
+residual domain bias in dense prediction. This design enables SIFR
+to jointly improve domain robustness and segmentation precision
+under severe distribution shifts. Extensive experiments on multiple
+DGSS benchmarks, including synthetic-to-real, real-to-real, and
+adverse-weather settings, demonstrate consistent improvements
+over previous state-of-the-art methods.
+Index Terms—Domain generalized semantic segmentation, vi-
+sion foundation model, vision-language model, frequency modeling,
+CLIP, DINOv2.
+I. INTRODUCTION
+Domain Generalized Semantic Segmentation (DGSS) aims
+to learn segmentation models from multiple source domains
+that generalize well to unseen target domains without any
+target-domain adaptation [1]–[7]. Compared with Domain
+Adaptive Semantic Segmentation [8]–[10], which addresses
+cross-domain discrepancies by leveraging unlabeled target-
+domain data during training, DGSS must confront domain
+shifts in a more challenging setting where no target-domain
+information is available at all. Consequently, a central challenge
+in DGSS is to achieve robustness to both low-level appearance
+changes and high-level semantic or contextual variations
+without compromising the accuracy and structural consistency
+of pixel-wise predictions [1], [2], [11].
+This work was supported in part by the National Natural Science Foundation
+of China under Grants 62406053 and 62441231, and in part by the Liaoning
+Provincial Doctoral Scientific Research Start-up Fund Project under Grant
+2025-BS-0080, and in part by the Fundamental Research Funds for the Central
+Universities under Grant DUT25LAB128.
+Yansong Bai, Yunzhi Zhuge, Lu Zhang, Pingping Zhang and Huchuan Lu are
+with the School of Information and Communication Engineering, Dalian Uni-
+versity of Technology, Dalian 116081, China. (e-mail: bys@mail.dlut.edu.cn;
+zgyz@dlut.edu.cn; zhangluu@dlut.edu.cn; lhchuan@dlut.edu.cn)
+Xinzhuo Yu and Jin Zhan are with the School of Computer Science and
+Technology, Dalian University of Technology, Dalian 116081, China. (e-mail:
+yxz 3132@mail.dlut.edu.cn; zhanjin@dlut.edu.cn)
+Existing DGSS methods mainly improve generalization from
+two perspectives: data-level generalization and feature-level
+representation learning [2], [4], [16], [17]. The former increases
+source-domain diversity through perturbation, stylization, or
+synthesis, while the latter aims to learn domain-invariant
+representations across source domains [2], [4], [17]–[20].
+However, both directions face an inherent tension between
+domain invariance and spatial discriminability. Increasing
+appearance diversity or enforcing feature consistency can
+improve robustness to domain shifts, but may also weaken
+boundary, texture, and other fine-grained cues that are essential
+for accurate segmentation. Consequently, those methods still
+struggle to jointly achieve strong domain robustness and precise
+spatial prediction [4], [16].
+Recent advances in large-scale pretrained models have
+opened a promising direction for DGSS, as they provide
+more transferable and stable visual priors than conventionally
+trained backbones [6]. In particular, vision-language models
+(VLMs) capture rich high-level semantic knowledge, while
+vision foundation models (VFMs) offer stronger local structural
+cues and dense visual representations [15], [21], [22]. However,
+simply combining these heterogeneous priors is still insufficient
+for DGSS, as it faces two core challenges: i) Cross-prior
+misalignment. VLM and VFM are pretrained with different
+objectives, which leads to inconsistent feature geometries and
+domain responses and thus makes their interaction unstable
+under domain shifts. ii) Domain appearance entanglement.
+Despite their strong transferability, both priors can still encode
+domain-specific style, texture, and low-level statistics, so direct
+fusion may propagate domain-sensitive variations instead of
+isolating task-relevant cues.
+To address these challenges, spectral modeling offers a
+complementary perspective. i) Spectral alignment. By orga-
+nizing heterogeneous priors in the frequency domain, spectral
+modeling promotes more coherent interaction between semantic
+and structural cues across domains. ii) Spectral disentangle-
+ment. By separating domain-variant appearance components
+from task-relevant structural information, spectral modeling
+suppresses domain-sensitive responses while preserving the
+local details required for precise segmentation.
+Inspired by these principles, we propose SIFR, a Spectral
+Invariant Fusion and Refinement framework for domain gener-
+alized semantic segmentation, which leverages heterogeneous
+large-scale priors while explicitly enhancing domain invariance.
+i) Spectral-Guided Invariant Fusion (SGIF). SGIF employs
+frozen CLIP [21] and DINOv2 [22] as the VLM and VFM,
+where CLIP provides high-level semantic priors and DINOv2
+captures fine-grained structural representations. By casting
+cross-prior interaction into the spectral domain, SGIF explicitly
+arXiv:2610.39926v1  [cs.CV]  29 Oct 2026
+
+
+IEEE TRANSACTIONS ON MULTIMEDIA, VOL. XX, NO. XX, MONTH YEAR
+2
+[6]
+[12]
+[13]
+[14]
+[15]
+Fig. 1. Representative characteristic of SIFR. (a) Performance comparison with recent DGSS methods on representative real-to-real and adverse-weather
+benchmarks, where SIFR consistently achieves the best mIoU. (b) Feature visualization comparing MFuser [15] and SIFR, where our method preserves clearer
+structures, suppresses domain-sensitive interference, and produces feature responses that better match the ground-truth semantics in challenging regions.
+suppresses domain-variant appearance responses and enhances
+domain-stable semantic and structural cues. As qualitatively
+illustrated in Fig. 1 (b), this spectral-guided invariant fusion
+produces clearer structural responses and better preserves
+semantically relevant regions under challenging domain shifts.
+Learnable query tokens and cross-attention [23] are further
+introduced to promote effective semantic-visual fusion under
+reduced domain interference. ii) Spectral Decoder Refinement
+(SDR). SDR performs decoder refinement via domain-stable
+normalization and frequency-guided enhancement module to
+curb the accumulation of domain-sensitive patterns, stabilize
+multi-scale features, and preserve informative components for
+precise segmentation. Overall, SIFR unifies spectral invariant
+fusion and refinement into a coherent framework that enhances
+generalization to unseen domains without sacrificing fine-
+grained spatial prediction.
+We evaluate SIFR on multiple DGSS benchmarks spanning
+real-to-real and real-to-adverse-weather settings, the compar-
+ison results of which is shown in Fig. 1 (a). Furthermore,
+on the synthetic-to-real setting, SIFR achieves state-of-the-art
+performance, reaching 71.30 mIoU on Cityscapes [24], 62.54
+on BDD100K [25], and 71.96 on Mapillary [26], with gains
+of up to +1.32 points over previous methods. On the real-to-
+real setting, SIFR consistently outperforms strong baselines,
+obtaining 67.60 and 78.48 mIoU on BDD100K [25] and Mapil-
+lary [26], respectively. These consistent improvements suggest
+that SIFR effectively suppresses domain-sensitive interference
+while preserving transferable semantic and structural cues,
+thereby enhancing robustness under domain shift.
+Our contributions can be summarized as follows:
+• We present SIFR, a frequency-aware dual-stream frame-
+work for domain generalized semantic segmentation that
+leverages frozen CLIP and DINOv2 as complementary
+semantic and structural priors, and introduces spectral
+modeling in both feature fusion and decoder refinement.
+• We introduce a Spectral-Guided Invariant Fusion (SGIF)
+module that couples token-level cross-attention with
+frequency-domain refinement to promote complementary
+interaction between heterogeneous pretrained representa-
+tions while suppressing domain-sensitive responses.
+• We develop a Spectral Decoder Refinement (SDR) module,
+comprising domain-stable normalization and frequency-
+guided enhancement, to stabilize decoder features and
+preserve segmentation-relevant spectral components for
+robust dense prediction under domain shift.
+• Extensive experiments on multiple DGSS benchmarks
+show that SIFR consistently improves cross-domain seg-
+mentation performance across synthetic-to-real, real-to-
+real, and adverse-weather settings.
+II. RELATED WORK
+A. Domain Generalized Semantic Segmentation
+Domain-generalized semantic segmentation (DGSS) studies
+how to learn segmentation models that generalize to unseen
+target domains without access to target-domain data during
+training. Existing research has explored this problem through
+multiple paradigms [1], [4], [11], [16], [27]. Earlier efforts
+often improve domain robustness either by simulating domain
+variation during training, such as through meta-learning or
+source-domain diversification [2], [20], [27], or by reducing
+domain-specific bias via feature alignment, normalization,
+whitening, and related representation learning techniques [1],
+[4], [28]. Beyond these data- and representation-oriented
+strategies, some studies further investigate architectural designs,
+including transformer-based models, to strengthen cross-domain
+feature modeling and dense prediction [13], [29]. More recently,
+foundation models have introduced a new opportunity for
+DGSS, since large-scale pretraining can provide stronger and
+more transferable visual priors than conventionally trained
+backbones [6], [11], [12], [15]. Existing attempts have begun
+to exploit such priors through synthetic data generation [11],
+model adaptation [6], [12], or semantic guidance [29], [30].
+Beyond conventional static vision–language alignment, SB-
+Gen [31] formulates the transformation from domain-specific
+visual representations to domain-agnostic textual semantics as
+a cross-modal Schr¨odinger Bridge, and models this alignment
+as a stochastic semantic evolution process. However, how
+to effectively utilize heterogeneous pretrained representations
+
+
+IEEE TRANSACTIONS ON MULTIMEDIA, VOL. XX, NO. XX, MONTH YEAR
+3
+Fig. 2. Overview of the proposed framework. Frozen VLM and VFM encoders extract hierarchical features, which are progressively fused by the proposed
+Spectral-Guided Invariant Fusion (SGIF) module via token-level cross-attention and frequency-domain refinement. The fused features are then passed to the
+pixel decoder and further refined by Spectral Decoder Refinement (SDR) module, including Domain-Stable Normalization (DS-Norm) and Frequency-Guided
+Enhancement (FGE), before being decoded with text-guided semantic priors to generate robust segmentation masks under domain shift.
+under domain shift, especially when different pretrained streams
+capture complementary yet unequally domain-sensitive cues,
+still remains to be explored.
+B. Vision Foundation Models
+Vision foundation models (VFMs) have recently emerged
+as a powerful basis for visual transfer learning, primarily
+driven by large-scale pretraining on diverse image corpora
+using self-supervised objectives [22], [32], [33], masked image
+modeling [34], and segmentation-oriented paradigms
+[35].
+Compared with conventionally supervised backbones, VFMs
+generally learn more generalizable and reusable representations,
+enabling strong transfer performance across a wide range of
+downstream tasks [22], [33], [34]. Representative examples
+include DINO series [22], [32], iBOT, MAE [34] and EVA
+series [33], [36], [37] which provide strong semantic and
+structural representations, as well as the SAM family [35],
+[38], which brings foundation-scale modeling to segmentation.
+Recent studies have also shown the relevance of VFMs
+to dense prediction. DINO [32] and iBOT [39] suggest
+that self-supervised ViTs can encode explicit segmentation-
+related information and strong local semantic patterns, while
+ViT-Adapter [40] demonstrates that pretrained ViTs can be
+effecti- vely adapted to semantic segmentation with lightweight
+task-specific designs. Nevertheless, existing efforts mostly
+emphasize architectural adaptation or downstream transfer,
+with limited attention paid to how domain-sensitive appearance
+statistics are entangled with transferable structural cues in
+pretrained dense representations. This leaves room for spectral
+modeling as a complementary mechanism for DGSS, since it
+can help expose and suppress domain-variant responses while
+preserving the structure-aware cues that VFMs already capture.
+C. Frequency Modeling Under Domain Shift
+Frequency-based modeling has become an increasingly
+important direction in cross-domain learning, since domain
+shift often affects not only spatial appearance but also frequency
+statistics [12], [18], [41], [42]. Existing studies mainly explore
+frequency information from two perspectives [12], [18], [41],
+[42]. One line of work applies frequency-domain perturbation,
+spectral substitution, or amplitude manipulation at the input
+level to expand source-domain diversity and alleviate style-
+related bias [18], [41], [42]. Another line of work performs
+frequency filtering or modulation at the feature level to improve
+the cross-domain robustness of learned representations [12],
+[43], [44]. Most recently, HarDiff [45] introduces the Discrete
+Hartley Transform into a diffusion-based framework for gener-
+alizable dense prediction. It exploits low-frequency structural
+priors from the source domain during training and high-
+frequency detail guidance from unseen-domain inputs during
+iterative sampling. Nevertheless, existing frequency-aware VFM
+methods mainly focus on adapting a single pretrained visual
+stream. For example, FADA [12] decomposes VFM features
+into low- and high-frequency branches through Haar wavelet
+
+
+IEEE TRANSACTIONS ON MULTIMEDIA, VOL. XX, NO. XX, MONTH YEAR
+4
+transformation, while SET [3] processes the amplitude and
+phase components of frozen VFM features with learnable
+spectral tokens. In contrast, our method focuses on frequency-
+aware interaction between heterogeneous VLM and VFM
+representations rather than frequency adaptation within a single
+VFM. Although MFuser [15] also integrates VLM and VFM
+features, it mainly employs Mamba-based modules to model
+sequential and spatial interactions, without explicitly regulating
+the domain-sensitive spectral responses propagated from the
+two pretrained streams. Our SGIF instead combines token-
+level cross-attention with stream-specific adaptive spectral
+reweighting, and SIFR further extends spectral regulation to
+multi-scale decoder refinement. Therefore, SIFR differs from
+existing approaches in both the representation scope and the
+stages at which spectral modeling is performed.
+III. METHOD
+A. Overview
+As shown in Fig. 2, our method adopts a unified frequency-
+aware segmentation framework that consists of hierarchical
+prior extraction, spectral-guided invariant fusion, and decoder-
+side refinement. Given an input image, frozen VLM and VFM
+encoders first extract multi-level features, where VLM pro-
+vides high-level semantic priors and VFM offers fine-grained
+structural cues. To effectively exploit these heterogeneous
+representations under domain shift, we introduce a Spectral-
+Guided Invariant Fusion (SGIF) module during layer-wise
+feature interaction. Specifically, SGIF combines token-level
+cross-attention with a frequency-guided enhancement branch,
+which transforms features into the spectral domain, adaptively
+reweights different frequency components, and then projects
+them back to the spatial domain. In this way, the fusion pro-
+cess suppresses domain-sensitive appearance variations while
+preserving domain-stable semantic and structural information
+that is more beneficial for semantic segmentation.
+The fused features are then fed into the pixel decoder and
+further refined by the proposed Spectral Decoder Refinement
+(SDR) module. Specifically, SDR module first applies low-
+frequency statistics-based normalization to mitigate residual
+domain-specific bias in decoder features, and then performs
+adaptive frequency selection to enhance segmentation-relevant
+spectral responses. The resulting multi-scale features are finally
+fed into the Transformer decoder, where they interact with text-
+guided semantic priors to progressively produce high-quality
+masks. At the framework level, SGIF, the pixel decoder, and
+SDR play complementary rather than redundant roles. SGIF
+suppresses domain-sensitive interference during heterogeneous
+feature interaction and fusion. The pixel decoder subsequently
+aggregates the SGIF-fused multi-level representations into
+multi-scale dense features, providing spatially structured visual
+representations for subsequent mask decoding. SDR then
+mitigates the residual domain bias that remains or accumulates
+during multi-scale feature aggregation and dense decoding.
+Finally, the text-guided semantic priors complement the SDR-
+refined visual representations by providing category-level
+semantic guidance within the Transformer decoder, thereby
+establishing more reliable pixel-to-class correspondences for
+mask prediction.
+B. Spectral-Guided Invariant Fusion
+In domain generalized semantic segmentation, pretrained
+VLMs [21] and VFMs [22] often exhibit domain preferential
+responses learning from their pretraining data. Therefore,
+directly combining their features can introduce domain-sensitive
+patterns during feature interaction and fusion. To address this
+issue, we formulate feature fusion as a dual-branch process, as
+shown in Fig. 2, consisting of a layer-wise interaction branch
+and a frequency-guided enhancement branch. The former
+captures complementary semantic interactions between the
+two pretrained representations, while the latter injects spectral
+priors to suppress domain-sensitive interference and preserve
+structurally stable cues.
+Given the features extracted from the i-th layer of VLM
+and VFM, we denote them as Xi
+vlm
+∈
+RB×Lc×D and
+Xi
+vfm ∈RB×Ld×D, where B is the batch size, Lc and Ld
+denote the token numbers, and D is the shared embedding
+dimension. To capture complementary interactions between
+the two branches, we first concatenate their features along the
+sequence dimension:
+Xi
+cat = Concat
+ Xi
+vlm, Xi
+vfm
+
+.
+(1)
+We then introduce a learnable query token T i ∈RB×Lq×D
+and perform cross-attention over the concatenated features:
+Xi
+attn = CrossAttn
+ T i, Xi
+cat, Xi
+cat
+
+,
+(2)
+where Xi
+attn denotes the i-th layer fusion result and Lq denotes
+the number of learnable query tokens.
+In parallel, we construct a frequency-guided enhancement
+branch. Specifically, features are reshaped into 2D feature
+maps, F i
+vlm ∈RB×D×Hc×Wc and F i
+vfm ∈RB×D×Hd×Wd.
+We then transform them into the frequency domain using
+Fourier transform operation F(·), yielding ˆF i
+vlm = F(F i
+vlm)
+and ˆF i
+vfm = F(F i
+vfm). Based on the spectral representations,
+we generate the adaptive spectral masks M i
+vlm and M i
+vfm
+through a lightweight refinement module. For each branch, the
+spectral feature is first summarized by channel-wise average
+and maximum pooled descriptors computed from the magnitude
+spectrum at each frequency location. These descriptors preserve
+the spatial frequency resolution and are concatenated and passed
+through a convolutional layer followed by a sigmoid function to
+produce the corresponding spectral mask. The spectral masks
+are applied to reweight the frequency responses:
+˜F i
+vlm = ˆF i
+vlm ⊙M i
+vlm,
+˜F i
+vfm = ˆF i
+vfm ⊙M i
+vfm,
+(3)
+where ⊙denotes element-wise multiplication. After inverse
+Fourier transform, the enhanced feature maps are transformed
+back into token representations, denoted as Xi
+freq.
+Finally, we combine the token-level fusion result and
+the frequency-guided enhancement through residual addition,
+followed by a convolutional layer to obtain the final fused
+representation:
+Xi
+fuse = Conv
+ Xi
+attn + Xi
+freq
+
+.
+(4)
+In this way, the proposed fusion strategy integrates the
+complementary semantic interactions captured by the cross-
+attention branch with the domain-robust structural cues pro-
+vided by the frequency-guided branch. As a result, it yields
+
+
+IEEE TRANSACTIONS ON MULTIMEDIA, VOL. XX, NO. XX, MONTH YEAR
+5
+Fig. 3.
+Paradigm of the Spectral Decoder Refinement (SDR) module.
+For each decoder feature, DS-Norm first normalizes the feature using low-
+frequency statistics obtained via FFT, low-pass filtering, and IFFT, while FGE
+then adaptively enhances segmentation-relevant frequency responses through
+pooled spectral descriptors and inverse reconstruction.
+more discriminative and robust intermediate features for the
+subsequent decoder under domain shift.
+C. Spectral Decoder Refinement
+Although the encoder-stage SGIF reduces domain-sensitive
+interference during heterogeneous prior fusion, residual appear-
+ance deviations may still remain in the fused representations
+and propagate through subsequent multi-scale decoding. The
+key motivation of SDR is to decouple residual domain-bias
+suppression from segmentation-relevant spectral preservation
+during dense prediction. Since global and smoothly varying
+domain changes, such as illumination, contrast, weather, and
+style, are more strongly reflected in low-frequency feature
+statistics, DS-Norm estimates normalization statistics from the
+low-frequency component while applying normalization to the
+original full-spectrum feature. This suppresses global statistical
+deviations without explicitly discarding fine-grained spatial
+responses. However, normalization alone cannot determine
+which frequency components are informative for different
+images and feature scales. Therefore, FGE further performs
+data-dependent spectral reweighting to adaptively emphasize
+segmentation-relevant responses. In this way, SDR follows a
+suppress-then-select principle: DS-Norm stabilizes decoder
+feature statistics, whereas FGE adaptively preserves and
+enhances informative spectral components for robust mask
+prediction. As shown in Fig. 2, SDR is inserted between the
+pixel decoder and the Transformer decoder. Fig. 3 details the
+internal suppress-then-select design of SDR.
+Let {Di}4
+i=1 denote the four multi-scale output features of
+the pixel decoder, where Di ∈RB×C×Hi×Wi. For each scale,
+we first extract its low-frequency component in the frequency
+domain. Specifically, we transform Di into the spectral domain,
+apply a low-pass filter, and project the filtered response back
+to the spatial domain, yielding the low-frequency feature Di
+low.
+The size of the retained low-frequency region is controlled by
+a filter ratio ρ. Based on Di
+low, we compute the channel-wise
+mean and standard deviation:
+µi
+low = Mean(Di
+low),
+σi
+low = Std(Di
+low).
+(5)
+These low-frequency statistics are then used to normalize
+the original decoder feature:
+˜Di = Di −µi
+low
+σi
+low + ϵ ,
+(6)
+where ϵ is a small constant for numerical stability.
+Built upon the normalized feature ˜Di, we further perform
+frequency-guided enhancement. We first transform ˜Di into the
+frequency domain and denote its spectral representation as:
+ˆ˜Di = F( ˜Di).
+(7)
+Then, we generate the frequency-guided mask M i from ˆ˜Di
+using a lightweight refinement module. Specifically, for each
+frequency location, we compute channel-wise pooled spectral
+descriptors from the magnitude spectrum of ˆ˜Di, including
+average, maximum, and minimum responses across the channel
+dimension. Different from spatial pooling with a fixed local
+window, these operations summarize cross-channel spectral
+statistics while preserving the spatial frequency resolution. The
+resulting descriptors are concatenated and fed into a lightweight
+convolutional layer followed by a sigmoid function to produce
+M i. The mask is then applied to reweight the normalized
+spectral representation:
+ˆDi
+enh = M i ⊙ˆ˜Di.
+(8)
+Finally, the enhanced decoder feature is obtained by inverse
+Fourier transform:
+Di
+enh = F−1( ˆDi
+enh).
+(9)
+In this way, the proposed decoder refinement suppresses
+residual domain-sensitive statistical deviations while further
+emphasizing structurally informative spectral responses. As
+a result, it provides more robust multi-scale features for the
+subsequent transformer decoder and improves mask prediction
+under domain shift.
+D. Training Objective
+We optimize the proposed framework using the standard
+segmentation objective together with a pixel-level vision-
+language alignment objective. For segmentation, following
+Mask2Former [46], the loss is defined as:
+Lseg = λbceLbce + λdiceLdice + λclsLcls,
+(10)
+where Lbce and Ldice denote the binary cross-entropy loss and
+Dice loss for mask prediction, respectively, and Lcls is the
+classification loss for query prediction.
+In addition, we introduce a pixel-text alignment loss Lalign
+to enforce semantic consistency between pixel-level visual
+representations and textual class embeddings. For each semantic
+class k, we construct its text prompt by placing M learnable
+context tokens {pm}M
+m=1 between the start token SOS and the
+tokenized class name ck, followed by the end token EOS. The
+CLIP text encoder is kept frozen, while the context tokens are
+optimized during training.
+Given the normalized pixel-level visual feature ˆvi at pixel i
+and the normalized text embedding ˆtk of class k, we compute
+their similarity score as the inner product ˆv⊤
+i ˆtk divided by
+the temperature τ, which is fixed to 0.07. The resulting dense
+similarity scores are supervised by the ground-truth semantic
+labels using pixel-wise cross-entropy:
+Lalign = −1
+|Ω|
+X
+i∈Ω
+log
+exp(si,yi)
+PK
+k=1 exp(si,k)
+,
+(11)
+
+
+IEEE TRANSACTIONS ON MULTIMEDIA, VOL. XX, NO. XX, MONTH YEAR
+6
+Fig. 4. Qualitative comparison of segmentation results across five source-to-target settings: G →B, G →C, G →M, C →B, and C →M. From
+left to right are the input image, the predictions of tqdm [29], MFuser [15], our SIFR, and the ground truth . The white boxes highlight challenging regions
+with small objects, thin structures, and ambiguous boundaries. Compared with previous methods, SIFR yields more complete predictions and better preserves
+fine structures, producing results closer to the ground truth.
+where K denotes the number of semantic classes, yi is the
+ground-truth label of pixel i, and Ωis the set of valid pixels.
+Pixels with the ignore label are excluded.
+The overall training objective is defined as
+Ltotal = Lseg + λalignLalign,
+(12)
+where λalign is set to 1.0 in all experiments.
+IV. EXPERIMENTS
+A. Experiment Settings
+Datasets and Metrics. We evaluate our method un-
+der synthetic-to-real, real-to-real, and real-to-adverse-weather
+DGSS settings on five driving-scene benchmarks that share
+19 semantic categories. GTA5 [47] is a large-scale synthetic
+dataset containing 24,966 densely annotated images with
+a fixed resolution of 1914×1052, and is widely used as
+a source domain for cross-domain semantic segmentation.
+Cityscapes [24] is a standard real-world benchmark for urban
+scene understanding, containing 2,975 training images, 500
+validation images, and 1,525 testing images, with a fixed
+resolution of 2048×1024. BDD100K [25] is a diverse real-world
+driving dataset with images of fixed resolution 1280×720; for
+semantic segmentation, it provides 10K annotated images and is
+commonly organized into 7,000 training, 1,000 validation, and
+2,000 test images. Mapillary [26] is a large-scale street-scene
+dataset containing 18,000 training images, 2,000 validation
+images, and 5,000 test images; unlike Cityscapes [24] and
+BDD100K [25], its images are high-resolution but come in
+diverse sizes and capture conditions. ACDC [48] is designed
+for adverse-condition semantic segmentation and contains
+1,600 training images, 406 validation images, and 2,000 test
+images under four weather conditions, i.e. fog, rain, snow, and
+nighttime, making it a challenging benchmark for evaluations
+under severe domain shifts. Following prior DGSS works [6],
+[15], we adopt mean Intersection over Union (mIoU) as the
+evaluation metric.
+Implementation Details. We adopt CLIP [21] as the vision-
+language model, DINOv2 [22] as the visual foundation model,
+and Mask2Former [46] as the segmentation head. During
+training, the CLIP visual encoder, CLIP text encoder, and
+DINOv2 backbone are kept frozen, and their parameters are
+not updated. Optimization is performed over the parameters
+of the SGIF modules and their learnable query tokens, the
+feature projection and fusion layers, the pixel decoder, the
+learnable layers within SDR, the text-guided cross-attention
+module, the Transformer decoder, and the classification and
+mask prediction heads. The learnable context tokens used to
+construct the class prompts are also optimized, while the CLIP
+text encoder remains frozen. All trainable parameters are jointly
+optimized in a single end-to-end training stage using the total
+
+
+IEEE TRANSACTIONS ON MULTIMEDIA, VOL. XX, NO. XX, MONTH YEAR
+7
+objective in Eq.(12). No stage-wise pretraining or alternating
+optimization is adopted. All input images are resized to 512 ×
+512. We train the model with a batch size of 2 on each GPU.
+We optimize the model using AdamW with a base learning rate
+of 1e-4 and a weight decay of 1e-4. The learning rate follows
+a poly decay schedule with a power of 0.9 and a minimum
+learning rate of 1e-6, together with a linear warm-up over
+the first 1900 iterations using a warm-up ratio of 1e-6. The
+model is trained for 30,000 iterations. During inference, we
+adopt sliding-window evaluation with a crop size of 512 ×
+512 and a stride of 341 × 341. Unless otherwise specified,
+we use Lq = 64 learnable query tokens in SGIF and set the
+low-pass filter ratio in DS-Norm to ρ = 0.25. All experiments
+are implemented based on MMSegmentation and conducted
+on two RTX 4090 GPUs.
+B. Comparison with State-of-the-Art Methods
+We compare SIFR with representative domain generalized
+semantic segmentation (DGSS) methods under three evaluation
+settings: synthetic-to-real generalization from GTA5 [47] to
+Cityscapes [24], BDD100K [25], and Mapillary [26] (G →
+C, B, M), real-to-real generalization from Cityscapes [24]
+to BDD100K [25] and Mapillary [26] (C →B, M), and
+real-to-adverse-weather generalization from Cityscapes [24]
+to ACDC [48] (C →A). Since our method is built upon
+heterogeneous pretrained priors, we place particular empha-
+sis on recent foundation-model-based approaches, including
+CLOUDS [11], VLTSeg [30], REIN [6], SET [3], MFuser [15],
+DepthForge [49], and tqdm [29]. For completeness, we also
+include several conventional DGSS methods to provide a
+broader comparison across different methodological paradigms.
+Real-to-Real Generalization. Tab. I reports the comparisons
+under the real-to-real setting. SIFR achieves the best perfor-
+mance on both C →B and C →M, demonstrating that the
+proposed spectral modeling strategy improves transferability
+across real-world domains. In particular, compared with the
+strong baseline MFuser [15], SIFR improves mIoU by +2.02
+on C →B and +0.38 on C →M, yielding an average gain
+of +1.20. Moreover, although DepthForge [49] additionally
+leverages depth information, SIFR still surpasses it by +1.41
+on C →B and +2.55 on C →M, corresponding to an average
+improvement of +1.98. These results indicate that SIFR more
+effectively exploits complementary semantic and structural
+priors for robust real-to-real generalization.
+Synthetic-to-Real Generalization. The results in Tab. II
+further verify the effectiveness of SIFR under the more
+challenging synthetic-to-real setting. SIFR obtains the best
+performance on all three target domains, namely G →C,
+G →B, and G →M. Relative to MFuser [15], SIFR improves
+performance by +0.06, +1.46, and +0.82 mIoU, respectively.
+The largest improvement on BDD100K [25] suggests that SIFR
+is particularly effective when the target domain exhibits larger
+appearance and context variations.
+Real-to-Adverse-Weather Generalization. As reported
+in Tab. III, SIFR achieves the best overall performance on
+Cityscapes [24] →ACDC [48], showing stronger robustness
+under adverse weather. It reaches 75.3 mIoU on Snow, 57.9 on
+TABLE I
+QUANTITATIVE COMPARISONS UNDER THE Cityscapes →BDD100K +
+Mapillary GENERALIZATION SETTING.
+Method
+Proc. & Year
+BDD100k
+Mapillary
+Avg
+ResNet based:
+IBN [50]
+ECCV2018
+48.56
+57.04
+52.80
+IW [51]
+CVPR2019
+48.49
+55.82
+52.16
+Itenorm [52]
+CVPR2019
+49.23
+56.26
+52.75
+DRPC [53]
+ICCV2019
+49.86
+56.34
+53.10
+GTR [54]
+TIP2021
+50.75
+57.16
+53.96
+RobustNet [1]
+CVPR2021
+50.73
+58.64
+54.69
+WildNet [2]
+CVPR2022
+50.94
+58.79
+54.87
+SAW [4]
+CVPR2022
+52.95
+59.81
+56.38
+BlindNet [28]
+CVPR2024
+51.84
+60.18
+56.01
+Transformer based:
+HGFormer [13]
+CVPR2023
+53.40
+66.90
+60.15
+CMFormer [14]
+AAAI2024
+59.27
+71.10
+65.19
+VFM based:
+REIN [6]
+CVPR2024
+63.54
+74.03
+68.79
+FADA [12]
+NeurIPS2024
+65.12
+75.86
+70.49
+SET [3]
+ACM MM
+65.07
+75.76
+70.37
+VLTSeg [30]
+ACCV2024
+64.40
+76.40
+70.40
+tqdm [29]
+ECCV2024
+64.72
+76.15
+70.44
+DPMFormer [55]
+ICCV2025
+64.20
+76.67
+70.44
+DepthForge [49]
+ICCV2025
+66.19
+75.93
+71.06
+Causal-Tune [56]
+AAAI2026
+66.28
+76.05
+71.16
+MFuser [15]
+CVPR2025
+65.58
+78.10
+71.84
+SBGen [31]
+NeurIPS2026
+66.03
+77.90
+71.97
+SIFR(ours)
+-
+67.60
+78.48
+73.04
+Night, and 83.7 on Fog, outperforming previous methods on all
+three conditions. Compared with FADA [12], SIFR improves
+by +1.8, +0.5, and +3.5 mIoU on Snow, Night, and Fog, while
+remaining competitive on Rain. This suggests that SIFR better
+preserves domain-invariant cues under severe weather-induced
+shifts.
+Qualitative Results Analysis. Fig. 4 further illustrates the
+qualitative superiority of SIFR on five cross-domain settings
+spanning synthetic-to-real and real-to-real generalization. Com-
+pared with tqdm [29] and MFuser [15], SIFR produces masks
+that are visually closer to the ground truth, especially in the
+white-boxed regions containing small objects, thin structures,
+and ambiguous boundaries. On G →B and G →C, our
+method better preserves object completeness for vehicles and
+roadside structures while reducing fragmented predictions. On
+G →M and C →M, SIFR yields cleaner layouts for roads,
+sidewalks, and vegetation, with fewer category confusions. On
+the challenging C →B case, it also recovers clearer scene
+boundaries under low-light conditions. These observations
+confirm that spectral fusion and decoder refinement improve
+both structural consistency and semantic precision.
+C. Ablation Analysis
+We conduct ablation experiments under the Cityscapes [24]
+→BDD100k [25] + Mapillary [26] setting to analyze the effect
+of the proposed spectral designs from five aspects, including
+normalization strategy, pooling design, module composition,
+the number of learnable query tokens in SGIF, and the low-pass
+filter ratio in DS-Norm.
+
+
+IEEE TRANSACTIONS ON MULTIMEDIA, VOL. XX, NO. XX, MONTH YEAR
+8
+Fig. 5. Qualitative comparison of feature responses. From top to bottom are the input images, the feature visualizations of MFuser [15], the feature
+visualizations of our SIFR, and the corresponding predictions of SIFR. SIFR exhibits clearer structural patterns and more discriminative feature responses than
+MFuser [15], particularly in regions containing distant objects and ambiguous semantic boundaries.
+Effect of Normalization Strategy. Tab. IV compares different
+normalization strategies in the decoder refinement stage. Among
+all variants, the proposed DS-Norm achieves the best average
+performance, improving the average mIoU to 73.04. Compared
+with conventional normalization schemes, such as LayerNorm,
+BatchNorm, GroupNorm, and InstanceNorm, DS-Norm yields
+more consistent gains on both BDD100k [25] and Mapil-
+lary [26]. This result indicates that directly applying generic
+normalization operators is insufficient to address domain-
+specific distribution shifts in decoder features. By contrast, our
+DS-Norm explicitly normalizes features with low-frequency
+statistics, which better suppresses residual domain-sensitive
+deviations and produces more robust representations for cross-
+domain segmentation.
+Effect of Pooling Design. Tab. V studies different pooling
+combinations for generating the spectral mask in the decoder
+stage. Using only two types of pooled descriptors already
+brings reasonable performance, but the full combination of min
+pooling, average pooling, and max pooling gives the best result,
+reaching 73.04 average mIoU. This suggests that different pool-
+ing operators capture complementary statistics in the frequency
+domain. In particular, max pooling emphasizes strong spectral
+responses, average pooling captures global frequency trends,
+and min pooling further supplements suppressed yet potentially
+informative cues. Their combination therefore enables a more
+comprehensive spectral characterization and leads to stronger
+domain-generalized segmentation performance.
+Effect of SGIF and SDR. Tab. VI further evaluates the
+contributions of the two proposed modules. Introducing either
+SGIF or SDR alone already improves the cross-domain
+performance over the baseline, indicating that both encoder-side
+spectral fusion and decoder-side spectral refinement are indi-
+vidually effective. Using both modules together yields further
+gains, highlighting their complementarity. Specifically, SGIF
+strengthens intermediate fused representations by combining
+token interaction with frequency-guided invariant cues, while
+SDR removes residual domain-sensitive bias during decoding.
+These results show that spectral modeling at both the feature
+fusion and decoder refinement stages is important for stronger
+robustness under domain shift.
+Hyperparameter Sensitivity. Table VII evaluates the sensi-
+tivity of SIFR to the number of learnable query tokens Lq in
+SGIF and the low-pass filter ratio ρ in DS-Norm. For each
+experiment, we vary one parameter while keeping the remaining
+configurations fixed.
+For the number of query tokens, SIFR achieves average
+mIoU scores of 72.49, 72.38, 73.04, and 72.04 with Lq set
+to 32, 48, 64, and 128, respectively. The model maintains
+comparable performance with moderate token numbers, while
+Lq = 64 achieves the best result. Increasing Lq to 128 leads to a
+moderate performance decrease, possibly because an excessive
+number of tokens introduces redundant cross-prior interactions.
+Therefore, we use Lq = 64 as the default setting.
+For DS-Norm, the low-pass filter ratios of 0.25, 0.50, and
+0.75 yield average mIoU scores of 73.04, 72.75, and 72.94,
+respectively. The maximum difference among these settings is
+only 0.29 mIoU, indicating that DS-Norm is relatively robust
+to the size of the low-pass filter. We adopt ρ = 0.25 because
+
+
+IEEE TRANSACTIONS ON MULTIMEDIA, VOL. XX, NO. XX, MONTH YEAR
+9
+TABLE II
+QUANTITATIVE COMPARISONS UNDER THE GTA5 →Cityscapes +
+BDD100K + Mapillary GENERALIZATION SETTING.
+Method
+Proc. & Year
+Cityscapes BDD100k Mapillary
+Avg
+ResNet based:
+Iternorm [52]
+CVPR2019
+31.81
+32.70
+33.88
+32.80
+DRPC [53]
+ICCV2019
+37.42
+32.14
+34.12
+34.56
+GTR [54]
+TIP2021
+37.53
+33.75
+34.52
+35.27
+RobustNet [1]
+CVPR2021
+36.58
+35.20
+40.33
+37.37
+AdvStyle [57]
+NeurIPS2022
+39.62
+35.54
+37.00
+37.39
+SAW [4]
+CVPR2022
+39.75
+37.34
+41.86
+39.65
+DIRL [58]
+AAAI2022
+41.04
+39.15
+41.60
+40.60
+SHADE [59]
+ECCV2022
+44.65
+39.28
+43.34
+42.42
+WildNet [2]
+CVPR2023
+44.62
+38.42
+46.09
+43.04
+SPC [17]
+CVPR2023
+44.10
+40.46
+45.51
+43.36
+BlindNet [28]
+CVPR2024
+45.72
+41.32
+47.08
+44.71
+TLDR [19]
+ICCV2023
+47.58
+44.88
+48.80
+47.08
+FAMix [60]
+CVPR2024
+49.47
+46.40
+51.97
+49.28
+Transformer based:
+CMFormer [14]
+AAAI2024
+55.31
+49.91
+60.09
+55.10
+VFM based:
+DIDEX [61]
+WACV2024
+62.00
+54.30
+63.00
+59.77
+CLOUDS [11]
+-
+60.20
+57.40
+67.00
+61.53
+VLTSeg [30]
+ACCV2024
+65.60
+58.40
+66.50
+63.50
+REIN [6]
+CVPR2024
+66.40
+60.40
+66.10
+64.30
+SET [3]
+ACMMM2024
+68.06
+61.64
+67.68
+65.79
+tqdm [29]
+ECCV2024
+68.88
+59.18
+70.10
+66.05
+FADA [12]
+NeurIPS2024
+68.23
+61.94
+68.09
+66.09
+HarDiff [45]
+ICCV2025
+62.00
+58.90
+68.80
+63.20
+MFuser [15]
+CVPR2025
+71.24
+61.08
+71.14
+67.82
+SBGen [31]
+NeurIPS2026
+71.24
+62.26
+71.91
+68.47
+SIFR
+-
+71.30
+62.54
+71.96
+68.60
+TABLE III
+QUANTITATIVE COMPARISONS UNDER THE Cityscapes →ACDC
+ADVERSE-WEATHER GENERALIZATION SETTING.
+Method
+Proc. & Year
+Snow Night
+Fog
+Rain
+ResNet based:
+IBN [50]
+ECCV2018
+49.6
+21.2
+63.8
+50.4
+Itenorm [52]
+CVPR2019
+49.9
+23.8
+63.3
+50.1
+IW [51]
+CVPR2019
+47.6
+21.8
+62.4
+52.4
+RobustNet [1]
+CVPR2021
+49.8
+24.3
+64.3
+56.0
+WildNet [2]
+CVPR2022
+28.4
+12.7
+41.2
+34.2
+Transformer based:
+HGFormer [13]
+CVPR2023
+68.6
+52.7
+69.9
+72.0
+CMFormer [14]
+AAAI2024
+64.3
+33.7
+77.8
+67.6
+VFM based:
+REIN [6]
+CVPR2024
+70.6
+55.9
+79.5
+72.5
+FADA [12]
+NeurIPS2024
+73.5
+57.4
+80.2
+75.0
+SIFR
+-
+75.3
+57.94
+83.7
+74.2
+it provides the best overall performance.
+D. Representation Analysis
+Local Feature Response analysis. We first visualize the
+intermediate feature responses in Fig. 5 to examine how SIFR
+affects local semantic and structural cues under domain shift.
+TABLE IV
+ABLATION STUDY OF DIFFERENT NORMALIZATION STRATEGIES ON
+CROSS-DOMAIN SEMANTIC SEGMENTATION. ALL EXPERIMENTS ARE
+CONDUCTED UNDER THE Cityscapes →BDD100k + Mapillary
+GENERALIZATION SETTING.
+Normalization
+BDD100k
+Mapillary
+Avg
+Layer Norm
+66.89
+76.68
+71.79
+Batch Norm
+66.09
+77.93
+72.01
+Group Norm
+66.56
+77.84
+72.20
+Instance Norm
+67.04
+78.12
+72.58
+DS-Norm
+67.60
+78.48
+73.04
+TABLE V
+ABLATION STUDY OF DIFFERENT POOLING DESIGNS UNDER THE Cityscapes
+→BDD100k + Mapillary GENERALIZATION SETTING.
+Min
+Avg
+Max
+BDD100k
+Mapillary
+Avg
+−
+−
+−
+66.86
+76.58
+71.72
+✓
+✓
+−
+66.96
+76.68
+71.79
+✓
+−
+✓
+67.07
+77.93
+72.01
+−
+✓
+✓
+66.96
+77.84
+72.20
+✓
+✓
+✓
+67.60
+78.48
+73.04
+TABLE VI
+ABLATION STUDY OF SGIF AND SDR UNDER THE Cityscapes →BDD100k
++ Mapillary GENERALIZATION SETTING.
+SGIF
+SDR
+BDD100k
+Mapillary
+Avg
+−
+−
+65.60
+76.16
+70.88
+✓
+−
+66.86
+76.58
+71.72
+−
+✓
+65.88
+76.53
+71.20
+✓
+✓
+67.60
+78.48
+73.04
+Compared with MFuser, SIFR produces clearer and more
+concentrated responses on distant objects, thin structures, and
+semantic boundaries. In particular, the highlighted regions
+show that SIFR better preserves object contours and suppresses
+irrelevant activations in ambiguous areas. These observations
+suggest that the proposed spectral designs help the model focus
+on structurally stable and semantically informative patterns,
+which are more transferable across domains.
+Global Feature Space Analysis. To examine the representation
+quality learned by the whole framework, we visualize decoder-
+level embeddings using t-SNE in Fig. 6. Specifically, we extract
+the 256-dimensional mask features produced by the final mask-
+feature projection of the pixel decoder immediately before mask
+prediction, using the same decoder stage for both the baseline
+and SIFR. For the C →B and C →M settings, features are
+sampled from the unseen BDD100K and Mapillary validation
+sets, respectively. To alleviate class imbalance, we sample up
+to 2,000 pixel-level feature vectors from each of the 19 shared
+semantic categories and project them into a three-dimensional
+space using t-SNE with PCA initialization and a fixed random
+seed, with each point colored according to its ground-truth
+semantic category.
+
+
+IEEE TRANSACTIONS ON MULTIMEDIA, VOL. XX, NO. XX, MONTH YEAR
+10
+Fig. 6. t-SNE visualization of decoder feature embeddings on C →B, M. Compared with the baseline, SIFR yields more compact intra-class clusters and
+clearer inter-class separation across most semantic categories, indicating that it learns more discriminative and transferable representations under domain shift.
+The visualization is based on the default CLIP-based VLM setting.
+TABLE VII
+SENSITIVITY ANALYSIS OF THE NUMBER OF LEARNABLE QUERY TOKENS
+Lq IN SGIF AND THE LOW-PASS FILTER RATIO ρ IN DS-NORM UNDER THE
+CITYSCAPES →BDD100K + MAPILLARY GENERALIZATION SETTING.
+Hyperparameter
+Value
+BDD100K
+Mapillary
+Avg.
+query tokens Lq
+32
+66.80
+78.18
+72.49
+48
+66.62
+78.13
+72.38
+64
+67.60
+78.48
+73.04
+128
+66.18
+77.89
+72.04
+Low-pass ratio ρ
+0.25
+67.60
+78.48
+73.04
+0.50
+67.23
+78.27
+72.75
+0.75
+67.53
+78.34
+72.94
+TABLE VIII
+QUANTITATIVE REPRESENTATION ANALYSIS ON ORIGINAL DECODER
+FEATURE EMBEDDINGS. LOWER INTRA AND DBI INDICATE MORE
+COMPACT INTRA-CLASS DISTRIBUTIONS, WHILE HIGHER INTER/INTRA AND
+CH INDICATE BETTER INTER-CLASS SEPARABILITY.
+Method
+Domain
+Intra↓
+Inter/Intra↑
+DBI↓
+CH↑
+Baseline
+BDD100K
+4.4342
+1.5037
+2.4203
+1103.83
+SIFR
+BDD100K
+3.9008
+2.1936
+1.7189
+2217.43
+Baseline
+Mapillary
+4.7610
+1.6438
+1.7518
+2561.98
+SIFR
+Mapillary
+4.5881
+1.8650
+1.3806
+3175.47
+Compared with the baseline, SIFR produces more compact
+intra-class clusters and clearer inter-class separation on both tar-
+get domains. To further quantify this observation, we compute
+representation-level criteria on the original decoder embeddings
+before t-SNE dimensionality reduction, including intra-class
+feature distance, inter-/intra-class distance ratio, Davies-Bouldin
+Index (DBI), and Calinski-Harabasz Index (CH). Lower intra-
+class distance and DBI indicate more compact class-wise
+feature distributions, whereas higher inter-/intra-class distance
+ratio and CH indicate better inter-class separability. As shown
+in Table VIII, SIFR consistently improves these metrics on
+both BDD100K and Mapillary. On BDD100K, SIFR reduces
+the intra-class distance from 4.4342 to 3.9008 and DBI from
+2.4203 to 1.7189, while increasing the inter-/intra-class ratio
+from 1.5037 to 2.1936 and CH from 1103.83 to 2217.43. On
+Fig. 7. Representative failure cases of the proposed method. From left
+to right, each row presents the input image, the SIFR prediction, and the
+ground-truth annotation. In the first and third cases, parts of the roadside
+vegetation are incorrectly classified as terrain because mixed natural elements,
+such as dry grass, rocks, shrubs, and autumn-colored trees, exhibit similar
+appearances. In the second case, parts of the drivable road are incorrectly
+classified as sidewalk because of their similar pavement appearances and
+ambiguous boundaries. Black regions in the ground-truth annotations denote
+ignored pixels and are excluded from the evaluation.
+Mapillary, SIFR also achieves lower intra-class distance and
+DBI, together with higher inter-/intra-class ratio and CH. These
+results provide quantitative evidence that SIFR learns more
+compact and discriminative representations on unseen domains,
+thereby supporting its improved cross-domain generalization.
+Failure Case Analysis. Although the proposed method achieves
+favorable generalization performance across different target
+domains, it still encounters difficulties in distinguishing visu-
+ally similar categories and preserving fine-grained semantic
+boundaries, as illustrated in Fig. 7. A recurring failure pattern
+observed in the first and third examples is the confusion
+between vegetation and terrain. In these cases, parts of the
+roadside vegetation are incorrectly classified as terrain because
+mixed natural elements, such as dry grass, rocks, shrubs, and
+irregular surfaces, exhibit similar colors and textures. In the
+second example, parts of the drivable road are incorrectly
+classified as sidewalk, particularly in regions where the two
+categories have similar pavement appearances and lack clear
+
+
+IEEE TRANSACTIONS ON MULTIMEDIA, VOL. XX, NO. XX, MONTH YEAR
+11
+curb boundaries. Moreover, the boundaries of some small and
+thin structures are not accurately preserved.
+V. CONCLUSION
+In this paper, we presented SIFR, a frequency-aware dual-
+stream framework for domain generalized semantic segmenta-
+tion that leverages the complementary strengths of frozen CLIP
+and DINOv2 under domain shift. SIFR improves generalization
+through both heterogeneous prior fusion and decoder refinement.
+It introduces Spectral-Guided Invariant Fusion to enhance
+semantic–structural interaction while reducing domain-sensitive
+interference, and Spectral Decoder Refinement to stabilize
+multi-scale decoding using low-frequency statistics-based nor-
+malization and adaptive spectral enhancement. Experiments
+on synthetic-to-real, real-to-real, and real-to-adverse-weather
+benchmarks show that SIFR consistently improves cross-
+domain segmentation, highlighting frequency-aware modeling
+as an effective way to exploit heterogeneous foundation priors
+for DGSS.
+REFERENCES
+[1] S. Choi, S. Jung, H. Yun, J. T. Kim, S. Kim, and J. Choo, “Robustnet:
+Improving domain generalization in urban-scene segmentation via
+instance selective whitening,” in IEEE Conf. Comput. Vis. Pattern Recog.,
+2021, pp. 11 580–11 590.
+[2] S. Lee, H. Seong, S. Lee, and E. Kim, “Wildnet: Learning domain
+generalized semantic segmentation from the wild,” in IEEE Conf. Comput.
+Vis. Pattern Recog., 2022, pp. 9936–9946.
+[3] J. Yi, Q. Bi, H. Zheng, H. Zhan, W. Ji, Y. Huang, Y. Li, and Y. Zheng,
+“Learning spectral-decomposited tokens for domain generalized semantic
+segmentation,” in ACM Int. Conf. Multimedia, 2024, pp. 8159–8168.
+[4] D. Peng, Y. Lei, M. Hayat, Y. Guo, and W. Li, “Semantic-aware domain
+generalized segmentation,” in IEEE Conf. Comput. Vis. Pattern Recog.,
+2022, pp. 2594–2605.
+[5] M. Liao, Y. Peng, Y. Sun, W. Huang, Y. Wang, K. Zhan, and Y. Zhang,
+“Multi-granularity token learning for domain generalized semantic
+segmentation,” IEEE Trans. Multimedia, pp. 1–14, 2026.
+[6] Z. Wei, L. Chen, Y. Jin, X. Ma, T. Liu, P. Ling, B. Wang, H. Chen,
+and J. Zheng, “Stronger fewer & superior: Harnessing vision foundation
+models for domain generalized semantic segmentation,” in IEEE Conf.
+Comput. Vis. Pattern Recog., 2024, pp. 28 619–28 630.
+[7] R. Zhang, F. Meng, H. Wei, Q. Wu, L. Xu, and H. Li, “Learning in
+diversity: Empowering domain generalized semantic segmentation with
+style injection,” IEEE Trans. Multimedia, pp. 1–14, 2026.
+[8] L. Hoyer, D. Dai, and L. Van Gool, “Daformer: Improving network
+architectures and training strategies for domain-adaptive semantic seg-
+mentation,” in IEEE Conf. Comput. Vis. Pattern Recog., 2022, pp. 9924–
+9935.
+[9] Y. Xue, X. Tian, F. Zhang, X. Wen, Z. Gao, and S. Chen, “Cacp:
+Covariance-aware cross-domain prototypes for domain adaptive semantic
+segmentation,” IEEE Trans. Multimedia, vol. 27, pp. 5023–5034, 2025.
+[10] J. Yu, G. Xie, Q. Liu, Z. Kan, L. Wang, T. Liu, Q. Ling, W. Xu, and F. Gao,
+“Contrastive learning with multiple prototypes for unsupervised domain
+adaptive semantic segmentation,” IEEE Trans. Multimedia, vol. 27, pp.
+5267–5282, 2025.
+[11] Y. Benigmim, S. Roy, S. Essid, V. Kalogeiton, and S. Lathuili`ere,
+“Collaborating foundation models for domain generalized semantic
+segmentation,” in IEEE Conf. Comput. Vis. Pattern Recog., 2024, pp.
+3108–3119.
+[12] Q. Bi, J. Yi, H. Zheng, H. Zhan, Y. Huang, W. Ji, Y. Li, and
+Y. Zheng, “Learning frequency-adapted vision foundation model for
+domain generalized semantic segmentation,” Adv. Neural Inform. Process.
+Syst., vol. 37, pp. 94 047–94 072, 2024.
+[13] J. Ding, N. Xue, G.-S. Xia, B. Schiele, and D. Dai, “Hgformer:
+Hierarchical grouping transformer for domain generalized semantic
+segmentation,” in IEEE Conf. Comput. Vis. Pattern Recog., 2023, pp.
+15 413–15 423.
+[14] Q. Bi, S. You, and T. Gevers, “Learning content-enhanced mask
+transformer for domain generalized urban-scene segmentation,” in Proc.
+AAAI Conf. Artif. Intell., vol. 38, no. 2, 2024, pp. 819–827.
+[15] X. Zhang and R. T. Tan, “Mamba as a bridge: Where vision foundation
+models meet vision language models for domain-generalized semantic
+segmentation,” in IEEE Conf. Comput. Vis. Pattern Recog., 2025, pp.
+14 527–14 537.
+[16] T. H. Rafi, R. Mahjabin, E. Ghosh, Y.-W. Ko, and J.-G. Lee, “Domain
+generalization for semantic segmentation: a survey,” Artif. Intell. Rev.,
+vol. 57, no. 9, p. 247, 2024.
+[17] W. Huang, C. Chen, Y. Li, J. Li, C. Li, F. Song, Y. Yan, and Z. Xiong,
+“Style projected clustering for domain generalized semantic segmentation,”
+in IEEE Conf. Comput. Vis. Pattern Recog., 2023, pp. 3061–3071.
+[18] Y. Yang and S. Soatto, “Fda: Fourier domain adaptation for semantic
+segmentation,” in IEEE Conf. Comput. Vis. Pattern Recog., 2020, pp.
+4085–4095.
+[19] S. Kim, D.-h. Kim, and H. Kim, “Texture learning domain randomization
+for domain generalized segmentation,” in Int. Conf. Comput. Vis., 2023,
+pp. 677–687.
+[20] L. Yang, X. Gu, and J. Sun, “Generalized semantic segmentation by self-
+supervised source domain projection and multi-level contrastive learning,”
+in Proc. AAAI Conf. Artif. Intell., vol. 37, no. 9, 2023, pp. 10 789–10 797.
+[21] A. Radford, J. W. Kim, C. Hallacy, A. Ramesh, G. Goh, S. Agarwal,
+G. Sastry, A. Askell, P. Mishkin, J. Clark et al., “Learning transferable
+visual models from natural language supervision,” in Int. Conf. Mach.
+Learn.
+PMLR, 2021, pp. 8748–8763.
+[22] M. Oquab, T. Darcet, T. Moutakanni, H. Vo, M. Szafraniec, V. Khalidov,
+P. Fernandez, D. Haziza, F. Massa, A. El-Nouby et al., “Dinov2: Learning
+robust visual features without supervision,” Trans. Mach. Learn. Res.,
+2023.
+[23] A. Jaegle, F. Gimeno, A. Brock, O. Vinyals, A. Zisserman, and J. Carreira,
+“Perceiver: General perception with iterative attention,” in Int. Conf. Mach.
+Learn.
+PMLR, 2021, pp. 4651–4664.
+[24] M. Cordts, M. Omran, S. Ramos, T. Rehfeld, M. Enzweiler, R. Benenson,
+U. Franke, S. Roth, and B. Schiele, “The cityscapes dataset for semantic
+urban scene understanding,” in IEEE Conf. Comput. Vis. Pattern Recog.,
+2016, pp. 3213–3223.
+[25] F. Yu, H. Chen, X. Wang, W. Xian, Y. Chen, F. Liu, V. Madhavan,
+and T. Darrell, “Bdd100k: A diverse driving dataset for heterogeneous
+multitask learning,” in IEEE Conf. Comput. Vis. Pattern Recog., 2020,
+pp. 2636–2645.
+[26] G. Neuhold, T. Ollmann, S. Rota Bulo, and P. Kontschieder, “The
+mapillary vistas dataset for semantic understanding of street scenes,” in
+Int. Conf. Comput. Vis., 2017, pp. 4990–4999.
+[27] J. Kim, J. Lee, J. Park, D. Min, and K. Sohn, “Pin the memory: Learning
+to generalize semantic segmentation,” in IEEE Conf. Comput. Vis. Pattern
+Recog., 2022, pp. 4350–4360.
+[28] W.-J. Ahn, G.-Y. Yang, H.-D. Choi, and M.-T. Lim, “Style blind domain
+generalized semantic segmentation via covariance alignment and semantic
+consistence contrastive learning,” in IEEE Conf. Comput. Vis. Pattern
+Recog., 2024, pp. 3616–3626.
+[29] B. Pak, B. Woo, S. Kim, D.-h. Kim, and H. Kim, “Textual query-driven
+mask transformer for domain generalized segmentation,” in Eur. Conf.
+Comput. Vis.
+Springer, 2024, pp. 37–54.
+[30] C. H¨ummer, M. Schwonberg, L. Zhou, H. Cao, A. Knoll, and
+H. Gottschalk, “Vltseg: Simple transfer of clip-based vision-language
+representations for domain generalized semantic segmentation,” 2023.
+[31] H. Zheng, J. Yi, Q. Bi, H. Huang, H. Zhan, Y. Huang, Y. Li, X. Wu,
+and Y. Zheng, “Learning a cross-modal schr¨odinger bridge for visual
+domain generalization,” vol. 38, pp. 167 613–167 641, 2026.
+[32] M. Caron, H. Touvron, I. Misra, H. J´egou, J. Mairal, P. Bojanowski, and
+A. Joulin, “Emerging properties in self-supervised vision transformers,”
+in Int. Conf. Comput. Vis., 2021, pp. 9650–9660.
+[33] Y. Fang, W. Wang, B. Xie, Q. Sun, L. Wu, X. Wang, T. Huang, X. Wang,
+and Y. Cao, “Eva: Exploring the limits of masked visual representation
+learning at scale,” in IEEE Conf. Comput. Vis. Pattern Recog., 2023, pp.
+19 358–19 369.
+[34] K. He, X. Chen, S. Xie, Y. Li, P. Doll´ar, and R. Girshick, “Masked
+autoencoders are scalable vision learners,” in IEEE Conf. Comput. Vis.
+Pattern Recog., 2022, pp. 16 000–16 009.
+[35] N. Ravi, V. Gabeur, Y.-T. Hu, R. Hu, C. Ryali, T. Ma, H. Khedr, R. R¨adle,
+C. Rolland, L. Gustafson et al., “Sam 2: Segment anything in images
+and videos,” in Int. Conf. Learn. Represent., 2025.
+[36] Y. Fang, Q. Sun, X. Wang, T. Huang, X. Wang, and Y. Cao, “Eva-02: A
+visual representation for neon genesis,” Image Vis. Comput., vol. 149, p.
+105171, 2024.
+
+
+IEEE TRANSACTIONS ON MULTIMEDIA, VOL. XX, NO. XX, MONTH YEAR
+12
+[37] Q. Sun, Y. Fang, L. Wu, X. Wang, and Y. Cao, “Eva-clip: Improved
+training techniques for clip at scale,” arXiv preprint arXiv:2303.15389,
+2023.
+[38] N. Carion, L. Gustafson, Y.-T. Hu, S. Debnath, R. Hu, D. Suris, C. Ryali,
+K. V. Alwala, H. Khedr, A. Huang et al., “Sam 3: Segment anything
+with concepts,” in Int. Conf. Learn. Represent., 2025.
+[39] J. Zhou, C. Wei, H. Wang, W. Shen, C. Xie, A. Yuille, and T. Kong,
+“ibot: Image bert pre-training with online tokenizer,” in Int. Conf. Learn.
+Represent., 2022.
+[40] Z. Chen, Y. Duan, W. Wang, J. He, T. Lu, J. Dai, and Y. Qiao, “Vision
+transformer adapter for dense predictions,” in Int. Conf. Learn. Represent.,
+2023.
+[41] J. Huang, D. Guan, A. Xiao, and S. Lu, “Fsdr: Frequency space domain
+randomization for domain generalization,” in IEEE Conf. Comput. Vis.
+Pattern Recog., 2021, pp. 6891–6902.
+[42] Q. Xu, R. Zhang, Y. Zhang, Y. Wang, and Q. Tian, “A fourier-based
+framework for domain generalization,” in IEEE Conf. Comput. Vis.
+Pattern Recog., 2021, pp. 14 383–14 392.
+[43] L. Chen, L. Gu, L. Li, C. Yan, and Y. Fu, “Frequency dynamic convolution
+for dense image prediction,” in IEEE Conf. Comput. Vis. Pattern Recog.,
+2025, pp. 30 178–30 188.
+[44] L. Chen, L. Gu, D. Zheng, and Y. Fu, “Frequency-adaptive dilated
+convolution for semantic segmentation,” in IEEE Conf. Comput. Vis.
+Pattern Recog., 2024, pp. 3414–3425.
+[45] Q. Bi, J. Yi, H. Huang, H. Zheng, H. Zhan, W. Ji, Y. Huang, Y. Li,
+and Y. Zheng, “A simple yet mighty hartley diffusion versatilist for
+generalizable dense vision tasks,” in Int. Conf. Comput. Vis., 2025, pp.
+6748–6760.
+[46] B. Cheng, I. Misra, A. G. Schwing, A. Kirillov, and R. Girdhar, “Masked-
+attention mask transformer for universal image segmentation,” in IEEE
+Conf. Comput. Vis. Pattern Recog., 2022, pp. 1290–1299.
+[47] S. R. Richter, V. Vineet, S. Roth, and V. Koltun, “Playing for data: Ground
+truth from computer games,” in Eur. Conf. Comput. Vis.
+Springer, 2016,
+pp. 102–118.
+[48] C. Sakaridis, D. Dai, and L. Van Gool, “Acdc: The adverse conditions
+dataset with correspondences for semantic driving scene understanding,”
+in Int. Conf. Comput. Vis., 2021, pp. 10 765–10 775.
+[49] S. Chen, T. Han, C. Zhang, X. Luo, M. Wu, G. Cai, and J. Su, “Stronger,
+steadier & superior: Geometric consistency in depth vfm forges domain
+generalized semantic segmentation,” in Int. Conf. Comput. Vis., 2025,
+pp. 8285–8295.
+[50] X. Pan, P. Luo, J. Shi, and X. Tang, “Two at once: Enhancing learning
+and generalization capacities via ibn-net,” in Eur. Conf. Comput. Vis.,
+2018, pp. 464–479.
+[51] X. Pan, X. Zhan, J. Shi, X. Tang, and P. Luo, “Switchable whitening
+for deep representation learning,” in Int. Conf. Comput. Vis., 2019, pp.
+1863–1871.
+[52] L. Huang, Y. Zhou, F. Zhu, L. Liu, and L. Shao, “Iterative normalization:
+Beyond standardization towards efficient whitening,” in IEEE Conf.
+Comput. Vis. Pattern Recog., 2019, pp. 4874–4883.
+[53] X. Yue, Y. Zhang, S. Zhao, A. Sangiovanni-Vincentelli, K. Keutzer, and
+B. Gong, “Domain randomization and pyramid consistency: Simulation-
+to-real generalization without accessing target domain data,” in Int. Conf.
+Comput. Vis., 2019, pp. 2100–2110.
+[54] D. Peng, Y. Lei, L. Liu, P. Zhang, and J. Liu, “Global and local texture
+randomization for synthetic-to-real semantic segmentation,” IEEE Trans.
+Image Process., vol. 30, pp. 6594–6608, 2021.
+[55] S. Jeon, K. Hong, and H. Byun, “Exploiting domain properties in
+language-driven domain generalization for semantic segmentation,” in
+Int. Conf. Comput. Vis., 2025, pp. 20 791–20 801.
+[56] Y. Zhang, Y. Zhang, Y. Zheng, B. Raducanu, and D. Liu, “Causal-
+tune: Mining causal factors from vision foundation models for domain
+generalized semantic segmentation,” in Proc. AAAI Conf. Artif. Intell.,
+vol. 40, no. 15, 2026, pp. 12 916–12 924.
+[57] Z. Zhong, Y. Zhao, G. H. Lee, and N. Sebe, “Adversarial style
+augmentation for domain generalized urban-scene segmentation,” Adv.
+Neural Inform. Process. Syst., vol. 35, pp. 338–350, 2022.
+[58] Q. Xu, L. Yao, Z. Jiang, G. Jiang, W. Chu, W. Han, W. Zhang,
+C. Wang, and Y. Tai, “Dirl: Domain-invariant representation learning for
+generalizable semantic segmentation,” in Proc. AAAI Conf. Artif. Intell.,
+vol. 36, no. 3, 2022, pp. 2884–2892.
+[59] Y. Zhao, Z. Zhong, N. Zhao, N. Sebe, and G. H. Lee, “Style-hallucinated
+dual consistency learning for domain generalized semantic segmentation,”
+in Eur. Conf. Comput. Vis.
+Springer, 2022, pp. 535–552.
+[60] M. Fahes, T.-H. Vu, A. Bursuc, P. P´erez, and R. De Charette, “A simple
+recipe for language-guided domain generalized segmentation,” in IEEE
+Conf. Comput. Vis. Pattern Recog., 2024, pp. 23 428–23 437.
+[61] J. Niemeijer, M. Schwonberg, J.-A. Term¨ohlen, N. M. Schmidt, and
+T. Fingscheidt, “Generalization by adaptation: Diffusion-based domain
+extension for domain-generalized semantic segmentation,” in IEEE Conf.
+Comput. Vis. Pattern Recog., 2024, pp. 2830–2840.
