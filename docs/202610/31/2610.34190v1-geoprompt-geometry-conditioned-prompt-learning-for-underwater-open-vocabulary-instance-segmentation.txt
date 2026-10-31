@@ -1,0 +1,229 @@
+Title: GeoPrompt: Geometry-Conditioned Prompt Learning for Underwater Open-Vocabulary Instance Segmentation
+
+URL Source: https://arxiv.org/pdf/2610.34190v1
+
+Published Time: Tue, 27 Oct 2026 01:17:41 GMT
+
+Number of Pages: 9
+
+Markdown Content:
+# GeoPrompt: Geometry-Conditioned Prompt Learning for Underwater Open-Vocabulary Instance Segmentation 
+
+# Shanshan Han 1, Yuxi Wang 1∗, Can Qin 1, Yujie Chen 1,Cong Pan 2, Haitao Li 1, Guoqiang Zhong 1∗
+
+> 1
+
+Ocean University of China, Qingdao, China 
+
+> 2
+
+Nanjing University of Aeronautics and Astronautics, Nanjing, China yuxi.wang@ouc.edu.cn 
+
+Abstract 
+
+Open-vocabulary instance segmentation (OVIS) provides a promising solution for marine perception by recognizing and segmenting categories beyond predefined label spaces. Ex-isting OVIS methods usually rely on vision-language align-ment, where visual region features are matched with tex-tual category embeddings to recognize both seen and un-seen classes. However, this alignment assumption becomes fragile in underwater environments. Color attenuation, scat-tering, turbidity, and low contrast distort visual appearance, causing region features to deviate from their corresponding semantic concepts. As a result, the similarity between de-graded visual features and textual classifiers becomes unre-liable, which particularly weakens the recognition of unseen underwater categories that cannot be corrected by category-specific supervision. To address these issues, we propose Geo-Prompt, a geometry-conditioned prompt learning framework for underwater open-vocabulary instance segmentation. Our key insight is that geometric structure is more stable than vi-sual appearance in degraded underwater scenes. Specifically, GeoPrompt introduces a geometry-guided visual adaptation module (GVAM) to extract depth-derived structural priors and inject them into multi-scale visual features. It further de-velops a geometry-conditioned prompt learning (GCPL) that generates geometry-aware textual classifiers from structural representations. These geometry-aware classifiers are inte-grated with fixed and image-conditioned textual classifiers to improve open-vocabulary semantic alignment. Experiments on the MARIS-OpenIS benchmark show that GeoPrompt achieves state-of-the-art performance and brings consistent improvements on underwater open-vocabulary instance seg-mentation. 
+
+# Introduction 
+
+Open-vocabulary instance segmentation (OVIS) aims to seg-ment object instances from both seen and unseen categories by aligning visual region representations with textual cate-gory embeddings (Radford et al. 2021; Li et al. 2022; Ding, Wang, and Tu 2022; Liang et al. 2023; Xu et al. 2023a,b; Qin et al. 2023; Yu et al. 2023). Benefiting from vision-language models, OVIS reduces the dependence on closed-set cat-egory annotations and provides a promising paradigm for marine perception, where underwater environments contain diverse, fine-grained, and long-tail object categories. This ability is especially important for underwater scene under-
+
+> ∗
+
+Corresponding author. 
+
+standing, since many marine objects are difficult to predefine and annotate in practical applications (Li et al. 2026). Despite recent progress, underwater open-vocabulary in-stance segmentation remains highly challenging. Most exist-ing OVIS methods are developed under the assumption that RGB visual appearance can provide discriminative cues for matching textual category embeddings (Cho et al. 2024; Liu et al. 2024; Xie et al. 2024; Shan et al. 2024; Jiao et al. 2024; Niu et al. 2025). However, underwater imaging conditions often violate this assumption. Color attenuation, light scat-tering, turbidity, low contrast, and non-uniform illumination distort object appearance (Akkaynak and Treibitz 2018; Is-lam et al. 2020; Lian et al. 2023, 2024; Chen et al. 2026), causing visual region features to deviate from their corre-sponding semantic concepts. Since open-vocabulary recog-nition depends on comparing visual features with textual classifiers, such appearance drift directly weakens vision-language alignment, especially for unseen categories that rely more heavily on transferable semantic correspondence. To address this challenge, MARIS (Li et al. 2026) intro-duces a marine OVIS benchmark and improves underwater segmentation through geometric enhancement and seman-tic alignment. Nevertheless, existing methods still leave an important problem underexplored: underwater degradation affects not only the visual representation, but also the way visual regions should be semantically aligned with textual classifiers. Prompt-based learning has become an effective strategy for adapting vision-language models to downstream tasks by replacing hand-crafted templates with learnable or input-conditioned textual contexts (Zhou et al. 2022b,a; Khat-tak et al. 2023a,b). In open-vocabulary segmentation, such prompts are used to construct textual classifiers, which di-rectly influence the matching between visual regions and category semantics (Radford et al. 2021; Liang et al. 2023; Yu et al. 2023). Fixed prompts preserve general semantic knowledge but cannot adapt to scene-specific underwater degradation. Image-conditioned prompt learning can gen-erate adaptive prompts from visual features (Zhou et al. 2022a), yet the image features used for prompt generation may also be affected by underwater appearance drift. There-fore, semantic adaptation based only on fixed templates or degraded RGB features remains insufficient for robust under-water open-vocabulary recognition. arXiv:2610.34190v1 [cs.CV] 25 Oct 2026 Figure 1: Visual comparison of appearance-only predictions, pseudo-depth maps, and GeoPrompt predictions. Appearance-only predictions are prone to incomplete masks or inaccurate localization, while pseudo-depth maps reveal object contours and spatial layout. By leveraging depth-derived geometry, GeoPrompt produces more complete and reliable open-vocabulary instance predictions. Geometry provides a natural complementary cue to allevi-ate this problem. Prior RGB-D, monocular depth estimation, and depth-aware segmentation studies have shown that ge-ometric information can complement RGB appearance by providing object boundaries, spatial layout, and shape cues for dense prediction tasks (Hazirbas et al. 2017; Park, Hong, and Lee 2017; Jiang et al. 2018; Chen et al. 2020; Ran-ftl, Bochkovskiy, and Koltun 2021; Yang et al. 2024a,b). Inspired by this observation, we use depth-derived interme-diate features as structural priors for underwater perception. Importantly, our method does not require ground-truth depth annotations or explicit depth supervision. Instead of treating monocular depth as a target prediction, we exploit depth-derived features to provide geometry-aware cues that are complementary to degraded RGB appearance. Figure 1 vi-sualizes pseudo-depth maps as intermediate geometry cues, showing that they provide useful structural information for improving underwater open-vocabulary instance prediction. Based on this insight, we propose GeoPrompt for un-derwater open-vocabulary instance segmentation, which in-troduces geometry-conditioned prompt learning to improve vision-language alignment. GeoPrompt adapts both sides of vision-language alignment. On the visual side, a geometry-guided visual adaptation module extracts depth-derived structural features and injects them into multi-scale visual representations, helping the segmentation decoder capture more stable object structure under underwater degradation. On the semantic side, a geometry-conditioned prompt branch generates geometry-aware textual classifiers from structural representations. These classifiers are integrated with the original fixed classifier and the image-conditioned prompt classifier, allowing the semantic space to adapt not only to image appearance but also to underwater geometry. By in-troducing geometry-guided visual adaptation and geometry-conditioned prompt learning, GeoPrompt improves both vi-sual representation and semantic alignment for seen and un-seen underwater categories. Our contributions are summarized as follows: 
+
+• We reformulate underwater open-vocabulary instance segmentation as a geometry-conditioned vision-language alignment problem, emphasizing that both visual repre-sentations and semantic prompts should be adapted under underwater degradation. 
+
+• We propose GeoPrompt, a unified framework consisting of Geometry-Guided Visual Adaptation Module (GVAM) and Geometry-Conditioned Prompt Learning (GCPL). The former injects depth-derived structural priors into multi-scale visual features, while the latter uses geomet-ric cues to generate degradation-aware semantic prompts. 
+
+• We design a Geometry-Conditioned Vision-Language Alignment strategy that aligns geometry-enhanced vi-sual embeddings with geometry-aware textual classifiers for open-vocabulary mask prediction. Experiments on MARIS show that GeoPrompt achieves state-of-the-art performance and improves generalization to unseen un-derwater categories. 
+
+# Related Work 
+
+Open-Vocabulary Instance Segmentation 
+
+Open-vocabulary instance segmentation (OVIS) aims to rec-ognize and segment object instances from both seen and unseen categories by leveraging the semantic generalization of vision-language models (Radford et al. 2021; Liang et al. 2023; Xu et al. 2023b). Existing approaches often decouple mask generation from category prediction: a segmentation decoder produces instance masks, while visual region em-beddings are matched with textual classifiers derived from category names or prompt templates (Liang et al. 2023; Xu et al. 2023a; Yu et al. 2023). This design enables recognition beyond the predefined training label space. However, most methods are developed on natural-image benchmarks and assume that RGB features provide reliable cues for vision-language alignment. This assumption is particularly fragile in underwater en-vironments. Color attenuation, scattering, turbidity, and low contrast distort visual appearance, causing region features to deviate from their corresponding textual concepts. Related Figure 2: Overall architecture of GeoPrompt. GeoPrompt consists of GVAM and GCPL. GVAM extracts depth-derived structural features from a frozen depth estimation model and adapts them to obtain geometry-enhanced visual representations, with the pseudo-depth map shown only as a visualization of the geometry cue. GCPL generates geometry-aware textual classifiers and integrates them with fixed and image-conditioned classifiers for geometry-conditioned vision-language alignment and open-vocabulary instance mask prediction. semantic segmentation studies have addressed distribution shifts through curriculum-style self-training for source-free adaptation (Wang, Liang, and Zhang 2024) and informative data mining for one-shot cross-domain adaptation (Wang et al. 2023). Although these methods do not directly tar-get underwater OVIS, they highlight the importance of ro-bust representations under distribution shifts. Furthermore, geometry-guided self-distillation has been explored for open-vocabulary 3D scene understanding (Wang et al. 2024), demonstrating the potential of structural cues for open-vocabulary representations. MARIS (Li et al. 2026) takes an important step toward underwater OVIS by introducing a marine benchmark and enhancing visual representations through geometric features and semantic alignment. Nevertheless, existing underwater OVIS approaches primarily employ geometry for visual fea-ture enhancement, while geometry-conditioned adaptation of textual classifiers remains underexplored. This motivates GeoPrompt, which uses depth-derived structural representa-tions to guide both visual adaptation and textual classifier generation for more reliable open-vocabulary alignment. 
+
+Geometry-Conditioned Prompt Learning 
+
+Prompt learning adapts vision-language models by replac-ing handcrafted textual templates with learnable or input-conditioned context tokens. CoOp (Zhou et al. 2022b) learns task-specific context vectors, while CoCoOp (Zhou et al. 2022a) introduces image-conditioned prompts to improve generalization to unseen categories. MaPLe (Khattak et al. 2023a) further explores multimodal prompt learning by jointly adapting visual and textual representations. These approaches provide flexible textual classifiers, but their ef-fectiveness depends on the reliability of the features used to generate adaptive prompts. In underwater scenes, image-conditioned prompts may in-herit appearance bias from degraded RGB features. Color distortion, scattering, and background interference can af-fect both visual region embeddings and image-level features used for prompt generation, weakening semantic alignment. Geometry offers a complementary cue, since structural in-formation such as object contours, shapes, and spatial layout can remain informative under appearance degradation. Pre-vious RGB-D segmentation studies (Hazirbas et al. 2017; Chen et al. 2020) have demonstrated the benefits of incorpo-rating geometric cues into visual representations. However, these methods primarily exploit geometry for visual feature enhancement rather than textual classifier adaptation. To address this limitation, GeoPrompt introduces geometry-conditioned prompt learning that generates adap-tive textual classifiers from depth-derived structural fea-tures. By integrating geometry-aware prompts with fixed and image-conditioned classifiers, GeoPrompt adapts both sides of vision-language alignment, reducing dependence on degraded RGB appearance and improving semantic corre-spondence for underwater open-vocabulary recognition. 
+
+# Method 
+
+The overall architecture of GeoPrompt is shown in Figure 2. It introduces three core components: (1) a Geometry-Guided Visual Adaptation Module (GVAM) that extracts depth-derived structural priors and injects them into multi-scale vi-sual features, alleviating underwater appearance drift; (2) a 
+
+Geometry-Conditioned Prompt Learning (GCPL) mod-ule that generates geometry-aware textual classifiers from structural representations, reducing semantic misalignment; (3) a Geometry-Conditioned Vision-Language Alignment 
+
+mechanism that matches geometry-enhanced visual features with adaptive textual classifiers for robust open-vocabulary mask prediction. Through this design, GeoPrompt adapts both sides of vision-language alignment, enabling more re-liable recognition of both seen and unseen underwater cate-gories. 
+
+Geometry-Guided Visual Adaptation 
+
+Underwater images are often degraded by color attenuation, scattering, turbidity, and low contrast, which weaken RGB-based representations for open-vocabulary instance segmen-tation (Lian et al. 2023, 2024; Chen et al. 2026). To comple-ment unreliable appearance cues, geometric structures such as object contours, shapes, spatial layout, and depth-related hierarchy provide useful structural information for dense pre-diction (Hazirbas et al. 2017; Park, Hong, and Lee 2017; Jiang et al. 2018; Chen et al. 2020). We therefore introduce a Geometry-Guided Visual Adaptation Module that extracts depth-derived structural features to enhance multi-scale vi-sual representations. 
+
+Geometry Feature Extraction. Given an input image x ∈
+
+RH×W ×3, we first extract multi-scale visual features {Fl}Ll=1 
+
+from the CLIP image encoder (Radford et al. 2021), where 
+
+L denotes the number of feature scales. In parallel, a pre-trained monocular depth estimation model D, implemented with Depth Anything V2 (Yang et al. 2024b), is employed as a geometry encoder to produce depth-derived structural features. Specifically, we extract intermediate features from the depth encoder at multiple stages: 
+
+{Gl}Ll=1 = Dintermediate (x), (1) where Gl ∈ RCg ×Hl×Wl represents the geometry feature at scale l.Since the raw geometry features are not directly optimized for underwater instance segmentation, we further introduce a lightweight geometry adapter to transform them into task-specific structural representations: 
+
+ˆGl = Ag (Gl), (2) where Ag (·) denotes the geometry adapter and ˆGl denotes the adapted geometry feature at scale l. These adapted geometry features provide structural cues that are complementary to degraded RGB appearance. 
+
+Visual-Geometry Fusion. After obtaining the adapted ge-ometry features ˆGl, we fuse them with the corresponding visual features Fl at each scale. Following the geometry-enhanced fusion paradigm in marine open-vocabulary in-stance segmentation (Li et al. 2026), we adopt a Visual-Geometric Multimodal Interaction (VGMI) block for cross-modal fusion. The VGMI block performs feature concatena-tion, channel transformation, and channel-wise gating: 
+
+F cat  
+
+> l
+
+= Conv 1×1
+
+
+
+Concat (Fl, ˆGl)
+
+
+
+, (3) 
+
+˜Fl = σ  MLP  GAP (F cat  
+
+> l
+
+) ⊙ F cat  
+
+> l
+
++ Fl, (4) where GAP denotes global average pooling, σ is the sig-moid function, and ⊙ denotes element-wise multiplication. The channel gate selectively emphasizes informative feature channels, while the residual connection preserves the orig-inal visual semantics. The output ˜Fl denotes the geometry-enhanced visual feature at scale l.This fusion strategy allows the model to exploit both RGB appearance information and geometry priors. It is particu-larly useful in underwater scenes, where object texture and color can be severely degraded while structural cues such as contours and spatial layout remain relatively stable. 
+
+Geometry-Conditioned Prompt Learning 
+
+Open-vocabulary instance segmentation relies on textual classifiers generated from category names and prompt tem-plates (Radford et al. 2021; Liang et al. 2023; Xu et al. 2023a,b; Yu et al. 2023). Fixed prompts such as “a photo of a [CLASS]” preserve general semantic knowledge from pre-training (Radford et al. 2021; Zhou et al. 2022b) but cannot adapt to scene-specific underwater degradation. Image-conditioned prompt learning further generates adap-tive prompts from image features (Zhou et al. 2022a): 
+
+pimg = MetaNet img (Pool (Fimg )) , (5) where Fimg denotes the image-level visual feature and Pool (·)
+
+denotes global feature aggregation, such as GAP or a CLS token. However, in underwater scenes, the image features used for prompt generation may themselves be affected by color attenuation, scattering, and low contrast (Lian et al. 2023, 2024; Chen et al. 2026). As a result, image-conditioned prompts may inherit degraded appearance bias, leading to semantic misalignment between visual regions and textual classifiers. To address this problem, we introduce a geometry-conditioned prompt branch that generates textual classifiers from depth-derived structural representations. 
+
+Geometry Context Aggregation. We first aggregate the adapted multi-scale geometry features into a global geometry context: 
+
+Gctx = Concat 
+
+
+
+GAP ( ˆG1), GAP ( ˆG2), . . . , GAP ( ˆGL)
+
+
+
+.
+
+(6) The concatenated context Gctx captures multi-scale geomet-ric structure information that is complementary to RGB ap-pearance (Hazirbas et al. 2017; Park, Hong, and Lee 2017; Jiang et al. 2018; Chen et al. 2020). 
+
+Geometry-Conditioned Prompt Generation. The geom-etry context Gctx is fed into a Geometry Prompt Adapter to generate geometry-conditioned prompt tokens. Specifically, we first project the geometry context into a compact repre-sentation: 
+
+Gproj = ReLU (Linear (LayerNorm (Gctx ))) , (7) and then generate geometry-conditioned prompt tokens: 
+
+pgeo = MetaNet geo (Gproj ). (8) These geometry-conditioned prompt tokens are combined with category name embeddings and encoded by the frozen CLIP text encoder (Radford et al. 2021) to produce a geometry-aware textual classifier: 
+
+Tgeo = CLIP text (compose (pgeo , ecls )) , (9) where ecls denotes the CLIP text embedding of the category name. 
+
+Multi-Source Classifier Integration. GeoPrompt inte-grates three complementary textual classifiers: the original fixed classifier, the image-conditioned classifier (Zhou et al. 2022a), and the geometry-conditioned classifier. The final textual classifier is computed as: 
+
+T = Norm ((1 − λ − αg )Tfix + λTimg + αg Tgeo ) , (10) where Tfix denotes the fixed textual classifier, Timg de-notes the image-conditioned classifier, and Tgeo denotes the geometry-conditioned classifier. The coefficient λ con-trols the contribution of the image-conditioned branch, while 
+
+αg controls the contribution of the geometry-conditioned branch. For ablation studies, this formulation supports flexi-ble configurations. Removing the image-conditioned branch yields a Fixed+Geo variant: 
+
+T = Norm ((1 − αg )Tfix + αg Tgeo ) . (11) Removing the geometry-conditioned branch recovers the fixed-plus-image-conditioned prompt variant. 
+
+Geometry-Conditioned Vision-Language Alignment 
+
+After obtaining the geometry-enhanced visual features 
+
+{ ˜Fl}Ll=1 and the final textual classifier T, the segmenta-tion decoder predicts instance masks and assigns open-vocabulary category labels by matching visual mask em-beddings with textual classifiers (Radford et al. 2021; Liang et al. 2023; Yu et al. 2023). This process performs geometry-conditioned vision-language alignment from both sides: the visual features are enhanced by depth-derived structural priors, and the textual classifier is adapted by geometry-conditioned prompt learning. Following the MARIS framework (Li et al. 2026), we employ a Mask2Former-style transformer decoder (Cheng, Schwing, and Kirillov 2021; Cheng et al. 2022). The decoder takes multi-scale visual features as input and refines a set of learnable query embeddings through multiple decoder layers. At each decoder layer, the model predicts mask embeddings and classification embeddings: 
+
+M(d) = MLP mask (Q(d)), C(d) = MLP cls (Q(d)), (12) where d indexes the decoder layer. The mask predictions are obtained by computing the similarity between mask embed-dings and pixel-level visual features: 
+
+P(d) 
+
+> mask
+
+= M(d) · ˜F⊤
+
+> px
+
+. (13) To perform open-vocabulary classification, instance-level visual embeddings are compared with the final textual clas-sifier (Radford et al. 2021; Liang et al. 2023; Yu et al. 2023): 
+
+P(d) 
+
+> cls
+
+= γlogit · C(d)
+
+∥C(d)∥2
+
+· T⊤
+
+∥T∥2
+
+, (14) where γlogit is a learnable logit scale. The final classifier T
+
+incorporates fixed semantic knowledge, image-conditioned adaptation, and geometry-conditioned semantic cues, en-abling more robust category prediction under underwater degradation. 
+
+Training Objective. GeoPrompt is optimized using the standard open-vocabulary instance segmentation objec-tive (Cheng et al. 2022; Li et al. 2026): 
+
+L = Lcls + Lmask + Ldice . (15) Here, Lcls is the classification loss, Lmask is the mask loss, and 
+
+Ldice is the DICE loss. The Hungarian matching algorithm is used for bipartite matching between predictions and ground truth, with deep supervision applied to auxiliary decoder outputs (Cheng et al. 2022). 
+
+# Experiments 
+
+Experimental Setup 
+
+Dataset. We conduct experiments on the MARIS-OpenIS benchmark for underwater open-vocabulary instance seg-mentation. MARIS-OpenIS contains more than 16K un-derwater images with pixel-level instance masks, covering 9 super-classes and 158 fine-grained subclasses. It refines coarse underwater labels such as “fish” and “plants” into more detailed marine categories, making it suitable for eval-uating fine-grained open-vocabulary recognition. Following the official protocol, the dataset is split into 5,712 training images and 10,439 validation images. The training and vali-dation sets contain 84 and 115 categories, respectively, with 41 overlapping categories. We report results on both intersec-tion categories and open-vocabulary categories that appear only in the validation set. 
+
+Evaluation Metrics. We report COCO-style mask AP (Lin et al. 2014), including AP, AP 50 , AP 75 . When category splits are available, we further report AP on seen/intersection and open-vocabulary categories. 
+
+Implementation Details. We use ConvNeXt-Base (Liu et al. 2022) CLIP (Radford et al. 2021) as the vision-language backbone and Depth Anything V2 (Yang et al. 2024b) with ViT-B as the geometry prior extractor. The model is trained for 50K iterations with a total batch size of 16 on 8 GPUs. The base learning rate is set to 1×10 −4. For prompt learning, the number of context tokens is set to 4 and initialized with “a photo of a”. The image-conditioned prompt coefficient is set to λ = 0 .05 , while the geometry-conditioned prompt coefficient is initialized as αg = 0 .05 and constrained by a maximum value of 0.10. 
+
+Comparison with the State-of-the-Art Methods 
+
+Quantitative Results Table 1 compares GeoPrompt with representative open-vocabulary segmentation methods on the MARIS benchmark. We compare with existing meth-ods including OVSeg (Liang et al. 2023), ODISE (Xu et al. 2023a), SAN (Xu et al. 2023b), FCCLIP (Yu et al. 2023), MAFT+ (Jiao et al. 2024), EOVSeg (Niu et al. 2025), and the marine open-vocabulary baseline MARIS (Li et al. 2026). Existing results are taken from the MARIS benchmark (Li Table 1: Comparison with the state-of-the-art open-vocabulary segmentation methods on the MARIS benchmark.The results of OVSeg, ODISE, SAN, FCCLIP, MAFT+, EOVSeg, and MARIS are reported by the MARIS benchmark. GeoPrompt is evaluated under the same in-domain setting. Method Publication Backbone Intersection Class Open-Vocabulary Class Overall Class mAP AP 50 AP 75 mAP AP 50 AP 75 mAP AP 50 AP 75                                                                                         
+
+> OVSeg CVPR’23 ViT-B 37.52 48.51 43.26 27.21 33.65 30.38 30.95 39.02 35.47 ODISE CVPR’23 ViT-B 41.89 50.74 46.83 30.26 35.68 32.54 34.71 41.56 38.12 SAN CVPR’23 ViT-B 43.26 52.18 48.05 31.57 37.09 34.02 36.05 43.06 39.26 FCCLIP NeurIPS’23 ConvNeXt-B 47.78 57.22 52.44 34.53 39.84 37.15 39.26 46.03 42.60 MAFT+ ECCV’24 ConvNeXt-B 48.15 58.26 54.57 35.72 40.67 38.88 40.08 47.16 43.33 EOVSeg AAAI’25 ConvNeXt-B 37.98 48.95 41.55 27.48 33.89 29.56 31.22 39.26 33.83 MARIS CVPR’26 ConvNeXt-B 52.68 61.56 57.33 39.77 45.78 42.68 44.37 51.41 47.90
+> GeoPrompt (Ours) –ConvNeXt-B 56.34 65.75 60.88 48.20 54.88 51.49 51.10 58.76 54.84
+
+et al. 2026), and our GeoPrompt is evaluated under the same in-domain setting. Compared with previous methods, Geo-Prompt achieves the best performance on intersection, open-vocabulary, and overall categories, demonstrating the effec-tiveness of geometry-conditioned prompt learning for under-water open-vocabulary instance segmentation. Compared with the MARIS baseline, GeoPrompt im-proves the overall mAP from 44.37 to 51.10, bringing a gain of 6.73 points. On open-vocabulary categories, GeoPrompt improves mAP from 39.77 to 48.20, with a gain of 8.43 points. This improvement is especially important because open-vocabulary categories rely more heavily on transfer-able vision-language alignment rather than category-specific supervision. These results show that geometry-conditioned prompt learning and geometry-guided visual adaptation can effectively reduce the negative influence of underwater ap-pearance degradation and improve the recognition of unseen underwater objects. 
+
+Qualitative Results Figure 3 presents qualitative compar-isons between GeoPrompt and MARIS, the strongest base-line in our quantitative comparison and the most relevant geometry-enhanced underwater OVIS method. Compared with MARIS, GeoPrompt produces more complete and accu-rate mask predictions in challenging scenes. In the first row, GeoPrompt successfully identifies multiple object instances, whereas MARIS misses part of the targets. In the second and third rows, GeoPrompt yields clearer object boundaries and more reliable localization for small or partially ambigu-ous instances. In the fourth row, GeoPrompt better preserves the object shape and extent, showing improved structural consistency. In the last row, GeoPrompt separates adjacent instances more clearly, while MARIS tends to produce in-complete or inaccurate masks. Overall, these qualitative re-sults show that GeoPrompt provides more reliable instance localization, finer boundary delineation, and stronger cate-gory discrimination than MARIS, demonstrating the benefit of jointly exploiting geometry-guided visual adaptation and geometry-aware prompt learning. 
+
+Ablation Experiments 
+
+Main Component Ablation. To evaluate the contribution of the two main components, we conduct ablation experi-
+
+Figure 3: Qualitative comparison between MARIS and Geo-Prompt. From left to right: input image, ground-truth anno-tation, prediction of MARIS, and prediction of GeoPrompt. Compared with MARIS, GeoPrompt produces more com-plete masks, clearer object boundaries, and more accurate instance-level predictions. ments on GVAM and GCPL. GVAM introduces geometry-guided visual adaptation to enhance multi-scale visual rep-resentations, while GCPL introduces geometry-conditioned prompt learning to adapt textual classifiers with structural context. As shown in Table 2, the baseline without GVAM and GCPL obtains 44.37 overall mAP. Introducing GVAM im-proves the overall mAP to 50.83, showing that geometry-guided visual adaptation provides effective structural cues for underwater instance segmentation. Introducing GCPL alone improves the overall mAP to 46.55, indicating that geometry-conditioned prompt learning can improve seman-tic alignment even without visual-side geometry fusion. When GVAM and GCPL are combined, GeoPrompt achieves the best overall mAP of 51.10 and the best Table 2: Ablation study on the main components of GeoPrompt.                                                     
+
+> GVAM GCPL Intersection Class Open-Vocabulary Class Overall Class mAP AP 50 AP 75 mAP AP 50 AP 75 mAP AP 50 AP 75
+> ××52.68 61.56 57.33 39.77 45.78 42.68 44.37 51.41 47.90
+> ✓×55.09 64.56 60.02 48.46 55.55 52.02 50.83 58.76 54.87
+> ×✓49.13 57.64 53.15 45.12 51.93 48.51 46.55 53.97 50.16
+> ✓✓56.34 65.75 60.88 48.20 54.88 51.49 51.10 58.76 54.84
+
+Figure 4: Qualitative visualization of image-side feature responses. Each group shows the input image, visual response, geometry response, and fused response. The fused response becomes more concentrated on object-related regions after visual-geometric adaptation. intersection-class mAP of 56.34. These results demon-strate that visual-side geometry adaptation and prompt-side geometry-conditioned classifier generation are complemen-tary. Although GVAM alone already provides strong im-provements on open-vocabulary categories, the full model achieves the best overall balance across intersection, open-vocabulary, and overall categories. 
+
+Feature Response Visualization. To further analyze the effect of geometry-guided visual adaptation, we visualize the image-side feature responses of GeoPrompt in Figure 4. Each row shows the input image, visual response, geom-etry response, and fused response. The visual response is obtained from RGB visual features, while the geometry re-sponse is derived from depth-based structural representa-tions after geometry adaptation. The fused response rep-resents the geometry-enhanced visual representation after visual-geometric adaptation. As shown in Figure 4, the visual response is often af-fected by underwater appearance degradation, such as color attenuation, low contrast, and background clutter. In con-trast, the geometry response highlights more stable struc-tural regions, including object contours and spatial layouts. After visual-geometric fusion, the fused response becomes more concentrated on object regions and shows clearer struc-tural activation. These qualitative results indicate that GVAM helps the model exploit geometry cues to obtain more ro-bust image-side representations under challenging underwa-ter conditions. 
+
+# Conclusion 
+
+In this paper, we proposed GeoPrompt, a geometry-conditioned prompt learning framework for underwater open-vocabulary instance segmentation. GeoPrompt con-sists of two complementary components: GVAM and GCPL. GVAM enhances multi-scale visual features with depth-derived geometric representations, while GCPL generates adaptive textual classifiers from image-level and geometry-level contexts. By jointly adapting visual representations and textual classifiers, GeoPrompt improves geometry-conditioned vision-language alignment under underwater appearance degradation. Importantly, GeoPrompt does not require ground-truth depth annotations, making it practical for RGB-only marine datasets. Experiments on the MARIS benchmark demonstrate the effectiveness of GeoPrompt. GeoPrompt improves OV mAP from 39.77 to 48.20, show-ing stronger generalization to unseen underwater categories. Ablation studies and qualitative results further validate the contribution of the proposed components. Despite these improvements, challenging cases remain. Extremely small objects, heavy occlusion, ambiguous boundaries, or noisy depth-derived geometry features may still lead to incomplete predictions. Future work will explore robust geometry priors and stronger semantic discrimination for complex marine scenarios. 
+
+# Acknowledgments 
+
+The authors would like to thank their colleagues for their valuable discussions and constructive suggestions during this research. References 
+
+Akkaynak, D.; and Treibitz, T. 2018. A Revised Underwater Image Formation Model. Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition ,6723–6732. Chen, X.; Lin, K.-Y.; Wang, J.; Wu, W.; Qian, C.; Li, H.; and Zeng, G. 2020. Bi-Directional Cross-Modality Feature Prop-agation With Separation-and-Aggregation Gate for RGB-D Semantic Segmentation. In Proceedings of the European Conference on Computer Vision , 561–577. Chen, Z.; Zhang, C.; Fang, H.; and Cong, R. 2026. Empow-ering DINO Representations for Underwater Instance Seg-mentation via Aligner and Prompter. In Proceedings of the AAAI Conference on Artificial Intelligence .Cheng, B.; Misra, I.; Schwing, A. G.; Kirillov, A.; and Gird-har, R. 2022. Masked-Attention Mask Transformer for Uni-versal Image Segmentation. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition ,1290–1299. Cheng, B.; Schwing, A.; and Kirillov, A. 2021. Per-Pixel Classification is Not All You Need for Semantic Segmenta-tion. In Advances in Neural Information Processing Systems ,volume 34, 17864–17875. Cho, S.; Shin, H.; Hong, S.; Arnab, A.; Seo, P. H.; and Kim, S. J. 2024. CAT-Seg: Cost Aggregation for Open-Vocabulary Semantic Segmentation. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition ,4113–4123. Ding, Z.; Wang, J.; and Tu, Z. 2022. Open-Vocabulary Panoptic Segmentation with MaskCLIP. arXiv preprint arXiv:2208.08984 .Hazirbas, C.; Ma, L.; Domokos, C.; and Cremers, D. 2017. FuseNet: Incorporating Depth into Semantic Segmentation via Fusion-Based CNN Architecture. In Computer Vision – ACCV 2016 , 213–228. Islam, M. J.; Edge, C.; Xiao, Y.; Luo, P.; Mehtaz, M.; Morse, C.; Enan, S. S.; and Sattar, J. 2020. Semantic Segmenta-tion of Underwater Imagery: Dataset and Benchmark. In 
+
+Proceedings of the IEEE/RSJ International Conference on Intelligent Robots and Systems , 1769–1776. Jiang, J.; Zheng, L.; Luo, F.; and Zhang, Z. 2018. Red-Net: Residual Encoder-Decoder Network for Indoor RGB-D Semantic Segmentation. arXiv preprint arXiv:1806.01054 .Jiao, S.; Zhu, H.; Huang, J.; Zhao, Y.; Wei, Y.; and Shi, H. 2024. Collaborative Vision-Text Representation Optimizing for Open-Vocabulary Segmentation. In Proceedings of the European Conference on Computer Vision .Khattak, M. U.; Rasheed, H.; Maaz, M.; Khan, S.; and Khan, F. S. 2023a. MaPLe: Multi-Modal Prompt Learning. In Pro-ceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 19113–19122. Khattak, M. U.; Wasim, S. T.; Naseer, M.; Khan, S.; Yang, M.-H.; and Khan, F. S. 2023b. Self-Regulating Prompts: Foundational Model Adaptation without Forgetting. In Pro-ceedings of the IEEE/CVF International Conference on Com-puter Vision , 15190–15200. Li, B.; Wang, F.; Zhang, D.; Zhao, Z.; Gao, J.; and Li, X. 2026. MARIS: Marine Open-Vocabulary Instance Segmen-tation. arXiv preprint arXiv:2510.15398 .Li, B.; Weinberger, K. Q.; Belongie, S.; Koltun, V.; and Ranftl, R. 2022. Language-Driven Semantic Segmentation. In International Conference on Learning Representations .Lian, S.; Li, H.; Cong, R.; Li, S.; Zhang, W.; and Kwong, S. 2023. WaterMask: Instance Segmentation for Underwater Imagery. In Proceedings of the IEEE/CVF International Conference on Computer Vision , 1305–1315. Lian, S.; Zhang, Z.; Li, H.; Li, W.; Yang, L. T.; Kwong, S.; and Cong, R. 2024. Diving into Underwater: Segment Anything Model Guided Underwater Salient Instance Segmentation and a Large-Scale Dataset. arXiv preprint arXiv:2406.06039 .Liang, F.; Wu, B.; Dai, X.; Li, K.; Zhao, Y.; Zhang, H.; Zhang, P.; Vajda, P.; and Marculescu, D. 2023. Open-Vocabulary Semantic Segmentation With Mask-Adapted CLIP. In Pro-ceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 7061–7070. Lin, T.-Y.; Maire, M.; Belongie, S.; Hays, J.; Perona, P.; Ramanan, D.; Dollár, P.; and Zitnick, C. L. 2014. Microsoft COCO: Common Objects in Context. In Computer Vision – ECCV 2014 , 740–755. Liu, Y.; Bai, S.; Li, G.; Wang, Y.; and Tang, Y. 2024. Open-Vocabulary Segmentation with Semantic-Assisted Calibra-tion. In Proceedings of the IEEE/CVF Conference on Com-puter Vision and Pattern Recognition , 3491–3500. Liu, Z.; Mao, H.; Wu, C.-Y.; Feichtenhofer, C.; Darrell, T.; and Xie, S. 2022. A ConvNet for the 2020s. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 11976–11986. Niu, H.; Hu, J.; Lin, J.; Jiang, G.; and Zhang, S. 2025. EOV-Seg: Efficient Open-Vocabulary Panoptic Segmentation. In 
+
+Proceedings of the AAAI Conference on Artificial Intelli-gence , 6254–6262. Park, S.-J.; Hong, K.-S.; and Lee, S.-W. 2017. RDFNet: RGB-D Multi-Level Residual Feature Fusion for Indoor Se-mantic Segmentation. In Proceedings of the IEEE Interna-tional Conference on Computer Vision , 4980–4989. Qin, J.; Wu, J.; Yan, P.; Li, M.; Ren, Y.; Xiao, X.; Wang, Y.; Wang, R.; Wen, S.; Pan, X.; et al. 2023. FreeSeg: Uni-fied, Universal and Open-Vocabulary Image Segmentation. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 19446–19455. Radford, A.; Kim, J. W.; Hallacy, C.; Ramesh, A.; Goh, G.; Agarwal, S.; Sastry, G.; Askell, A.; Mishkin, P.; Clark, J.; Krueger, G.; and Sutskever, I. 2021. Learning Trans-ferable Visual Models From Natural Language Supervision. In Proceedings of the International Conference on Machine Learning , 8748–8763. Ranftl, R.; Bochkovskiy, A.; and Koltun, V. 2021. Vision Transformers for Dense Prediction. In Proceedings of the IEEE/CVF International Conference on Computer Vision ,12179–12188. Shan, X.; Wu, D.; Zhu, G.; Shao, Y.; Sang, N.; and Gao, C. 2024. Open-Vocabulary Semantic Segmentation with Image Embedding Balancing. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition ,28412–28421. Wang, P.; Wang, Y.; Li, S.; Zhang, Z.; Lei, Z.; and Zhang, L. 2024. Open Vocabulary 3D Scene Understanding via Geometry Guided Self-Distillation. In Computer Vision – ECCV 2024 , 442–460. Wang, Y.; Liang, J.; Xiao, J.; Mei, S.; Yang, Y.; and Zhang, Z. 2023. Informative Data Mining for One-Shot Cross-Domain Semantic Segmentation. In Proceedings of the IEEE/CVF International Conference on Computer Vision , 1064–1074. Wang, Y.; Liang, J.; and Zhang, Z. 2024. A Curriculum-Style Self-Training Approach for Source-Free Semantic Segmen-tation. IEEE Transactions on Pattern Analysis and Machine Intelligence , 46(12): 9890–9907. Xie, B.; Cao, J.; Xie, J.; Khan, F. S.; and Pang, Y. 2024. SED: A Simple Encoder-Decoder for Open-Vocabulary Semantic Segmentation. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 3426–3436. Xu, J.; Liu, S.; Vahdat, A.; Byeon, W.; Wang, X.; and De Mello, S. 2023a. Open-Vocabulary Panoptic Segmen-tation With Text-to-Image Diffusion Models. In Proceed-ings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 2955–2966. Xu, M.; Zhang, Z.; Wei, F.; Hu, H.; and Bai, X. 2023b. Side Adapter Network for Open-Vocabulary Semantic Seg-mentation. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 2945–2954. Yang, L.; Kang, B.; Huang, Z.; Xu, X.; Feng, J.; and Zhao, H. 2024a. Depth Anything: Unleashing the Power of Large-Scale Unlabeled Data. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition ,10371–10381. Yang, L.; Kang, B.; Huang, Z.; Zhao, Z.; Xu, X.; Feng, J.; and Zhao, H. 2024b. Depth Anything V2. In Advances in Neural Information Processing Systems .Yu, Q.; He, J.; Deng, X.; Shen, X.; and Chen, L.-C. 2023. Convolutions Die Hard: Open-Vocabulary Segmen-tation With Single Frozen Convolutional CLIP. In Advances in Neural Information Processing Systems .Zhou, K.; Yang, J.; Loy, C. C.; and Liu, Z. 2022a. Conditional Prompt Learning for Vision-Language Models. In Proceed-ings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 16816–16825. Zhou, K.; Yang, J.; Loy, C. C.; and Liu, Z. 2022b. Learning to Prompt for Vision-Language Models. International Journal of Computer Vision , 130: 2337–2348.
