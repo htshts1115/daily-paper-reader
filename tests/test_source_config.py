@@ -15,6 +15,16 @@ from src.source_config import (
 
 
 class SourceConfigMigrationTest(unittest.TestCase):
+    def test_direct_fetch_is_runtime_only_and_leaves_conferences_unchanged(self):
+        from copy import deepcopy
+        cfg = {"source_backends": {key: {"enabled": True, "url": "https://example.supabase.co"}
+                                   for key in ("arxiv", "icml")}}
+        original = deepcopy(cfg)
+        with patch.dict("os.environ", {"DPR_ARXIV_DIRECT_FETCH": "1"}):
+            self.assertFalse(get_source_backend(cfg, "arxiv")["enabled"])
+            self.assertTrue(get_source_backend(cfg, "icml")["enabled"])
+            self.assertEqual(cfg, original)
+
     def test_migrate_fills_missing_paper_sources_and_source_backends(self):
         cfg = {
             "supabase": {

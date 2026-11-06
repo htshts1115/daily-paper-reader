@@ -40,6 +40,9 @@ jobs:
     outputs:
       research_days: ${{ steps.window.outputs.days }}
     env:
+      # 临时绕过不可用的共享数据库；设为 0 可恢复原数据库检索。
+      DPR_ARXIV_DIRECT_FETCH: "1"
+      DPR_ARXIV_CATEGORIES: "cs.CV,cs.LG,cs.AI,eess.IV"
       DPR_MODELS_REMOTE_ONLY: "1"
       DPR_EMBED_ALLOW_LOCAL_FALLBACK: "0"
       DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}

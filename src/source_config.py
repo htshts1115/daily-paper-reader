@@ -493,7 +493,12 @@ def list_known_source_keys(config: Dict[str, Any]) -> List[str]:
 
 
 def get_source_backend(config: Dict[str, Any], source_key: str) -> Dict[str, Any]:
-    return copy.deepcopy(resolve_source_backends(config).get(normalize_source_key(source_key)) or {})
+    key = normalize_source_key(source_key)
+    backend = copy.deepcopy(resolve_source_backends(config).get(key) or {})
+    # Runtime-only override: preserve saved configuration and other conference backends.
+    if key == ARXIV_SOURCE_KEY and os.getenv("DPR_ARXIV_DIRECT_FETCH", "").lower() in {"1", "true", "yes"}:
+        backend["enabled"] = False
+    return backend
 
 
 def validate_profile_paper_sources(

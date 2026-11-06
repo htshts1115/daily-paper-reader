@@ -36,6 +36,16 @@ CATEGORIES_TO_FETCH = [
 RANGE_TOKEN_RE = re.compile(r"^\d{8}-\d{8}$")
 
 
+def resolve_fetch_categories() -> list[str]:
+    raw = os.getenv("DPR_ARXIV_CATEGORIES", "").strip()
+    if not raw:
+        return list(CATEGORIES_TO_FETCH)
+    categories = list(dict.fromkeys(part.strip() for part in raw.split(",") if part.strip()))
+    if not categories or any(not re.fullmatch(r"[A-Za-z][A-Za-z0-9.-]*", part) for part in categories):
+        raise ValueError("DPR_ARXIV_CATEGORIES 必须为逗号分隔的 arXiv 分类。")
+    return categories
+
+
 def load_config() -> dict:
     try:
         return load_config_with_source_migration(CONFIG_FILE, write_back=False)
@@ -386,6 +396,8 @@ def fetch_category_in_windows(
                 for candidate in (cat_max_left, cat_max_right):
                     if candidate and (max_published_new is None or candidate > max_published_new):
                         max_published_new = candidate
+            elif os.getenv("DPR_ARXIV_DIRECT_FETCH", "").lower() in {"1", "true", "yes"}:
+                raise RuntimeError(f"arXiv 抓取失败：{category} {start_str}..{end_str}；不更新抓取水位。") from e
             time.sleep(5)
         finally:
             group_end()
@@ -521,7 +533,7 @@ def fetch_all_domains_metadata_robust(
     )
 
     # 2. 遍历分类进行抓取
-    for category in CATEGORIES_TO_FETCH:
+    for category in resolve_fetch_categories():
         cat_max = fetch_category_in_windows(
             client=client,
             category=category,

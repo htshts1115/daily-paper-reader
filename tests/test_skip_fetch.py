@@ -45,6 +45,10 @@ class ShouldSkipFetchTest(unittest.TestCase):
         """All Supabase retrieval features on → skip fetch."""
         self.assertTrue(should_skip_fetch(self.FULL_SUPABASE_CONFIG))
 
+    def test_direct_fetch_overrides_saved_database_configuration(self):
+        with patch.dict(os.environ, {"DPR_ARXIV_DIRECT_FETCH": "1"}):
+            self.assertFalse(should_skip_fetch(self.FULL_SUPABASE_CONFIG))
+
     def test_skip_when_source_backends_arxiv_fully_configured(self):
         cfg = {
             "arxiv_paper_setting": {"prefer_supabase_read": True},
