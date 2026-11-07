@@ -1,8 +1,69 @@
 {
   "label": "2026-11-06",
   "date": "2026-11-06",
-  "generated_at": "2026-11-06T00:37:44",
-  "count": 0,
-  "papers": [],
+  "generated_at": "2026-11-07T00:25:10",
+  "count": 4,
+  "papers": [
+    {
+      "paper_id": "202611/06/2610.41190v1-flowmode-coarse-to-fine-flow-matching-for-detail-aware-sim-to-real-monocular-depth-estimation",
+      "section": "deep",
+      "title_en": "FlowMoDE: Coarse-to-fine Flow Matching for Detail-aware Sim-to-Real Monocular Depth Estimation",
+      "authors": "Liangjing Shao, Wanhao Liu, Jinsong Lin, Zhiwei Fang, Hongliang Ren",
+      "date": "2026-10-30",
+      "pdf": "https://arxiv.org/pdf/2610.41190v1",
+      "score": "9.0",
+      "evidence": "由粗到细流匹配的单目深度估计",
+      "tldr": "单目深度估计需兼顾细节与泛化，但扩散模型多步采样推理慢，单步扩散又难恢复高保真深度。FlowMoDE提出由粗到细的流匹配框架：先基于预训练语义编码器的扩散特征做粗级解码，再用扩展解码层恢复细粒度结构。仅用单个合成室内数据集训练，便在五个真实室内外数据集上平均降低14.1%相对误差和9.9%点云Chamfer距离。该方法提升了仿真到现实及跨场景泛化能力，兼顾效率与结构感知。",
+      "tags": "query:mono-depth",
+      "abstract_en": "Monocular depth estimation is a fundamental capability for 3D spatial perception in robotic and intelligent systems. While data-driven discriminative methods have achieved compelling performance for monocular depth estimation, generative approaches can reconstruct fine structural details with stronger generalization. However, most existing generative diffusion models suffer from low inference efficiency caused by multi-step sampling, whereas single-step diffusion models struggle to recover high-fidelity depth maps. To mitigate these drawbacks, this paper presents FlowMoDE, a coarse-to-fine flow-matching-based framework for efficient, structure-aware monocular depth estimation supporting sim-to-real and cross-scene generalization. The core architecture first conducts coarse-level decoding conditioned on diffused features extracted from a pre-trained semantic encoder, and subsequently restores fine-grained structural patterns via expanded decoding layers. Trained exclusively on a single synthetic indoor dataset, our proposed method outperforms prior methods across five real-world indoor and outdoor datasets, yielding an average 14.1% reduction in relative error against state-of-the-art works as well as 9.9\\% reduction in chamfer distance for point cloud reconstruction. We further validate the generalization capability of FlowMoDE on realistic robotic scenes, with qualitative comparisons against state-of-the-art methods. The project page is https://flowmode-shao.netlify.app/",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202611/06/2611.02203v1-depth-anyviewpoint-evaluating-monocular-depth-over-viewpoint-sequences",
+      "section": "deep",
+      "title_en": "Depth Anyviewpoint? Evaluating Monocular Depth Over Viewpoint Sequences",
+      "authors": "Theo Rode, Rui Zhang, Ryan Aubrey, Olivia Li, Jessica Huang, Liv Chu, Healani Dowd, Calden Wloka",
+      "date": "2026-11-01",
+      "pdf": "https://arxiv.org/pdf/2611.02203v1",
+      "score": "8.0",
+      "evidence": "评估跨视角的仿射不变相对深度",
+      "tldr": "单目深度估计已能凭单张RGB图像预测仿射不变深度，在单图基准和视频定性结果上表现突出，但其跨移动视角的空间结构一致性及度量锚定仍缺乏系统检验。作者提出基于移动相机视频序列的新评估协议，利用SfM将模型输出锚定到度量深度，并在多样真实视频上测试跨视角一致性。结果显示模型在长时程时间一致性上仍存在明显挑战，直接采用SfM作为度量接地工具也有局限。该工作为单目深度基础模型的真实视频应用与可靠评估提供了新基准。",
+      "tags": "query:mono-depth",
+      "abstract_en": "Monocular depth estimation aims to predict depth maps from single RGB images (forgoing the need for stereo camera pairs) and has seen impressive leaps in performance in recent work due to the introduction of affine-invariant losses and the use of foundation model features. These monocular depth models predict affine-invariant depth, which describes the relative positions of objects in the scene instead of absolute depth. While these models demonstrate strong performance on single image benchmarks and qualitatively consistent predictions in video, their effectiveness at preserving consistent spatial structure has been less thoroughly explored. Many potential real-world applications, such as handling video streams as input, rely on coherent three dimensional consistency in scenes. Further, anchoring relative depth predictions to a metric reference for a given scene is a key challenge for applying monocular depth models to real-world situations. We develop a novel evaluation protocol for monocular depth models using video sequences with moving camera positions to test the consistency of prediction across variation in viewpoint. We demonstrate this methodology over diverse, real-world video sequences where we are able to anchor depth model output to metric depth values using structure from motion. Our work demonstrates open challenges in the development of broadly applicable monocular depth foundation models, particularly with their ability to provide temporal consistency over long time frames. We also identify challenges in the straightforward adoption of structure-from-motion as a metric grounding tool for monocular depth estimation models.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202611/06/2611.04491v1-spa-q-structure-preserving-adaptive-post-training-quantization-for-monocular-depth-estimation",
+      "section": "deep",
+      "title_en": "SPA-Q: Structure-Preserving Adaptive Post-Training Quantization for Monocular Depth Estimation",
+      "authors": "Jaemin Choi, Jincheol Yang, Nahyun Lim, Yun-Seong Jeong, Matti Zinke, Hyunwoo Yu, Suk-Ju Kang",
+      "date": "2026-11-03",
+      "pdf": "https://arxiv.org/pdf/2611.04491v1",
+      "score": "8.0",
+      "evidence": "对Depth Anything单目深度模型做训练后量化以高效部署",
+      "tldr": "单目深度估计基础模型（如 Depth Anything）计算与存储开销高，低比特训练后量化（PTQ）又难以保持注意力结构与特征分布。本文提出 SPA-Q 结构保持自适应 PTQ 框架：用注意力保持校准（APC）按全精度注意力分布确定 query/key 量化参数，再用通道级分布对齐（CWDA）学习可吸收进权重的仿射变换。在 NYUv2 和 KITTI 的 4-bit 量化下，AbsRel 平均降低 25.9%，δ1 提升 17.3%，优于现有 PTQ 方法。该工作为 MDE 模型的高效低比特部署提供了结构感知的量化方案。",
+      "tags": "query:mono-depth",
+      "abstract_en": "Monocular depth estimation (MDE) has advanced rapidly with the emergence of foundation models such as Depth Anything. Their transformer-based architectures provide strong generalization across diverse scenes and domains, but also incur high computational and memory cost, making efficient deployment challenging. Post-Training Quantization (PTQ) provides an efficient and practical solution for model compression, yet low-bit PTQ remains challenging for MDE models. When applying PTQ to Depth Anything, we identify two key challenges: (i) independently minimizing the quantization error of the query and key projections fails to preserve the attention maps induced by their interaction, and (ii) quantization errors accumulate across layers, resulting in intermediate feature distribution shifts. To address these issues, we propose SPA-Q, a Structure-Preserving Adaptive PTQ framework for MDE, consisting of two main components. First, Attention-Preserving Calibration (APC) determines query and key quantization parameters by matching the full-precision attention distribution. Second, Channel-Wise Distribution Alignment (CWDA) learns channel-wise affine transformations to mitigate quantization-induced distribution shifts, and the learned parameters are absorbed into the weights after training. Experimental results show that SPA-Q consistently outperforms existing PTQ methods under 4-bit quantization, achieving an average 25.9% reduction in AbsRel and a 17.3% improvement in $δ_1$ across NYUv2 and KITTI datasets.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202611/06/2611.01645v1-ua-depth-uncertainty-aware-depth-restoration-for-material-agnostic-object-manipulation",
+      "section": "quick",
+      "title_en": "UA-Depth: Uncertainty-Aware Depth Restoration for Material-Agnostic Object Manipulation",
+      "authors": "Rui Cao, Jia-Hui Pan, Yin Zhang, Qiwei Meng, Jiapeng Li, Gang Wang, Runsong Zhu, Wei Chen, Chi-Wing Fu, Jiangliu Wang, Yun-Hui Liu",
+      "date": "2026-11-01",
+      "pdf": "https://arxiv.org/pdf/2611.01645v1",
+      "score": "7.0",
+      "evidence": "面向透明反射材质的度量深度修复并借助深度基础模型先验",
+      "tldr": "针对商品级RGB-D相机在透明、反射、半透明等非朗伯物体上易产生空洞、结构化噪声和深度偏置的问题，UA-Depth提出不确定性感知的深度恢复框架，迭代联合优化深度与逐像素不确定性，并用不确定性门控特征抑制不可靠线索。方法以冻结深度基础模型初始化缺失深度，结合两阶段MAD加权对数深度尺度归一化提升零样本迁移。在八数据集零样本基准上取得最佳平均排名，透明与反射主导场景增益明显，并利用预测不确定性改善类别级6D位姿估计与6D抓取合成。",
+      "tags": "query:mono-depth",
+      "abstract_en": "Robotic manipulation requires accurate metric depth, yet commodity RGB-D cameras often fail on non-Lambertian objects such as transparent, reflective, and translucent materials, producing holes, structured noise, and biased depth. Most restoration methods produce only a single depth map, treating noisy and reliable regions uniformly for downstream tasks while ignoring regional uncertainty. We present UA-Depth, an uncertainty-aware depth restoration framework that iteratively co-refines depth and pixel-wise uncertainty, and uses uncertainty-gated features to suppress unreliable cues for stable updates. To strengthen zero-shot behavior, UA-Depth leverages a frozen depth foundation model as a prior to initialize missing or unreliable depth, and applies two-stage MAD-weighted log-depth scale normalization to reduce outlier bias in relative-to-metric alignment. We introduce an eight-dataset zero-shot benchmark across diverse scenes, materials, and sensors. Across these benchmarks, UA-Depth achieves the best mean rank among representative baselines, with particularly strong gains on datasets dominated by transparent and reflective objects. Beyond depth metrics, we demonstrate downstream improvements in category-level 6D pose estimation and 6D grasp synthesis by exploiting the predicted uncertainty. \\emph{Code, models, and data for training and evaluation will be released upon publication.}",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    }
+  ],
   "errors": []
 }
