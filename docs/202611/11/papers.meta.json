@@ -1,0 +1,54 @@
+{
+  "label": "2026-11-11",
+  "date": "2026-11-11",
+  "generated_at": "2026-11-11T00:30:19",
+  "count": 3,
+  "papers": [
+    {
+      "paper_id": "202611/11/2611.10729v1-lift-local-metric-alignment-and-foundation-guided-propagation-for-few-shot-depth-completion",
+      "section": "deep",
+      "title_en": "LIFT: Local Metric Alignment and Foundation-guided Propagation for Few-shot Depth Completion",
+      "authors": "Xiang Li, Xiaojin Gong",
+      "date": "2026-11-07",
+      "pdf": "https://arxiv.org/pdf/2611.10729v1",
+      "score": "8.0",
+      "evidence": "利用冻结的单目深度估计基础模型先验进行度量深度补全",
+      "tldr": "少样本深度补全需在少量目标域标注下，从稀疏测量恢复稠密度量深度。LIFT利用冻结的单目深度估计基础模型的深度与特征先验：先在粗网格估计局部尺度与偏移并插值成平滑稠密参数场，获得空间自适应度量深度初始化；再以基础特征引导多尺度深度传播逐步细化，并用轻量残差解码器融合多级特征与传播校正。在NYUv2和KITTI-DC上取得少样本SOTA，兼顾标注成本与域适应。",
+      "tags": "query:mono-depth",
+      "abstract_en": "Few-shot depth completion aims to recover dense metric depth from sparse measurements using only a small number of target-domain annotations, offering a favorable balance between annotation cost and model adaptation. We propose LIFT, a framework that harnesses both depth and feature priors from a frozen pretrained monocular depth estimation (MDE) foundation model for few-shot depth completion. Specifically, LIFT first estimates local scale and shift parameters on a coarse grid and interpolates them into smooth, dense parameter fields, providing a spatially adaptive metric depth initialization. It then progressively refines this initialization through multi-scale depth propagation guided by foundation features. Finally, a lightweight residual decoder combines multi-level foundation features with propagation correction to refine the metric depth. Extensive experiments on NYUv2 and KITTI-DC demonstrate that our proposed method achieves state-of-the-art few-shot performance. The source code will soon be released.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202611/11/2611.11763v1-langdepth-vision-language-scene-priors-for-semantic-binning-and-cross-domain-monocular-depth-estimation",
+      "section": "deep",
+      "title_en": "LangDepth: Vision-Language Scene Priors for Semantic Binning and Cross-Domain Monocular Depth Estimation",
+      "authors": "Reyhaneh Ahani Manghotay, Jie Liang",
+      "date": "2026-11-09",
+      "pdf": "https://arxiv.org/pdf/2611.11763v1",
+      "score": "8.0",
+      "evidence": "场景条件化的单目度量深度估计",
+      "tldr": "单目深度估计的度量尺度仍易受场景范围影响，室内房间与室外驾驶场景的深度分布差异显著，而多数解码器仅隐式推断全局结构。LangDepth用冻结CLIP与可学习场景概念键生成紧凑场景描述符，由SPM预测场景条件度量深度区间，再以DINOv2-L、轻量FPN、PPAN和置信门完成稠密分箱预测。单模型在NYU与KITTI上δ1均达0.960，并在DIODE室内、iBims-1和SUN RGB-D上保持稳健跨域表现。结果表明场景条件输出空间是一种实用且可解释的跨域单目度量深度估计机制。",
+      "tags": "query:mono-depth",
+      "abstract_en": "Monocular depth estimation has advanced through large-scale pretraining and strong visual backbones, yet metric depth remains sensitive to scene-level scale. Indoor rooms and outdoor driving scenes occupy very different depth ranges, but most depth decoders infer this global structure implicitly from visual features. We ask whether scene-level semantic structure can instead act as an upstream prior that shapes the metric output space before dense prediction.   We present LangDepth (SemanticBins), a monocular depth architecture that couples strong visual features with a scene-conditioned output space. A frozen CLIP encoder and a learnable bank of scene- and geometry-oriented concept keys convert image features into a compact scene descriptor, without requiring per-image text or an external captioner. A Scene Prior Module (SPM) maps this descriptor to a scene-conditioned metric depth interval, providing a global range anchor before dense decoding. In parallel, a DINOv2-L backbone with a lightweight FPN extracts dense visual features, and a Per-Pixel Assignment Network (PPAN) assigns pixels to the scene-prescribed bin structure. A confidence gate fuses the dense visual estimate with the SPM prior.   We train LangDepth jointly on NYU Depth V2 and KITTI under a modest supervised depth budget, without web-scale depth supervision or pseudo-labelled depth data. A single model achieves delta_1 = 0.960 on NYU, 0.960 on KITTI, 0.887 on DIODE indoor, 0.946 on iBims-1, and 0.861 on SUN RGB-D. Beyond aggregate accuracy, the SPM predicts compact indoor ranges and much wider outdoor KITTI ranges, the gate becomes SPM-dominant on outdoor scenes, and perturbing the routed scene context causes large drops on KITTI and iBims-1. These results support scene-conditioned output spaces as a practical and interpretable mechanism for cross-domain monocular depth estimation.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202611/11/2611.11272v1-birefnet-v2-rethinking-bilateral-reference-for-high-resolution-dichotomous-image-segmentation",
+      "section": "quick",
+      "title_en": "BiRefNet-V2: Rethinking Bilateral Reference for High-Resolution Dichotomous Image Segmentation",
+      "authors": "Peng Zheng, Deng-Ping Fan, Binglu Wang, Nicu Sebe",
+      "date": "2026-11-08",
+      "pdf": "https://arxiv.org/pdf/2611.11272v1",
+      "score": "7.0",
+      "evidence": "像素级前景背景分离，保留细丝与锐利边界",
+      "tldr": "高分辨率二值图像分割需保留细丝与锐边，BiRefNet的双边参考却存在局部结构丢失、语义引导不足及单通道梯度注意力局限。BiRefNet-V2将问题重述为受控信息恢复，以保局部语义门控细节注入、无边界标注的全通道边界流和双分支解码器实现。框架采用LayerNorm、GELU、Lion与DINOv3骨干，训练由600轮降至50轮。在DIS5K、伪装目标检测和高分辨率显著目标检测的13个评估集上均达SOTA。",
+      "tags": "query:seg",
+      "abstract_en": "Dichotomous image segmentation requires pixel-accurate foreground-background separation while preserving fine structures such as thin filaments, sharp edges, and intricate textures. BiRefNet addressed this challenge through bilateral references, combining image patches and gradient information, but its inward reference loses local spatial structure and lacks semantic guidance, while its outward reference relies on single-channel gradient attention. We recast this paradigm as controlled information recovery - locality determines what spatial information survives, semantic selectivity what information enters, and focused boundary supervision where refinement occurs - and propose BiRefNet-V2 to implement it: (1) locality-preserving and semantically guided detail injection through space-to-depth transformation, overlapping patches, and a Semantically Guided Gate; (2) a learned boundary stream with focused supervision that generates full-channel residual attention without requiring boundary annotations; and (3) a dual-branch decoder integrating depth-wise boundary convolutions with large-kernel attention. A modernized framework - LayerNorm, GELU, the Lion optimizer, and a DINOv3 backbone - cuts training from 600 to 50 epochs. Extensive experiments demonstrate state-of-the-art performance on DIS5K, camouflaged object detection, and high-resolution salient object detection across all 13 evaluation sets. Code is available at https://github.com/ZhengPeng7/BiRefNet-V2.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    }
+  ],
+  "errors": []
+}

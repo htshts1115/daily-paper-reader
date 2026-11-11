@@ -1,0 +1,3333 @@
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE
+1
+BiRefNet-V2: Rethinking Bilateral Reference
+for High-Resolution Dichotomous Image
+Segmentation
+Peng Zheng, Deng-Ping Fan, Binglu Wang, Nicu Sebe
+zhengpeng0108@gmail.com
+Abstract—Dichotomous image segmentation requires pixel-accurate foreground–background separation while preserving fine struc-
+tures such as thin filaments, sharp edges, and intricate textures. BiRefNet addressed this challenge through bilateral references,
+combining image patches and gradient information, but its inward reference loses local spatial structure and lacks semantic guidance,
+while its outward reference relies on single-channel gradient attention. We recast this paradigm as controlled information recovery—
+locality determines what spatial information survives, semantic selectivity what information enters, and focused boundary supervision
+where refinement occurs—and propose BiRefNet-V2 to implement it: (1) locality-preserving and semantically guided detail injection
+through space-to-depth transformation, overlapping patches, and a Semantically Guided Gate; (2) a learned boundary stream with
+focused supervision that generates full-channel residual attention without requiring boundary annotations; and (3) a dual-branch
+decoder integrating depth-wise boundary convolutions with large-kernel attention. A modernized framework—LayerNorm, GELU, the
+Lion optimizer, and a DINOv3 backbone—cuts training from 600 to 50 epochs. Extensive experiments demonstrate state-of-the-art
+performance on DIS5K, camouflaged object detection, and high-resolution salient object detection across all 13 evaluation sets. Code
+is available at https://github.com/ZhengPeng7/BiRefNet-V2.
+Index Terms—Dichotomous image segmentation, high-resolution segmentation, bilateral reference, camouflaged object detection.
+✦
+1
+INTRODUCTION
+D
+ICHOTOMOUS image segmentation (DIS) [1] seeks
+masks that separate foreground from background
+with pixel-level accuracy in high-resolution natural images,
+where the objects of interest are defined by structures as
+fine as thin filaments, hollow lattices, and hair-level edges.
+Unlike salient object detection [2], [3], [4], [5], [6], which
+tolerates coarse boundaries, DIS is judged by a comple-
+mentary suite—the region-based maximum and weighted
+F-measure, the structure measure, and the human correc-
+tion efforts HCEγ—in which the maximum F-measure F x
+β
+mainly reflects the large-area components of the mask while
+HCEγ counts the manual corrections that the fine structures
+demand. This evaluation regime sharpens a fundamental
+tension in encoder–decoder design: deep encoders must
+downsample aggressively to form the abstract representa-
+tions needed for reliable foreground identification, yet the
+high-frequency content discarded during downsampling is
+exactly what HCEγ demands back at full resolution. Recon-
+ciling global semantic abstraction with lossless local detail
+is therefore the defining challenge of the field (Fig. 1).
+Existing approaches attack this tension from differ-
+ent perspectives, but each leaves a gap. Intermediate-
+supervision methods [1], [9] sharpen the encoder but never
+reinstate, during decoding, the detail lost to downsampling
+(Fig. 2(b)); multi-scale aggregation schemes [10], [11] fuse
+features across resolutions, but the original image re-enters
+•
+Deng-Ping Fan (corresponding author) is with the College of Com-
+puter Science, Nankai University, Tianjin 300350, China (e-mail:
+dengpfan@gmail.com). Peng Zheng and Nicu Sebe are with the Depart-
+ment of Information Engineering and Computer Science, University of
+Trento, Trento 38123, Italy. Binglu Wang is with the School of Astronau-
+tics, Northwestern Polytechnical University, Xi’an 710072, China.
+GT
+Ours
+PDFNet
+DiffDIS
+Fig. 1. Visual comparison on high-resolution dichotomous image
+segmentation. BiRefNet-V2 versus PDFNet [7] and DiffDIS [8] (mask
+binarized per its official protocol). Insets enlarge the red-boxed region.
+On a filament-level structure such as this racket’s string bed, the com-
+peting methods blur the lattice into solid regions and absorb the people
+seen through the strings into the foreground, whereas BiRefNet-V2
+reconstructs the topology nearly identically to the ground truth.
+decoding at most as one ungated shallow branch added in
+the final upsampling steps, never as a reference available
+at every decoder stage. Recent diffusion-based methods [8],
+[12] import powerful generative priors at heavy inference
+cost, but still blur filament-level topology (DiffDIS in Fig. 1).
+BiRefNet [13] established the bilateral-reference paradigm: an
+inward reference that feeds original image content into every
+decoder stage to compensate for encoding loss, and an out-
+ward reference that uses gradient cues to sharpen boundaries.
+The paradigm directly targets this tension.
+Its original instantiation, however, realizes only a fraction
+of the paradigm’s potential. The inward reference splits the
+image into a grid of patches and stacks them along the chan-
+nel dimension: every convolution response mixes content
+from grid cells that lie far apart in the image, and pixels
+adjacent across a patch border land at opposite spatial edges
+of the rearranged tensor, so the locality the reference aims
+to preserve is destroyed before any convolution sees it. The
+arXiv:2611.11272v1  [cs.CV]  8 Nov 2026
+
+
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE
+2
+(a) The challenge
+— semantic abstraction vs lossless fine detail
+full res
+1/4
+1/16
+1/32
+encoder downsampling dissolves fine structures
+so, what recovery material
+actually reaches the decoder?
+ground truth
+all four cards show this ROI
+the recovery target
+(b) Conventional
+— lossy recovery
+image
+Enc
+Dec
+mask-only
+target
+Up-
+sample
+Skip features
+resolution already lost
+✗lossless ✗full-res
+✓locality ✗selectivity
+structure lost
+(c) BiRefNet
+— uncontrolled recovery
+image
+Enc
+Dec
+raw-edge
+target
+Patch
+Merge
+Grid split
+coordinates scrambled
+✓lossless ✓full-res
+✗locality
+✗selectivity
+coarse, holes merged
+(d) BiRefNet-V2
+— controlled information recovery
+image
+Enc
+Dec
+focused-edge
+target
+Sem.
+Gate
+Local S2D + overlap
+coordinates preserved
+✓lossless ✓full-res
+✓locality ✓selectivity
+faithfully recovered
+Fig. 2. The defining challenge of DIS and three architectural responses. The mask tiles in (b)–(d) are real predictions, (b) by IS-Net [1], on
+the red-boxed region of one DIS-TE4 image whose ground truth is given in (a); the remaining image content is rendered from the input pixels for
+illustration, except the teal map in (d), the RMS over channels of BiRefNet-V2’s gated inward reference at full resolution, high (teal) between the
+strings and low (white) on them. Patch Merge: BiRefNet’s channel-wise stacking of grid-split patches; S2D: space-to-depth; Sem. Gate: Semantically
+Guided Gate; focused-edge target: the prediction-gated image-edge target of §3.4.
+injection is moreover ungated, admitting raw texture every-
+where with equal weight (Fig. 2(c)). The outward reference,
+meanwhile, supervises its boundary head with an image-
+Laplacian target scaled by an unbounded intermediate logit
+rather than gated by a foreground probability, and applies
+the result as a bare single-channel rescaling that modulates
+all feature channels uniformly. These are not isolated defects
+to be patched, but symptoms that the paradigm has never
+been instantiated with its core requirements—locality, selec-
+tivity, and focused supervision—taken seriously.
+In this paper we re-instantiate the bilateral-reference
+paradigm from the ground up: BiRefNet-V2 inherits the
+paradigm and the encoder–decoder skeleton from BiRefNet,
+but its core components—both references and the decoder
+block that links them—are redesigned (Table 1). The re-
+design elevates those three requirements into a single
+principle—bilateral reference as controlled information recov-
+ery (Fig. 2(d)): detail recovery is a question of which infor-
+mation to inject and where, controlled at both ends of the
+decoder—realized by the three components summarized be-
+low. Complementing these architectural changes, we switch
+the backbone from a fully fine-tuned Swin-L [14] to a
+self-supervised DINOv3 [15] encoder kept mostly frozen,
+with only its last transformer stage fine-tuned at a low
+learning rate (§3.5), shrinking both the trainable stack and
+the training schedule while accuracy improves rather than
+degrades. The payoff is generality: trained separately per
+benchmark with no task-specific adaptation, the same ar-
+chitecture surpasses models purpose-built for camouflaged
+object detection and high-resolution salient object detection
+as well as for DIS—suggesting that these detail-demanding
+tasks pose the same information-recovery problem.
+Our main contributions are summarized as follows:
+•
+We formulate the conceptual advance over BiRefNet
+as a general principle—bilateral reference as con-
+trolled information recovery, with locality, selectivity,
+and focused supervision as its three requirements—
+and trace the failures of the original instantiation to
+these unmet requirements. This principle, not any
+single module, is our central contribution.
+•
+Implementing
+locality
+and
+selectivity,
+we
+re-
+instantiate
+the
+inward
+reference
+with
+locality-
+preserving
+detail
+injection—a
+space-to-depth
+transformation,
+overlapping
+patches
+with
+a
+lightweight compressor, and a Semantically Guided
+Gate—so that the decoder’s own semantics decide
+where raw image detail enters.
+•
+Implementing focused supervision, we upgrade the
+outward
+reference
+from
+single-channel
+image-
+gradient
+attention
+to
+full-channel
+residual
+at-
+tention driven by boundary features supervised
+with a prediction-gated image-edge target, making
+boundary refinement focused on the object being
+segmented—without any GT boundary labels.
+•
+Linking the two references structurally, we introduce
+a dual-branch decoder block that jointly models lo-
+cal boundaries (depth-wise convolutions) and global
+context (large-kernel attention).
+•
+Complementing the principle-driven redesign, we
+establish a modernized framework—LayerNorm,
+GELU, Lion, and a self-supervised DINOv3 encoder
+with a tailored fine-tuning scheme (§3.5)—and ablate
+it separately, so that its gains are never conflated with
+those of the paradigm.
+Together, these improvements cut the trainable parame-
+ters to ∼40% of BiRefNet’s and accelerate training conver-
+gence by 12× (§4.5.6).
+2
+RELATED WORK
+DIS. Qin et al. [1] formalized DIS and introduced the
+DIS5K benchmark together with IS-Net, which mitigates
+the loss of fine structures during encoding via intermediate
+supervision. Later work attacked the same problem with
+frequency priors [16], a unite-divide-unite decomposition
+of trunk and boundary [9], image-pyramid processing at
+multiple resolutions [11], and multi-view aggregation [10].
+Our prior work, BiRefNet [13], introduced the bilateral-
+reference paradigm. More recently, generative priors have
+entered DIS. GenPercept [12] repurposes a pretrained dif-
+fusion model for dense perception tasks, including DIS,
+with single-step inference; DiffDIS [8] adapts pretrained
+diffusion priors specifically to high-precision DIS, and is
+the strongest fully automatic diffusion-based method in
+our comparison; MaskFactory [17] instead uses diffusion
+models offline to synthesize additional DIS training pairs. A
+separate line adds user prompts on top of generative mod-
+eling: LawDIS [18] formulates DIS as prompt-guided mask
+
+
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE
+3
+generation inside a latent diffusion model, and FlowDIS [19]
+as text-guided flow matching that transports the image
+distribution to the mask distribution—a setting distinct
+from the fully automatic methods we compare against.
+SAMA [20] and FCLM [21] bring the same prompt-driven
+setting to discriminative models. Outside the generative
+family, PDFNet [7] pairs each image with a pseudo-depth
+map from a monocular depth estimator as a structural
+prior, and is the strongest of the published methods we
+compare against on F x
+β , the primary DIS metric. Unlike
+the methods above, which strengthen the encoder, aggre-
+gate multiple scales, or rely on heavy generative priors,
+BiRefNet-V2 makes the original image itself re-enter every
+decoder stage—now under explicit semantic control—while
+keeping single-forward discriminative inference.
+Detail Preservation in High-Resolution Segmentation.
+Several families of methods compensate for the fine detail
+discarded by encoder downsampling: skip connections [22],
+[23] forward encoder features to the decoder, but those
+features are already abstracted and lack pixel-level fidelity;
+multi-scale input schemes [11], [24] process the image
+at several resolutions in separate streams; and pyramid-
+grafting methods [25] fuse features across lightweight and
+heavy backbones operating at different scales. More di-
+rectly, BiRefNet [13] injects original image patches into each
+decoder stage (the inward reference), and MVANet [10]
+decomposes the input into multi-view patches within a
+single encoder–decoder stream. The injection of BiRefNet,
+however, is indiscriminate and sacrifices spatial locality
+by stacking patches along the channel dimension; our re-
+designed inward reference addresses exactly these failures.
+Auxiliary Supervision for Feature Refinement. Beyond
+the primary segmentation loss, deep supervision [1], [9]
+applies the loss at multiple decoder stages, contour su-
+pervision [5], [26] adds explicit boundary-prediction heads,
+and gradient-based supervision [27] predicts image-derived
+edge maps to sharpen features near boundaries. The out-
+ward reference of BiRefNet [13] follows the last route, but
+its Laplacian target responds to background texture as much
+as to object contours. BiRefNet-V2 instead gates the image-
+edge target with the decoder’s evolving prediction and
+upgrades to full-channel residual attention (§3.4).
+3
+BILATERAL REFERENCE NETWORK V2
+In this section, we present the architecture of BiRefNet-V2.
+After the framework overview (§3.1), the structure mirrors
+the three requirements identified in §1: §3.2 restores locality
+and adds selectivity on the input side, §3.3 structurally links
+the two references, §3.4 brings focused supervision to the
+output side, and §3.5 details training and inference.
+3.1
+Framework Overview
+BiRefNet-V2 follows an encoder–decoder architecture with
+bilateral reference. The pipeline is summarized below and
+shown in Fig. 3.
+Encoder. We adopt a DINOv3-Large (DINOv3-L) [15]
+backbone encoder, a ViT-L/16 model with 24 transformer
+blocks. Given an input image I ∈R3×H×W , the backbone
+extracts four intermediate features {Fi}4
+i=1 from transformer
+blocks {6, 12, 18, 24}, ordered from shallowest to deepest.
+These four tapped blocks partition the otherwise uniform
+encoder into four consecutive block groups, which we call
+its stages; the encoder is kept frozen except for the last of
+them—blocks 19–24—which is fine-tuned as described in
+§3.5. Since all four feature maps share the same channel
+dimension Cbb = 1024 (a property of plain ViT architec-
+tures), we employ a pyramid neck consisting of four 1 × 1
+convolutions to project them into a hierarchical channel
+structure of 192, 384, 768, and 1536 channels for F1 to F4,
+and resize each to
+H
+2i+1 ×
+W
+2i+1 , restoring the multi-scale
+structure expected by FPN-style decoders [13].
+Squeeze module. Following BiRefNet [13], we apply
+a squeeze module to the deepest feature F4 prior to the
+pyramid-neck projection. This module is a residual con-
+volutional block with an Atrous Spatial Pyramid Pooling
+(ASPP) [28] module between its two convolutions, which
+captures multi-scale context to enrich global semantics.
+Decoder. The decoder has four stages that progressively
+refine predictions from the coarsest to the finest resolution.
+At each stage s ∈{0, 1, 2, 3} (written s0–s3, from deepest to
+shallowest, as in Fig. 3), the processing follows three steps:
+1)
+Inward reference (IR): The original image I is parti-
+tioned into patches at a resolution matching the cur-
+rent stage, processed by a lightweight convolutional
+block, and selectively injected into decoder features
+via a Semantically Guided Gate (SGG).
+2)
+Dual-branch decoder block (DB): The concatenated
+features are transformed by a block that combines
+the modeling of local boundaries with the aggrega-
+tion of global context.
+3)
+Outward reference (OR) (stages s0–s2): The de-
+coder output is refined through full-channel resid-
+ual attention, where the model learns to predict
+boundary maps supervised by prediction-gated
+image-edge targets during training.
+After stage s3, the decoder output is upsampled to
+the input resolution and concatenated with a final inward
+reference (the full-resolution injection site, denoted stage s4,
+where each patch is a single pixel) into Dout to produce the
+prediction ˆM = σ(Conv1×1(Dout)) ∈[0, 1]H×W , where σ
+denotes the sigmoid function.
+Multi-scale supervision. During training, intermediate
+predictions are generated at stages s0–s2 via 1 × 1 convolu-
+tions. Together with the final prediction, these form a set of
+multi-scale supervision signals, each bilinearly upsampled
+to the ground-truth resolution and supervised there. Table 1
+summarizes the component-level differences from BiRefNet.
+3.2
+Inward Reference
+Compared to BiRefNet [13], our redesign addresses three
+limitations: broken spatial locality, patch boundary artifacts,
+and missing semantic guidance. Fig. 4 illustrates one de-
+coder stage with the redesigned module, the decoder block,
+and the outward reference.
+3.2.1
+Locality-Preserving Patch Decomposition
+At each decoder stage s, we decompose the input image into
+patches whose spatial extent matches the downsampling
+
+
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE
+4
+Bilateral Reference: Fig. 4
+(a)
+(b)
+(c)
+inward
+from I
+outward
+to boundary
+I 1024×1024
+DINOv3-L Encoder
+frozen: blocks 1–18
+fine-tuned: blocks 19–24, 0.05× LR
+Squeeze (conv + ASPP)
+Pyramid Neck: 1×1 conv + resize · F4 →s0 (coarsest) ... F1 →s3 (finest)
+6
+12
+18
+24
+F1
+F2
+F3
+F4
+F1–F4: 1024 ch
+@ 64×64 each
+ˆ
+M
+from F4: 1536 ch
+from F3: 768 ch
+from F2: 384 ch
+from F1: 192 ch
+Decoder
+Bilateral Reference = IR + OR
+Inward Reference (IR), s0–s4
+all of I, every stage, gated
+[·; ·]
+[·; ·]
+[·; ·]
+[·; ·]
+[·; ·]
+DB
+DB
+DB
+DB
+1×1 conv, σ
+↑×2
+↑×2
+↑×2
+↑×4
+IR
+IR
+IR
+IR
+IR
+96 ch
+96 ch
+96 ch
+96 ch
+96 ch
+5808×32×32
+1452×64×64
+300×128×128
+48×256×256
+3×1024×1024
+s0 @ 32×32
+s1 @ 64×64
+s2 @ 128×128
+s3 @ 256×256
+s4 @ 1024×1024
+OR
+OR
+OR
+Lbdr
+target: prediction-gated edges of I
+s2
+Lpix
+ˆ
+M0
+ˆ
+M1
+ˆ
+M2
+Outward Reference (OR), s0–s2
+re-weights ⊙block output
+no OR at s3, s4
+IR: see Fig. 4(a)
+DB (dual-branch decoder block): see Fig. 4(b)
+OR: see Fig. 4(c)
+SGG (teal ⊙, the gate): see Fig. 5
+add
+[·; ·]: concat
+orange ⊙: re-weight
+↑×k: upsample ×k
+decoder features guide the gate
+training only
+ˆ
+Ms: intermediate prediction
+Lbdr, Lpix: boundary, pixel-level losses
+Fig. 3. Overall architecture of BiRefNet-V2. The framed stage is detailed in Fig. 4, its gate in Fig. 5; the edge target is square-root scaled for display.
+TABLE 1
+Component-level changes from BiRefNet to BiRefNet-V2. LKA:
+large-kernel attention; deform.: deformable convolution
+Component
+BiRefNet
+BiRefNet-V2
+Backbone
+Swin-L, fine-tuned
+DINOv3-L, last-stage tuned
+Norm / activation
+BatchNorm / ReLU
+LayerNorm / GELU
+Inward Reference
+grid-split, ungated
+S2D+overlap, SGG-gated
+Outward Reference
+image grad., 1-ch.
+pred.-gated edge, full-ch.
+Decoder block
+conv (+ deform.)
+dual-branch conv+LKA
+Optimizer / schedule
+Adam, 600 epochs
+Lion, 50 epochs
+Trainable params
+215M
+84.9M
+grid cell of the corresponding feature map. For an input
+of size H × W and a feature map of size h × w, each patch
+covers a kh × kw region with kh = H/h and kw = W/w.
+We rearrange these patches into the channel dimension via
+a space-to-depth (S2D) transformation:
+Ps = S2D(I) ∈R(3·k′
+h·k′
+w)×h×w,
+(1)
+where k′
+h and k′
+w denote the effective patch size after ac-
+counting for overlap (detailed below). Unlike BiRefNet’s
+grid split, our formulation assigns each spatial location the
+content of its own local patch: pixels that are neighbors in
+I remain neighbors within each patch, enabling subsequent
+convolutions to exploit local correlations effectively. Each
+channel slice holds the same pixel offset of every patch,
+i.e., one phase of I; the channel vector at (i, j) holds that
+position’s whole local patch, so I is recovered exactly.
+3.2.2
+Overlapping Patches with Compression
+Non-overlapping patch boundaries introduce discontinu-
+ities at the edges of adjacent patches. To mitigate this, we
+extend each patch by a border of ⌊α · k⌋pixels on each
+side, taken from the neighboring patches (by reflection at
+the image border), where α = 0.2 is the overlap ratio.
+The patches are thus extracted with overlapping sliding
+windows of size k′ = k + 2⌊α · k⌋for k ∈{kh, kw}, yielding
+a higher channel count 3 · k′
+h · k′
+w; the border vanishes at the
+two finest stages, where ⌊α · k⌋= 0. By contrast, BiRefNet’s
+grid split is a bijective tensor reshape that cannot overlap
+patches at all, so α>0 is reachable only by space-to-depth.
+Since the expanded channel dimension can be large
+(e.g., 3 × 44 × 44 = 5808 at the deepest stage), we ap-
+ply a lightweight 1 × 1 convolution with LayerNorm and
+GELU that compresses the patches to a fixed dimension
+dc = 64 whenever their channel count exceeds it (in our
+configuration, the three coarsest stages). The compressed
+Ps is then passed through a two-layer convolutional block
+(i.e., two 3 × 3 convolutions with LayerNorm and GELU)
+to produce the inward-reference features Rin
+s ∈RCr×h×w,
+where Cr = 96 for all stages.
+3.2.3
+Semantically Guided Gate
+Ungated concatenation of Rin
+s
+with the decoder features
+injects raw image content everywhere, regardless of what
+the decoder already knows about each position. We in-
+troduce a Semantically Guided Gate that conditions the in-
+jection on the decoder’s semantic context, so that the de-
+coder itself decides where raw detail enters. In the trained
+model this decision is made at the full-resolution stage,
+the coarser gates varying little or not at all between fore-
+ground and background; at that stage the gate averages
+0.12 inside the foreground, 0.40 along its boundary, and
+0.63 in the background over the 470 DIS-VD images, with
+the background above the foreground in all but one (see
+the supplementary material).
+Given the decoder features Ds and the inward-reference
+features Rin
+s , the SGG computes:
+SGG(Ds, Rin
+s ) = Rin
+s ⊙σ(g),
+(2)
+where ⊙denotes element-wise multiplication and g is the
+gating signal computed below.
+
+
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE
+5
+(a) Inward reference
+BiRefNet-V2: space-to-depth (S2D)
+overlap 2o
+I H×W (k=H/h)
+reflect pad o, patch k′=k+2o
+(i, j)
+Ps
+h×w
+3k′
+hk′w
+channel slices:
+same offset, every patch
+S2D at (i, j) 3k′
+hk′w×1×1
+1×1
+SGG
+⊙
+σ(g)
+q
+Ds
+Cs
+k, v
+(i, j)
+two
+3×3
+Rins
+dc
+Cr
+Cs+Cr
+ˆDs=[Ds; · ]
+BiRefNet:
+grid split
+channel slices:
+one whole patch
+grid split at (i, j)
+then two 3×3 →[Ds; · ], no gate
+3khkw
+h×w
+Ds at (i, j)
+own local patch
+far apart
+(b) Decoder block
+(c) Outward reference
+(stages s0–s2)
+ˆDs
+1×1
+boundary
+context
+LKA
++
+B
+C
+gf
+⊙
+⊙
+1−
++
+adaptive
+fusion
++ β Proj
+([B; C])
+3×3
++
+proj
+Ys
+boundary
+features
+Hs
+As
+⊙
+1+As
+↑
+Ds+1
+ˆGs
+BCE
+E ⊙ˆ
+Ms
+edges of I
+⊙own
+prediction
+training
+only
+Fig. 4. Bilateral reference at one decoder stage. Panel (a) is drawn on toy grids (15×15 pixels, 3×3 positions), with an overlap border of o=⌊αk⌋
+pixels. Maps come from the trained model on one DIS-VD image: Ds is shown by its first principal component, As by its mean over channels, and
+E ⊙ˆ
+Ms with a 0.5 display gamma.
+Window SGG, stages s0–s3: Rin
+s queries Ds
+Ds
+Rins
+1×1, LN
+1×1, LN
+k, v
+q
+weights
+sum
+16
+16
+cross-attention in
+16×16 windows
+1×1
+g σ
+gated
+detail
+Conv SGG, stage s4 (full resolution)
+Ds
+Rins
+1×1
+1×1
+concat
+DW 3×3,
+1×1
+1×1
++
+LN,
+GELU
+1×1
+g σ
+gated
+detail
+Fig. 5. The Semantically Guided Gate (SGG). The gate σ(g) has one
+value per channel and pixel of Rin
+s .
+Specifically, after 1 × 1 projections with LayerNorm to a
+shared attention dimension, Rin
+s serves as queries q and Ds
+as keys and values k, v in a window-based cross-attention
+(Window SGG, Fig. 5; no shifted windows or positional
+encoding) with a fixed window size ws=16, which yields
+O(N · w2
+s) complexity for N spatial positions. The gating
+signal is then computed as:
+g = GateProj(OutProj(WindowAttn(q, k, v))),
+(3)
+where WindowAttn is scaled dot-product attention within
+non-overlapping ws × ws windows; OutProj and GateProj
+are 1 × 1 convolutions (one box in Fig. 5). At the final stage
+(input resolution), where the feature map is at H × W, we
+use a lightweight convolutional gate (Conv SGG)—window
+attention at full resolution costs about a third more peak
+training memory per sample—that aligns both inputs via
+1 × 1 convolutions and fuses them through parallel 1 × 1
+and depth-wise separable 3 × 3 branches.
+The gate is initialized close to open, so that the inward
+reference passes through nearly unmodified at the start of
+training. The gated inward reference is concatenated with
+the decoder features Ds along the channel dimension:
+ˆDs = [Ds; SGG(Ds, Rin
+s )] ∈R(Cs+Cr)×h×w,
+(4)
+where [·; ·] denotes channel-wise concatenation and Cs is the
+decoder channel dimension at stage s (width of F4−s after
+the pyramid neck for s0–s3, from 1536 to 192, and 96 at s4).
+3.3
+Dual-Branch Decoder Block
+DIS requires simultaneously capturing fine boundary de-
+tails and maintaining global structural coherence. A single
+processing pathway struggles to satisfy both requirements:
+small-kernel convolutions excel at local edge detection but
+lack context, while softmax self-attention captures long-
+range dependencies only at a quadratic cost that becomes
+prohibitive at high-resolution decoder stages. We address
+this with a dual-branch decoder block that processes both
+aspects in parallel—a depth-wise convolutional boundary
+branch and a large-kernel-attention context branch—and
+fuses them adaptively.
+3.3.1
+Architecture
+Given input features ˆDs (Fig. 4(b)), we first apply a 1 × 1
+convolution with LayerNorm and GELU to reduce chan-
+nels to 64. The reduced features X are then processed by
+two parallel branches:
+Boundary branch. Two stacked depth-wise 3 × 3 convo-
+lutions with LayerNorm capture local spatial patterns and
+high-frequency boundary cues with minimal parameters:
+B = DWConv3×3(DWConv3×3(X)),
+(5)
+
+
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE
+6
+where each depth-wise convolution is followed by Layer-
+Norm, with a GELU between the two.
+Context branch. The context branch aggregates struc-
+tural context through large-kernel attention (LKA) [29], which
+emulates a large kernel (a 23 × 23 effective receptive field)
+by a decomposed convolution chain—a 5 × 5 depth-wise
+convolution, a 7 × 7 depth-wise convolution with dilation 3,
+and a 1 × 1 point-wise convolution—whose response acts as
+an element-wise attention map:
+LKA(Z) = Z ⊙Conv1×1
+ DWConvd=3
+7×7(DWConv5×5(Z))
+
+.
+(6)
+This data-dependent long-range interaction costs only
+O(N). The branch follows a pre-norm layout: the reduced
+features are normalized by LayerNorm, projected by a 1 × 1
+convolution with GELU, attended by LKA, projected back
+by a second 1 × 1 convolution, and added residually; a
+feed-forward network (expansion ratio 2) with LayerNorm
+completes the branch, yielding the context features C.
+3.3.2
+Adaptive Fusion
+The two branches are fused via a learned gate that adap-
+tively weighs boundary and context features:
+O = gf ⊙B + (1 −gf) ⊙C + β · Proj([B; C]),
+(7)
+where gf = σ(Conv1×1([B; C])) is a fusion gate with one
+value per channel and pixel (distinct from the SGG gating
+signal g), Proj is a 1 × 1 projection, and β = 0.1 is a fixed
+scaling factor for the cross-branch residual. The fused fea-
+tures pass through a 3×3 convolution with LayerNorm that
+restores the stage width, and are summed with a shortcut
+that projects the block input ˆDs to the same width by a 1×1
+convolution with LayerNorm; the sum is the block output
+Ys ∈RCs+1×h×w, which the outward reference (§3.4) refines
+before it is upsampled and added to the next encoder feature
+(at s0–s2).
+3.4
+Outward Reference
+While BiRefNet [13] computes a Laplacian edge map from
+the input image and uses single-channel attention to weight
+decoder features (Ys ←Ys ⊙a, a ∈R1×h×w), our redesign
+(Fig. 4(c)) introduces three improvements: prediction-gated
+image-edge supervision, lightweight boundary feature ex-
+traction, and full-channel residual attention.
+3.4.1
+Prediction-Gated Image-Edge Supervision
+BiRefNet already multiplies its Laplacian target by its in-
+termediate prediction, but does so in logit space—a signed
+Laplacian times an unbounded logit, squashed by a sigmoid
+only at the loss (§1). We instead build the target in two steps,
+bounding the edge map and the gate separately. First, an
+edge map is extracted from the input image by a lightly
+smoothed Laplacian: the grayscale input is filtered by a 5×5
+bilateral filter, followed by a 5 × 5 Laplacian whose absolute
+response is squashed by tanh:
+E = tanh
+ |Lap5(Bilateral5(gray(I)))|
+
+.
+(8)
+Second, the supervision target for stage s is constructed
+by multiplying E with the intermediate sigmoid prediction
+ˆMs, confining the boundary learning to the edges inside
+the object currently being segmented while discarding back-
+ground clutter edges:
+Glabel
+s
+= E ⊙ˆMs,
+(9)
+where the supervision is computed at the input resolution
+for every stage. The target is thus available without any
+ground-truth boundary annotation: the auxiliary supervi-
+sion asks the model to respect exactly the visible edge
+evidence inside its own predicted foreground. No stop-
+gradient is applied to the gating prediction
+ˆMs, so the
+boundary loss also propagates through the gate into the
+segmentation head, reaching the mask prediction itself: the
+boundary and segmentation streams are thus optimized
+jointly rather than in isolation.
+3.4.2
+Lightweight Boundary Feature Extraction
+From the block output Ys at stage s, a depth-wise sepa-
+rable block extracts boundary features: a 3 × 3 depth-wise
+convolution captures local spatial patterns, and a 1×1 point-
+wise convolution projects them to a compact 16-channel
+representation, each followed by LayerNorm and GELU:
+Hs = PWConv1×1(DWConv3×3(Ys)).
+(10)
+From
+Hs,
+we
+predict
+the
+boundary
+map
+ˆGs
+=
+σ(Conv1×1(Hs)), which is supervised against Glabel
+s
+during
+training. Boundary evidence is a local, low-level signal, so a
+depth-wise separable block suffices to isolate it; keeping the
+stream compact ensures the auxiliary path refines, rather
+than competes with, the main decoding pathway—the en-
+tire outward-reference stack adds only ∼0.06M parameters
+across the three decoder stages it serves.
+3.4.3
+Full-Channel Residual Attention
+The key refinement mechanism is a channel-wise attention
+map As ∈RCs+1×h×w (the shape of Ys: 768, 384, and 192
+channels at s0–s2), produced from the boundary features by
+a second, separate 1 × 1 convolution head:
+As = σ(Conv1×1(Hs)),
+(11)
+modulating the block output in place via residual attention:
+Ys ←Ys ⊙(1 + As).
+(12)
+This formulation offers two advantages over BiRefNet’s
+Ys ⊙a: (1) the full-channel attention enables per-channel
+modulation, selectively amplifying each feature dimension
+by its own factor in (1, 2) instead of scaling all channels by
+the same factor; (2) the residual form (1 + As) preserves the
+original features when As ≈0, preventing information loss
+and stabilizing gradients.
+3.5
+Training and Inference
+3.5.1
+Training Procedure
+Backbone. We keep the DINOv3-L backbone frozen except
+for its last transformer stage, which is fine-tuned at 0.05×
+the base learning rate, so that adapting the pretrained
+representation refines rather than overwrites it. Together
+with the decoder, squeeze module, pyramid neck, and the
+inward- and outward-reference modules, this gives 84.9M
+trainable parameters. §4.5 quantifies this partial adaptation
+
+
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE
+7
+on both sides: it clearly outperforms a fully frozen backbone,
+while tuning deeper—the last two stages—is both costlier
+and less accurate.
+Normalization and activation. We replace BatchNorm
+and ReLU with LayerNorm and GELU throughout the de-
+coder: LayerNorm operates independently of batch statistics
+and remains stable under bf16 mixed precision, matching
+the ViT backbone’s convention.
+Optimization. We train with the Lion optimizer [30] un-
+der a linear-warmup–cosine schedule; the hyperparameter
+configuration is listed in §4.3.
+Loss function. The total loss combines pixel-level losses
+and boundary prediction losses:
+L = Lpix + Lbdr,
+(13)
+where Lpix applies BCE and IoU to every prediction in
+P = { ˆMs} ∪{ ˆM} against the ground-truth mask M, and
+SSIM [31] to the final output only:
+Lpix =
+X
+ˆ
+Ms∈P
+
+λbceLBCE( ˆMs, M) + λiouLIoU( ˆMs, M)
+
++ λssimLSSIM( ˆM, M),
+(14)
+with loss weights given in §4.3. The boundary loss Lbdr su-
+pervises the boundary predictions of the outward-reference
+modules against Glabel
+s
+using BCE loss.
+3.5.2
+Inference Procedure
+During inference, BiRefNet-V2 performs a single forward
+pass without the auxiliary boundary supervision; the out-
+ward reference still contributes through its learned attention
+map As.
+4
+EXPERIMENTS
+We evaluate BiRefNet-V2 on three high-precision segmen-
+tation tasks: DIS, high-resolution salient object detection
+(HRSOD), and camouflaged object detection (COD). All
+three tasks require pixel-accurate segmentation masks with
+fine structural details.
+4.1
+Datasets and Settings
+DIS. We use the DIS5K benchmark [1], which contains high-
+resolution images across 225 categories with pixel-accurate
+annotations. The training set (DIS-TR) comprises 3,000 im-
+ages. We report results on five evaluation sets: DIS-VD (470
+images), DIS-TE1 (500), DIS-TE2 (500), DIS-TE3 (500), and
+DIS-TE4 (500), the four DIS-TE splits being organized by
+increasing structural complexity.
+HRSOD. Following [11], [13], [25], we adopt different
+combinations of the training splits of DUTS [32] (10,553
+images), HRSOD [33] (1,610 images), and UHRSD [25] (4,932
+images) as the training set. Evaluation is conducted on
+three high-resolution benchmarks: DAVIS-S [33] (92 im-
+ages), HRSOD-TE [33] (400 images), and UHRSD-TE [25]
+(988 images). We additionally report the two standard low-
+resolution salient object detection test sets, DUTS-TE [32]
+(5,019 images) and DUT-OMRON [34] (5,168 images), eval-
+uated with the same checkpoints without any re-training.
+COD. Following the standard protocol [35], we train on
+the combined training splits of COD10K [36] (3,040 images)
+and CAMO [37] (1,000 images). Evaluation is conducted
+on three test sets: CAMO-TE [37] (250 images), COD10K-
+TE [36] (2,026 images), and NC4K [38] (4,121 images).
+4.2
+Evaluation Metrics
+For DIS, following [1], [9], [13], we adopt six widely
+used metrics: maximum F-measure (F x
+β ) [39], weighted
+F-measure (F ω
+β ) [40], mean absolute error (M), structure
+measure (Sm) [41], mean E-measure (Em
+ϕ ) [42], and relaxed
+human correction efforts (HCEγ) [1], the last of which
+approximates the human effort (i.e., mouse clicks within
+tolerance γ=5) required to correct faulty predictions. For
+HRSOD, following [13], [25], we report Sm, F x
+β , Em
+ϕ , and
+M. For COD, following [13], [35], we report Sm, F ω
+β , mean
+F-measure (F m
+β ), Em
+ϕ , max E-measure (Ex
+ϕ), and M.
+4.3
+Implementation Details
+We implement BiRefNet-V2 using PyTorch [43]. Training
+uses two GPUs. Unless otherwise stated, all measurements
+are performed on a single NVIDIA GeForce RTX 5090.
+Backbone freezing and the DINOv3 last-stage tuning follow
+§3.5; all decoder-side components are optimized at the base
+learning rate. The base learning rate is 3 × 10−4, and the
+total batch size is 8, split evenly across the training GPUs.
+We apply gradient clipping at norm 10.0. Training uses bf16
+mixed precision with a compiled computation graph. Unless
+otherwise stated, input images are resized to 1024 × 1024
+for both training and inference. We use random horizon-
+tal flipping and foreground–background recomposition for
+data augmentation.
+The model is trained for 50 epochs on DIS5K, 30 epochs
+on COD, and 20 epochs on HRSOD. The loss function
+applies BCE (λ=30) and IoU (λ=2) losses to all decoder
+predictions, applies SSIM (λ=400) to the final prediction,
+and adds a BCE loss for the outward-reference boundary
+predictions; the weights are set so that the three pixel-level
+terms stay within the same order of magnitude. In the state-
+of-the-art comparisons (Tables 2 to 4 and Fig. 6), every num-
+ber reported for a training configuration comes from one
+checkpoint, with no per-set selection: the checkpoint that
+maximizes the task’s primary metric—F x
+β for DIS, Sm for
+HRSOD and COD—averaged with equal weight over its pri-
+mary evaluation sets, namely DIS-VD and the four DIS-TE
+splits for DIS; CAMO-TE, COD10K-TE, and NC4K for COD;
+and DAVIS-S, HRSOD-TE, and UHRSD-TE for HRSOD. The
+two low-resolution sets of Table 3 are reported without
+taking part in the selection. The output masks are resized
+back to the original resolution via bilinear interpolation
+for evaluation. Detailed model size, GMACs, and inference
+speed analyses are reported in §4.5.6. Pretrained models1
+and an interactive online demo2 have been released.
+4.4
+Comparison with State-of-the-Art Methods
+4.4.1
+DIS5K
+As shown in Table 2, BiRefNet-V2 achieves the best score
+in every metric on all five evaluation sets. Compared with
+1. https://huggingface.co/collections/ZhengPeng7/birefnet-v2
+2. https://huggingface.co/spaces/ZhengPeng7/BiRefNet demo
+
+
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE
+8
+TABLE 2
+Quantitative comparison on DIS5K. All methods use 1024 × 1024 input; DIS-TEs is the mean of the per-split scores, and best results are in
+bold. †We recompute GenPercept’s scores from its official inference, changing only the input resolution from its native 768. ‡Unlike the other
+methods, DiffDIS is evaluated on fully binarized maps, following its official protocol. Hyperlinked method names link to their released code
+Methods
+DIS-TE1 (500)
+DIS-TE2 (500)
+DIS-TE3 (500)
+F x
+β ↑F ω
+β ↑M ↓Sm ↑Em
+ϕ ↑HCEγ ↓
+F x
+β ↑F ω
+β ↑M ↓Sm ↑Em
+ϕ ↑HCEγ ↓
+F x
+β ↑F ω
+β ↑M ↓Sm ↑Em
+ϕ ↑HCEγ ↓
+IS-Net22 [1]
+.740
+.662
+.074
+.787
+.820
+149
+.799
+.728
+.070
+.823
+.858
+340
+.830
+.758
+.064
+.836
+.883
+687
+InSPyReNet22 [11] .845
+.788
+.043
+.873
+.894
+110
+.894
+.846
+.036
+.905
+.928
+255
+.919
+.871
+.034
+.918
+.943
+522
+FP-DIS23 [16]
+.784
+.713
+.060
+.821
+.860
+160
+.827
+.767
+.059
+.845
+.893
+373
+.868
+.811
+.049
+.871
+.922
+780
+UDUN23 [9]
+.784
+.720
+.059
+.817
+.864
+140
+.829
+.768
+.058
+.843
+.886
+325
+.865
+.809
+.050
+.865
+.917
+658
+MVANet24 [10]
+.873
+.823
+.037
+.879
+.916
+105
+.916
+.874
+.030
+.915
+.943
+252
+.929
+.890
+.031
+.920
+.952
+527
+GenPercept†
+25 [12]
+.839
+.818
+.036
+.873
+.917
+215
+.874
+.854
+.034
+.887
+.937
+503
+.892
+.876
+.032
+.894
+.954
+965
+DiffDIS‡
+25 [8]
+.883
+.862
+.030
+.891
+.933
+104
+.917
+.895
+.026
+.913
+.951
+267
+.934
+.916
+.025
+.919
+.964
+595
+PDFNet26 [7]
+.891
+.848
+.030
+.899
+.928
+114
+.920
+.886
+.027
+.924
+.948
+273
+.936
+.901
+.027
+.928
+.957
+576
+BiRefNet24 [13]
+.860
+.819
+.037
+.885
+.911
+106
+.894
+.857
+.036
+.900
+.930
+266
+.925
+.893
+.028
+.919
+.955
+569
+BiRefNet-V2
+.914
+.890
+.022
+.927
+.949
+94
+.939
+.915
+.020
+.940
+.960
+225
+.951
+.926
+.019
+.942
+.968
+473
+Methods
+DIS-TE4 (500)
+DIS-TEs (TE1–TE4) (2,000)
+DIS-VD (470)
+F x
+β ↑F ω
+β ↑M ↓Sm ↑Em
+ϕ ↑HCEγ ↓
+F x
+β ↑F ω
+β ↑M ↓Sm ↑Em
+ϕ ↑HCEγ ↓
+F x
+β ↑F ω
+β ↑M ↓Sm ↑Em
+ϕ ↑HCEγ ↓
+IS-Net22 [1]
+.827
+.753
+.072
+.830
+.870
+2888
+.799
+.726
+.070
+.819
+.858
+1016
+.791
+.717
+.074
+.813
+.856
+1116
+InSPyReNet22 [11] .905
+.848
+.042
+.905
+.928
+2336
+.891
+.838
+.039
+.900
+.923
+806
+.889
+.834
+.042
+.900
+.922
+904
+FP-DIS23 [16]
+.846
+.788
+.061
+.852
+.906
+3347
+.831
+.770
+.057
+.847
+.895
+1165
+.823
+.763
+.062
+.843
+.891
+1309
+UDUN23 [9]
+.846
+.792
+.059
+.849
+.901
+2785
+.831
+.772
+.057
+.844
+.892
+977
+.823
+.763
+.059
+.838
+.892
+1097
+MVANet24 [10]
+.912
+.857
+.041
+.903
+.938
+2347
+.908
+.861
+.035
+.904
+.937
+808
+.904
+.863
+.034
+.905
+.936
+899
+GenPercept†
+25 [12]
+.864
+.850
+.043
+.868
+.944
+3769
+.867
+.850
+.037
+.881
+.938
+1363
+.868
+.852
+.037
+.882
+.938
+1434
+DiffDIS‡
+25 [8]
+.909
+.893
+.032
+.896
+.955
+2762
+.911
+.892
+.028
+.905
+.950
+932
+.908
+.888
+.029
+.904
+.948
+1055
+PDFNet26 [7]
+.912
+.869
+.037
+.910
+.941
+2510
+.915
+.876
+.030
+.916
+.944
+868
+.915
+.875
+.029
+.916
+.945
+946
+BiRefNet24 [13]
+.904
+.864
+.039
+.900
+.939
+2723
+.896
+.858
+.035
+.901
+.934
+916
+.891
+.854
+.038
+.898
+.931
+989
+BiRefNet-V2
+.939
+.908
+.027
+.933
+.959
+2150
+.936
+.910
+.022
+.936
+.959
+736
+.932
+.907
+.024
+.935
+.956
+731
+TABLE 3
+Quantitative comparison on high- and low-resolution salient object detection benchmarks. The last two benchmarks are low-resolution. TR
+is the training set: 1, 2, and 3 denote DUTS, HRSOD, and UHRSD. Second-best results are underlined, and “-” marks unavailable scores; ¶whole
+row taken from [25], which reports more of these scores than the method’s own paper
+Methods
+TR
+DAVIS-S (92)
+HRSOD-TE (400)
+UHRSD-TE (988)
+DUTS-TE (5,019)
+DUT-OMRON (5,168)
+Sm ↑F x
+β ↑Em
+ϕ ↑M ↓
+Sm ↑F x
+β ↑Em
+ϕ ↑M ↓
+Sm ↑F x
+β ↑Em
+ϕ ↑M ↓
+Sm ↑F x
+β ↑Em
+ϕ ↑M ↓
+Sm ↑F x
+β ↑Em
+ϕ ↑M ↓
+HRSOD¶
+19 [33]
+1,2
+.876
+.899
+.955
+.026
+.896
+.905
+.934
+.030
+-
+-
+-
+-
+.824
+.835
+.885
+.050
+.762
+.743
+.831
+.065
+LDF¶
+20 [44]
+1
+.922
+.911
+.947
+.019
+.904
+.904
+.919
+.032
+.888
+.913
+.891
+.047
+.892
+.898
+.910
+.034
+.838
+.820
+.873
+.051
+DHQ21 [45]
+1,2
+.939
+.938
+-
+.012
+.922
+.922
+-
+.022
+-
+-
+-
+-
+.892
+.900
+-
+.031
+.843
+.820
+-
+.048
+PGNet22 [25]
+2,3
+.954
+.957
+.979
+.010
+.938
+.945
+.946
+.020
+.935
+.949
+.916
+.026
+.859
+.871
+.897
+.038
+.786
+.772
+.884
+.058
+BiRefNet24 [13]
+1
+.967
+.966
+.984
+.008
+.957
+.958
+.972
+.014
+.931
+.933
+.943
+.030
+.939
+.937
+.958
+.019
+.868
+.813
+.878
+.040
+BiRefNet24 [13]
+2,3
+.976
+.980
+.990
+.006
+.956
+.953
+.967
+.016
+.952
+.958
+.964
+.019
+.933
+.928
+.954
+.020
+.864
+.810
+.879
+.040
+BiRefNet24 [13] 1,2,3
+.975
+.979
+.989
+.006
+.962
+.961
+.973
+.013
+.957
+.963
+.969
+.016
+.944
+.943
+.962
+.018
+.882
+.839
+.896
+.038
+BiRefNet-V2
+1
+.974
+.975
+.989
+.006
+.962
+.961
+.976
+.012
+.943
+.949
+.956
+.025
+.940
+.933
+.957
+.020
+.876
+.834
+.895
+.043
+BiRefNet-V2
+2,3
+.980
+.985
+.993
+.004
+.968
+.969
+.980
+.010
+.959
+.966
+.971
+.016
+.942
+.943
+.964
+.018
+.890
+.861
+.918
+.036
+BiRefNet-V2
+1,2,3
+.979
+.984
+.993
+.004
+.968
+.969
+.980
+.010
+.960
+.967
+.973
+.015
+.950
+.949
+.969
+.016
+.895
+.864
+.916
+.035
+PDFNet [7]—the strongest competitor in the table on the pri-
+mary metric, which additionally consumes a pseudo-depth
+map produced by a 335 M monocular estimator—on DIS-
+VD F x
+β improves from 0.915 to 0.932 (+1.7 points), Sm from
+0.916 to 0.935, F ω
+β from 0.875 to 0.907, and HCEγ falls from
+946 to 731. Against DiffDIS [8], the strongest competitor
+that, like ours, takes nothing beyond the RGB image, the
+margins widen to +2.4 points of F x
+β (0.908 to 0.932) and
++3.1 of Sm (0.904 to 0.935), with M dropping from 0.029 to
+0.024. BiRefNet-V2 consistently achieves the lowest HCEγ;
+the advantage is most pronounced on the hardest split,
+DIS-TE4, where BiRefNet-V2 lowers the correction effort to
+2150—below the previous best of 2336 (InSPyReNet) and
+∼21% below BiRefNet (2723).
+4.4.2
+HRSOD
+Table 3 reports results on three high-resolution and two low-
+resolution salient object detection benchmarks, comparing
+methods under matched training data (the TR column).
+Under the identical TR=2,3 setting, BiRefNet-V2 surpasses
+BiRefNet on every metric of all three benchmarks (e.g.,
+HRSOD-TE Sm 0.968 vs 0.956 and M 0.010 vs 0.016), achiev-
+ing the strongest results among methods trained on matched
+data. Adding the low-resolution DUTS set on top (TR=1,2,3)
+performs on par with TR=2,3—the two agree to 0.969 in
+Sm averaged over the three benchmarks, and no single
+benchmark separates them by more than 0.001 in Sm—so
+on these benchmarks the two high-resolution sets already
+saturate the benefit of the extra DUTS data. Even trained
+on DUTS alone (TR=1), BiRefNet-V2 outperforms the iden-
+tically trained LDF by large margins (e.g., +6.4 points of F x
+β
+on DAVIS-S) and surpasses BiRefNet under the same TR=1
+setting on every metric of all three benchmarks, indicating
+that the gain does not stem from high-resolution training
+data. The two low-resolution test sets probe the converse
+risk—that an architecture built around a high-resolution
+detail stream might pay for it at conventional resolutions—
+
+
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE
+9
+TABLE 4
+Quantitative comparison on COD benchmarks. Competitors’ scores are from their papers where the metric is reported with the same definition;
+†remaining cells recomputed from the released predictions of the same model; ‡whole row recomputed from the released model, which is not the
+cited version’s checkpoint but scores within 0.01 of it on every metric both report; ¶whole row taken from re-evaluations of the released predictions
+reported in [13] (SINet: the authors’ retrained release, as reported in [46], [47]), as the cited papers report fewer metrics
+Methods
+CAMO-TE (250)
+COD10K-TE (2,026)
+NC4K (4,121)
+Sm ↑F ω
+β ↑F m
+β ↑Em
+ϕ ↑Ex
+ϕ ↑M ↓
+Sm ↑F ω
+β ↑F m
+β ↑Em
+ϕ ↑Ex
+ϕ ↑M ↓
+Sm ↑F ω
+β ↑F m
+β ↑Em
+ϕ ↑Ex
+ϕ ↑M ↓
+SINet¶
+20 [36]
+.745
+.644
+.702
+.804
+.829
+.091
+.776
+.631
+.679
+.864
+.874
+.043
+.808
+.723
+.769
+.871
+.883
+.058
+SINet-V2†
+22 [35]
+.820
+.743
+.782
+.882
+.895
+.070
+.815
+.680
+.718
+.887
+.906
+.037
+.847
+.770
+.805
+.903
+.914
+.048
+FEDER¶
+23 [48]
+.802
+.738
+.781
+.867
+.873
+.071
+.822
+.716
+.751
+.900
+.905
+.032
+.847
+.789
+.824
+.907
+.915
+.044
+HitNet¶
+23 [49]
+.849
+.809
+.831
+.906
+.910
+.055
+.871
+.806
+.823
+.935
+.938
+.023
+.875
+.834
+.853
+.926
+.929
+.037
+FSPNet23 [50]
+.856
+.799
+.830
+.899
+.928
+.050
+.851
+.735
+.769
+.895
+.930
+.026
+.879
+.816
+.843
+.915
+.937
+.035
+CamoFormer‡
+24 [51]
+.872
+.831
+.854
+.929
+.938
+.046
+.869
+.786
+.811
+.932
+.939
+.023
+.892
+.847
+.868
+.939
+.946
+.030
+ZoomNeXt†
+24 [46]
+.889
+.857
+.875
+.935
+.945
+.041
+.898
+.827
+.848
+.941
+.956
+.018
+.903
+.863
+.884
+.940
+.951
+.028
+FSEL†
+24 [52]
+.885
+.851
+.868
+.942
+.948
+.040
+.873
+.800
+.817
+.937
+.947
+.021
+.892
+.853
+.871
+.942
+.947
+.030
+ESCNet‡
+25 [47]
+.875
+.849
+.867
+.937
+.940
+.041
+.873
+.808
+.827
+.942
+.946
+.020
+.893
+.864
+.881
+.945
+.949
+.028
+RUN‡
+25 [53]
+.804
+.739
+.779
+.864
+.873
+.070
+.823
+.717
+.751
+.898
+.904
+.031
+.850
+.790
+.822
+.908
+.915
+.043
+VSCode-v2†
+26 [54]
+.875
+.817
+.840
+.919
+.932
+.049
+.874
+.787
+.811
+.930
+.942
+.024
+.897
+.845
+.866
+.934
+.944
+.031
+BiRefNet24 [13]
+.904
+.890
+.904
+.954
+.959
+.030
+.913
+.874
+.888
+.960
+.967
+.014
+.914
+.894
+.909
+.953
+.960
+.023
+BiRefNet-V2
+.925
+.909
+.916
+.963
+.971
+.024
+.934
+.901
+.906
+.970
+.978
+.012
+.928
+.908
+.918
+.959
+.967
+.020
+DIS-TE1
+DIS-TE2
+DIS-TE3
+DIS-TE4
+DIS-VD
+DAVIS-S
+HRSOD-TE
+UHRSD-TE
+CAMO-TE
+COD10K-TE
+NC4K
+.88
+.92
+.96
+Sm ↑
+BiRefNet-V2 (Ours)
+BiRefNet
+Task specialist
+Fig. 6. Cross-task architectural transferability. Sectors: DIS (yellow),
+HRSOD (teal; TR=2,3), and COD (green); task specialists (strongest
+compared): PDFNet, PGNet, and ZoomNeXt, respectively. The radial
+axis runs from 0.87 (center) to 0.99 (rim), which enlarges the differences.
+and the same checkpoints take the best value of every metric
+on both: under identical training data (TR=1,2,3) BiRefNet-
+V2 improves on BiRefNet by +0.6 points of Sm on DUTS-TE
+and by +1.3 on DUT-OMRON—matching or exceeding the
+gain on any of the three high-resolution benchmarks. The
+detail-oriented redesign therefore costs nothing where the
+input carries little detail to begin with.
+4.4.3
+COD
+As shown in Table 4, BiRefNet-V2 establishes a new state of
+the art on all three COD benchmarks across every metric.
+On NC4K (the largest test set), it surpasses the strongest
+baseline BiRefNet by +1.4 points on both Sm and F ω
+β ,
+with a ∼13% relative reduction in M. The gain over recent
+specialist COD models is even larger: BiRefNet-V2 outper-
+forms ZoomNeXt [46], FSEL [52], and ESCNet [47] on every
+applicable metric across all three test sets, and on COD10K-
+TE reduces M from 0.018 (ZoomNeXt) to 0.012, a relative
+improvement of ∼33%.
+4.4.4
+Cross-Task Architectural Transferability
+A more demanding test of the bilateral-reference paradigm
+is whether a single architecture—trained separately on each
+benchmark, with nothing adapted per task—can match or
+surpass models that are purpose-built for a particular task.
+Fig. 6 visualizes this comparison, tracing Sm on the 11 pri-
+mary evaluation sets of the three tasks against the strongest
+specialist of each.
+Two observations stand out. First, BiRefNet-V2 forms
+the outermost contour on all 11 axes, surpassing each task’s
+specialist by a clear margin (average Sm of 0.935 vs 0.915 on
+DIS, 0.969 vs 0.942 on HRSOD, and 0.929 vs 0.897 on COD):
+it does not merely transfer to other detail-demanding tasks
+but outperforms the task-tailored architectures on their own
+benchmarks. Second, the red contour dominates the blue
+contour of BiRefNet on every axis, confirming that the gains
+are consistent rather than task-specific.
+4.5
+Analytical Results
+In this section, we analyze the contribution of each individ-
+ual design choice and the sensitivity to the most important
+hyperparameters. Every configuration is trained on DIS5K
+under the final training recipe (§4.3) and differs from its
+neighbors only in the studied component. Fig. 7 visualizes
+the component build-up with one checkpoint per configura-
+tion, on DIS-VD samples drawn from those with the largest
+IoU gain from the baseline framework (first row of Table 5)
+to the full model. Throughout the analytical studies (Tables 5
+to 7, the resolution study of Fig. 8, and the two dissections
+of the supplementary material), each reported score is the
+mean±std, over at least four independent training runs that
+share the same fixed random seed but are not bit-wise iden-
+tical, of the best checkpoint of each run, with checkpoints
+both selected and evaluated on the DIS-VD validation set:
+F x
+β is the primary readout, and every table co-reports the
+boundary-quality HCEγ (mean±std over the same runs).
+Within each run, the best checkpoint is the one with the
+highest F x
+β on DIS-VD; ties at the three-decimal precision
+of the evaluation logs are broken by the lower HCEγ and
+
+
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE
+10
+Image
+Baseline
+Modernized
++ IR
++ IR + OR
++ IR + OR + DB
+GT
+Truck
+Locust
+Hoop
+Ladder
+Fig. 7. The cumulative component build-up, visualized. Insets (top three rows) enlarge the red-boxed region.
+then by the earlier epoch. Table 5 covers the component
+combinations: the modernized framework enters as a single
+step whose derivation Table 6 unpacks choice by choice,
+and all combinations of the three architectural contributions
+build on it—each component alone, each pair, and thereby
+every leave-one-out complement of the full model. The
+corrections compose: the modernized framework decides
+what is segmented—the baseline framework (first prediction
+column of Fig. 7) claims the housing row behind the boom
+(Truck) and misses the camouflaged insect entirely (Locust)—
+the inward reference recovers filament-thin structure (the
+net and the thin truss bars in Hoop, the twin boom pipes in
+Truck and the leg spines in Locust; see the insets), and the
+outward reference clears the spurious bucket in Ladder (one
+of the few DIS-VD samples on which it changes the mask
+markedly), closing the gap to the ground truth.
+Read along its build-up path (baseline framework →
+modernized framework →+IR →+IR+OR →full model),
+Table 5 rises monotonically from 0.8722 to 0.9328 (+6.06
+points), but its two columns tell different stories. Modern-
+izing the framework alone lifts F x
+β by 4.33 points while
+leaving boundary quality worse than the BiRefNet starting
+point (HCEγ 1270→1374): a stronger encoder identifies the
+foreground region more reliably without recovering its fine
+structure. It is the inward reference that then collapses
+HCEγ by 45% (1374→752), at a further +1.30 points. Region
+accuracy and boundary fidelity are therefore separate axes,
+and a reader tracking only F x
+β would misjudge which half
+of the redesign does the structural work. The remaining
+combination rows complete the space, and two of them
+locate where the detail work resides: alone on the modern-
+ized framework the dual-branch decoder is worth +0.0063
+(0.9155→0.9218), yet its marginal gain as the last step of
+the build-up path shrinks to +0.0020, so the dual-branch
+decoder and the inward reference overlap on the detail
+work; the outward reference alone reads −0.0010.
+4.5.1
+From BiRefNet to the Modernized Framework
+Table 6 isolates the modernized framework itself. The start-
+ing point keeps every BiRefNet framework choice—a fully
+fine-tuned Swin-L encoder, BatchNorm, ReLU, AdamW—
+but carries no bilateral references; each subsequent row then
+replaces one of those choices with its modern counterpart,
+the encoder by a frozen DINOv3-L, BatchNorm by Layer-
+Norm, ReLU by GELU, and AdamW by Lion. The four
+replacements lift F x
+β from 0.8722 to 0.8955, dominated by
+the encoder swap (+1.48); LayerNorm adds a further +0.55,
+GELU +0.23, and Lion +0.07. This configuration—a frozen
+encoder paired with the plain single-branch decoder—
+already exceeds the full BiRefNet model on DIS-VD (0.8955
+vs 0.891, cf. Table 2) with ∼24× fewer trainable parameters
+(8.8M) and a 12× shorter schedule. We fold the four replace-
+ments, together with the last-stage tuning described below,
+into a single modernization step in Table 5.
+The top block of Table 6 closes with the DINOv3
+last-stage tuning of §3.5. Applied directly on top of the Lion
+row, it is the largest single step of the ladder, lifting F x
+β from
+0.8955 to 0.9155 (+2.00 points). Notably, it barely moves
+HCEγ (1404→1374): the adaptation repairs the region-
+level fit of the frozen self-supervised features—a strong
+starting point, but slightly mismatched to the pixel-accurate
+demands of DIS—while boundary quality is delivered by
+the references built on top of it. Tuning depth has a single
+interior optimum in F x
+β , with all four of its points measured
+against the same full-model anchor: freezing the encoder
+entirely costs −0.0130 (0.9198±0.0028, HCEγ 807), tuning
+the last two stages costs −0.0135 (0.9193±0.0050, HCEγ 723),
+and unfreezing it altogether costs −0.0215 (0.9113±0.0030,
+HCEγ 745) while also being the most expensive option. The
+near-symmetry of the two inner losses in F x
+β shows that
+adapting exactly the last semantic stage is not a compromise
+between cost and accuracy but the accuracy optimum itself,
+and that deeper adaptation at this short schedule is both
+costlier and less accurate. We therefore keep this adaptation
+minimal and treat it as part of the modernized framework
+rather than a separate module.
+A framework choice ultimately matters at the final con-
+figuration, where it can disagree with the ladder—the op-
+timizer is the case in point: with only the 8.8M-parameter
+decoder training, Lion merely matches AdamW, but at the
+
+
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE
+11
+TABLE 5
+Component-combination ablation of the main contributions. Every row is an independent configuration. × denotes the BiRefNet framework in
+the Modernized framework column and the absence of the component elsewhere (no reference; a plain single-branch decoder block: two 3 × 3
+convolutions, each followed by normalization, with an activation between the two, plus a 1 × 1 projection shortcut); v1 marks BiRefNet’s
+counterpart of that component (Table 1)
+Configuration
+Modernized
+framework
+Inward Reference
+(IR)
+Outward
+Reference (OR)
+Dual-Branch
+Decoder (DB)
+F x
+β ↑
+HCEγ ↓
+Baseline framework
+×
+×
+×
+×
+.8722±.0022
+1270±2
+Modernized framework (Table 6)
+✓
+×
+×
+×
+.9155±.0024
+1374±5
++ BiRefNet references & decoder
+✓
+v1
+v1
+v1
+.9193±.0028
+1108±2
++ IR
+✓
+✓
+×
+×
+.9285±.0031
+752±7
++ OR
+✓
+×
+✓
+×
+.9145±.0026
+1341±4
++ DB
+✓
+×
+×
+✓
+.9218±.0015
+1297±7
++ IR + OR
+✓
+✓
+✓
+×
+.9308±.0017
+754±6
++ IR + DB
+✓
+✓
+×
+✓
+.9300±.0024
+731±8
++ OR + DB
+✓
+×
+✓
+✓
+.9175±.0042
+1284±6
++ IR + OR + DB (Full model)
+✓
+✓
+✓
+✓
+.9328±.0015
+730±14
+TABLE 6
+From BiRefNet to the modernized framework. In the top block, each
+row replaces (→) or adds (+) one framework choice on top of the
+previous row. Shaded rows mark the adopted setting of each block
+Framework
+F x
+β ↑
+HCEγ ↓
+Baseline framework
+.8722±.0022
+1270±2
+→DINOv3-L (frozen)
+.8870±.0018
+1474±2
+→LayerNorm
+.8925±.0017
+1454±4
+→GELU
+.8948±.0021
+1429±2
+→Lion (all four replacements, backbone frozen)
+.8955±.0017
+1404±3
++ DINOv3 last-stage tuning
+.9155±.0024
+1374±5
+Optimizer re-validated at the final configuration:
+Full model with Lion (default)
+.9328±.0015
+730±14
+Full model with AdamW
+.9225±.0010
+805±6
+full model (bottom block of Table 6, 84.9M trainable) Lion is
+decisively better—F x
+β 0.9328±0.0015 vs 0.9225±0.0010, a gap
+of 1.03 points with per-run ranges entirely disjoint (0.9310–
+0.9340 against 0.9210–0.9230), with HCEγ moving the same
+way (730 vs 805). The optimizer thus interacts with the scale
+of the trainable stack—inert when only the small decoder
+trains, decisive once the last encoder stage trains along
+with the complete architecture—which, together with its
+halved optimizer state, makes Lion the default optimizer of
+BiRefNet-V2. The recommendation is specific to the mostly-
+frozen regime, and we state its converse boundary rather
+than leave it implicit: with the complete BiRefNet-V2 ar-
+chitecture, built with LayerNorm and GELU and mounted
+on a fully fine-tuned Swin-L encoder, the same optimizer
+diverges outright, collapsing to 0.6538±0.0066 over four
+runs where AdamW reaches 0.8770±0.0012.
+Introduced together, the framework and the architec-
+ture raise an attribution question. The row marked “v1”
+in Table 5 answers it directly: BiRefNet’s own references
+and decoder, mounted on the same modernized framework,
+reach 0.9193—short of the full model by 1.35 points and
+378 HCEγ counts. The three components follow BiRefNet’s
+official implementation, with normalization and activation
+matching the host, so the gap measures architectural design
+under one shared recipe—not the framework choices Table 6
+already isolates. A stronger encoder and a better recipe do
+not, by themselves, explain BiRefNet-V2—and the IR design
+study of Table 7 points to the gating, not the patch layout,
+TABLE 7
+Inward-reference design ablation. All rows come from one dedicated
+sweep, so the two rows of the Inward reference axis are independent
+replicates of—not identical to—the corresponding rows of Table 5
+Design axis
+Value
+F x
+β ↑
+HCEγ ↓
+absent
+.9156±.0022
+1374±6
+Inward reference
+adopted
+.9332±.0040
+751±10
+hybrid Window/Conv
+.9332±.0040
+751±10
+Conv SGG only
+.9266±.0029
+757±5
+Gate (SGG)
+none (ungated)
+.9260±.0024
+993±6
+grid split (α=0)
+.9300±.0007
+814±7
+space-to-depth (α=0)
+.9298±.0029
+750±5
+Layout
+space-to-depth (α=0.2)
+.9332±.0040
+751±10
+0
+.9298±.0029
+750±5
+0.1
+.9318±.0022
+745±7
+0.2
+.9332±.0040
+751±10
+Overlap ratio α
+0.4
+.9288±.0028
+751±8
+16
+.9292±.0011
+753±6
+64
+.9332±.0040
+751±10
+256
+.9300±.0029
+747±4
+Compression dc
+off (uncompressed)
+.9280±.0021
+755±9
+64
+.9298±.0018
+766±8
+96
+.9332±.0040
+751±10
+128
+.9308±.0013
+740±3
+Detail channels Cr
+pyramid (0.2× neck)
+.9270±.0020
+780±2
+as the main missing piece. BiRefNet’s components are worth
+just +0.38 in that row, and the converse transplant (reported
+in the supplementary material) completes the picture: our
+components are worth +0.33 on the original framework
+against +1.73 on the modernized one, and the framework
+itself adds +4.33 without our architecture against +5.73 with
+it. Both cross pairings of old and new underperform; the co-
+designed pair composes. Only boundary quality transfers
+across hosts: on the original framework the inward refer-
+ence alone cuts HCEγ from 1270 to 898, and BiRefNet’s
+references and decoder cut it from 1374 to 1108 on ours—as
+expected of mechanisms that re-inject the input image rather
+than refine semantics.
+4.5.2
+Effectiveness of Inward Reference
+Activating the redesigned inward reference on top of the
+modernized framework (Table 5) lifts F x
+β from 0.9155 to
+
+
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE
+12
+0.9285—the largest architectural increment (+1.30 points)—
+while cutting HCEγ from 1374 to 752, nearly halving the
+residual correction effort. The leave-one-out view (the “+
+OR + DB” row of Table 5) confirms the same picture
+from the opposite direction, and more sharply: removing
+the inward reference from the full model is the costliest
+single removal on both readouts, −0.0153 on F x
+β and HCEγ
+from 730 to 1284. Removing only the gate while keeping
+the detail stream (the ungated Rin
+s ) costs −0.0043 on F x
+β
+(0.9285±0.0039) and degrades HCEγ to 918: the gate moves
+both readouts, and its dominant effect is on how cleanly
+the structure is reconstructed—precisely the quantity the
+DIS5K protocol measures with HCEγ—and together the
+detail stream and its gate act as the model’s boundary-
+quality engine. A further control dissects the hybrid gating
+that Fig. 5 depicts: removing only the full-resolution stage-
+s4 injection site costs −0.0045 on F x
+β but inflates HCEγ from
+730 to 1096 (+50%)—the native-resolution entry point itself,
+not only its gate, carries the boundary-quality gain.
+Table 7 dissects the module’s internal design where the
+inward reference enters the chain—the modernized frame-
+work in place, the outward reference and the dual-branch
+decoder absent—deviating from the adopted configuration
+one axis at a time. The sweep independently reproduces
+the module-level step (+1.76 points, HCEγ 1374→751) and
+shows which of the internal choices carry weight. The gate
+is the sharpest axis. Removing it costs −0.0072 and inflates
+HCEγ by 242 counts—over one and a half times what
+the same removal costs at the full-model operating point
+(−0.0043)—so the gate matters most at the point where
+the detail stream first enters. Replacing the Window SGG
+of stages s0–s3 by the convolutional form costs −0.0066
+at essentially unchanged boundary quality (757 vs 751):
+the window form buys region-level accuracy that the con-
+volutional one does not, while stage s4 keeps the convo-
+lutional form because window attention at full resolution
+costs about a third more peak training memory per sample
+(§3.2). The three swept axes are each single-peaked at the
+adopted value—overlap α=0.2 (−0.0034 at 0, −0.0044 at 0.4),
+compression dc=64, and detail budget Cr=96—and two of
+them carry a lesson beyond tuning: leaving the patches
+uncompressed, the widest and most expensive option, is
+the worst point of its axis (−0.0052), and a pyramid-shaped
+detail budget mirroring the neck is worse than a uniform
+one on both readouts (−0.0062, HCEγ 780). At matched
+zero overlap the space-to-depth layout ties BiRefNet’s grid
+split on F x
+β (0.9298 vs 0.9300) but is 64 counts better in
+HCEγ, and only space-to-depth admits overlap at all: the
+locality-preserving layout pays off in boundary quality and
+in the design freedom it unlocks. Boundary quality is in fact
+governed by a different subset of the choices than region
+accuracy—HCEγ varies by ten counts across the overlap
+and compression axes (745–755) but responds strongly to
+the presence of the gate, to the layout, and to how the detail
+budget is distributed.
+4.5.3
+Effectiveness of Outward Reference
+The outward reference’s measured effect on the region
+metric is small at every operating point of Table 5, and
+we report it as such: enabling it on top of the modernized
+framework+IR stack lifts F x
+β from 0.9285 to 0.9308 while
+TABLE 8
+Scaling the semantic encoder on DIS5K. Each size reports its best
+checkpoint, selected by the five-set mean of F x
+β . Params: total
+(trainable), in M; TMACs at 10242
+F x
+β ↑/ HCEγ ↓
+DINOv3
+Params
+TMACs
+FPS
+DIS-TEs
+DIS-VD
+S+
+35 (16)
+0.39
+34.1
+.911 / 792
+.907 / 818
+B
+94 (37)
+0.79
+29.8
+.917 / 763
+.916 / 756
+L (default)
+312 (85)
+2.21
+18.4
+.936 / 736
+.932 / 731
+H+
+851 (220)
+4.97
+11.9
+.938 / 729
+.930 / 745
+7B
+6738 (1700)
+33.27
+2.5
+.939 / 733
+.942 / 739
+HCEγ rises from 752 to 754, removing it from the full model
+(the “+ IR + DB” row) costs −0.0028 and leaves HCEγ one
+count higher, and alone on the modernized framework it
+reads −0.0010 (0.9145±0.0026). We keep it because it com-
+pletes the paradigm this paper re-instantiates: the outward
+direction supplies boundary evidence that the mask loss
+alone does not carry, and the supplementary material shows
+the same components behave very differently depending
+on what they are attached to. The learned boundary tracks
+its prediction-gated target closely across DIS-VD (Pearson
+r=0.67±0.05 at s2), and the resulting residual attention
+concentrates on the fine structures it serves.
+4.5.4
+Effectiveness of Dual-Branch Decoder
+Replacing the plain single-branch decoder block with our
+dual-branch decoder block completes the full model: F x
+β
+rises from 0.9308 to 0.9328 with the lowest HCEγ of Ta-
+ble 5 (730). The combination rows of Table 5 locate its
+contribution precisely: alone on the modernized framework
+the block is worth +0.0063 (0.9155→0.9218, with HCEγ
+1374→1297)—the largest single-component gain after the
+inward reference—although its marginal gain as the last step
+of the build-up path shrinks to +0.0020—direct evidence
+that part of its contribution overlaps with the inward refer-
+ence’s detail stream. We keep the block for its cumulative
+gain and its role as the structural link between the two
+references. Retaining only the boundary branch costs 0.0033
+on the region metric (0.9295) and only the context branch
+0.0015 (0.9313), against 0.9328 for the pair, and HCEγ orders
+them the same way (772 and 741 against 730): the pair is
+the cleanest configuration. Replacing the large-kernel atten-
+tion with an O(N 2) boundary-aware self-attention context
+branch reads −0.0020 on F x
+β and lowers HCEγ from 730
+to 717, at a substantially higher compute cost, supporting
+the linear-cost choice.
+4.5.5
+Scaling the Semantic Encoder
+Because everything except the encoder is held fixed—the
+decoder, both references, the last-stage tuning rule, and the
+final training recipe—swapping the mostly-frozen DINOv3
+backbone yields a controlled, and unusually affordable,
+scaling study for high-resolution segmentation (Table 8).
+Three observations emerge. First, semantic capacity pays
+steeply up to the L scale, then returns diminish sharply:
+on the four DIS-TE splits the readout climbs from 0.911 (S+)
+through 0.917 (B) to 0.936 at L—+2.5 points across a 9× span
+of model size—after which the 2.7× larger H+ adds +0.20
+points and the 22× larger 7B +0.33 points. On DIS-VD the
+
+
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE
+13
+TABLE 9
+Efficiency comparison. Each method runs its official inference path
+(1024 × 1024 input, batch size 1, bf16 mixed precision); the Trainable
+column counts the inference model’s parameters that are trained
+Method
+#Params (M)↓Trainable↓FPS↑Peak mem. (GB)↓
+IS-Net22 [1]
+44.0
+44.0
+77.4
+2.8
+InSPyReNet22 [11]
+90.7
+90.7
+24.9
+2.8
+UDUN23 [9]
+24.9
+24.9
+63.0
+0.6
+MVANet24 [10]
+94.1
+94.1
+19.1
+2.6
+GenPercept25 [12]
+949.6†
+865.9
+3.9
+8.8
+DiffDIS25 [8]
+996.6†
+912.9 0.31‡
+16.7
+PDFNet26 [7]
+433.2
+97.9
+1.9¶
+9.5
+ZoomNeXt24 [46]
+84.8
+84.8
+11.7
+1.4
+FSEL24 [52]
+67.3
+67.3
+20.3
+1.1
+ESCNet25 [47]
+99.9
+99.9
+21.0
+1.6
+RUN25 [53]
+79.2
+79.2
+6.9
+6.1
+BiRefNet24 [13]
+215
+215
+15.3
+3.5
+BiRefNet-V2
+312.4
+84.9
+18.4
+3.2
+†Excluding the frozen text encoder (∼340 M). ‡The official inference includes
+6-pass test-time augmentation; a single pass runs at 1.9 FPS. ¶The official two-
+stage inference includes the same 6-pass test-time augmentation and pseudo-
+depth generation by a 335 M Depth Anything V2 estimator, matching the
+accounting reported in its paper; a single pass runs at 9.7 FPS.
+top of the family reads −0.2 points for H+ and +1.0 points
+for 7B. Boundary quality traces the same shape (DIS-TEs
+HCEγ 792→763→736 up to L, then 729 and 733). Second,
+mechanism beats raw capacity: past the default L, a 2.7×–
+22× larger model buys at most +0.33 points on the DIS-TE
+splits and +1.0 points on DIS-VD, whereas our architecture
+contributes +1.7 points on DIS-VD at fixed scale (Table 5)—
+so L remains the accuracy/cost sweet spot and our default,
+within seven HCEγ counts of the family’s best. Third, the
+family spans practical deployment endpoints: the 35M S+
+variant reaches 0.907 on DIS-VD at 34.1 FPS—above the fully
+fine-tuned Swin-L BiRefNet (0.891, Table 2)—while the 6.7B
+variant still runs single-forward at 2.5 FPS with a 14.5 GB
+peak, roughly 8× faster and slightly leaner than DiffDIS’s of-
+ficial inference (Table 9). Encoder scale thus forms a second
+deployment axis, orthogonal to the resolution axis studied
+next: resolution sets the spatial token budget, and encoder
+size the per-token semantic capacity.
+4.5.6
+Efficiency
+Model size and GMACs. BiRefNet-V2 contains 312.4M
+total parameters, of which 84.9M are trainable (9.3M in
+the decoder plus the fine-tuned last backbone stage; the
+remaining 227.5M are frozen). At the standard input reso-
+lution of 1024 × 1024, the model performs 2208.8 GMACs
+(≈2.2 TMACs) per forward pass, of which 2068.3 GMACs
+reside in the mostly-frozen DINOv3-L backbone and only
+140.5 GMACs in the decoder stack. Compared with the
+previous BiRefNet, which trains the entire encoder–decoder
+stack (215M trainable parameters [13]), BiRefNet-V2 cuts
+the trainable parameter count to ∼40% while delivering
+the accuracy gains documented in Tables 2 to 4. BiRefNet-
+V2 thus carries more total parameters than BiRefNet but
+optimizes far fewer, making training substantially cheaper:
+a 12× shorter schedule and a modest per-GPU memory foot-
+print (detailed below). Tighter compute budgets are served
+by the backbone family of Table 8 (down to 0.39 TMACs at
+S+) and by the synchronized low-resolution regime below.
+10
+20
+30
+40
+50
+Per-Image Runtime (ms, Log Scale) ↓
+.86
+.88
+.90
+.92
+.94
+Fx
+β on DIS-VD ↑
+Better
+.92
+.93
+30
+40
+50
+Full model (default)
+Resolution R:
+Input and IR both at R
+Input at 1024, IR at R
+Input at R, IR at 1024
+Input at R, no IR
+1024
+768
+512
+384
+Fig. 8. Resolution–accuracy trade-off on DIS-VD. Each point is a
+model retrained from scratch at its resolution configuration. The inset’s
+runtime axis is also logarithmic. Error bars: ±1 standard deviation.
+Inference efficiency. BiRefNet-V2 runs at 18.4 FPS with
+bf16 mixed precision and batch size 1 at 1024 × 1024 input,
+with a peak GPU memory footprint of ∼3.2 GB. Table 9
+places this figure in context: every compared method listed
+there is re-benchmarked under the single protocol of the
+table caption, keeping each method’s official inference pro-
+cedure intact (e.g., the test-time augmentation built into
+the DiffDIS release). BiRefNet-V2 runs faster and leaner
+than BiRefNet (18.4 vs 15.3 FPS; 3.2 vs 3.5 GB) despite
+carrying a larger total parameter count; lightweight CNN-
+based detectors such as IS-Net remain ∼4× faster, but at a
+substantial accuracy deficit (Table 2). PDFNet, the strongest
+competitor on the primary DIS metric, pays for its pseudo-
+depth prior with a 433 M two-stage pipeline running at
+1.9 FPS—an order of magnitude slower than BiRefNet-V2.
+The contrast with the diffusion-based family is starkest:
+GenPercept needs ∼950 M inference parameters for 3.9 FPS,
+and DiffDIS—the strongest fully automatic diffusion-based
+method in our comparison—runs its official inference at
+0.31 FPS with a 16.7 GB peak, roughly 60× slower and 5×
+more memory-hungry than BiRefNet-V2 while trailing it in
+accuracy (Table 2). Single-forward discriminative inference
+thus remains the only route that combines top accuracy
+with a commodity-hardware footprint at full resolution. On
+the COD side the pattern repeats: the strongest specialist,
+ZoomNeXt, runs at 11.7 FPS and the Mamba-based RUN at
+6.9 FPS, while BiRefNet-V2 serves COD with the identical
+architecture and cost.
+Resolution–accuracy trade-off. Because the resolutions
+of the input (backbone) stream and the inward-reference
+detail stream can be set independently, deployment raises
+two questions: how accuracy trades against throughput
+as the input scales down, and whether the two streams
+should be scaled together or independently. We answer both
+by retraining the final architecture from scratch at every
+resolution configuration and plotting DIS-VD F x
+β against
+per-image runtime (Fig. 8). Three findings emerge. First,
+synchronized down-scaling is a well-behaved deployment
+frontier: 7682 runs in 31 ms/image (1.8× faster than the
+full model) within 0.9 points of it (0.924 vs 0.933), 5122
+
+
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE
+14
+DIS-TE1
+DIS-TE2
+DIS-TE3
+DIS-TE4
+DIS-VD
+Image
+GT
+BiRefNet-V2
+PDFNet
+DiffDIS
+MVANet
+BiRefNet
+InSPyReNet GenPercept
+IS-Net
+Fig. 9. Qualitative comparison on DIS5K. An all-white inset means the method labels the whole enlarged region as foreground.
+in 16 ms at −2.0 points, and 3842 in 11 ms at −3.1 points.
+Second, scaling both streams together is what turns res-
+olution into speed: decoupling—shrinking only the input
+while the inward reference stays at 10242, or the reverse—
+keeps accuracy within 1.7 points of the full model even
+at 3842, but cannot bring per-image runtime below ∼30–
+47 ms because the stream left at 10242 remains the compute
+floor. Between the two decoupled regimes, however, there
+is no consistent preference to state: at matched resolution
+R the reverse direction leads by 0.0007–0.0045, but that
+ordering inverts once the two are compared at matched
+runtime—the fair comparison, since down-scaling the heavy
+semantic stream is far cheaper than down-scaling the light
+detail stream—where shrinking the input instead leads by
+up to 0.0063 at the fastest budget the two regimes share.
+Decoupling is therefore a way to preserve accuracy, not a
+way to buy throughput, and which stream to keep at full
+resolution can be decided on engineering grounds rather
+than on accuracy. Third, the injected detail earns its cost
+throughout: the no-IR floor (the inward reference removed)
+trails the synced curve at every operating point, and the gap
+widens sharply as the backbone loses resolution—1.6 points
+at 7682, 2.8 at 5122, 3.8 at 3842—so the detail stream acts
+as a resolution-adaptive injector that matters most where
+aggressive downsampling discards the most high-frequency
+content. At 10242 no additional training is needed: the an-
+chor shared by the three regimes with the inward reference
+is the full model and the endpoint of the no-IR curve is the
+“+ OR + DB” configuration, so both points reuse the from-
+scratch runs behind these two rows of Table 5. The runtimes
+in Fig. 8 were measured earlier than those of Table 9, with
+the same precision and batch size but on an older software
+stack with a shorter timing loop, so the full model’s runtime
+there corresponds to 18.0 rather than its tabulated 18.4 FPS.
+Training efficiency. The mostly-frozen-backbone design
+also shrinks the training cost: BiRefNet-V2 converges in 50
+epochs on DIS5K (versus 600 epochs for BiRefNet, a 12×
+reduction), with a per-GPU footprint of 6.5 GB at batch size
+1 and 11.4 GB at batch size 2 (1024 × 1024, bf16)—within
+consumer-grade 32 GB cards. We attribute this efficiency to
+two factors: (i) gradients flow only through the decoder and
+the last backbone stage, removing most of the backbone’s
+share of the activation memory; and (ii) the strong DINOv3
+features remove the need for the long schedules that fully
+fine-tuned encoders need to become foreground-aware.
+Maximum native resolution. The same mostly-frozen-
+backbone economy also raises the ceiling for native high-
+resolution training: the 32 GB card used above sustains full
+training steps at up to 2432 × 2432 (forward-only inference
+up to 3968 × 3968), and a large-memory 268 GB GPU trains
+at up to 7552 × 7552 (see the supplementary material).
+4.6
+Qualitative Results
+To complement the quantitative numbers, Figs. 9 and 10
+compare BiRefNet-V2 against representative state-of-the-art
+methods on DIS5K and COD, with our prediction placed
+next to the ground truth in every panel.
+DIS5K (Fig. 9). The five rows span the benchmark’s full
+difficulty spectrum, from DIS-TE1 (top) to DIS-VD (bottom),
+and separate two failure modes. The first is semantic: the
+annotated foreground of the DIS-TE1 image is the kick
+scooter alone, whereas every competitor also claims the
+cardboard box behind it. The second is structural and recurs
+on rake tines (TE2), chair spindles (TE3), a steel tower’s
+cross-bracing (TE4), and a racket’s string bed (VD): inside
+the red box the openwork is filled into a solid patch, washed
+out, or erased outright by most competitors, the strongest
+included, while BiRefNet-V2 keeps every gap open. The red
+insets enlarge the highest-frequency or most semantically
+confusable sub-regions; the component-level evidence for
+the locality-preserving inward reference and its gate is given
+by Tables 5 and 7 and Fig. 7.
+COD (Fig. 10). The four rows isolate four distinct fine-
+structure challenges. BiRefNet-V2 traces the grasshopper’s
+slender hind legs all the way to the image border, which
+
+
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE
+15
+Slender
+Multi-Leg
+Occluded
+Spiny
+Image
+GT
+BiRefNet-V2
+BiRefNet
+ZoomNeXt
+FSEL
+VSCode-v2
+ESCNet
+SINet-V2
+RUN
+Fig. 10. Qualitative comparison on COD. All four samples are from COD10K-TE.
+Input
+Text behind Subject
+Background Replacement
+Fig. 11. Application demonstration. A held-out DIS-TE4 wrought-iron
+gate processed by the released BiRefNet-V2. New background: cropped
+from a photo by AuHaidhausen, CC BY 4.0.
+every competing method truncates or drops (Slender); re-
+solves the centipede’s legs individually, which RUN partly
+fuses with an adjacent gray object and SINet-V2 smears into
+a ghost (Multi-Leg); reproduces both the branch crossing
+the owl’s body and the tail tapering below it, which SINet-
+V2 blurs away and RUN drops altogether (Occluded); and
+keeps the comb of fine spines along the ghost pipefish’s
+underside, which SINet-V2 smooths into a featureless out-
+line (Spiny). Across both benchmarks, the qualitative gap is
+thus widest exactly on the structures that the redesigned in-
+ward reference, the outward reference, and the dual-branch
+decoder jointly target—filament-thin, densely articulated,
+occluded, or finely spined foregrounds—explaining why the
+quantitative gains (Tables 2 and 4) translate into visibly
+more reliable masks.
+5
+APPLICATIONS
+High-resolution dichotomous segmentation has moved well
+beyond the laboratory. Since its original release in 2024,
+the open-source BiRefNet family has accumulated more
+than 27 million downloads on Hugging Face3 and has seen
+third-party adoption and recognition: Cloudflare adopted
+the model to power the beta background-removal feature
+3. https://huggingface.co/api/models/ZhengPeng7/BiRefNet?
+expand[]=downloadsAllTime: the Hugging Face API reports all-time
+downloads per model—20.1M for this flagship repository alone, 27.0M
+summed across the official model series as of October 2026.
+of its Images API4, and OpenCV includes the model in
+the official benchmark suite of its new OpenCV 5 DNN
+engine5. Because BiRefNet-V2 preserves its predecessor’s
+single-forward interface (§§ 3.5.2 and 4.5.6), existing inte-
+grations can adopt it without interface changes and inherit
+the accuracy and efficiency gains reported in Tables 2 to 4
+and in §4.5.6.
+For deployment, three properties of BiRefNet-V2 matter
+beyond benchmark scores. First, adaptation is light: a com-
+plete training run needs 50 epochs (∼8% of its predecessor’s
+schedule), and training fits in 6.5 GB of GPU memory at
+batch size 1 and 1024 × 1024 (§4.5.6), so fine-tuning on
+data of comparable scale costs at most one such run—
+feasible on commodity hardware. Second, the same memory
+economy puts the native-resolution ceiling at 2432 × 2432
+for training and 3968 × 3968 for inference on a single 32 GB
+consumer-grade GPU (§4.5.6). Third, the operating point is
+tunable along two orthogonal axes: synchronized resolution
+scaling converts resolution into throughput (1.8× faster at
+768×768 within 0.9 points, Fig. 8), while the encoder family
+of Table 8 trades compute for semantic capacity, spanning
+35M parameters (34.1 FPS at 1024 × 1024) to 6.7B under one
+decoder—lower the resolution when latency dominates, and
+scale the encoder when accuracy is the priority.
+Fig. 11 shows two canonical edits driven by one pre-
+dicted mask: text insertion behind the subject and full
+background replacement—both hinge on keeping intact
+the openwork structures that motivated this work. In the
+background replacement, the composite keeps the input’s
+own pixel colors, so the wrought-iron gate’s upper-left bars
+and finials, photographed against a bright sky, stay pale
+over the new background. We expect the lowered training
+and deployment cost to widen the model’s adoption, from
+interactive editors to automated content pipelines.
+4. https://blog.cloudflare.com/background-removal (accessed Octo-
+ber 2026): “For our beta version, we opted to use the BiRefNet model to
+drive decisions for background removal”; “The Images API now sup-
+ports automatic background removal for hosted and remote images.”
+5. https://github.com/opencv/opencv/wiki/
+OpenCV-5-DNN-Benchmarks (accessed October 2026): BiRefNet is
+among the models profiled in the official OpenCV 5 DNN benchmarks.
+
+
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE
+16
+DIS-
+VD
+DIS-
+TE4
+Image
+GT
+Ours
+BiRefNet PDFNet
+DiffDIS
+Fig. 12. Failure cases on DIS5K. Top: ambiguous extent of the target;
+bottom: same-color adjacency.
+6
+LIMITATIONS
+Fig. 12 shows two characteristic failure cases, drawn from
+the worst predictions of BiRefNet-V2 on DIS5K as ranked by
+per-image M. Both errors lie at the level of foreground defi-
+nition—deciding what counts as the object—rather than seg-
+mentation quality: the model truncates a target whose extent
+is genuinely ambiguous (the bridge deck), and merges a
+second, same-colored vehicle into the target (the cargo tricy-
+cle). BiRefNet, PDFNet, and DiffDIS, shown alongside, fail
+in the same way in both cases: the errors are neither intro-
+duced by our redesign nor specific to the bilateral-reference
+paradigm—they arise where the foreground decision itself
+is the hard part. The pattern is consistent with the design:
+the references chiefly sharpen how well the selected region
+is delineated and only occasionally prune a spurious region
+(the bucket in Ladder, Fig. 7), while the selection itself is
+made by the semantic stream, whose verdict the Semanti-
+cally Guided Gate can only execute, not overturn; when that
+stream commits to the wrong target, detail injection refines
+the wrong decision. The semantic axis, on which BiRefNet-
+V2 also improves over prior methods (Fig. 9, top row), is
+thus where its residual failures concentrate: the paradigm
+moves the frontier from delineation to definition.
+Beyond these failure modes, BiRefNet-V2 has two sys-
+temic limitations. First, it inherits the inference cost of its
+ViT-L backbone: although mostly frozen at training time,
+the backbone accounts for 2068.3 of the 2208.8 GMACs per
+forward pass, limiting full-resolution inference to 18.4 FPS;
+latency-critical deployments must fall back to the synced
+low-resolution regime of §4.5.6 or to distillation. Second,
+training remains at 1024 × 1024, which under-exploits na-
+tively 4K benchmarks such as UHRSD-TE (Table 3).
+7
+CONCLUSION
+We have presented BiRefNet-V2, which recasts the bilateral-
+reference paradigm for high-resolution DIS as controlled
+information recovery: raw image detail re-enters the decoder
+locally, selectively, and under supervision focused on the
+object being segmented. Tracing the shortfalls of the original
+BiRefNet to these three unmet requirements, we redesigned
+both references and the decoder block that links them, and
+paired them with a modernized, mostly-frozen framework.
+The resulting model leads across all 13 evaluation sets of
+three tasks and converges in an order of magnitude fewer
+epochs than its predecessor.
+The broader lesson is a separation of concerns: a heavy
+semantic stream that can stay mostly frozen, and a light
+detail stream that runs at full resolution under semantic
+gating. This separation lets the framework absorb stronger
+frozen encoders (§4.5.5) and set each stream’s resolution
+independently (Fig. 8). We see the paradigm as a reusable
+template for dense prediction tasks whose difficulty lies in
+fine structure rather than semantics, with alpha matting and
+medical segmentation as immediate candidates.
+REFERENCES
+[1]
+X. Qin, H. Dai, X. Hu, D.-P. Fan, L. Shao et al., “Highly accurate
+dichotomous image segmentation,” in ECCV, 2022. 1, 2, 3, 7, 8, 13
+[2]
+D.-P. Fan, J. Zhang, G. Xu, M.-M. Cheng, and L. Shao, “Salient
+objects in clutter,” IEEE TPAMI, vol. 45, no. 2, pp. 2344–2366, 2023.
+1
+[3]
+Q. Hou, M.-M. Cheng, X. Hu, A. Borji, Z. Tu, and P. H. S. Torr,
+“Deeply supervised salient object detection with short connec-
+tions,” IEEE TPAMI, vol. 41, no. 4, pp. 815–828, 2019. 1
+[4]
+J.-J. Liu, Q. Hou, M.-M. Cheng, J. Feng, and J. Jiang, “A simple
+pooling-based design for real-time salient object detection,” in
+CVPR, 2019. 1
+[5]
+J.-X. Zhao, J.-J. Liu, D.-P. Fan, Y. Cao, J. Yang, and M.-M. Cheng,
+“EGNet: Edge guidance network for salient object detection,” in
+ICCV, 2019. 1, 3
+[6]
+X. Qin, Z. Zhang, C. Huang, C. Gao, M. Dehghan, and
+M. J¨agersand, “BASNet: Boundary-aware salient object detection,”
+in CVPR, 2019. 1
+[7]
+X. Liu, K. Fu, and Q. Zhao, “High-precision dichotomous image
+segmentation via depth integrity-prior and fine-grained patch
+strategy,” in CVPR, 2026. 1, 3, 8, 13
+[8]
+Q. Yu, P.-T. Jiang, H. Zhang, J. Chen, B. Li, L. Zhang, and H. Lu,
+“High-precision dichotomous image segmentation via probing
+diffusion capacity,” in ICLR, 2025. 1, 2, 8, 13
+[9]
+J. Pei, Z. Zhou, Y. Jin, H. Tang, and P.-A. Heng, “Unite-Divide-
+Unite: Joint boosting trunk and structure for high-accuracy di-
+chotomous image segmentation,” in ACM MM, 2023. 1, 2, 3, 7,
+8, 13
+[10] Q. Yu, X. Zhao, Y. Pang, L. Zhang, and H. Lu, “Multi-view
+aggregation network for dichotomous image segmentation,” in
+CVPR, 2024, pp. 3921–3930. 1, 2, 3, 8, 13
+[11] T. Kim, K. Kim, J. Lee, D. Cha, J. Lee, and D. Kim, “Revisiting im-
+age pyramid structure for high resolution salient object detection,”
+in ACCV, 2022. 1, 2, 3, 7, 8, 13
+[12] G. Xu, Y. Ge, M. Liu, C. Fan, K. Xie, Z. Zhao, H. Chen, and C. Shen,
+“What matters when repurposing diffusion models for general
+dense perception tasks?” in ICLR, 2025. 1, 2, 8, 13
+[13] P. Zheng, D. Gao, D.-P. Fan, L. Liu, J. Laaksonen, W. Ouyang,
+and N. Sebe, “Bilateral reference for high-resolution dichotomous
+image segmentation,” CAAI AIR, vol. 3, p. 9150038, 2024. 1, 2, 3,
+6, 7, 8, 9, 13
+[14] Z. Liu, Y. Lin, Y. Cao, H. Hu, Y. Wei, Z. Zhang, S. Lin, and B. Guo,
+“Swin Transformer: Hierarchical vision transformer using shifted
+windows,” in ICCV, 2021, pp. 9992–10 002. 2
+[15] O. Sim´eoni, H. V. Vo, M. Seitzer, F. Baldassarre, M. Oquab, C. Jose,
+V. Khalidov, M. Szafraniec, S. Yi, M. Ramamonjisoa et al., “DI-
+NOv3,” arXiv preprint arXiv:2508.10104, 2025. 2, 3
+[16] Y. Zhou, B. Dong, Y. Wu, W. Zhu, G. Chen, and Y. Zhang, “Di-
+chotomous image segmentation with frequency priors,” in IJCAI,
+2023. 2, 8
+[17] H. Qian, Y. Chen, S. Lou, F. S. Khan, X. Jin, and D.-P. Fan,
+“MaskFactory: Towards high-quality synthetic data generation for
+dichotomous image segmentation,” in NeurIPS, 2024, pp. 66 455–
+66 478. 2
+[18] X. Yan, M. Sun, G.-P. Ji, F. S. Khan, S. Khan, and D.-P. Fan,
+“LawDIS: Language-window-based controllable dichotomous im-
+age segmentation,” in ICCV, 2025, pp. 23 902–23 911. 2
+[19] A. Sargsyan and S. Navasardyan, “FlowDIS: Language-guided
+dichotomous image segmentation with flow matching,” in CVPR,
+2026. 3
+[20] Z. Fan, X. Li, T. Biswas, K. Nag, and K. Achan, “Segment and
+matte anything in a unified model,” in AAAI, 2026, pp. 3813–3821.
+3
+[21] H. Zhou, Z. Xing, H. Wang, J. Ma, P. Li, and L. Zhu, “Toward real-
+world high-precision image matting and segmentation,” in AAAI,
+2026, pp. 13 611–13 619. 3
+[22] O. Ronneberger, P. Fischer, and T. Brox, “U-Net: Convolutional
+networks for biomedical image segmentation,” in MICCAI, 2015.
+3
+
+
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE
+17
+[23] T.-Y. Lin, P. Doll´ar, R. Girshick, K. He, B. Hariharan, and S. Be-
+longie, “Feature pyramid networks for object detection,” in CVPR,
+2017. 3
+[24] H. Zhao, X. Qi, X. Shen, J. Shi, and J. Jia, “ICNet for real-time
+semantic segmentation on high-resolution images,” in ECCV, 2018.
+3
+[25] C. Xie, C. Xia, M. Ma, Z. Zhao, X. Chen, and J. Li, “Pyramid
+grafting network for one-stage high resolution saliency detection,”
+in CVPR, 2022. 3, 7, 8
+[26] Y. Sun, S. Wang, C. Chen, and T.-Z. Xiang, “Boundary-guided
+camouflaged object detection,” in IJCAI, 2022. 3
+[27] G.-P. Ji, D.-P. Fan, Y.-C. Chou, D. Dai, A. Liniger, and L. Van Gool,
+“Deep gradient learning for efficient camouflaged object detec-
+tion,” MIR, vol. 20, no. 1, pp. 92–108, 2023. 3
+[28] L.-C. Chen, Y. Zhu, G. Papandreou, F. Schroff, and H. Adam,
+“Encoder-decoder with atrous separable convolution for semantic
+image segmentation,” in ECCV, 2018. 3
+[29] M.-H. Guo, C.-Z. Lu, Z.-N. Liu, M.-M. Cheng, and S.-M. Hu,
+“Visual attention network,” CVMJ, vol. 9, no. 4, pp. 733–752, 2023.
+6
+[30] X. Chen, C. Liang, D. Huang, E. Real, K. Wang, H. Pham, X. Dong,
+T. Luong, C.-J. Hsieh, Y. Lu et al., “Symbolic discovery of optimiza-
+tion algorithms,” NeurIPS, vol. 36, pp. 49 205–49 233, 2023. 7
+[31] Z. Wang, A. C. Bovik, H. R. Sheikh, and E. P. Simoncelli, “Image
+quality assessment: from error visibility to structural similarity,”
+IEEE TIP, vol. 13, no. 4, pp. 600–612, 2004. 7
+[32] L. Wang, H. Lu, Y. Wang, M. Feng, D. Wang, B. Yin, and X. Ruan,
+“Learning to detect salient objects with image-level supervision,”
+in CVPR, 2017. 7
+[33] Y. Zeng, P. Zhang, J. Zhang, Z. Lin, and H. Lu, “Towards high-
+resolution salient object detection,” in ICCV, 2019. 7, 8
+[34] C. Yang, L. Zhang, H. Lu, X. Ruan, and M.-H. Yang, “Saliency
+detection via graph-based manifold ranking,” in CVPR, 2013. 7
+[35] D.-P. Fan, G.-P. Ji, M.-M. Cheng, and L. Shao, “Concealed object
+detection,” IEEE TPAMI, vol. 44, no. 10, pp. 6024–6042, 2022. 7, 9
+[36] D.-P. Fan, G.-P. Ji, G. Sun, M.-M. Cheng, J. Shen, and L. Shao,
+“Camouflaged object detection,” in CVPR, 2020. 7, 9
+[37] T.-N. Le, T. V. Nguyen, Z. Nie, M.-T. Tran, and A. Sugi-
+moto, “Anabranch network for camouflaged object segmenta-
+tion,” CVIU, vol. 184, pp. 45–56, 2019. 7
+[38] Y. Lv, J. Zhang, Y. Dai, A. Li, B. Liu, N. Barnes, and D.-P. Fan,
+“Simultaneously localize, segment and rank the camouflaged ob-
+jects,” in CVPR, 2021. 7
+[39] R. Achanta, S. Hemami, F. Estrada, and S. Susstrunk, “Frequency-
+tuned salient region detection,” in CVPR, 2009. 7
+[40] R. Margolin, L. Zelnik-Manor, and A. Tal, “How to evaluate
+foreground maps?” in CVPR, 2014. 7
+[41] D.-P. Fan, M.-M. Cheng, Y. Liu, T. Li, and A. Borji, “Structure-
+measure: A new way to evaluate foreground maps,” in ICCV, 2017.
+7
+[42] D.-P. Fan, C. Gong, Y. Cao, B. Ren, M.-M. Cheng, and A. Borji,
+“Enhanced-alignment measure for binary foreground map evalu-
+ation,” in IJCAI, 2018. 7
+[43] A. Paszke, S. Gross, F. Massa, A. Lerer, J. Bradbury, G. Chanan,
+T. Killeen, Z. Lin, N. Gimelshein, L. Antiga et al., “PyTorch:
+An imperative style, high-performance deep learning library,”
+NeurIPS, vol. 32, 2019. 7
+[44] J. Wei, S. Wang, Z. Wu, C. Su, Q. Huang, and Q. Tian, “Label
+decoupling framework for salient object detection,” in CVPR, 2020.
+8
+[45] L. Tang, B. Li, Y. Zhong, S. Ding, and M. Song, “Disentangled high
+quality salient object detection,” in ICCV, 2021. 8
+[46] Y. Pang, X. Zhao, T.-Z. Xiang, L. Zhang, and H. Lu, “ZoomNeXt:
+A unified collaborative pyramid network for camouflaged object
+detection,” IEEE TPAMI, vol. 46, no. 12, pp. 9205–9220, 2024. 9, 13
+[47] S. Ye, X. Chen, Y. Zhang, X. Lin, and L. Cao, “ESCNet: Edge-
+semantic collaborative network for camouflaged object detection,”
+in ICCV, 2025. 9, 13
+[48] C. He, K. Li, Y. Zhang, L. Tang, Y. Zhang, Z. Guo, and X. Li,
+“Camouflaged object detection with feature decomposition and
+edge reconstruction,” in CVPR, 2023. 9
+[49] X. Hu, S. Wang, X. Qin, H. Dai, W. Ren, D. Luo, Y. Tai, and L. Shao,
+“High-resolution iterative feedback network for camouflaged ob-
+ject detection,” in AAAI, 2023. 9
+[50] Z. Huang, H. Dai, T.-Z. Xiang, S. Wang, H.-X. Chen, J. Qin, and
+H. Xiong, “Feature shrinkage pyramid for camouflaged object
+detection with transformers,” in CVPR, 2023. 9
+[51] B. Yin, X. Zhang, D.-P. Fan, S. Jiao, M.-M. Cheng, L. Van Gool, and
+Q. Hou, “CamoFormer: Masked separable attention for camou-
+flaged object detection,” IEEE TPAMI, vol. 46, no. 12, pp. 10 362–
+10 374, 2024. 9
+[52] Y. Sun, C. Xu, J. Yang, H. Xuan, and L. Luo, “Frequency-spatial en-
+tanglement learning for camouflaged object detection,” in ECCV,
+2024. 9, 13
+[53] C. He, R. Zhang, F. Xiao, C. Fang, L. Tang, Y. Zhang, L. Kong, D.-P.
+Fan, K. Li, and S. Farsiu, “RUN: Reversible unfolding network for
+concealed object segmentation,” in ICML, 2025, pp. 22 853–22 864.
+9, 13
+[54] Z. Luo, N. Liu, X. Yang, D. Zhang, D.-P. Fan, F. S. Khan, and J. Han,
+“VSCode-v2: Dynamic prompt learning for general visual salient
+and camouflaged object detection with two-stage optimization,”
+IEEE TPAMI, vol. 48, no. 3, pp. 3137–3153, 2026. 9
+Peng Zheng received the M.Sc. degree in ICT
+Innovation (Visual Computing and Communi-
+cation) from Aalto University, Finland, and the
+University of Trento, Italy, in 2023. He is cur-
+rently working toward the PhD degree with the
+Multimedia and Human Understanding Group
+(MHUG), University of Trento, Italy. He was a
+research intern with the Inception Institute of
+Artificial Intelligence (IIAI) from 2021 to 2022,
+a research assistant with MBZUAI in 2022, and
+a research intern with Alibaba Group in 2023.
+He is the author of the open-source BiRefNet series for high-resolution
+segmentation, with more than 20 million downloads on Hugging Face.
+He serves as a reviewer for journals and conferences including IEEE
+TPAMI, IJCV, TIP, CVPR, ICCV, ECCV, and NeurIPS. His research
+interests include computer vision and machine learning.
+Deng-Ping Fan received the PhD degree from
+Nankai University in 2019, under the supervision
+of Prof. Ming-Ming Cheng. He is a full professor
+and the deputy director with the Media Comput-
+ing Lab (MCLab), College of Computer Science,
+Nankai University, China. Prior to his current po-
+sition, he was a postdoctoral fellow, collaborating
+with Prof. Luc Van Gool in the Computer Vision
+Lab, ETH Zurich. From 2019 to 2021, he served
+as a research scientist (Principal Investigator)
+and team leader of IIAI - CV&Med at the Incep-
+tion Institute of Artificial Intelligence, working alongside Prof. Ling Shao
+and Prof. Jianbing Shen. His research interests span computer vision,
+machine learning, and medical image analysis. Specifically, he focuses
+on Dichotomous Image Segmentation and Multi-Modal AI. He is a senior
+member of IEEE.
+Binglu Wang (M’21) received the Ph.D. degree
+in Control Science and Engineering from the
+School of Automation at Northwestern Polytech-
+nical University, Xi’an, China, in 2021. He was a
+postdoctoral researcher with the School of Infor-
+mation and Electronics, Beijing Institute of Tech-
+nology, Beijing, China, from 2022 to 2024. He is
+currently a professor with the School of Astro-
+nautics, Northwestern Polytechnical University.
+His research interests include computer vision,
+digital signal processing, and deep learning.
+Nicu Sebe is a Professor at the University of
+Trento, Italy, leading the research in the areas
+of multimedia information retrieval and human
+behavior understanding as the leader of the
+Multimedia and Human Understanding Group
+(MHUG). He was a Program Chair of the ACM
+Multimedia 2011 and 2007, ECCV 2016, ICCV
+2017, and ICPR 2020. He is a Program Chair
+of CVPR 2027 and a General Chair of ACM
+MM 2027 and ECCV 2028. He is the co-editor
+in chief of Computer Vision and Image Under-
+standing. He is a senior member of IEEE and ACM and a fellow of IAPR
+and ELLIS.
