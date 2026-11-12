@@ -54,11 +54,11 @@
     <strong class="dpr-home-dashboard-count">共 1 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
-    <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>2 次</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>1</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>0</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-11-12 01:45:42 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-11-12 23:52:32 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -69,7 +69,9 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今天精读1篇9.0分论文，聚焦单目深度感知如何服务移动机器人安全导航。最值得看的是：把深度估计的不确定性显式建模，并将它转化为“安全深度”，让机器人在感知不可靠时也能做出保守决策。普通读者可先抓住“不确定性感知+安全约束”这条主线，再对照自身导航场景评估是否适用。</p>
+<p>今天精读 1 篇、速读 0 篇，重点放在移动机器人导航方向的 9.0 分论文《From Depth to Safe Depth: Uncertainty-Aware Monocular Perception for Mobile Robot Navigation》。</p>
+<p>这篇论文最值得关注的是它把单目深度感知中的不确定性纳入考量，并将“深度”转化为可供导航使用的“安全深度”，思路兼顾感知与安全决策。</p>
+<p>普通读者可先看摘要与实验部分，了解它如何量化不确定性、又如何把结果用于避障判断。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
