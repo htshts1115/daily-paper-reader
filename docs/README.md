@@ -48,17 +48,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-11-12</span>
+      <span class="dpr-home-dashboard-kicker">2026-11-13</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 1 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 4 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
-    <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>2 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>1</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>0</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>2</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>2</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-11-12 23:52:32 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-11-14 00:07:54 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -69,9 +69,9 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今天精读 1 篇、速读 0 篇，重点放在移动机器人导航方向的 9.0 分论文《From Depth to Safe Depth: Uncertainty-Aware Monocular Perception for Mobile Robot Navigation》。</p>
-<p>这篇论文最值得关注的是它把单目深度感知中的不确定性纳入考量，并将“深度”转化为可供导航使用的“安全深度”，思路兼顾感知与安全决策。</p>
-<p>普通读者可先看摘要与实验部分，了解它如何量化不确定性、又如何把结果用于避障判断。</p>
+<p>今天筛出 4 篇几何/深度估计论文，精读 2 篇、速读 2 篇，主线是新场景泛化与全景深度估计。</p>
+<p>最值得看的是 9.0 分的《Adapting Monocular Depth Estimation in Novel Scenes through Disparity Refinement and Robot Ego-Motion》——用视差细化和机器人自运动提升陌生场景单目深度；以及 8.0 分的 EG360，靠全景-透视蒸馏加球面跨层融合做高效可泛化的 360° 深度。</p>
+<p>普通读者建议先读这两篇精读，抓住“新场景适配”和“全景蒸馏”两条思路，再看 Iris-Z 与 Kosmo-GFM 了解生成式与工程化基础模型的差异。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -80,12 +80,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">1 篇</strong>
+    <strong class="dpr-home-dashboard-count">2 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="From Depth to Safe Depth: Uncertainty-Aware Monocular Perception for Mobile Robot Navigation">From Depth to Safe Depth: Uncertainty-Aware Monocular Perception for Mobile Robot Navigation</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Adapting Monocular Depth Estimation in Novel Scenes through Disparity Refinement and Robot Ego-Motion">Adapting Monocular Depth Estimation in Novel Scenes through Disparity Refinement and Robot Ego-Motion</span></li><li><span class="dpr-home-dashboard-paper-title" title="EG360: Efficient and Generalizable $360^\circ$ Depth Estimation via Adaptive Panorama-Perspective Distillation and Spherical Cross-Level Feature Fusion">EG360: Efficient and Generalizable $360^\circ$ Depth Estimation via Adaptive Panorama-Perspective Distillation and Spherical Cross-Level Feature Fusion</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">mono-depth <strong>1</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">mono-depth <strong>2</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -93,12 +93,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">0 篇</strong>
+    <strong class="dpr-home-dashboard-count">2 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p class="dpr-home-dashboard-empty">今日暂无推荐。</p>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Iris-Z: Scaling One Generative Model Past Specialist Geometry Models">Iris-Z: Scaling One Generative Model Past Specialist Geometry Models</span></li><li><span class="dpr-home-dashboard-paper-title" title="Kosmo-GFM: A Production-Ready Geometry Foundation Model">Kosmo-GFM: A Production-Ready Geometry Foundation Model</span></li></ul>
   </div>
-
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">mono-depth <strong>2</strong></span></div>
 </section>
 </div>
 
