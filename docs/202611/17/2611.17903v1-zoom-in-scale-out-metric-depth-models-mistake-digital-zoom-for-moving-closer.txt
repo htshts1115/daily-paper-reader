@@ -1,0 +1,626 @@
+Title: Zoom In, Scale Out: Metric Depth Models Mistake Digital Zoom for Moving Closer
+
+URL Source: https://arxiv.org/pdf/2611.17903v1
+
+Published Time: Mon, 16 Nov 2026 02:00:07 GMT
+
+Number of Pages: 22
+
+Markdown Content:
+# Zoom In, Scale Out: Metric Depth Models Mistake Digital Zoom for Moving Closer 
+
+## Rabeya Noor Department of CSE Daffodil International University 
+
+> rabeyanoor.dev@gmail.com
+
+## Khandoker Nosiba Arifin Department of CSE Daffodil International University 
+
+> nosibaarifin.cse@diu.edu.bd
+
+## Abstract 
+
+Many new AI models estimate how far away things are, in metres, from a single photo. To do this they must also work out what camera took the photo. We check whether they re-ally do with a simple test: digital zoom, that is, cropping a photo and enlarging the crop back to full size. Zooming does not move anything in the scene, so a correct model should give the same distance for every point that is still in the picture. The test is free, exact and needs no ground-truth labels. We describe a model’s reaction with two numbers: how much its depth changes with the zoom factor s (written 
+
+s−α; ideal α = 0 ) and how much its estimate of the cam-era’s focal length grows (written sβ ; ideal β = 1 ). On 800 images from KITTI, NYUv2 and DIODE, the widely used Depth Anything V2 has α = 0 .95 : it treats a zoomed photo almost exactly as if the camera had moved closer, because it judges distance mainly from how large things look. Models that also predict the camera remove only part of this error (α ≈ 0.31 –0.36), because their focal-length estimate grows too little. When we give Depth Pro and DA3-Nested the true camera, their depth stays correct ( α ≈ 0), so the error comes from their camera estimate, not from their depth es-timate. We explain why: a zoomed photo is, pixel for pixel, identical to a normal photo of a scene squashed in depth, so an object’s size alone cannot tell the two apart, and a camera estimator trained by regression plays safe and stays close to the cameras it saw in training. Undoing this “play-ing safe” needs no labels and no training, and it removes Depth Pro’s error ( α = 0 .04 ) at almost no cost on nor-mal photos. Control tests, including a real optical zoom lens, rule out image blur and resizing artefacts as the cause. Finally, fine-tuning on unlabeled photos so that the model agrees with itself across zooms lowers α to 0.05 on KITTI and 0.07 on NYUv2, once we stop the model from learning a “blurry means zoomed” shortcut; we also report what this costs on normal and unseen photos. Code: https:// github.com/rabeyanoor/zoom-equivariance .
+
+## 1. Introduction 
+
+The problem in plain words. Models that tell how far away things are, in metres, from one photo ( metric depth )have improved fast [3, 12, 22, 31, 35]. They now run on phones, robots and cars, often with cameras they never saw in training. But a single photo hides an old problem: a close scene taken with a wide-angle lens and a far scene taken with a telephoto lens can look the same [11]. To answer in metres, a model has to work out the camera too. Some mod-els are given the camera’s settings (its intrinsics , mainly the focal length). Some predict them. Many simply guess me-tres from the pixels, for example from the usual size of cars or doors. Benchmark scores cannot show which of these re-ally happens, because test sets come from only a few cam-eras. 
+
+Our test: digital zoom. We use a test that needs no la-bels and no new data. Crop a photo and enlarge the crop back to full size. The result is exactly the photo a camera with a longer focal length would have taken from the same spot. Nothing in the scene has moved, so every point still in view is at the same distance as before; only the focal length has grown, by the zoom factor s (Sec. 3). A model that understands the camera should therefore keep its depth the same and multiply its focal-length estimate by s. This matters in practice: phones zoom digitally all the time, and so do gallery apps, screenshots and object-detection crops. Earlier work showed that depth maps change under crop-ping [40] and that models which are given the camera fail when a crop leaves the camera settings out of date [14]. What is still missing is a test of today’s metric models in which the cropped photo’s camera is updated correctly. We ask four questions. 
+
+Q1 Do current metric depth models keep the same depth when a photo is digitally zoomed, and do models that pre-arXiv:2611.17903v1 [cs.CV] 13 Nov 2026 zoom 1× zoom 2× zoom 3×             
+
+> DA-V2-S  28.5 m 15.1 m 7.8 m
+> MoGe-2-S  22.1 m 16.0 m 11.5 m
+> EFT+B (ours)
+> 34.7 m 35.5 m 34.8 m Figure 1. A KITTI image at 1×,2×,3×digital zoom, one colour scale (metres); the number is the median depth inside the 3×crop, the same points in every column. Depth Anything V2 moves the scene closer (28.5 m to 7.8 m), MoGe-2 less. Our label-free EFT+B (392-px input) keeps it (34.7, 35.5, 34.8 m; frozen at that input: 33.6 to 11.8 m) at a wrong scale (LiDAR: 21.3 m). NYUv2: supplement.
+
+dict the focal length multiply it by s?
+
+Q2 Do models that are given, predict, or ignore the camera fail in different ways, and can geometry explain why? 
+
+Q3 Which part of a zoom causes the failure: losing the area around the crop, or everything left in the crop looking larger? 
+
+Q4 Can the zoom test itself be used to train a model on unla-beled photos, and what does that cost? 
+
+What we find. Q1. No tested model that has to guess or ignores the camera passes the test. Depth Anything V2 makes the scene look closer almost in proportion to the zoom ( α = 0 .95 , where α = 1 would mean “exactly like walking closer” and α = 0 means correct; Fig. 1). Models with a camera head do better, but their focal-length esti-mate grows far less than s (Fig. 2). Q2. All failures fol-low one pattern. A zoomed photo is, pixel for pixel, the same as a normal photo of the scene squashed along the viewing direction; we call this the zoom–squash ambiguity .A model that judges distance from size cannot tell the two apart, and lands on the line α + β = 1 (with β the growth of its focal estimate), which is where Depth Pro sits im-age by image. Giving the network the true camera shows where the error lives: Depth Pro and DA3-Nested then keep their depth ( α = −0.03 and −0.04 ), so the whole error comes from their focal-length estimate (Tab. 2). The same ambiguity explains why every focal estimator we test, in-cluding a dedicated calibration network, grows too little: trained by regression, it stays close to the cameras it saw in training. Undoing this, without labels, makes Depth Pro pass the test. Q3. For models that use only pixels, the fail-ure comes from the content looking larger, not from the lost surroundings, on every dataset. Q4. Fine-tuning a model so that it agrees with itself across zooms, in the spirit of [40], first teaches it a shortcut, “blurry means zoomed”. Adding a term that makes the model ignore blur removes the shortcut and brings α close to zero on the training datasets, at a cost on other photos that we report in full. 
+
+Contributions. 
+
+1. A label-free digital-zoom test for metric depth, with ex-act geometry and two simple numbers, one for depth ( α)and one for focal length ( β). It comes with control tests for resizing, loss of detail, image compression, crop po-sition, and optical against digital zoom, including a real zoom lens (Sec. 4). We also check what the score pre-dicts: how much a model degrades under zoom, not its accuracy in general. 2. The classical focal–depth ambiguity written as an exact, testable zoom–squash statement, and the α + β = 1 
+
+line it predicts for the main failure. We check it on three groups of models and a range of models up to Depth Anything 3 and VGGT (Secs. 3 and 5). 3. Two experiments that locate the failure . Giving the same network the true camera shows that the focal-length head, not the depth network, causes the error of Depth Pro and DA3-Nested, and that their depth fits their own focal estimate better than the true one, whereas MoGe-2 and UniDepthV2 improve in both zoom con-sistency and accuracy (Sec. 4 and Tab. 2). An account of why focal heads “play safe” ( β measures how reliable the camera cue is) gives FocalUnshrink , a correction that needs no training and no labels. Splitting a zoom into lost surroundings and enlargement shows that enlarge-ment drives the pixels-only models (Sec. 4 and Tab. 3). 4. A careful test of label-free correction : fine-tuning for self-consistency, the blur shortcut it learns, EFT+B that removes it, a scale-only variant (EFT-S) that trains on a CPU from a cache, a training-free fix when the zoom factor is known, and the accuracy cost on unseen data (Secs. 6 and 7). 
+
+## 2. Related work 
+
+Metric depth and the camera. Early work gave the focal length to the network [11] or made convolutions camera-aware [6]; FS-Depth [32] augments focal lengths by crop-ping, with depth labels. Today’s models fall into three groups. Some take the camera : Metric3D [12, 36] maps ev-ery image to a canonical camera and needs K at test time, and Depth Any Camera [9] and ZeroDepth [8] are also con-ditioned on it. Some predict the camera : Depth Pro [3] estimates the field of view, UniDepth [20, 22] predicts a ray per pixel, and MoGe-2 [31] returns a metric point map with intrinsics. The rest use pixels only , such as the metric heads of Depth Anything [34, 35] and ZoeDepth [1]. Training on many cameras [17] is meant to make camera inference ro-bust; our audit tests whether it is. 
+
+Depth cues. DepthCues [5] probes which monocular cues large vision models pick up, among them the known size of objects. Our exponent α measures one cue in particular, apparent size, and our cue intervention (Sec. 4) changes it directly while keeping everything else fixed. 
+
+Single-image calibration. Classical methods calibrate from vanishing points and right angles [10]; learned ones regress the intrinsics [4], predict crop- and resize-invariant incidence fields (WildCamera [41]) or local perspective fields [13], or combine a network with geometric optimisa-tion (GeoCalib [28]). These are the cues the zoom–squash ambiguity says a model must use. InFlux [15] benchmarks video cameras whose intrinsics change over time, for exam-ple by zooming, and shows that most calibration methods struggle with it. We ask instead whether depth models re-spond correctly to the one camera change whose effect is known exactly. 
+
+Crops and equivariance. Zhong et al . [40] are the closest to us. They show that supervised depth and normal predic-tors are not equivariant to crop-and-resize and fix it with test-time averaging and a self-consistency loss on unlabeled images; the output is treated as a map that should simply be cropped, and the camera does not appear. UniDepth trains a geometric invariance loss that aligns camera-conditioned depth features across rescaled and cropped views [20]. We instead measure how released models change their metric depth and focal under the exact camera change. For met-ric models a crop is a zoom, the focal length must grow by s, and a model that reads apparent size breaks the rule in a predictable way. Our fine-tuning (Sec. 6) follows the self-consistency idea of [40] with a frozen teacher; we do not claim the loss as new and compare against their stop-gradient target. Kim and Lee [14] study camera-conditioned models whose pipeline passes stale intrinsics after a crop, resize or padding, and propose a mismatch-aware camera module; our stale-K run is one case of this setting, included only to put such models on the same scale. Crops also mat-ter elsewhere: resize-and-crop augmentation breaks plane geometry in self-supervised depth [30], crops cause a per-spective ambiguity for object-level 3D [23] and human meshes [18], and NERO [39] visualises broken equivari-ance. Robustness to camera roll [25] leaves the intrinsics unchanged; a zoom does not. 
+
+Label-free evaluation and adaptation. Self-Geometry [37] adapts 3D foundation models at test time with multi-view constraints, Re-Depth Anything [2] refines depth by self-supervised re-lighting, and test-time adaptation has been used for depth completion [19]. Amodel can be consistently wrong, so we always report the label-free exponents next to errors against ground truth. 
+
+## 3. Digital zoom as an exact camera transform 
+
+The law. Let an image I of size W × H be taken by a pinhole camera with intrinsics K =
+
+ fx 0 cx    
+
+> 0fycy
+> 001
+
+
+
+. Cropping the box b = ( x0, y 0, w, h ) and resizing it back to W × H
+
+gives an image ZbI that is exactly the image of the same scene taken with 
+
+f ′ 
+
+> x
+
+= sxfx, c′ 
+
+> x
+
+= sx (cx − x0 + 12 ) − 12 , sx = W/w, 
+
+(1) and likewise for y (the half pixels come from pixel centres). Every pixel that survives the crop sees the same 3D point, so its metric depth is unchanged. For a centred crop with 
+
+sx = sy = s we call s the zoom factor . Eq. (1) needs no assumption about the scene, the model or the data; our im-plementation reproduces it to below 10 −3 px (supplement). 
+
+What a correct model must do. Let a model map an im-age to a depth map ˆD(I) and, optionally, a focal estimate ˆf (I). Zoom equivariance asks 
+
+ˆD(ZbI) Zb(p) = ˆD(I)( p), ˆf (ZbI) = s ˆf (I) (2) for all pixels p inside b. Neither side involves ground truth. 
+
+Two exponents. Real models do not satisfy Eq. (2); over 
+
+s ∈ [1 , 3] we summarise their behaviour by two power laws, 
+
+ˆD(ZbI)ˆD(I) ≈ s−α, ˆf (ZbI)ˆf (I) ≈ sβ , (3) fitted per image by least squares in log-log space through the origin (the depth ratio is the median over the pixels in 
+
+b). An equivariant model has α = 0 and β = 1 . The fit is an approximation: the median residual is 0.061 in log depth, and α grows with the zoom (Depth Pro 0.10 for s ≤ 1.5,0.32 for s ≥ 2) because β falls (0.83 to 0.65) while α + β
+
+stays near 1 (supplement). A model that ignores the zoom in its camera estimate has β = 0 .
+
+Three invariants. Unprojecting the prediction with the model’s own focal gives a point cloud. Under a zoom, depth scales by s−α and the lateral coordinate X = ( u − c) ˆD/ ˆf
+
+by s · s−α/s β = s1−α−β . Hence • α = 0 : depth is preserved; • β = 1 : the shape of the point cloud (the ratio X/Z ) is preserved; • α + β = 1 : lateral coordinates are preserved (not depth, not shape). The third relation is what a model obtains if it reasons from apparent size. An object of metric width L that spans ℓ
+
+pixels is placed at ˆD = ˆf L/ℓ . A zoom multiplies ℓ by 
+
+s and ˆf by sβ , so ˆD scales by sβ−1, that is α = 1 − β.A pixels-only model ( ˆf fixed, implicitly) that reasons from size has α = 1 : twice as large means twice as close. 
+
+The zoom–squash ambiguity. Why would a model rea-son from size at all, when the zoom is in plain sight? Be-cause a zoom is invisible to size cues. A point (X, Y, Z )
+
+seen with focal sf projects to u = sf X/Z + c =
+
+f X/ (Z/s ) + c.
+
+A zoomed photo of a scene is pixel-for-pixel the unzoomed photo of the same scene squashed along the viewing axis by s.
+
+This is the classical focal–depth ambiguity of a single view [11], written as an exact, testable statement about a zoom; it is not a new ambiguity. The squashed scene has the same lateral sizes, so every object has a plausible width; only its extent in depth is wrong (a 4.5 m car be-comes 2.25 m long at s = 2 ), and so are the angles between surfaces. Telling the two apart needs priors on 3D shape (aspect ratios in depth, right angles, the rate at which par-allel lines converge), not priors on size. One consequence is a hard limit: a fronto-parallel plane squashed along the viewing axis is still a fronto-parallel plane, so no estima-tor can be equivariant on such scenes without being told the camera. The ambiguity also explains why the third invari-ant is the natural failure mode: believing the squashed scene means α = 1 with β = 0 , a point on the line α + β = 1 .Note that the line only guarantees lateral consistency; along it, depth and shape are wrong unless β = 1 .
+
+Why a focal head under-scales. A simple model shows why a regression-trained focal head has β < 1. Suppose the training cameras spread as log f ∼ N (μ, τ 2) and the image carries evidence x = log f + ϵ, ϵ ∼ N (0 , σ 2). The squared-error optimum is the posterior mean μ + ρ (x − μ)
+
+with ρ = τ 2/(τ 2 + σ2). A zoom adds log s to x, so β = ρ:the focal exponent is the reliability of the camera cue, and it equals 1 only for a perfect cue. Inverting the shrinkage, 
+
+log fc = μ + (log ˆf − μ)/β , restores β = 1 but scales the noise by 1/β , so equivariance and accuracy trade off more steeply the less reliable the cue. Both β and μ can be measured without labels (Sec. 5). 
+
+Models that take the camera as input. Metric3D [12, 36] receives K and predicts depth in a canonical camera, so with the correct K′ it is equivariant by design. When the zoom happens after capture (a gallery crop, a screenshot) the metadata may still describe the original camera [14]; with this stale K only the final scale f / 1000 changes, by 
+
+s, so αstale = αtrue + 1 up to output clipping. Our runs confirm this (mean difference over 800 images 0.999), so a camera-conditioned model with stale metadata behaves like a pixels-only model that reads apparent size. 
+
+## 4. The zoom audit 
+
+Models. We test seven models in three groups (Sec. 2): 
+
+pixels only — Depth Anything V2 metric Small and Base [35] (indoor or outdoor head, matching the dataset) and ZoeDepth NYU+KITTI [1]; predicts camera — Depth Pro [3], MoGe-2 ViT-S [31] and UniDepthV2 ViT-S [22]; 
+
+takes camera — Metric3D v2 ViT-S [12], run once with the correct zoomed K′ and once with the stale K. All use the official weights and the authors’ preprocessing (Hug-ging Face transformers or the official repositories). 
+
+Data. KITTI depth val selection [7, 26] (outdoor, Li-DAR), the 654 official NYUv2 test images [24] (indoor, Kinect, Eigen crop), and the DIODE validation set [27] split into indoor and outdoor scans (laser). From each of the four sets we draw a fixed random subset of 200 images (seed 0), identical for all models. Ground-truth intrinsics come with all three datasets. 
+
+Zooms and controls. We zoom by s ∈ { 1.25 , 1.5, 2, 3}
+
+about the image centre (bicubic, antialiased, as in a phone’s digital zoom). The zoom factor used in all fits is the exact one, f ′
+
+> x
+
+/f x from Eq. (1), which absorbs the rounding of the crop box. The prediction on the zoomed image is resam-pled onto the crop’s own pixel grid by area averaging and compared, pixel by pixel, with the prediction on the original image (label-free) and with ground truth (for accuracy). To separate the camera change from the loss of detail, the blur control down-samples the image by s = 2 and up-samples it again: same detail loss as a 2× zoom, same field of view. A subset of 50 images per set from KITTI and NYUv2 is also zoomed about the four quadrant centres, where the principal point moves out of the image centre. 
+
+Optical versus digital zoom. A digital zoom changes the camera and loses detail. We treat a 2× down-sampled copy of each image as the camera. Its optical 2× zoom is the same view cut from the full-resolution image, with real de-tail. Its digital 2× zoom is a crop of the down-sampled image, up-sampled. Both have the same intrinsics. We also test bilinear resampling and JPEG quality 75. 
+
+Splitting a zoom into its causes. A digital zoom removes the context around the crop and makes everything in it s
+
+times larger. To separate the two, paste keeps the 2× crop at its own place and size on a mean-colour canvas (original K,only the context is gone), and shrink places the whole image 
+
+2× smaller on a plain canvas, with its own intrinsics. On the same pixels we compare paste with original ( context ), zoom with paste ( magnification ), zoom with original, and shrink with original; apparent-size reasoning gives 1, 0.5, 0.5 and 2, a camera-aware model 1 throughout. The canvas is unusual, so these are interventions on the cue, not natural images. Samples: 100 images per set (50 for Depth Pro and DA3-Metric-L). 
+
+Giving the camera back. To locate the failure of a camera-predicting model, we give the same network the true zoomed camera K′ of Eq. (1). For Depth Pro and DA3-Nested, whose metres are their own focal estimate times a camera-free output, this is an exact rescaling of the au-dit’s predictions. MoGe-2 takes the true horizontal field of view in place of the one it recovers from its point map, and UniDepthV2 conditions its decoder on the rays of K′; we rerun both on the same 200 images per set as their plain runs. 1 2 3    
+
+> zoom factor s
+> 0.5 1.0 ̂
+> Ds/̂D1 ideal 1/s
+> Depth (same pixels)
+> 123
+> zoom factor s
+> 123̂
+> fs/̂f1
+> ideal none
+> Predicted focal
+> DA-V2-S DA-V2-B ZoeDepth Depth Pro MoGe-2-S UniDepthV2-S Metric3D v2-S Metric3D, stale K
+> Figure 2. Depth (left) and predicted focal (right) of the same pixels as a function of the zoom factor, median over images. Dashed: the law; dotted: apparent size only.
+
+Metrics. Label-free: the exponents α and β of Eq. (3), and the depth inconsistency at 2×, DIE 2 =
+
+| median p log ˆD2/ ˆD1|. With labels: AbsRel and δ1 on the pixels of the crop that have ground truth (capped at 80 m for KITTI, 10 m for NYUv2, 50 m and 150 m for DIODE indoor and outdoor). We report medians over images with 95% bootstrap intervals. Frames of one KITTI drive, one DIODE scene or one NYUv2 scene are not independent, so the intervals in the main tables resample whole scenes (clus-ter bootstrap); paired comparisons use Wilcoxon signed-rank tests with Holm correction. We also report a shape error, the median absolute deviation of log ˆDs/ ˆD1 from its median, which is zero when a zoom changes depth by a sin-gle global factor. 
+
+## 5. Results: the zoom audit 
+
+Models that infer or ignore the camera miss the zoom (Q1). Table 1 and Fig. 2 summarise 800 images per model. The pixels-only models shrink depth almost like 
+
+1/s : α = 0 .95 [0.83, 1.12] for DA-V2-S, 0.85 for DA-V2-B and 0.61 for ZoeDepth. A 3× zoom thus moves a scene to about 0.35 of its predicted distance. Models that predict their camera do better but are far from equivariant (α between 0.31 and 0.36), and their focal estimate grows by only 1.63–2.05 at 3× instead of 3. Metric3D with the correct K′ is close to the law ( α = −0.07 , a slight over-correction), and with the stale K its exponent is α = 0 .93 ,larger by 1.000 per image (median) as derived in Sec. 3. On the same pixels, the AbsRel of DA-V2-S grows from 0.336 unzoomed to 0.652 at 3×.
+
+The failure follows apparent size (Q2). Figure 3 places each camera-predicting model in the (β, α ) plane. Depth Pro lies on the line α + β = 1 (median of the per-image sums 0.97), MoGe-2 close to it (0.95) and UniDepthV2 be-low it (0.87). On this line a model keeps the lateral size of what it sees but not its depth, the reading the zoom–squash ambiguity makes available: the zoomed image is consis-Table 1. Zoom audit, pooled over KITTI, NYUv2, DIODE-indoor and DIODE-outdoor (800 images per model, 158 scenes). α: depth exponent (ideal 0; apparent size only: 1), median over images with a 95% interval from a scene-level bootstrap. β: focal exponent (ideal 1). 
+
+α + β: median per image (1 = lateral sizes kept, Sec. 3). Blur: depth change under the blur control. AbsRel at 1× on the full image, and at 
+
+3× on the crop for the unzoomed prediction (“same px”) and the zoomed one. The high AbsRel of UniDepthV2-S at 1× is DIODE-outdoor alone (2.75; other sets 0.11–0.25), a scale over-estimate (Sec. 5). AbsRel Model Group α β α + β Blur 1× 3× same px 3× zoomed DA-V2-S pixels only 0.95 [0.83, 1.12] – – 1.3% 0.317 0.336 0.652 DA-V2-B pixels only 0.85 [0.76, 0.94] – – 0.8% 0.313 0.335 0.599 ZoeDepth pixels only 0.61 [0.53, 0.75] – – 0.7% 0.310 0.302 0.539 Depth Pro predicts camera 0.31 [0.20, 0.41] 0.65 0.97 2.8% 0.310 0.293 0.459 MoGe-2-S predicts camera 0.36 [0.30, 0.40] 0.56 0.95 3.1% 0.274 0.277 0.465 UniDepthV2-S predicts camera 0.34 [0.23, 0.51] 0.45 0.87 4.1% 0.824 0.785 0.792 Metric3D v2-S takes camera (true K) −0.07 [−0.11 , −0.05 ] – – 1.6% 0.142 0.148 0.358 Metric3D v2-S (stale K) takes camera (stale K) 0.93 [0.89, 0.95] – – 1.6% 0.142 0.148 0.628 0.0 0.2 0.4 0.6 0.8 1.0     
+
+> β(focal exponent)
+> 0.0 0.2 0.4 0.6 0.8 1.0
+> α (depth exponent)
+> α+β= 1 (apparent size) ideal MoGe-2 UniDepthV2 Depth Pro UniK3D-L DA3-Nested
+> marker size: S < B < L arrow: small to large
+
+Figure 3. Camera-predicting models in the (β, α ) plane. Dashed: 
+
+α + β = 1 , where lateral sizes are preserved (apparent-size rea-soning). The ideal model is at (1 , 0) . Arrows join the sizes of one family, small to large; each model on its own sample (supplement). 
+
+tent with a compressed scene in which every object keeps its width. The line is a geometric signature, not by itself a proof of how a model reasons; for Depth Pro it follows from its architecture, as the next paragraphs show. The ambiguity explains the direction of the failure, not which images es-cape it: scenes with a larger depth range are not easier, and familiar objects such as people and cars follow the zoom at least as much as walls and floors (supplement). 
+
+It is the camera, not the pixels. The blur control, which loses as much detail as a 2× zoom without changing the field of view, moves depth by only 1.3% for DA-V2-S and at most 4.1% for any model in Tab. 1. A further control (supplement) separates the two effects of a digital zoom directly: an optical 2× zoom with real detail changes the depth of DA-V2-S by a factor of 0.58, the same zoom done digitally by 0.55, while bilinear resampling and JPEG com-pression change it by 0.54 and 1.00. Real detail does not rescue the model. On a real zoom lens (SR-RAW [38], 50 tripod sequences, supplement) DA-V2-S gives α = 0 .76 ,the same as for the digital zoom of the widest shot (0.76). Depth Pro keeps its depth under the real lens ( α = −0.08 ), as on DIODE-outdoor ( −0.01 ), but not on KITTI, NYUv2 and DIODE-indoor (0.35, 0.46, 0.19): its failure depends on the scene. 
+
+Bigger and newer models. The supplement adds larger variants, Depth Anything 3 [16], UniK3D [21] and VGGT [29]. On the 151 images every model saw, size helps but does not remove the effect ( α 0.87, 0.81, 0.72 for DA-V2-S, B, L), and UniK3D-L comes closest ( α = 0 .17 ). The largest model, DA3-Nested (1,690M), shrinks depth with 
+
+α = 0 .50 on the 78 images it shares with the main models, near ZoeDepth (0.54), while DA3-Metric-L and Metric3D v2-L, given the camera, keep it ( −0.05 , −0.04 ). Whether the camera enters the model matters more than its size. 
+
+Same network, true camera. Is the failure in the cam-era head or in the depth network? Depth Pro and DA3-Nested turn a camera-free network output into metres by multiplying it with their own focal estimate ( infer in the official Depth Pro code [3]; the metric branch of DA3-Nested [16]). Giving them the true zoomed focal instead therefore changes each depth map by the exact factor f ∗/ ˆf .It removes the failure: α falls from 0.31 to −0.03 for Depth Pro and from 0.56 to −0.04 for DA3-Nested (Tab. 2). For such a model, ˆD = ˆf C (I) with a camera-free C, so per image α + β = 1 + αK exactly, where αK is the exponent with the true focal (it holds on every image to machine pre-cision). Their camera-free outputs follow the zoom as ge-ometry requires ( αK ≈ 0), the focal head carries the whole Table 2. The same camera-predicting network with its own focal and given the true (zoomed) camera. α: depth exponent. Scale: median over images of | median p log ˆD/D ∗| at 1× (0 = correct metric scale). exact : the model’s metres are its own focal times a camera-free output, so the given-camera depth follows exactly from the audit; rerun : run again with the camera as input, on the same images as the plain run. own focal true camera Model how images α scale α scale Depth Pro exact 800 0.31 0.136 −0.03 0.189 DA3-Nested exact 200 0.56 0.099 −0.04 0.309 MoGe-2-S rerun 800 0.36 0.214 −0.08 0.146 UniDepthV2-S rerun 800 0.34 0.138 0.13 0.104 
+
+error, and this is why they sit on α + β = 1 . A calibration-only network, GeoCalib [28], under-scales the zoomed fo-cal as well ( β = 0 .60 , supplement). The true focal does not make them more accurate on unzoomed images, however. Their median metric-scale error rises from 0.136 to 0.189 and from 0.099 to 0.309 (it rises on DIODE for both and is about unchanged on NYUv2; the exception is Depth Pro on KITTI, 0.117 to 0.071; supplement). Overall the depth output is better matched to the model’s own focal than to the true one, so a focal estimate is not simply a camera measurement that can be swapped for EXIF. MoGe-2 and UniDepthV2 also accept the camera as input, and for them the true camera helps on both counts: α falls from 0.36 to 
+
+−0.08 and from 0.34 to 0.13, and the unzoomed scale error from 0.214 to 0.146 and from 0.138 to 0.104. UniDepthV2-S’s large error on DIODE-outdoor (Tab. 1) is a scale over-estimate (median factor 1.44), which the official inference code reproduces. 
+
+Undoing the shrinkage without labels. The true camera is rarely available, but the shrinkage of Sec. 3 can be in-verted without it. FocalUnshrink measures ˆβ by self-zoom and μ as the mean unzoomed log focal on unlabeled im-ages of the target domain, and maps every focal estimate to 
+
+μ + (log ˆf − μ)/ ˆβ. It needs no training, labels, camera or zoom factor (cross-fitted over image halves; supplement). For Depth Pro ( ˆβ = 0 .70 , a slope pooled over images; per-image median 0.65 in Tab. 1) it brings α from 0.31 to 0.04 and the scale error at 3× from 0.467 to 0.359, while the un-zoomed error stays at 0.138 (0.136 before). DA3-Nested, with a less reliable cue ( ˆβ = 0 .41 ), also becomes equivari-ant ( α = −0.05 ), but the amplified noise raises its errors, as the trade-off predicts. 
+
+Pixels-only models follow magnification; camera heads differ (Q3). Table 3 splits a 2× zoom into its two parts (Sec. 4). For the pixels-only models, removing the context                                                             
+
+> Table 3. Splitting a 2×zoom into its two parts, median depth ratio on the same pixels (1 = unchanged). Context : the crop pasted at its own place and size on a plain canvas. Magnify : the zoomed image against that pasted crop. Zoom : both together. Shrink : the whole image made 2×smaller on a canvas. A model that reads apparent size gives 1, 0.5, 0.5 and 2. ∗Predicted focal on the shrunk image (correct: 0.5). Lower block: DA-V2-S at the fine-tuning input size, frozen and tuned with EFT+B and EFT-S (Sec. 6). Model context magnify zoom shrink focal ∗
+> DA-V2-S 0.96 0.58 0.55 1.76 –ZoeDepth 0.95 0.66 0.64 1.47 –MoGe-2-S 1.06 0.75 0.79 1.32 0.75 UniDepthV2-S 0.75 1.07 0.79 1.09 0.64 Depth Pro 1.04 0.84 0.84 1.16 0.70 DA3-Metric-L 0.79 1.34 1.03 0.78 –frozen 1.01 0.54 0.56 1.79 –EFT+B 1.03 0.86 0.89 1.52 –EFT-S 1.17 0.71 0.87 1.88 –
+
+around the crop barely changes its depth (DA-V2-S 0.96, ZoeDepth 0.95), while showing the same content 2× larger accounts for almost the whole zoom effect (0.58, 0.66). This holds on every dataset: magnification lowers their depth in 8 of 8 model–dataset pairs (factors 0.49–0.72), whereas the context effect changes sign between datasets (0.77–1.24). Shrinking the whole image raises their depth (DA-V2-S 1.76, against 2 for apparent size alone): the apparent-size reading of Sec. 3 in isolation. The camera-predicting models do not share one mechanism. MoGe-2-S behaves like the pixels-only models (magnify 0.75, below 1 on 4 of 4 datasets). UniDepthV2-S reacts to the lost con-text instead (context 0.75, below 1 on 4 of 4; magnify 1.07). Depth Pro follows magnification on KITTI and NYUv2 but not on DIODE (pooled 0.84); DA3-Metric-L is discussed in the supplement. 
+
+What the label-free score is good for. Across the 32 model–dataset pairs, |α| rank-correlates with the error a 3×
+
+zoom adds (Spearman 0.67, [0.08, 0.97] resampling mod-els and datasets), not with unzoomed accuracy ( −0.09 ): it tells which model will degrade most under zoom. When the zoom factor is known, scaling depth by sˆα (ZoomFix) re-moves 38–70% of the error a 3× zoom adds to DA-V2-S, except on DIODE-outdoor (supplement). 
+
+## 6. Equivariance fine-tuning 
+
+The law in Eq. (1) is not only a test; it is free supervision. Following the self-consistency idea of Zhong et al . [40], but with a metric target and a frozen teacher, for a pixels-only model ˆDθ we keep a frozen copy ˆD0 (the teacher) and min-Table 4. Fine-tuning DA-V2-S on unlabeled images, identical preprocessing for all variants. For each: α, AbsRel on unzoomed images, and the depth change under the blur control (the resolution shortcut). †never used in training.                                                                                                 
+
+> Frozen Zhong et al.-style Blur-only EFT EFT+B (ours) EFT+B, λ=3
+> Dataset αAbs 1×blur αAbs 1×blur αAbs 1×blur αAbs 1×blur αAbs 1×blur αAbs 1×blur KITTI 1.03 0.138 1.1% 0.18 0.222 25.8% 0.82 0.160 0.2% 0.18 0.156 29.6% 0.05 0.175 4.9% 0.07 0.173 6.7% NYUv2 0.98 0.344 0.7% 0.11 0.453 4.1% 0.56 0.384 0.2% 0.12 0.313 4.2% 0.07 0.301 0.4% 0.05 0.360 0.3% DIODE-in †0.70 0.280 1.0% 0.39 0.419 0.6% 0.44 0.404 0.3% 0.39 0.368 0.6% 0.37 0.400 0.4% 0.35 0.432 0.4% DIODE-out †0.65 0.731 0.6% 0.37 0.926 1.6% 0.45 0.802 0.2% 0.39 0.877 1.5% 0.40 1.000 0.4% 0.41 0.971 0.4%
+
+imise, on unlabeled images I,
+
+L = Ub log ˆDθ (ZbI) − log ˆD0(I) b 1
+
++ λ log ˆDθ (I) − log ˆD0(I) 1, (4) with a zoom term (first) and an anchor (second), where b is a random box with zoom factor s ∼ LogUniform[1 , 3] and random centre, Ub resamples the zoomed prediction onto the crop grid, and ·| b crops. The teacher’s prediction on the 
+
+unzoomed image is the target for the zoomed one, so the stu-dent has to discover from the pixels that a zoom happened and undo the size-based shortcut. No depth labels and no intrinsics are used. 
+
+Setup. We tune Depth Anything V2 metric Small (24.8M parameters). The outdoor head is tuned on the frames of seven KITTI raw drives that do not overlap the 13 drives of the KITTI val selection (3,323 images), and the indoor head on the RGB of the 795 official NYUv2 training images. AdamW, learning rate 5 · 10 −5 (head) and 5 · 10 −6 (back-bone), batch 4, 3,000 steps, λ = 1 , horizontal flips, input height 392 px, mixed precision on one T4 GPU. DIODE is never used for training. The frozen baseline is re-evaluated through the same fixed 392-px input as the tuned models, so its α and error can differ from Tab. 1. 
+
+The resolution shortcut and EFT+B. A digital zoom also removes detail, so a student trained with Eq. (4) alone can learn to detect a zoom from sharpness instead of geom-etry. The blur control of Sec. 4 exposes exactly this (Sec. 7). EFT+B adds a third term that removes the shortcut: 
+
+LB = L + γ log ˆDθ (Bs′ I) − log ˆD0(I) 1, (5) where Bs′ down-samples by an independent s′ ∼
+
+LogUniform[1 , 3] and up-samples back. A blurred image has the field of view of the original, so its target is the un-zoomed depth; detail loss alone is no longer evidence of a zoom. We use γ = 1 .
+
+EFT-S: correcting only the scale. The zoom error of the frozen model is almost one number per image: at 3× the log depth of the crop moves by 1.00, its shape (Sec. 4) by only 0.075. EFT-S keeps DA-V2-S frozen and learns one log-scale per image, ˆD = ˆD0(I) ec(I), with the EFT+B ob-jective; c is a small MLP on the frozen tokens that trains from a cache on a CPU (supplement). 
+
+Baselines and ablations. Anchor-only tuning is no con-trol (the student starts as the teacher, so its loss and gradient are exactly zero). Blur-only drops the zoom term; a Zhong 
+
+et al .-style [40] variant uses the student’s own stop-gradient prediction as target. 
+
+## 7. Results: correcting the models 
+
+Plain self-consistency learns a shortcut. EFT lowers α
+
+of DA-V2-S from 1.03 to 0.18 on KITTI and from 0.98 to 0.12 on NYUv2 (Tab. 4). The blur control reveals how: the tuned model moves depth by 29.6% on KITTI when the image is only blurred, against 1.1% before tuning. It has learned that a blurry image is a zoomed one. 
+
+EFT+B removes it. With the blur-invariance term the shortcut is gone (4.9% on KITTI, 0.4% on NYUv2) and 
+
+α drops further, to 0.05 and 0.07. On the two datasets never used in training it is 0.37 and 0.40 (frozen: 0.70 and 0.65). Over 3 training seeds α is 0.03 ± 0.05 , 0.09 ± 0.03 ,
+
+0.33 ± 0.03 and 0.41 ± 0.01 (mean ± sd, same order). 
+
+The cost. AbsRel on unzoomed KITTI images rises from 0.138 to 0.175, and on DIODE-outdoor from 0.731 to 1.000 (higher for every seed), while NYUv2 is about unchanged (0.344 to 0.326 ±0.026 over seeds). A stronger anchor does not buy it back (supplement). 
+
+What does the work. Blur augmentation alone leaves most of the effect in place ( α 0.82 on KITTI, 0.56 on NYUv2). The student’s own stop-gradient target, as in Zhong et al . [40], reaches a similar α (0.18, 0.11) but drifts: the blur shortcut returns (25.8% on KITTI) and unzoomed AbsRel degrades most (0.222 on KITTI). Teacher, zoom term and blur term are each needed. Correcting only the scale. EFT-S, which learns one num-ber per image, reaches α = 0 .04 on NYUv2 at no un-zoomed cost (AbsRel 0.346, frozen 0.344). It also trans-fers better than EFT+B to the unseen DIODE ( α = 0 .23 
+
+and 0.27, against 0.37 and 0.40), but is weaker on KITTI (α = 0 .19 ) and costs more unzoomed accuracy there and on DIODE-outdoor. Tuning only Depth Pro’s focal head (EFT-F) helps on its training domains, not on DIODE (sup-plement). 
+
+## 8. Limitations and conclusion 
+
+Limitations. Real optical zoom is tested on only 50 scenes from one lens. When the camera is not given, a crop also removes surrounding context, so α = 0 is a goal, not a promise; the test measures how far a model is from the law and in which direction. Giving the model the true camera is an exact experiment only for Depth Pro and DA3-Nested. EFT+B lowers accuracy on normal and unseen photos. Fo-calUnshrink is a first-order correction; it needs unlabeled photos from the target domain to set its scale, and a reliable focal cue. 
+
+Conclusion. In short: today’s metric depth models that are not told the camera mistake a digital zoom for moving closer, and their focal-length estimates stay too close to the cameras they were trained on. Our zoom test needs no la-bels and no new data, takes only a crop and a resize, and should be a routine check for any model that reports depth in metres. LLM Usage Statement 
+
+Claude (Anthropic) and ChatGPT (OpenAI) were used throughout this work. Working as agents, with limited step-by-step direction, they wrote and ran the experiment code, analysed the results, produced the figures, drafted and edited the text, and found and summarised related work and citations. They also proposed research ideas, such as which models to evaluate and which controls to run, from which the authors chose. No LLM was used to create or annotate data. The authors checked all code, results, ref-erences and claims, and take full responsibility for the pa-per. 
+
+## References 
+
+[1] Shariq Farooq Bhat, Reiner Birkl, Diana Wofk, Peter Wonka, and Matthias M¨ uller. ZoeDepth: Zero-shot transfer by com-bining relative and metric depth. arXiv:2302.12288 , 2023. 3, 4 [2] Ananta R. Bhattarai and Helge Rhodin. Re-Depth Anything: Test-time depth refinement via self-supervised re-lighting. 
+
+arXiv:2512.17908 , 2025. 3 [3] Aleksei Bochkovskii, Ama¨ el Delaunoy, Hugo Germain, Marcel Santos, Yichao Zhou, Stephan R. Richter, and Vladlen Koltun. Depth Pro: Sharp monocular metric depth in less than a second. In ICLR , 2025. 1, 3, 4, 6 [4] Oleksandr Bogdan, Viktor Eckstein, Francois Rameau, and Jean-Charles Bazin. DeepCalib: A deep learning approach for automatic intrinsic calibration of wide field-of-view cam-eras. In CVMP , 2018. 3 [5] Duolikun Danier, Mehmet Ayg¨ un, Changjian Li, Hakan Bilen, and Oisin Mac Aodha. DepthCues: Evaluating monocular depth perception in large vision models. In 
+
+CVPR , 2025. 3 [6] Jose M. Facil, Benjamin Ummenhofer, Huizhong Zhou, Luis Montesano, Thomas Brox, and Javier Civera. CAM-Convs: Camera-aware multi-scale convolutions for single-view depth. In CVPR , 2019. 3 [7] Andreas Geiger, Philip Lenz, Christoph Stiller, and Raquel Urtasun. Vision meets robotics: The KITTI dataset. IJRR ,2013. 4 [8] Vitor Guizilini, Igor Vasiljevic, Dian Chen, Rares Ambrus, and Adrien Gaidon. Towards zero-shot scale-aware monoc-ular depth estimation. In ICCV , 2023. 3 [9] Yuliang Guo, Sparsh Garg, S. Mahdi H. Miangoleh, Xinyu Huang, and Liu Ren. Depth Any Camera: Zero-shot metric depth estimation from any camera. In CVPR , 2025. 3 [10] Richard Hartley and Andrew Zisserman. Multiple View Ge-ometry in Computer Vision . Cambridge University Press, 2nd edition, 2004. 3 [11] Lei He, Guanghui Wang, and Zhanyi Hu. Learning depth from single images with deep neural network embedding fo-cal length. IEEE TIP , 2018. 1, 3, 4 [12] Mu Hu, Wei Yin, Chi Zhang, Zhipeng Cai, Xiaoxiao Long, Hao Chen, Kaixuan Wang, Gang Yu, Chunhua Shen, and Shaojie Shen. Metric3D v2: A versatile monocular geomet-ric foundation model for zero-shot metric depth and surface normal estimation. IEEE TPAMI , 2024. 1, 3, 4 [13] Linyi Jin, Jianming Zhang, Yannick Hold-Geoffroy, Oliver Wang, Kevin Matzen, Matthew Sticha, and David F. Fouhey. Perspective fields for single image camera calibration. In 
+
+CVPR , 2023. 3 [14] Huijun Kim and Deokwoo Lee. Robust monocular depth estimation under crop-resize-induced intrinsics mismatch. 
+
+Electronics , 15(10):2180, 2026. 1, 3, 4, 13 [15] Erich Liang, Roma Bhattacharjee, Sreemanti Dey, Rafael Moschopoulos, Caitlin Wang, Michel Liao, Grace Tan, An-drew Wang, Karhan Kayan, Stamatis Alexandropoulos, and Jia Deng. InFlux: A benchmark for self-calibration of dy-namic intrinsics of video cameras. In NeurIPS Datasets and Benchmarks Track , 2025. 3 [16] Haotong Lin, Sili Chen, Junhao Liew, Donny Y. Chen, Zhenyu Li, Guang Shi, Jiashi Feng, and Bingyi Kang. Depth Anything 3: Recovering the visual space from any views. 
+
+arXiv:2511.10647 , 2025. 6 [17] Baorui Ma, Jiahui Yang, Donglin Di, Xuancheng Zhang, Jianxun Cui, Hao Li, Yan Xie, and Wei Chen. Metri-cAnything: Scaling metric depth pretraining with noisy het-erogeneous sources. arXiv:2601.22054 , 2026. 3 [18] Yongwei Nie, Changzhen Liu, Chengjiang Long, Qing Zhang, Guiqing Li, and Hongmin Cai. Multi-RoI hu-man mesh recovery with camera consistency and contrastive losses. In ECCV , 2024. 3 [19] Hyoungseob Park, Anjali Gupta, and Alex Wong. Test-time adaptation for depth completion. In CVPR , 2024. 3 [20] Luigi Piccinelli, Yung-Hsu Yang, Christos Sakaridis, Mattia Segu, Siyuan Li, Luc Van Gool, and Fisher Yu. UniDepth: Universal monocular metric depth estimation. In CVPR ,2024. 3, 13 [21] Luigi Piccinelli, Christos Sakaridis, Mattia Segu, Yung-Hsu Yang, Siyuan Li, Wim Abbeloos, and Luc Van Gool. UniK3D: Universal camera monocular 3D estimation. In 
+
+CVPR , 2025. 6 [22] Luigi Piccinelli, Christos Sakaridis, Yung-Hsu Yang, Mat-tia Segu, Siyuan Li, Wim Abbeloos, and Luc Van Gool. UniDepthV2: Universal monocular metric depth estimation made simpler. arXiv:2502.20110 , 2025. 1, 3, 4 [23] Aditya Prakash, Arjun Gupta, and Saurabh Gupta. Mitigat-ing perspective distortion-induced shape ambiguity in image crops. In ECCV , 2024. 3 [24] Nathan Silberman, Derek Hoiem, Pushmeet Kohli, and Rob Fergus. Indoor segmentation and support inference from RGBD images. In ECCV , 2012. 4 [25] Kaihua Tang, Ziqing Xia, Xiaoxu Zheng, Xiaoxue Zhang, Michael Bi Mi, Zhan Xu, and Dave Zhenyu Chen. Break-ing the horizontal prior: From long-tailed orientation bias to roll-robust monocular depth estimation. arXiv:2608.00678 ,2026. 3 [26] Jonas Uhrig, Nick Schneider, Lukas Schneider, Uwe Franke, Thomas Brox, and Andreas Geiger. Sparsity invariant CNNs. In 3DV , 2017. 4 [27] Igor Vasiljevic, Nick Kolkin, Shanyi Zhang, Ruotian Luo, Haochen Wang, Falcon Z. Dai, Andrea F. Daniele, Moham-madreza Mostajabi, Steven Basart, Matthew R. Walter, and Gregory Shakhnarovich. DIODE: A dense indoor and out-door DEpth dataset. arXiv:1908.00463 , 2019. 4 [28] Alexander Veicht, Paul-Edouard Sarlin, Philipp Linden-berger, and Marc Pollefeys. GeoCalib: Learning single-image calibration with geometric optimization. In ECCV ,2024. 3, 7, 13 [29] Jianyuan Wang, Minghao Chen, Nikita Karaev, Andrea Vedaldi, Christian Rupprecht, and David Novotny. VGGT: Visual geometry grounded transformer. In CVPR , 2025. 6 [30] Ruoyu Wang, Zehao Yu, and Shenghua Gao. PlaneDepth: Self-supervised depth estimation via orthogonal planes. In 
+
+CVPR , 2023. 3 [31] Ruicheng Wang, Sicheng Xu, Yue Dong, Yu Deng, Jianfeng Xiang, Zelong Lv, Guangzhong Sun, Xin Tong, and Jiaolong Yang. MoGe-2: Accurate monocular geometry with metric scale and sharp details. In NeurIPS , 2025. 1, 3, 4 [32] Chengrui Wei, Meng Yang, Lei He, and Nanning Zheng. FS-Depth: Focal-and-scale depth estimation from a single image in unseen indoor scene. arXiv:2307.14624 , 2023. 3 [33] Enze Xie, Wenhai Wang, Zhiding Yu, Anima Anandkumar, Jose M. Alvarez, and Ping Luo. SegFormer: Simple and efficient design for semantic segmentation with transformers. In NeurIPS , 2021. 14 [34] Lihe Yang, Bingyi Kang, Zilong Huang, Xiaogang Xu, Jiashi Feng, and Hengshuang Zhao. Depth Anything: Unleashing the power of large-scale unlabeled data. In CVPR , 2024. 3 [35] Lihe Yang, Bingyi Kang, Zilong Huang, Zhen Zhao, Xiao-gang Xu, Jiashi Feng, and Hengshuang Zhao. Depth Any-thing V2. In NeurIPS , 2024. 1, 3, 4 [36] Wei Yin, Chi Zhang, Hao Chen, Zhipeng Cai, Gang Yu, Kaixuan Wang, Xiaozhi Chen, and Chunhua Shen. Met-ric3D: Towards zero-shot metric 3D prediction from a single image. In ICCV , 2023. 3, 4 [37] Seokhyun Youn, Dahyeon Kye, Sung-Ho Bae, and Jihyong Oh. Self-Geometry: GT-free and plug-and-play test-time adaptation for geometrically consistent 3D vision foundation models. arXiv:2608.10708 , 2026. 3 [38] Xuaner Cecilia Zhang, Qifeng Chen, Ren Ng, and Vladlen Koltun. Zoom to learn, learn to zoom. In CVPR , 2019. 6, 19, 20 [39] Zhuokai Zhao, Takumi Matsuzawa, William Irvine, Michael Maire, and Gordon Kindlmann. Evaluating machine learn-ing models with NERO: Non-equivariance revealed on or-bits. arXiv:2305.19889 , 2023. 3 [40] Yuanyi Zhong, Anand Bhattad, Yu-Xiong Wang, and David Forsyth. Improving equivariance in state-of-the-art super-vised depth and normal predictors. In ICCV , pages 21775– 21785, 2023. 1, 2, 3, 7, 8, 13 [41] Shengjie Zhu, Abhinav Kumar, Masa Hu, and Xiaoming Liu. Tame a wild camera: In-the-wild monocular camera calibra-tion. In NeurIPS , 2023. 3 Supplementary Material 
+
+This supplementary material is referred to as “the sup-plement” in the main text. Section and table numbers with-out a letter refer to the main paper. Every number here is generated from the same result files as the main paper. 
+
+## A. Relation to the closest work 
+
+Table S1 sets this audit next to the three works closest to it, each described by what it states about itself. The differ-ence is the setting: the earlier works ask whether a depth 
+
+map follows a crop, or how a camera-conditioned model degrades when a pipeline passes stale intrinsics after a crop or resize. We give every model the correct zoomed cam-era, or let it infer its own, and ask how its metric scale and its predicted focal respond, which is what the exponents α
+
+and β, the line α + β = 1 and the shrinkage account of β
+
+describe. The stale-K case is one row of our audit (Sec. 3, 
+
+αstale = αtrue + 1 ). 
+
+## B. Qualitative example on NYUv2 
+
+Figure S1 repeats Fig. 1 on an NYUv2 test image. Depth Anything V2 again moves the scene closer as the zoom grows (3.85, 1.66 and 0.52 m); EFT+B keeps the depth of the same points, at a wrong scale. 
+
+## C. The depth exponent per dataset 
+
+Table S2 and Fig. S2 split the pooled α of Tab. 1 by dataset. On every set each pixels-only model has a larger α than each camera-predicting model (ZoeDepth and MoGe-2-S tie on DIODE-indoor), and Metric3D v2 with the true cam-era stays near zero. The pixels-only models shrink most on KITTI and NYUv2, where DA-V2-S even exceeds pure apparent-size behaviour ( α > 1). 
+
+## D. Complete test sets 
+
+The main audit uses 200 images per set. Table S3 reruns the six main models on every image of the four sets. Per model and dataset, α moves by at most 0.04 (median 0.01), and the ordering of pixels-only above camera-predicting models holds on every set (closest: ZoeDepth and MoGe-2-S on DIODE-indoor, tied on the sample, 0.43 and 0.42 on the complete set). 
+
+## E. How well the power law fits 
+
+Per image, the median RMS residual of log depth ratio around −α log s is 0.061 over the main models. The ex-ponent is not constant over s: fitted on s ≤ 1.5 and on 
+
+s ≥ 2 separately, it is 0.85 and 0.97 for DA-V2-S, 0.10 and 0.32 for Depth Pro, 0.27 and 0.37 for MoGe-2-S, and 0.29 and 0.36 for UniDepthV2-S (medians over images). The zoom 1× zoom 2× zoom 3×         
+
+> DA-V2-S  3.8 m 1.7 m 0.5 m
+> MoGe-2-S  2.4 m 2.8 m 2.1 m
+> EFT+B (ours)  4.7 m 4.5 m 4.6 m
+> GT
+> 2.3 m 2.3 m 2.3 m
+
+Figure S1. The layout of Fig. 1 on an NYUv2 test image: depth at 
+
+1×, 2× and 3× digital zoom on one colour scale in metres. The number in each panel is the median depth over the pixels inside the 3× crop, the same physical points in every column. EFT+B (392-px input) keeps 4.65, 4.47 and 4.55 m (frozen model at that input: 4.16 to 0.81 m); the ground truth is 2.26 m. KITTI NYUv2 DIODE-in DIODE-out 
+
+> −0.5 0.0 0.5 1.0
+> α
+> DA-V2-S DA-V2-B ZoeDepth Depth Pro MoGe-2-S UniDepthV2-S Metric3D v2-S Metric3D v2-S (stale K) DA-V2-L MoGe-2-B MoGe-2-L UniDepthV2-B UniDepthV2-L UniK3D-L DA3-Nested DA3-Metric-L Metric3D v2-L
+
+Figure S2. Median α per model and dataset. 
+
+camera-predicting models follow small zooms better than large ones; a single α over [1 , 3] averages these. Table S4 explains why. With scene-bootstrap inter-vals for every exponent, the focal exponent of the camera-predicting models falls from the small to the large zooms (Depth Pro 0.83 to 0.65, MoGe-2-S 0.65 to 0.55), while 
+
+α + β stays near 1 in both ranges. The focal head saturates on large zooms, as a shrinkage estimator does in the tails of its prior, and the depth follows it along the line. For the Table S1. The closest work and this audit, side by side. Each entry summarises the setting the work itself describes; a dash: not described as part of that work. Zhong et al . [40] UniDepth [20] Kim and Lee [14] this work Transform crop-and-resize of the in-put rescaled and cropped views in training crop, resize, padding in preprocessing crop-and-resize as an exact camera change (Eq. (1)) Camera after the crop does not enter conditions the features stale (not updated) correct K′, or inferred by the model What is measured equivariance of depth and normal maps (training loss) bias from the mismatch, focal vs principal-point part metric scale ( α) and predicted focal ( β) per image, against the exact zoomed camera Models supervised depth and normal predictors UniDepth camera-conditioned depth pixels-only, camera-predicting and camera-taking metric mod-els (7 main, 11 more) Explanation – – resize scales the focal, crop shifts the principal point zoom–squash ambiguity, α +
+
+β = 1 , focal head as shrinkage (β = cue reliability) Real optical zoom – – – SR-RAW, 50 sequences Correction test-time averaging; self-consistency fine-tuning invariance loss Mismatch-Aware Camera Module (uses preprocess-ing metadata) FocalUnshrink (no training or labels); EFT+B, EFT-S (unla-beled images) Table S2. Depth exponent α per dataset (median over images). Model KITTI NYUv2 DIODE-in DIODE-out DA-V2-S 1.28 1.07 0.76 0.71 DA-V2-B 1.19 0.83 0.75 0.66 ZoeDepth 0.82 0.60 0.43 0.52 Depth Pro 0.35 0.46 0.19 −0.01 
+
+MoGe-2-S 0.44 0.21 0.43 0.33 UniDepthV2-S 0.60 0.13 0.32 0.25 Metric3D v2-S −0.03 −0.11 −0.09 −0.18 
+
+Metric3D v2-S (stale K) 0.97 0.89 0.91 0.82 Table S3. Depth exponent α on the 200-image sample per set / on the complete test sets (KITTI val selection, NYUv2 test, DIODE val indoor and outdoor; 1000, 654, 325 and 446 images), median over images. Model KITTI NYUv2 DIODE-in DIODE-out DA-V2-S 1.28 / 1.26 1.07 / 1.08 0.76 / 0.75 0.71 / 0.70 ZoeDepth 0.82 / 0.82 0.60 / 0.59 0.43 / 0.43 0.52 / 0.50 Depth Pro 0.35 / 0.33 0.46 / 0.44 0.19 / 0.20 −0.01 / 0.03 MoGe-2-S 0.44 / 0.43 0.21 / 0.18 0.43 / 0.42 0.33 / 0.34 UniDepthV2-S 0.60 / 0.60 0.13 / 0.11 0.32 / 0.30 0.25 / 0.21 Metric3D v2-S −0.03 / −0.03 −0.11 / −0.11 −0.09 / −0.08 −0.18 / −0.18 
+
+pixels-only DA-V2-S, α is close to 1 in both ranges (0.85, 0.97), and for Metric3D v2 with the true camera close to 0 (−0.08 , −0.07 ). 
+
+## F. A calibration-only reference 
+
+GeoCalib [28] predicts the camera but no depth. Run on the same zooms of the same 800 images, its focal exponent is β = 0 .60 (median over images; 0.72 on KITTI, 0.80 on NYUv2, 0.35 on DIODE-in, 0.47 on DIODE-out), against the ideal β = 1 , and its median focal error on the unzoomed images is a factor 1.29. A model built only for calibration also under-scales the focal under zoom, so the under-scaling of the depth models’ focal heads ( β = 0 .65 for Depth Pro, 0.56 for MoGe-2-S) is not specific to depth estimation. 
+
+A calibrator’s focal in place of the true one. The true camera is rarely available, so a natural alternative is to give a depth model the focal of a dedicated calibrator. For Depth Pro this is exact without a new run: its metres are its focal times a camera-free output, so replacing its focal by Geo-Calib’s rescales each depth map by fGeoCalib / ˆf . On the 800 images of the main sample this gives α = 0 .35 (own fo-cal 0.31, true focal −0.03 , FocalUnshrink 0.04) and an un-zoomed scale error of 0.226 (own focal 0.136). GeoCalib’s focal under-scales under zoom as well, so it does not repair the zoom response, and it is less accurate for Depth Pro’s depth than Depth Pro’s own focal. 
+
+Own versus true focal, per dataset. The pooled un-zoomed scale errors of Tab. 2 depend on the mix of datasets. Per dataset (median | log ˆD/D ∗| at 1×, own → true focal), Depth Pro gives 0.117 → 0.071 on KITTI, 0.064 → 0.063 on NYUv2, 0.138 → 0.358 on DIODE-indoor and 0.458 
+
+→ 0.816 on DIODE-outdoor; DA3-Nested gives 0.195 →
+
+0.301, 0.051 → 0.047, 0.095 → 0.418 and 0.165 → 0.370 in the same order. The true focal makes both worse on DIODE and leaves NYUv2 about unchanged; it helps Depth Pro on KITTI and hurts DA3-Nested there. Table S4. The exponents with 95% intervals from a scene-level bootstrap (median over images, centred zooms), and fitted separately on the small zooms ( s ≤ 1.5) and the large ones ( s ≥ 2). For the camera-predicting models α grows with the zoom because β falls, while                                                                     
+
+> α+βstays close to 1 in both ranges. all zooms small / large zooms Model images αβα+βαβα+β
+> DA-V2-S 800 0.95 [0.83, 1.12] ––0.85 / 0.97 – / – – / – ZoeDepth 800 0.61 [0.53, 0.75] ––0.68 / 0.60 – / – – / – Depth Pro 800 0.31 [0.20, 0.41] 0.65 [0.58, 0.75] 0.97 [0.95, 1.00] 0.10 / 0.32 0.83 / 0.65 0.93 / 0.97 MoGe-2-S 800 0.36 [0.30, 0.40] 0.56 [0.50, 0.63] 0.95 [0.91, 0.98] 0.27 / 0.37 0.65 / 0.55 0.92 / 0.92 UniDepthV2-S 800 0.34 [0.23, 0.51] 0.45 [0.37, 0.67] 0.87 [0.79, 0.94] 0.29 / 0.36 0.50 / 0.45 0.79 / 0.81 DA3-Nested 200 0.56 [0.44, 0.66] 0.39 [0.27, 0.56] 0.96 [0.92, 0.98] 0.42 / 0.57 0.55 / 0.40 0.96 / 0.96 Metric3D v2-S 800 −0.07 [−0.11 ,−0.05 ]––−0.08 /−0.07 – / – – / –
+
+## G. FocalUnshrink 
+
+Table S5 gives the shrinkage inversion of Secs. 3 and 5 for every focal head. Per model, ˆβ is the least-squares slope of log ˆfs/ ˆf1 on log s pooled over images (a pooled slope is more stable than the per-image median of Tab. 1, 0.65 for Depth Pro), and μ is the mean unzoomed log ˆf of the tar-get dataset; both come from one half of each dataset’s im-ages and are applied to the other half, then the halves swap. Without labels the correction cannot remove a model’s bias on unzoomed images: it is centred on the model’s own esti-mate, so at 1× it only spreads the estimates around μ. What it removes is the error that the zoom adds. The result follows ˆβ. Depth Pro, with the most reliable focal cue, becomes equivariant and more accurate under zoom at no cost unzoomed. MoGe-2-S also gains under zoom (its depth is not exactly its focal times a camera-free output, so its depth columns are an approximation). For UniDepthV2-S and DA3-Nested, with ˆβ ≤ 0.50 , the 1/ ˆβ
+
+amplification of per-image noise outweighs the gain, and for GeoCalib the focal error at 3× falls from 0.453 to 0.306. Equivariance obtained this way is free of training, but its accuracy is bounded by how much the camera cue actually knows, which is what β measures. 
+
+Sensitivity. Table S6 varies the two measured quantities. 
+
+ˆβ is known to within its scene-bootstrap interval (Depth Pro 0.70 [0.62, 0.78]); at the ends of that interval Depth Pro’s corrected α is 0.13 and −0.09 , an over- or under-correction of the size the interval implies. The prior centre μ cancels in the ratio of two zooms, so it cannot affect α; taking it from the other datasets instead of the target one changes only the unzoomed scale (Depth Pro 0.245, against 0.138 with the target’s μ). Unlabeled target images matter for scale, not for equivariance. 
+
+Non-Gaussian priors. The inversion is exact when log f
+
+and the cue are Gaussian. Real camera distributions are not (phones cluster at a few focal lengths). Table S7 simulates an exact posterior-mean focal head under Laplace, uniform and bimodal priors of the same variance. The measured 
+
+ˆβ stays close to the Gaussian reliability ρ, but the head is no longer linear in the cue, so a single ˆβ cannot undo it image by image: the per-image zoom error falls from 0.54 to 0.48 for the bimodal prior at ρ = 0 .65 , against 0 for the Gaussian one. In every case the error at 1× grows, by the 
+
+1/ ˆβ amplification of Sec. 3. FocalUnshrink is therefore a first-order correction; a non-linear inverse would need the prior’s shape, which self-zoom alone does not give. 
+
+## H. Objects of familiar size and surfaces 
+
+If a model fixed scale from the usual size of known objects, its depth on those objects should follow the zoom less than its depth on walls, floors and roads. We split each image with SegFormer-B5 trained on ADE20K [33] into object classes (people, cars, chairs, beds, etc .) and surface classes (wall, floor, road, ceiling, etc .), and fit α per region from the 2× and 3× zooms on the 200 images per set. On the 429 images with both kinds of region, the median α on ob-jects and surfaces is 1.07 and 1.01 for DA-V2-S, 0.38 and 0.36 for Depth Pro, and 0.41 and 0.39 for MoGe-2-S. Ob-jects follow the zoom slightly more , not less (median paired difference 0.03, 0.02 and 0.03; larger on objects in 55%, 65% and 69% of images; Wilcoxon p = 0 .0088 , 2.5e-13 and 2.9e-12). We find no sign that familiar objects anchor the scale; the difference is small and the response is nearly uniform over the image. 
+
+## I. Bigger and newer models 
+
+Table S8 extends the audit to larger variants and to Depth Anything 3 (DA3), UniK3D and VGGT (100 images per set; 50 for the DA3 and VGGT runs). On the 151 im-ages that every model saw, size helps the pixels-only fam-ily but does not remove the effect: α falls from 0.87 (DA-V2-S) to 0.81 (B) and 0.72 (L), so the large model still re-Table S5. FocalUnshrink: the focal head’s shrinkage inverted without labels, training or the zoom factor, log fc = μ + (log ˆf − μ)/ ˆβ
+
+with ˆβ from self-zoom (pooled over datasets) and μ the mean unzoomed log focal of the target dataset, both measured on one half of the images and applied to the other (cross-fitted). Before → after. Scale: median | log ˆD/D ∗| on the crop at 1×, 3× and over all zooms; focal: median | log ˆf /f ∗| at 3×. exact : metres are the focal times a camera-free output, so the corrected depth is exact; approx. : the depth is rescaled as if it were. Model depth ˆβ α scale 1× scale 3× scale, all focal 3×
+
+Depth Pro exact 0.70 0.31 → 0.04 0.136 → 0.138 0.467 → 0.359 0.209 → 0.189 0.350 → 0.360 DA3-Nested exact 0.41 0.56 → − 0.05 0.099 → 0.130 0.784 → 0.865 0.275 → 0.368 0.559 → 0.738 MoGe-2-S approx. 0.55 0.36 → − 0.08 0.214 → 0.214 0.625 → 0.390 0.327 → 0.281 0.573 → 0.342 UniDepthV2-S approx. 0.50 0.34 → − 0.05 0.138 → 0.201 0.485 → 0.458 0.211 → 0.348 0.466 → 0.412 GeoCalib focal only 0.58 – – – – 0.453 → 0.306 Table S6. Sensitivity of FocalUnshrink on real data. ˆβ with a 95% scene-bootstrap interval; α after the correction with ˆβ at the upper end of its interval, at its estimate and at the lower end. Scale: median | log ˆD/D ∗| at 1×, before, after, and after with a misspecified prior centre μ taken from the other datasets instead of the target one. μ does not enter α (it cancels in the ratio of two zooms), so a wrong prior centre costs scale, not equivariance. 
+
+α scale 1×
+
+Model ˆβ [95%] before after ( ˆβhi / ˆβ / ˆβlo ) before after wrong μ α, wrong μ
+
+Depth Pro 0.70 [0.62, 0.78] 0.31 0.13 / 0.04 / −0.09 0.136 0.138 0.245 0.03 DA3-Nested 0.41 [0.29, 0.55] 0.56 0.23 / −0.05 / −0.50 0.099 0.130 0.593 −0.05 
+
+MoGe-2-S 0.55 [0.51, 0.62] 0.36 0.02 / −0.08 / −0.18 0.214 0.214 0.432 −0.09 
+
+UniDepthV2-S 0.50 [0.39, 0.64] 0.34 0.14 / −0.05 / −0.30 0.138 0.201 0.431 −0.07 
+
+Table S7. FocalUnshrink when the camera prior is not Gaussian (simulation, Sec. G): log f from a unit-variance prior, a noisy cue of Gaussian reliability ρ, the exact posterior-mean focal head. Zoom error: per-image RMS of log ˆf3 − log ˆf1 − log 3 ; error: RMS of log ˆf against the truth. Before → after the correction. prior ρ β zoom error error 1× error 3×
+
+gaussian 0.65 0.65 0.38 → 0.00 0.59 → 0.74 0.70 → 0.74 gaussian 0.40 0.40 0.66 → 0.00 0.78 → 1.23 1.01 → 1.23 laplace 0.65 0.64 0.43 → 0.28 0.57 → 0.74 0.71 → 0.85 laplace 0.40 0.40 0.67 → 0.37 0.76 → 1.25 1.01 → 1.40 uniform 0.65 0.59 0.51 → 0.41 0.58 → 0.81 0.76 → 0.74 uniform 0.40 0.39 0.69 → 0.30 0.77 → 1.28 1.02 → 1.20 bimodal 0.65 0.58 0.54 → 0.48 0.56 → 0.81 0.79 → 0.77 bimodal 0.40 0.38 0.69 → 0.35 0.77 → 1.28 1.04 → 1.21 
+
+turns less than half the depth at 3×. MoGe-2 is flat across sizes (0.37, 0.37, 0.35), with a focal exponent stuck near 0.55. UniDepthV2 improves with size (0.35 to 0.23, β from 0.39 to 0.68), and UniK3D-L comes closest ( α = 0 .17 ,
+
+β = 0 .82 ). None reaches the level of a model that is given the correct camera (Metric3D v2, α = −0.07 ). Scale and newer camera heads narrow the gap; they do not close it. Size alone is not the answer. On the 78 images it shares with the main models, the largest model in the study, DA3-Nested (1,690M parameters), shrinks depth with α = 0 .50 
+
+(0.56 on all 200 of its images), more than Depth Pro, MoGe-2-S and UniDepthV2-S (0.23, 0.33, 0.18) and close to the pixels-only ZoeDepth (0.54); its focal follows the zoom only partly ( β = 0.40 ) and, on its own sample, 
+
+α + β = 0 .96 , again the apparent-size line. Given the true camera, both DA3-Metric-L and Metric3D v2-L keep depth ( α = −0.05 and −0.04 ). Of the two relative-depth models, VGGT-1B tracks the focal change well ( β = 0 .73 )and DA3-L does not (0.32). What decides the behaviour is whether the camera enters the model, not how large the model is. 
+
+Cue split, further notes. On the shrunk image, MoGe-2-S, UniDepthV2-S and Depth Pro all shrink their focal less than the correct factor 0.5 (0.75, 0.64, 0.70). DA3-Metric-L, which is given the camera, moves in opposite directions under the two edits of Tab. 3 (0.79 and 1.34), which nearly cancel in the full zoom (1.03). 
+
+## J. What the label-free score is good for 
+
+When does the label-free score predict error? The 32 model–dataset pairs share models and datasets, so we re-sample both together for the intervals. |α| rank-correlates with AbsRel at 3× (Spearman 0.55; 95% interval [0.18, 0.86] when pairs are resampled, but [ −0.23 , 0.97] when models and datasets are, so this is not established). Part of that association is mechanical, since a shrinking depth Table S8. Model ladder: larger variants and newer families. Left: each model on its own sample (200 images per set for the main models, 100 for the larger variants and UniK3D, 50 for DA3, VGGT and Metric3D v2-L). Right: the models with at least 100 images per set on the 151 images that all of them saw (paired). DA3-L and VGGT normalise depth per scene, so only β is defined for them. pred. K: predicts the camera; takes K: given the true camera. own sample shared Model Group Params α β α β                                                                                                            
+
+> DA-V2-S pixels 25M 0.95 –0.87 –DA-V2-B pixels 97M 0.85 –0.81 –ZoeDepth pixels 345M 0.61 –0.60 –Depth Pro pred. K 952M 0.31 0.65 0.24 0.74 MoGe-2-S pred. K 35M 0.36 0.56 0.37 0.53 UniDepthV2-S pred. K 34M 0.34 0.45 0.35 0.39 Metric3D v2-S takes K 37M −0.07 –−0.07 –DA-V2-L pixels 335M 0.73 –0.72 –MoGe-2-B pred. K 105M 0.35 0.62 0.37 0.55 MoGe-2-L pred. K 331M 0.31 0.61 0.35 0.55 UniDepthV2-B pred. K 114M 0.30 0.40 0.31 0.44 UniDepthV2-L pred. K 354M 0.19 0.69 0.23 0.68 UniK3D-L pred. K 359M 0.16 0.77 0.17 0.82 DA3-Nested pred. K 1,690M 0.56 0.39 ––DA3-Metric-L takes K 334M −0.05 –––Metric3D v2-L takes K 412M −0.03 –––DA3-L pred. K (rel.) 411M –0.37 ––VGGT-1B pred. K (rel.) 1,257M –0.81 ––
+
+is also a growing error. Subtracting the unzoomed predic-tion’s error on the same pixels removes the error a model has anyway: |α| then rank-correlates with the added error (0.67, [0.08, 0.97]). Within KITTI, NYUv2 and DIODE-indoor the plain correlation is 0.98, 0.95 and 0.88, and within DIODE-outdoor −0.38 , where errors are dominated by UniDepthV2. The score does not predict accuracy on unzoomed images ( −0.09 ). We read this narrowly: without labels, the audit tells which model will degrade most under zoom, not which model is more accurate. 
+
+Flagging images to distrust. The same score also works per image. For each model and dataset we rank the images by their own inconsistency at 2× and keep only the most consistent ones. If the score carries information, the mean AbsRel at 2× of the kept images should fall faster than with a random order. It does in 26 of 28 model–dataset pairs. On average the area under the risk–coverage curve is 0.86 of the random baseline (1 = no better than random): 0.81 on NYUv2, 0.78 on DIODE-indoor, and a weaker 0.92 on KITTI and 0.92 on DIODE-outdoor. The two pairs above 1 are both on DIODE-outdoor (DA-V2-S and UniDepthV2-S). So a user can run the zoom check on their own photos and set aside the images where the model is least sure of the scale, without any labels. 
+
+A training-free fix when the zoom is known (ZoomFix). 
+
+Phones record a digital zoom ratio, and apps know their own crops. Since α needs no labels, a user can measure it on their own photos and multiply the depth of zoomed images by sˆα. We evaluate this cross-fitted: ˆα is measured with-out labels on half of a dataset’s images and the correction scored on the other half. For DA-V2-S at 3× it removes 61%, 38% and 70% of the error the zoom adds on KITTI (AbsRel 0.758 to 0.384, against 0.149 for the unzoomed prediction on the same pixels), NYUv2 (0.675 to 0.495) and DIODE-indoor (0.598 to 0.365). On DIODE-outdoor the mean error rises (0.558 to 0.661). The cause is a heavy tail: even unzoomed, the mean AbsRel there (0.605) is far above the median (0.430), and scaling depth up amplifies the images that are already over-estimated, while the typi-cal image improves. Depth Pro, whose α is already small, barely changes. A single global factor cannot undo a zoom that also distorts shape (Sec. 4); it is a stop-gap for deployed pixels-only models, not a replacement for a camera-aware one. 
+
+## K. Depth range of the scene 
+
+A softer reading of the zoom–squash ambiguity would be that scenes with a larger depth range, where the squash should be more visible, are easier. The within-dataset rank correlation between α and the inter-quartile range of log depth is 0.00 for Depth Pro and 0.02 for MoGe-2, so this centre top-left top-right bottom-left bottom-right 0.0 0.5 1.0 1.5 2.0 
+
+> median  α
+> KITTI
+> DA-V2-S Depth Pro MoGe-2-S UniDepthV2-S
+> centre top-left top-right bottom-left bottom-right
+> median  α
+> NYUv2
+
+Figure S3. Median α by crop position. 1.25 1.50 1.75 2.00 2.25 2.50 2.75 3.00          
+
+> zoom s
+> 0.1 0.2 0.3 0.4 0.5 0.6 0.7
+> |principal point error| / width  KITTI
+> MoGe-2-S UniDepthV2-S always the centre
+> 1.25 1.50 1.75 2.00 2.25 2.50 2.75 3.00
+> zoom s
+> |principal point error| / width  NYUv2
+
+Figure S4. Principal-point error (fraction of the image width) un-der quadrant zooms. Dotted: the error of always answering the image centre. 
+
+is not supported. 
+
+## L. Off-centre crops and the principal point 
+
+Zooms about the four quadrant centres (50 images per set from KITTI and NYUv2) give α of the same order as cen-tred zooms (Fig. S3). For such crops the zoom law moves the principal point by (cx − x0 + 12 ) W/w − 12 , half the image width at 2×. Figure S4 compares the principal point predicted by MoGe-2 and UniDepthV2 with the law: both errors lie on the curve of a predictor that always answers the image centre (0.496 and 0.494 of the width at 2×, against 0.496). 
+
+## M. ZoomFix per dataset 
+
+Table S9 gives the cross-fitted ZoomFix of Sec. J per dataset. The label-free exponent tracks the dataset: it is above 1 for DA-V2-S on KITTI and NYUv2, where the pooled α hides a stronger shrink. The MoGe-2-S entry for DIODE-outdoor is dominated by a few zoomed images with very large errors (the zoomed AbsRel is 3.037 against 0.379 unzoomed), which a global factor cannot repair. 
+
+## N. EFT-S per domain 
+
+Head. c is a two-layer MLP (198,657 parameters) on the last-layer class token and the mean patch token of the frozen ViT. Its last layer starts at zero, so training starts from the frozen model, and the depth shape is the frozen model’s by construction. 
+
+Training from a cache. Because c is one number per view, each term of the loss depends only on the distribution of the residual log ˆD0(view ) − log ˆD0(I) over the crop. We store 100 quantiles of that residual and the token features for 4,000 random zoom and blur views per domain, drawn as for EFT+B from the same training images, from a sin-gle pass of the frozen model. The head is then fitted on this cache (60 epochs, AdamW, learning rate 10 −3, batch 64) on a CPU. 
+
+Results. Table S10 gives the per-dataset numbers of the scale-only variant EFT-S discussed in Sec. 7, next to the frozen model and EFT+B. Without the blur term, blur alone moves its KITTI depth by 23.6% (7.3% with it): EFT-S finds the same blur shortcut as EFT. 
+
+## O. EFT-F: tuning only the focal head 
+
+Depth Pro predicts depth as ˆf C (I)/W , and with the true focal its camera-free part C already follows a zoom (Tab. 2), so its zoom error sits in the focal head. A digital zoom by 
+
+s multiplies the true focal in pixels by s, which supervises that head without labels. EFT-F tunes only the head’s layers after its frozen ViT (the neck, the fusion convolution and the output head) with 
+
+L = log t(ZsI) − log t0(I) + log s
+
++ log t(BI ) − log t0(I) + log t(I) − log t0(I) ,
+
+where t = tan(fov /2) , t0 is the original head, Zs a random zoom ( 1 ≤ s ≤ 3, random box) and B a blur with the same field of view, as for EFT+B. The depth network is untouched. Everything the tuned layers read is frozen, so it is computed once for 4 views of each of 300 unlabeled KITTI raw and 300 NYUv2 train images (10% held out), and the layers are fitted on that cache (AdamW, learning rate 10 −4, batch 32, 40 epochs). On held-out zoomed views the focal error drops from 0.187 to 0.074 in log t.Table S11 gives the audit on the same 200 images per set. On the two training domains EFT-F lowers α (KITTI 0.35 to 0.23, NYUv2 0.46 to 0.09) and the error at 3× (NYUv2 AbsRel 0.464 to 0.247), at a small cost at 1×. It does not 
+
+transfer: on DIODE, which it never saw, α rises from 0.19 to 0.44 (indoor) and from −0.01 to 0.44 (outdoor). A focal head tuned on two domains learns those domains; the label-free loss allows any unlabeled images, and broader training data is the obvious next step that we have not run. 
+
+## P. Fine-tuning details 
+
+Training drives. The training kernel asserts that its seven KITTI drives are disjoint from the 13 drives of the evalua-tion selection. Table S9. ZoomFix per dataset at 3×, cross-fitted: the exponent ˆe is measured without labels on half of the images and the correction scored on the other half. AbsRel of the zoomed prediction as is, after multiplying by sˆe, and of the unzoomed prediction on the same pixels (the target). 
+
+KITTI NYUv2 DIODE-in DIODE-out Model ˆe as is fixed target ˆe as is fixed target ˆe as is fixed target ˆe as is fixed target DA-V2-S 1.25 0.758 0.384 0.149 1.12 0.675 0.495 0.205 0.75 0.598 0.365 0.263 0.69 0.558 0.661 0.605 Depth Pro 0.31 0.258 0.277 0.160 0.44 0.449 0.223 0.121 0.19 0.399 0.421 0.201 0.12 0.636 0.638 0.665 MoGe-2-S 0.44 0.536 0.262 0.255 0.12 0.272 0.227 0.129 0.44 0.493 0.364 0.257 0.38 3.037 4.396 0.379 
+
+Table S10. Scale-only equivariance tuning (EFT-S): DA-V2-S stays frozen and a small head learns one log-scale correction per image from its tokens, with the EFT+B objective. α, AbsRel on unzoomed images, and the depth change under the blur control. †never used in training. 
+
+Frozen EFT+B EFT-S (ours) EFT-S, no blur term Dataset α Abs 1× blur α Abs 1× blur α Abs 1× blur α Abs 1× blur KITTI 1.03 0.138 1.1% 0.05 0.175 4.9% 0.19 0.197 7.3% 0.17 0.176 23.6% NYUv2 0.98 0.344 0.7% 0.07 0.301 0.4% 0.04 0.346 0.7% 0.11 0.347 0.8% DIODE-in † 0.70 0.280 1.0% 0.37 0.400 0.4% 0.23 0.333 1.3% 0.26 0.335 1.1% DIODE-out † 0.65 0.731 0.6% 0.40 1.000 0.4% 0.27 1.179 1.4% 0.25 0.940 1.4% 
+
+Table S11. EFT-F: Depth Pro with only its focal head tuned on un-labeled KITTI and NYUv2 training images (the depth network is unchanged). Same 200 images per set; median α, β, mean AbsRel at 1× and 3×; ideal α = 0 , β = 1 .
+
+α β Abs 1× Abs 3×
+
+Set DP EFT-F DP EFT-F DP EFT-F DP EFT-F KITTI 0.35 0.23 0.63 0.75 0.161 0.184 0.251 0.192 NYUv2 0.46 0.09 0.56 0.93 0.101 0.113 0.464 0.247 DIODE-in 0.19 0.44 0.73 0.44 0.194 0.233 0.386 0.411 DIODE-out −0.01 0.44 0.96 0.53 0.786 0.788 0.739 0.811 
+
+Training seeds. EFT+B was trained with 3 seeds (image order, flips, zoom boxes, blur strengths and the torch ran-dom state). Unzoomed AbsRel over seeds is 0.170 ± 0.013 
+
+on KITTI, 0.326 ± 0.026 on NYUv2, 0.430 ± 0.028 on DIODE-in and 0.965 ±0.056 on DIODE-out (frozen: 0.138, 0.344, 0.280, 0.731). The tables report seed 0. 
+
+Anchor weight. A three times stronger anchor gives KITTI AbsRel 0.173 and NYUv2 AbsRel 0.360 at α =0.07 and 0.05: it does not buy the KITTI accuracy back and costs NYUv2, so the trade-off is not a matter of tuning the weight. 
+
+Variants. All variants start from the same DA-V2-S checkpoint and differ only in the loss: EFT (anchor + zoom term), EFT+B (+ blur term), EFT+B with λ = 3 , blur-only (anchor + blur term), and the Zhong et al .-style target (an-chor + zoom term, with the student’s own stop-gradient pre-diction on the unzoomed image as target). Each is trained once per domain (KITTI raw outdoor, NYUv2 train indoor) with the settings of Sec. 6. 0 500 1000 1500 2000 2500 3000         
+
+> step
+> 0.05 0.10 0.15 0.20 0.25
+> L1 in log depth
+> outdoor head
+> 0500 1000 1500 2000 2500 3000
+> step L1 in log depth
+> indoor head
+> EFT: zoom loss EFT: anchor loss EFT+B (ours): zoom loss EFT+B (ours): anchor loss EFT+B, λ=3: zoom loss EFT+B, λ=3: anchor loss Zhong et al.-style: zoom loss Zhong et al.-style: anchor loss blur-only FT: anchor loss
+
+Figure S5. Zoom loss (solid) and anchor loss (dashed) of the fine-tuning variants, outdoor and indoor heads. Blur-only has no zoom term. 
+
+Training curves. Figure S5 shows the zoom and anchor terms over training (running mean over 100 steps). The an-chor term is exactly zero at the first step, since the student is a copy of the teacher; it jumps as soon as the zoom term moves the weights and then falls through training (EFT out-door: mean 0.10 over the first 100 steps, 0.04 over the last 100), as the model learns to satisfy both terms. 
+
+## Q. Confounder controls 
+
+Table S12 gives the optical-versus-digital, bilinear and JPEG controls discussed in Sec. 5. Depth Pro shrinks less with real detail (0.83 optical, 0.75 digital), MoGe-2-S slightly more (0.77, 0.82), and Metric3D v2 with the true 
+
+K′ stays near 1 under every control (1.05, 1.04, 0.99). On DIODE-outdoor, UniDepthV2-S over-estimates the scale by more than 2× on 38% of the images. 
+
+JPEG together with the zoom. The JPEG control above compresses the unzoomed image. A camera that zooms digitally saves the zoomed crop as a JPEG, and cropping a saved photo zooms into an image that is already com-Table S12. Confounder controls: median depth ratio on the same pixels (1 = unchanged). Optical: real-detail 2× zoom of a half-resolution camera; digital: the same zoom by crop and up-sampling; bilinear: the 2× digital zoom with bilinear resampling; JPEG: quality 75, no zoom. Model optical 2× digital 2× bilinear 2× JPEG DA-V2-S 0.58 0.55 0.54 1.00 Depth Pro 0.83 0.75 0.82 1.00 MoGe-2-S 0.77 0.82 0.79 1.05 Metric3D v2-S 1.05 1.04 1.05 0.99 Table S13. JPEG (quality 75) together with a 2× digital zoom, on the complete test sets (all four datasets pooled). Median depth ratio on the same pixels. Zoom: the plain zoom against the un-zoomed image. JPEG 1×: compression alone. JPEG after zoom (a camera that zooms and saves a JPEG) and zoom of a JPEG (cropping a saved photo): against the plain zoom of the same im-age, so 1 means JPEG adds nothing. Model images zoom JPEG JPEG after zoom of                             
+
+> 2×1×zoom a JPEG DA-V2-S 2425 0.53 1.00 1.00 0.97 Depth Pro 2425 0.80 1.00 0.90 0.82 MoGe-2-S 2425 0.78 1.06 1.05 1.18 Metric3D v2-S 2425 1.04 1.00 1.00 0.98 UniDepthV2-S 2425 0.75 1.01 1.02 1.16
+
+pressed. Table S13 runs both orders on the complete test sets. The audit itself never compresses a zoomed image, so the zoom response of Tab. 1 is not caused by compression; the question is whether compression changes it. For four of the five models, compressing after the zoom moves depth by a factor of 1.00 to 1.05 relative to the plain zoom, about the size of the JPEG control itself. Depth Pro is the exception: JPEG after the zoom lowers its depth by a further factor of 0.90 (1.00 for JPEG without the zoom), and the change sits in its focal estimate, which moves by 0.90. A digital zoom followed by compression, as on a phone, therefore adds to Depth Pro’s zoom error. Zooming into a JPEG adds more: 0.82 for Depth Pro (focal 0.82), 1.18 for MoGe-2-S and 1.16 for UniDepthV2-S, for the last two largest on KITTI (1.28 and 1.44), and less for DA-V2-S and Metric3D v2 (0.97 and 0.98; DA-V2-S 0.86 on KITTI). 
+
+One change at a time. Table S14 collects these runs into a single factorial view of a 2× digital zoom: the changes that alter the camera (zoom, magnification of the content, shrinking the whole image, an optical zoom with real detail) against those that keep it (removing the context around the crop, losing detail by resizing). For the pixels-only DA-V2-S, magnification alone reproduces the zoom (0.58 against 0.52), shrinking moves depth the other way (1.76), and nei-ther the lost context (0.96) nor the lost detail (1.3%) matters. Metric3D v2 separates the camera from the pixels directly: the same pixels give 1.05 with the true K′ and 0.53 with the stale K, which is the pixels-only response. 
+
+## R. Real optical zoom 
+
+SR-RAW [38] holds static scenes shot from a tripod with a Sony FE 24–240 mm zoom lens at seven focal lengths. The camera does not move, so the true depth of every point is the same in every shot and no depth labels are needed. We use the camera JPEGs of the test set at a long side of 1024 px and the EXIF focal length; the shots with s ≤ 3.2 against the widest one are compared, 150 zoomed shots in all 50 test sequences. As SR-RAW assumes, a zoomed shot shows the centred 1/s box of the wide shot; we compare the median log depth over the inner 80% of the zoomed shot with the median over the matching box of the wide shot’s prediction, which leaves a margin for the small shift of the lens centre. The same crop of the wide shot, done digitally, is scored on the same scenes. Models that take the camera get K from the EXIF 35 mm-equivalent focal. Table S15 gives the result. For DA-V2-S a real lens and a digital zoom are the same to the model ( α = 0 .76 and 0.76, Wilcoxon p = 0 .45 over sequences): the error is not an artefact of resampling. Depth Pro keeps its depth under both ( −0.08 , −0.08 ) and Metric3D v2 with the EXIF cam-era does too ( −0.04 ). MoGe-2-S and UniDepthV2-S shrink 
+
+more under the real lens than under the digital zoom (0.38 against 0.26, and 0.62 against 0.39). EFT+B lowers α of DA-V2-S on this unseen data to 0.59, less than on its train-ing domains. Figure S6 shows the sequence whose DA-V2-S α is the median over all sequences. 
+
+## S. Fine-tuning curves 
+
+Figure S7 shows the depth ratio and the AbsRel of the frozen and fine-tuned DA-V2-S over the whole zoom range, the curves behind the exponents of Tab. 4. 
+
+## T. Sanity check of the pipeline 
+
+Projecting random 3D points with K, applying the crop-and-resize to the pixel coordinates, and projecting with K′
+
+agree to < 10 −3 px for all zooms and crop centres, and a constant depth map survives the zoom/unzoom round trip exactly. 
+
+## U. Models and compute 
+
+Checkpoints. Hugging Face ids unless noted.         
+
+> •DA-V2: depth-anything/Depth-Anything-V2-Metric-{Indoor,Outdoor }-{Small,Base,Large }-hf
+> •ZoeDepth: Intel/zoedepth-nyu-kitti
+> •Depth Pro: apple/DepthPro-hf
+> •MoGe-2: Ruicheng/moge-2-{vits,vitb,vitl }-normal
+
+Table S14. A 2× digital zoom taken apart, one change at a time (numbers from the runs of Tab. 1, Tab. 3 and Tab. S12). Entries: factor by which depth changes on the same pixels (1 = unchanged; apparent size alone: 0.5 for zoom and magnification, 2 for shrink). Zoom: 
+
+2−α from the audit. Crop only: the crop at its own place and size, original K (context removed). Magnification: zoom against crop only. Shrink: the whole image 2× smaller. Optical: the same field of view with real detail. Resize only: the blur control (detail lost, field of view and camera unchanged), absolute change. Only the factors that change the camera move depth; detail loss, compression and resampling do not. camera changes camera fixed Model zoom 2× magnification shrink optical 2× crop only resize only DA-V2-S 0.52 0.58 1.76 0.58 0.96 1.3% Depth Pro 0.81 0.84 1.16 0.83 1.04 2.8% MoGe-2-S 0.78 0.75 1.32 0.77 1.06 3.1% Metric3D v2-S, true K′ 1.05 – – 1.05 – 1.6% Metric3D v2-S, stale K 0.53 – – – – 1.6% Table S15. Real optical zoom (SR-RAW [38]): the same static scene shot at several focal lengths ( s ≤ 3.2), against the same zoom done digitally from the widest shot. Median over sequences; ideal α = 0 , β = 1 . The 392-px row is the frozen reference for EFT+B (same input size). 
+
+α β
+
+Model seq. optical digital optical digital DA-V2-S 50 0.76 0.76 – –DA-V2-S, 392-px input 50 0.74 0.71 – –DA-V2-S + EFT+B (ours) 50 0.59 0.59 – –Depth Pro 50 −0.08 −0.08 0.98 0.87 Depth Pro + EFT-F (ours) 50 0.04 −0.07 0.89 0.85 MoGe-2-S 50 0.38 0.26 0.58 0.69 UniDepthV2-S 50 0.62 0.39 0.22 0.53 Metric3D v2-S 50 −0.04 −0.03 – –                  
+
+> •UniDepthV2: lpiccinelli/unidepth-v2-
+> {vits14,vitb14,vitl14 }
+> •UniK3D: lpiccinelli/unik3d-vitl
+> •DA3: depth-anything/DA3NESTED-GIANT- LARGE-1.1 ,
+> DA3METRIC-LARGE ,DA3-LARGE-1.1
+> •VGGT: facebook/VGGT-1B
+> •Metric3D v2: metric3d vit {small,large }(official torch hub entry) •Camera intervention (Sec. 4): MoGe-2-S and UniDepthV2-S with the checkpoints above, given the true zoomed camera (MoGe-2: fov x ;UniDepthV2: the camera argument of infer )
+
+Compute. The audits, EFT, EFT+B and EFT-F ran as Kaggle notebooks with one T4 GPU each. The cue split and the EFT-S cache and fit ran as many parallel PyTorch jobs on the CPU cores of a Kaggle TPU VM (the TPU it-self was not used); the analysis runs on a laptop CPU. A check script confirms that all models of one sample saw the same images, that every zoom row is complete, that the ex-act zoom factor matches the nominal one, and that every SR-RAW shot has its optical and digital pair. 24 mm (1.00×) 34 mm (1.42×) 49 mm (2.04×) 69 mm (2.88×)                
+
+> DA-V2-S  40.3 m 30.3 m 23.2 m 17.9 m
+> EFT+B (ours)  40.3 m 31.5 m 25.4 m 21.4 m
+> Depth Pro  13.4 m 16.2 m 20.8 m 21.8 m
+> EFT-F (ours)  13.7 m 16.3 m 17.1 m 14.5 m
+> MoGe-2-S  23.6 m 21.5 m 18.5 m 15.6 m
+
+Figure S6. One SR-RAW sequence (the one with the median DA-V2-S α, not hand-picked) shot at several focal lengths from a fixed tripod. The true depth does not change across a row; the number is the median predicted depth over the field of view of the longest shot, i.e. the same points in every column. Single sequences vary: here Depth Pro moves the scene away as the focal grows; Tab. S15 gives the medians. 0.4 0.6 0.8 1.0 ̂               
+
+> Ds/̂D1
+> KITTI 0.4 0.6 0.8 1.0
+> NYUv2 0.6 0.8 1.0
+> DIODE-in (unseen) 0.6 0.8 1.0
+> DIODE-out (unseen) 123
+> zoom s
+> 0.2 0.4 0.6
+> AbsRel
+> 123
+> zoom s
+> 0.2 0.3 0.4 0.5
+> 123
+> zoom s
+> 0.3 0.4 0.5
+> 123
+> zoom s
+> 0.6 0.7 0.8 0.9 1.0
+> DA-V2-S (frozen) blur-only FT EFT EFT+B (ours) EFT+B, λ=3
+
+Figure S7. Depth ratio (top) and AbsRel (bottom) against the zoom factor for the frozen and fine-tuned models. AbsRel at dif-ferent zooms is measured on different pixels (the crop); α, not AbsRel, is the equivariance measure: on NYUv2 the frozen model over-estimates depth at 1×, so the shrink at moderate zoom hap-pens to lower its error.

@@ -1,0 +1,307 @@
+Title: Calibrating the Uncertainty of Self-Supervised Monocular Depth without Labels
+
+URL Source: https://arxiv.org/pdf/2611.19188v1
+
+Published Time: Tue, 17 Nov 2026 01:57:25 GMT
+
+Number of Pages: 10
+
+Markdown Content:
+# Calibrating the Uncertainty of Self-Supervised Monocular Depth without Labels 
+
+## Jun Seok Kim Rui Huang ∗
+
+## The Chinese University of Hong Kong, Shenzhen 
+
+junseokkim@link.cuhk.edu.cn, ruihuang@cuhk.edu.cn 0.1 1 10 
+
+predicted uncertainty σ (m)    
+
+> 0.1 110
+> absolute depth error (m)
+> calibrated above the line: uncertainty too small MonoCal (ours): as released 1.94 + scale calibration 0.96 + disagreement target 0.96 scale
+
+(a) One network in detail: MonoProb        
+
+> shape 0.1 110
+> Poggi et al., Self
+> 6.19 to 0.96
+> Monodepth2
+> 4.66 to 0.87
+> MaGNet · Argoverse 1
+> 4.23 to 0.92 0.1 110 0.1 110
+> MaGNet (LiDAR-trained)
+> 1.97 to 0.96 0.1 110
+> Lite-Mono
+> 2.67 to 0.92 0.1 110
+> MaGNet · DrivingStereo
+> 3.15 to 1.06 con fi dent uncertain
+
+(b) Scale calibration on other networks (c) On other datasets predicted uncertainty σ (m) absolute depth error (m) 
+
+Figure 1. The uncertainty of self-supervised depth is miscalibrated in scale and shape, and MonoCal corrects both without labels. (a) MonoProb [29]. The scale is the error divided by the uncertainty over all pixels, and the shape is whether the curve follows the line. 
+
+(b) The scale before and after scale calibration on four other networks on KITTI, one of them from Poggi et al . [37]. (c) On two other datasets. 
+
+## Abstract 
+
+Self-supervised monocular depth networks can predict a per-pixel uncertainty, which is mainly evaluated by how well it ranks pixels according to their error. Such metrics are insensitive to the magnitude of the uncertainty, so an un-certainty half as large as the actual error obtains the same score. In this paper, we investigate whether the predicted uncertainty is as large as the depth error, both on average (scale ) and across confident and uncertain, near and far pix-els ( shape ). On KITTI, the scale is miscalibrated for every uncertainty estimate we evaluate, and the error of Mono-Prob is nearly twice its predicted uncertainty. We propose MonoCal, which corrects both the scale and the shape with-out ground-truth depth. Scale calibration multiplies the un-certainty by a single constant measured from stereo pairs, requiring no retraining, and this constant closely matches the one fitted with ground truth. Since a constant cannot change the shape, we further retrain the uncertainty to pre-
+
+> *
+
+Corresponding author. 
+
+dict where the depth of the network disagrees with that of a second self-supervised network. Experiments on KITTI show that MonoCal achieves better calibration across un-certainty levels and depth ranges than rescaling with ground truth, while still using a single image at inference. Code will be made publicly available. 
+
+Table 1. How we measure the magnitude of an uncertainty esti-mate. The ratio is the absolute depth error divided by the predicted uncertainty. It is 1 when the uncertainty is calibrated.         
+
+> is the uncertainty right ratio taken over reported as shown in scale on average? all pixels rmed ,rrms
+> (→1)Fig. 1, numbers shape
+> 
+> consistency for confident and uncertain pixels alike? bins by uncertainty ENCE med ,ENCE ( ↓)Fig. 1, curves adaptivity for near and far pixels alike? bins by depth SI-ENCE med ,SI-ENCE ( ↓)Fig. 3
+
+1arXiv:2611.19188v1 [cs.CV] 14 Nov 2026 1. Introduction 
+
+Systems that fuse depth measurements rely on the magni-tude of the predicted uncertainty. Dense mapping systems weight or reject each depth measurement according to an uncertainty that is specified by hand as a function of dis-tance or of the sensor [3, 31–33], learned by a supervised network [3, 24], or derived from bundle adjustment [39]. A learned uncertainty can replace these models only if it has the correct magnitude. However, self-supervised monocular depth networks that predict an uncertainty σ, interpreted as the standard deviation of the predicted depth, are typically evaluated using sparsification metrics such as the area un-der the sparsification error (AUSE) [18, 37]. These metrics assess whether σ ranks the pixels according to their error. Since they are invariant to any rescaling of σ, a σ that is half or twice the size it should be obtains the same score [13, 29]. In this paper, we measure this magnitude using a single ratio, the absolute depth error divided by the predicted un-certainty, which equals 1 for a calibrated σ and 2 for a σ that is half the size it should be. We examine two properties of this ratio (Tab. 1). The scale describes whether the ratio is 1 over all pixels, and the shape describes whether the ratio is the same for pixels of small and large σ and for near and far pixels [35]. For MonoProb [29], which predicts the uncer-tainty as a standard deviation in meters, the error is nearly twice the predicted uncertainty over all pixels (Fig. 1a) and more than three times in the nearest depth range, indicat-ing that the network is overconfident. Moreover, the scale is miscalibrated for every uncertainty estimate we evaluate on KITTI, including published self-supervised networks, three other backbones and systems trained with depth labels, by factors between 0.6 and 6 (Fig. 4). For self-supervised net-works, the training objective does not constrain this mag-nitude, since the network is trained to reconstruct images rather than to regress depth [37] and no loss term compares 
+
+σ with a depth error. Existing systems correct the magnitude using a constant fitted against a reference depth, on a network trained with la-bels (Sec. 2). However, this constant is not universal. When measured by the same rule, it varies across networks and datasets (Fig. 4), which has also been observed in supervised regression [27]. The constant therefore has to be measured where σ is used, and for self-supervised depth this is a set-ting without labels. To address this, we propose MonoCal, which corrects the scale and the shape without labels using two components. The first component, scale calibration , measures the con-stant. We obtain a depth from a stereo pair by semi-global matching [14] and compare it with the depth of the network. The median ratio of this residual to σ then determines a sin-gle constant. This procedure requires neither ground-truth depth nor retraining of the network. The stereo pair is re-quired only to measure the constant, while inference still uses a single image. On KITTI, the constant is within ×1.08 
+
+of the ground-truth constant for 16 of 17 uncertainty esti-mates (Fig. 4, Fig. 1a). However, a constant can only correct the scale. On the reliability diagram in Fig. 1(a), a constant shifts the curve horizontally without changing its slope. Similarly, it shifts the entire profile along depth, so that MonoProb still un-derestimates the uncertainty in the nearest depth range even with the ground-truth constant (Fig. 3). The second com-ponent, the disagreement target , is designed to correct this shape. We retrain σ to predict where the depth of the net-work disagrees with that of a second, independently trained self-supervised network of a different architecture, and then apply scale calibration (Fig. 2). On KITTI, the ratio in the nearest depth range becomes 0.96, and the calibration er-rors across uncertainty levels and across depth are lower than those of the ground-truth constant (Tab. 2). The consistency gain generalizes to two of the three other backbones (Tab. 3). 
+
+Contributions. 
+
+1. We measure the magnitude of self-supervised depth un-certainty by separating scale from shape, and show that the scale is miscalibrated for every uncertainty estimate we evaluate, by a factor that varies across networks and datasets. 2. We propose scale calibration , a single label-free constant measured from stereo residuals without retraining. On KITTI, this constant agrees with the ground-truth con-stant within ×1.08 for 16 of 17 uncertainty estimates. 3. We propose the disagreement target , which trains σ on the disagreement with a second self-supervised network. On KITTI, it reduces the calibration errors across uncer-tainty levels and across depth below those of the ground-truth constant. 
+
+## 2. Related Work 
+
+Uncertainty in self-supervised depth. Self-supervised monocular depth is trained by view synthesis, from stereo pairs [10] or video [11]. Per-pixel uncertainty was intro-duced in this setting as the width of a Laplacian over the pho-tometric residual [21, 49], by applying the heteroscedastic loss of Kendall and Gal [20] to the reprojection error. In this formulation, the magnitude of the uncertainty is determined by the photometric error rather than by a depth error, and training a variance with a Gaussian likelihood has known failure modes [40, 41]. Poggi et al . [37] compared empir-ical, predictive and Bayesian estimators using the ranking metrics AUSE and AURG, and found self-teaching, in which the depth of a second network serves as the target, to be among the most useful. MonoProb [29] samples the pho-tometric loss over a predicted distribution and offers a self-distilled variant in which a student learns the depth distri-bution of a teacher. These works evaluate σ through spar-sification [18], and ConFiDeNet [43], a recent supervised 2Scale calibration (no labels, no retraining)   
+
+> stereo pair stereo depth
+> depth
+> uncertainty
+> of any released network stereo depth ÷median over 326 images
+> Disagreement target (training the uncertainty)
+> second network
+> its depth
+> where they disagree gradient reaches only then scale calibration : self-distilled from a frozen teacher (not shown)
+
+Figure 2. Overview of MonoCal. Scale calibration (blue) measures one constant s from the residual between the network’s depth μ and a stereo depth, and multiplies the uncertainty σ by it. The disagreement target (orange) trains σ on where μ disagrees with the depth of a second self-supervised network. MonoCal applies the target, then the calibration. Inference uses one image. 
+
+system that compares against MonoProb, additionally re-ports the ARU and RMSU metrics of MonoProb. However, sparsification curves are invariant to a monotone rescaling of σ, and ARU and RMSU, which are pointwise distances between σ and the error, are minimized by a σ below cali-bration (Sec. 5.2). A second depth has previously been used as a target, namely SfM depth in Klodt and Vedaldi [21] and a teacher of the same architecture in self-teaching and in the self-distillation of MonoProb. In all three cases, this target also supervises the depth. In contrast, we use the disagree-ment between two networks of different architectures as the target of σ alone. 
+
+Calibration of regression uncertainty. Pernot [35] defines three calibration targets for a predicted σ, namely average calibration (our scale ), consistency (calibration as a func-tion of σ itself) and adaptivity (calibration as a function of the input), and shows that consistency does not imply adap-tivity. We refer to the last two as the shape . The expected normalized calibration error of Levi et al . [28] measures consistency as the mean over σ bins of |RMSE /RMV − 1|.Rescaling σ by a constant fitted on labeled data is a stan-dard recalibration step. For example, σ scaling [27, 28] fits a single scalar by the likelihood on a validation set, sim-ilar to temperature scaling for classification [12], and iso-tonic recalibration [23] fits a monotone map. Calibration without target labels has been studied for classification un-der domain shift [16]. Our work adds a way to measure the constant without labels and a training target that corrects what the constant cannot. In depth estimation, f-Cal [2] re-ports the expected calibration error of a label-trained net-work. McCraith et al . [30] calibrate the metric scale of self-supervised depth rather than the magnitude of its un-certainty. Gustafsson et al . [13] note that a perfect AUSE is compatible with a consistently under-estimated σ. Hor-nauer et al . [15] compare error and uncertainty per bin on self-supervised Monodepth2 and MonoViT, but first apply min–max normalization to both, which again removes the magnitude of σ. Similarly, Landgraf et al . [26] combine five uncertainty estimators with Depth Anything V2 [48] and evaluate how well the uncertainty ranks the errors, not its magnitude. To our knowledge, consistency and adaptivity have not been measured for the σ of self-supervised depth. Concurrently, Deng et al . [7] audit the confidence of seven feed-forward 3D reconstruction models using the ratio of er-ror to predicted uncertainty per confidence bin, and repair it post hoc using a two-constant power law fitted with ground truth per backbone and dataset. In contrast, we evaluate self-supervised monocular σ, measure the constant without la-bels and also examine calibration along depth. 
+
+How systems calibrate uncertainty in practice. Jung et al . [19] fit a constant so that the mean Mahalanobis dis-tance on a validation set is one. MP-SfM [34] fits a con-stant to an SfM point cloud of another dataset and adds a depth-proportional floor. Mono-SF [4] trains a recalibra-tion network on held-out ground truth, and Tao et al . [44] train σ with ground truth and choose the rejection thresh-old by mapping performance. All four build on networks trained with labels, and three of them recalibrate σ before use. OKVIS2-X [3] states that heuristic uncertainty models are not sufficient for learned depth. 
+
+## 3. Measuring the Magnitude of Uncertainty 
+
+For a pixel with predicted depth μ, predicted uncertainty σ
+
+and ground-truth depth dgt , we define the error as the abso-lute depth error e = |μ − dgt |. Since a calibrated σ is as large as the errors it accompanies, we compute the ratio r
+
+of error to predicted σ over a set of pixels using two statis-tics. The first, rmed = median (e/σ) / 0 .6745 , takes the per-pixel ratio first (the median absolute deviation of a Gaus-sian is 0.6745 σ). The second, rrms = RMSE /RMV, di-vides the root-mean-square error by the root-mean-variance. For both statistics, r = 1 corresponds to a calibrated σ and 3r = 2 to a σ that is half the size it should be. The median statistic remains exact for a calibrated Gaussian σ that varies from pixel to pixel within the set. In contrast, the RMS statistic corresponds to what a downstream system assum-ing Gaussian errors observes, but it is sensitive to the tails and can therefore be unreliable under heavy-tailed distribu-tions [36]. We therefore report both statistics and compare results within the same statistic. The scale of σ, not to be confused with the scale of the depth, is defined as r over all pixels, which corresponds to the average calibration of Pernot [35]. The shape describes how r varies across pixels along two axes (Tab. 1), which we call consistency and adaptivity following Pernot [35]. For 
+
+consistency , pixels are sorted by predicted σ into 20 bins of equal count, and r is computed for each bin. We summa-rize it by ENCE = 120 
+
+∑ 
+
+> g
+
+|rg − 1| using the RMS statis-tic [28] and by ENCE med , the same mean using rmed per bin. Since each bin is compared with 1, a miscalibrated scale also increases this error, and we therefore compare it after ap-plying the constant. For adaptivity , the 20 bins are instead formed by ground-truth depth, since the same ENCE mea-sures adaptivity when binned by a variable other than σ [35]. We summarize adaptivity by SI-ENCE = min 
+
+> c
+
+120 
+
+∑
+
+> k
+
+|c r k − 1|, (1) which is the depth-binned ENCE after applying the best sin-gle constant, an oracle σ scaling [27] chosen on the eval-uation images in the same way for every method. We call it the scale-invariant ENCE (SI-ENCE), where the scale is that of σ, and write SI-ENCE med when rk is rmed . It is there-fore invariant to any rescaling of σ and measures only what a constant cannot remove. 
+
+Observations. On KITTI, the scale is miscalibrated for ev-ery uncertainty estimate we evaluate, by factors between 0.6 and 6 (Fig. 4). For MonoProb, the error is 1.94 times the predicted uncertainty, and the shape is also miscalibrated, as the ratio is larger for small σ than for large σ (Fig. 1a) and largest in the nearest depth range (Fig. 3). 
+
+## 4. Method 
+
+MonoCal consists of two components (Fig. 2): scale cali-bration , a constant that can be applied to any pretrained net-work (Sec. 4.1), and the disagreement target , a training tar-get for what the constant cannot change (Sec. 4.2 and 4.3). 
+
+4.1. Scale Calibration 
+
+With ground truth, the scale could be corrected by fitting the constant that yields rmed = 1 on labeled images. We measure the same constant using a stereo pair instead of the label. For each validation image, we obtain a depth dS from the stereo pair by semi-global matching [14], which has been used as a proxy label for monocular depth [45]. We align 
+
+dS to the depth μ of the network by the per-image median ratio and measure the constant at the pixels where σ is eval-uated, i.e., the LiDAR-covered pixels of the standard evalu-ation crop. Only the positions of these pixels are used, not their depth values. Without the positions, the constant of MonoCal changes from ×2.26 to ×2.22 , i.e., by less than 2 %. Other pixel sets are compared in Tab. S5 of the sup-plementary material. The stereo residual eS = |μ − dS |
+
+then serves as a substitute for the error, and the constant is computed as 
+
+s = exp 
+
+(
+
+median  
+
+> p
+
+log eS,p 
+
+σp
+
+)/ 
+
+0.6745 (2) over all evaluated pixels p of the 326 validation images, which is the value that makes the median of eS /( s σ ) equal to that of a Gaussian. The calibrated uncertainty is s σ , while 
+
+μ and the network remain unchanged. After multiplying by s, the scale of σ with respect to the stereo residual is one by construction. The scale with re-spect to the true error is also one exactly when the median of log (eS /σ) equals that of log (e/σ), which requires the stereo residual to be as large as the error in the median, but not for each pixel. Since stereo matchers introduce errors of their own, and estimating their per-pixel confidence is a research field in itself [38], whether this median condition holds is an empirical question, which we examine in Sec. 5.3 for 17 uncertainty estimates. Stereo is required only to measure s,while inference uses a single image. 
+
+4.2. Limitation of a Single Constant 
+
+Scale calibration multiplies every σ by the same number. On the reliability diagram of predicted σ against error (Fig. 1a), which is drawn in log coordinates, this multiplication cor-responds to a translation along x. The curve is therefore shifted onto the calibration line, while its slope and its bends are preserved. A calibrated σ yields a slope of 1, since the error grows in proportion to σ. In contrast, MonoProb has a slope of 0.74, both before and after applying any con-stant. When the σ of MonoProb increases tenfold, the er-ror increases only 5.5-fold, which means that σ overstates its own differences and that the uncertainty of small-σ pix-els is underestimated more than that of large-σ pixels. The same holds along depth. A constant scales the entire depth profile of r by a single factor, so correcting the middle ranges leaves both ends underestimated, whereas correct-ing the nearest range makes the middle ranges overestimated (Fig. 3). By definition, SI-ENCE also remains unchanged. Consequently, the shape cannot be corrected by any con-stant, whether label-free or fitted with ground truth, and a different σ is required. 4Table 2. Main results on KITTI with the MonoProb backbone. MonoCal (full) is the disagreement target followed by scale calibration. A constant changes neither the depth nor the ranking of pixels, so the first three rows share SI-ENCE, AUSE and abs_rel. Bold: best label-free result. †: lowest for a σ that is too small, so no value is bold.                                                                                         
+
+> scale ( →1)shape ( ↓)standard consistency adaptivity uncertainty rmed rrms ENCE med ENCE SI-ENCE med SI-ENCE AUSE ↓abs_rel ↓ARU †RMSU †
+> MonoProb (released) 1.937 1.651 1.072 2.882 0.194 0.150 0.034 0.092 0.067 2.916
+> +ground-truth constant (uses labels) 0.900 0.767 0.304 0.846 0.194 0.150 0.034 0.092 0.088 3.765
+> +scale calibration (ours) 0.964 0.821 0.301 0.969 0.194 0.150 0.034 0.092 0.084 3.582 MonoCal (ours, full) 0.960 0.696 0.077 0.208 0.048 0.083 0.025 0.091 0.072 3.538 5.7 7.7 10.7 16.5 80 m 1510 15 20 0.7 11.5 235
+> absolute depth error ÷ predicted uncertainty  3.29 0.96
+> MonoProb SI-ENCE med 0.19 to 0.05
+> 5.7 7.7 10.7 16.5 80 m 1510 15 20 0.7 11.5 235calibrated
+> Monodepth2 SI-ENCE med 0.10 to 0.06 as released / as trained + scale calibration (ours) MonoCal (ours, full)
+> 5.7 7.7 10.7 16.5 80 m 1510 15 20 0.7 11.5 235scale (one constant)
+> Lite-Mono SI-ENCE med 0.10 to 0.05
+> ground-truth-depth bin (1 = nearest), with the depth at the bin edges in gray (m)
+
+Figure 3. A constant shifts the depth profile, and the disagreement target flattens it. Absolute depth error divided by predicted uncertainty in 20 equal-count bins of ground-truth depth (1 is calibrated). Band: range over runs. On the two other backbones the change is smaller (Tab. 3). 
+
+4.3. Disagreement Target 
+
+To correct the shape, we retrain σ using a target that is available without labels, namely the disagreement between the depth of the network and the depth of a second self-supervised network.Following MonoProb [29], a student network is retrained from ImageNet initialization by self-distillation from the frozen MonoProb network, using the loss Ldistill , i.e., the negative log-likelihood of the residual with respect to this teacher. We add a term of the same form, 
+
+Lσ , in which the teacher is replaced by dext , the depth of a second self-supervised network of a different architecture (MonoViT [51], public KITTI weights): 
+
+Lσ = mean 
+
+> p
+
+[ (sg (μp) − dext ,p )2
+
+2 σ2
+
+> p
+
++ log σp
+
+]
+
+. (3) This term is computed after aligning μ and σ to dext by the per-image median ratio. The operator sg stops the gradient through μ, so that the second network affects only σ and the depth is trained by Ldistill alone. The total loss is Ldistill + Lσ
+
+(settings in Sec. S1). After training, σ is multiplied by the constant s of Sec. 4.1, while μ remains unchanged. In sum-mary, MonoCal applies the disagreement target followed by scale calibration. 
+
+Motivation. Disagreement between trained models has long been used to estimate generalization error [22] and pre-dictive uncertainty [25]. Two networks of different architec-tures disagree where at least one of them is inaccurate, which allows their disagreement to serve as a substitute for the er-ror. However, the disagreement does not necessarily have the magnitude of the error. Two self-supervised networks agree with each other more than either agrees with LiDAR, and before applying the constant, the retrained σ is further from calibration than that of MonoProb (Fig. 4). The target therefore determines where σ is large, while scale calibra-tion determines how large it is. Where both networks make the same error, the target provides no signal, and the con-stant can only restore the magnitude. 
+
+Cost. The student is retrained together with its depth, and 5the depth accuracy is unchanged or better (Tab. 2). A single run takes about 3.7 h on one RTX 2080 Ti, and the second network is required only during training. We compare alter-natives to this configuration in Tab. 4. 
+
+## 5. Experiments 
+
+5.1. Experimental Setup 
+
+Data and protocol. We conduct our experiments on KITTI [9]. We use the Eigen split [8] with improved ground truth [46], and split its 652 test images by drive into a val-idation set and a test set (326 images each). The constants are estimated and the configuration is selected on the val-idation set, and all methods are evaluated on the test set. Similarly, on Argoverse 1 and DrivingStereo, we estimate the constants on validation logs and evaluate on test logs, whereas nuScenes is evaluated on its validation set. All methods are evaluated on the same pixels, i.e., the official evaluation mask with 10 −3 < d gt < 80 m, in which the nearest LiDAR depth is about 3.7 m. Following the standard protocol for self-supervised monocular depth, μ is scaled per image by its median ratio to the ground truth, and σ is scaled by the same factor. The depth bins are fixed once and shared by all methods. 
+
+Reporting. Each retrained model is trained four times, and we report the mean over the runs. Unless stated otherwise, all numbers are based on the median statistic. 
+
+Reference with labels. The ground-truth constant is the global constant fitted with LiDAR ground truth on the vali-dation set using the same rule as s (×2.15 for MonoProb). It serves as a reference rather than a method, since a label-free result that reaches it achieves what labels provide under a global constant. 
+
+Uncertainty estimates evaluated. In addition to Mono-Prob [29] and its self-distilled checkpoint, we evaluate the self-supervised estimators of Poggi et al . [37], the self-distilled σ that we trained using the public recipes of Mon-odepth2 [11], MonoViT [51] and Lite-Mono [50], and three systems trained with depth labels, namely MaGNet [1], the depth network of OKVIS2-X [3] and Metric3D v2 [17]. We further use Argoverse 1 [6], DrivingStereo [47] and nuScenes [5] as additional datasets. 
+
+5.2. Main Results 
+
+Scale. As shown in Tab. 2, scale calibration reduces the rmed 
+
+of MonoProb from 1.94 to 0.96 without labels or retraining, compared to 0.90 for the ground-truth constant. Since both constants are measured on the validation set, neither yields exactly 1 on the test set. 
+
+Shape. However, a constant alone is insufficient to correct the shape. It reduces only the part of the consistency er-ror caused by the scale, while SI-ENCE remains unchanged. In contrast, MonoCal reduces both the consistency error and SI-ENCE med by a factor of about four compared to any constant, and both are significantly lower than those of the ground-truth constant (Tab. 2). On the reliability diagram, the slope increases to 0.95 (Fig. 1a). The profile along depth also becomes flatter (Fig. 3). Specifically, the ratio in the nearest range decreases from about three to about one, whereas a constant alone leaves the uncertainty underesti-mated in the near range and overestimated in the middle ranges. The same conclusions hold for the RMS statistic on consistency and adaptivity. 
+
+Standard metrics. MonoCal also preserves depth accu-racy, with an abs_rel of 0.091 against 0.092 for MonoProb (Tab. 2). All seven standard depth metrics are in Tab. S3. AUSE, which is invariant to any constant, is 26 % lower than that of MonoProb, although 12 % higher than that of the self-distilled MonoProb checkpoint. In contrast, ARU and RMSU [29] increase, which is expected. These metrics are pointwise distances between σ and |e|, and since |e| is right-skewed, their optima under a global constant are below a calibrated σ. Seitzer et al . [40] observed the same effect when using such a distance as a training loss, which leads to an underestimated variance. Consequently, a σ that is too small by a factor of two is close to its ARU optimum, and every calibrated σ obtains a higher value, by 29–33 % for the ground-truth constant and by 8–21 % for MonoCal (Tab. 2). 
+
+5.3. Generalization 
+
+Scale calibration across networks. On KITTI, the label-free constant corrects the scale of 17 uncertainty estimates (Fig. 4 shows 11 of them, Fig. S1 all). It is within ×1.08 of the ground-truth constant for all of them except the indoor checkpoint of OKVIS2-X. By construction, the scale with respect to the stereo residual is one, and Fig. 4 shows that it is also one with respect to the LiDAR error. Scale calibration works in both directions. For example, the uncertainty of the other OKVIS2-X checkpoint is too large on KITTI (0.66), and scale calibration corrects it to 0.99. 
+
+Other datasets. On Argoverse 1 and DrivingStereo, where the constant is re-measured, the agreement is weaker than on KITTI, and for MonoProb neither constant yields a scale of 1 (Fig. 4). This is likely due to the stereo depth itself, since semi-global matching produces three times as many errors on DrivingStereo as on KITTI [47]. Since nuScenes provides no stereo pairs, the constant cannot be measured on this dataset, and reusing the constant measured on KITTI results in a scale of 1.4 for MonoProb (Fig. 4). 
+
+The disagreement target on other backbones and datasets. The disagreement target reduces the shape errors of backbones that exhibit them (Tab. 3, Fig. 3). We apply it to Monodepth2, MonoViT and Lite-Mono, each trained us-ing its public recipe. On Monodepth2 and Lite-Mono, both shape errors decrease. On MonoViT, whose shape errors are already low, only the consistency error decreases. On these 60.5 1 2 4 8
+
+absolute depth error ÷ predicted uncertainty      
+
+> MonoProb (released) MonoProb, self-distilled Poggi et al. Self, MS Poggi et al. Snap+Self, MS Monodepth2 backbone MonoViT Lite-Mono MaGNet OKVIS2-X, mix Metric3D v2 ours MonoProb · Argoverse 1 * MonoProb · DrivingStereo MonoProb · nuScenes MaGNet · Argoverse 1 MaGNet · DrivingStereo OKVIS2-X · Argoverse 1 * OKVIS2-X · DrivingStereo *
+> KITTI · self-supervised, published KITTI · self-supervised, other backbones (our training) KITTI · trained with depth labels KITTI · this paper Other datasets · MonoProb as released Other datasets · trained with depth labels
+> calibrated uncertainty too small uncertainty too large ground-truth constant (uses labels) as released + scale calibration ours ground-truth constant (uses labels) as released + scale calibration ours
+
+Figure 4. Scale calibration matches the ground-truth constant. 
+
+Absolute depth error divided by predicted uncertainty over all pix-els: as released (gray), after scale calibration (blue, with interval or run range) and after the ground-truth constant (open). Squares: the retrained σ of MonoCal. ∗: the two constants differ by more than ×1.08 .Table 3. Generalization to other backbones and datasets. Ref.: the backbone’s own σ. For consistency it is multiplied by the ground-truth constant that minimizes ENCE med , a stricter reference than the constant of Tab. 2. Bottom: the σ of MonoCal, trained on KITTI, with only s re-measured, against each dataset’s ground-truth constant. Bold: better of each pair. 
+
+consistency adaptivity ENCE med (↓) SI-ENCE med (↓)backbone / dataset ref. ours ref. ours MonoProb 0.303 0.077 0.194 0.048 
+
+Monodepth2 0.227 0.118 0.101 0.059 
+
+MonoViT 0.088 0.072 0.071 0.074 Lite-Mono 0.162 0.077 0.098 0.053 
+
+Argoverse 1 0.316 0.167 0.278 0.196 
+
+DrivingStereo 0.488 0.360 0.132 0.053 
+
+backbones, AUSE increases by 2–9 %. The second net-work always has a different architecture from the backbone (Dynamo-Depth [42] for MonoViT). The gain also general-izes to Argoverse 1 and DrivingStereo, where the σ trained on KITTI, with only s re-measured, achieves significantly lower shape errors than the ground-truth constant of each dataset. 
+
+Table 4. Ablation study. Top: the same training with four sources of the target. Middle: corrections of MonoProb that need no train-ing. Bottom: rows that train a σ; MonoCal adds the disagreement target to the self-distillation of [29]. Bold: best per block.                                                         
+
+> rmed ENCE med ENCE SI-ENCE med
+> (→1)(↓)(↓)(↓)
+> target of σ, then scale calibration
+> second network (MonoCal) 0.960 0.077 0.208 0.048 stereo (SGBM) 0.916 0.182 0.257 0.087 Depth Anything V2 1.084 0.197 0.655 0.046
+> LiDAR (uses labels) 0.939 0.181 0.311 0.060
+> no training: corrections of MonoProb
+> scale calibration 0.964 0.301 0.969 0.194 per-σ-bin constants 0.978 0.056 0.912 0.138 per-( σ, depth)-bin constants 1.035 0.077 0.625 0.089
+> one training
+> σhead only, network frozen 1.032 0.098 0.377 0.064 self-distilled [29] +scale calibration 0.883 0.201 0.152 0.096 self-distilled +per-( σ, depth)-bin constants 0.959 0.051 0.137 0.066 MonoCal (ours) 0.960 0.077 0.208 0.048
+
+5.4. Ablation Study 
+
+Choice of target. The disagreement target, which uses no labels, achieves a lower consistency error than a LiDAR tar-get. In the top block of Tab. 4, we keep the training fixed and vary only the source of the target, using the second network, stereo, a foundation model [48] and LiDAR. After scale cal-ibration, the second-network target achieves the lowest con-sistency error and the second-lowest SI-ENCE med .These re-sults indicate that the scale is determined by the constant and the shape by the target. 
+
+Without training. The scale and ENCE med can be cor-rected without training, whereas the adaptivity of MonoCal requires it. We consider three corrections that can be ap-plied to MonoProb without training (Tab. 4, middle). With scale calibration alone, both shape errors remain. Using one constant per σ bin straightens the reliability diagram, but SI-ENCE med remains high, since the correction applied per 
+
+σ bin is redistributed across depth. This is consistent with the observation of Pernot that consistency does not imply adaptivity [35]. Using constants per ( σ, depth) bin is more effective. These constants are comparable to MonoCal on the scale and on ENCE med and reduce SI-ENCE med by half, but SI-ENCE med and ENCE remain significantly higher than those of MonoCal. 
+
+With training. Trained alternatives perform close to Mono-Cal, but each at a cost (Tab. 4, bottom). The self-distillation of MonoProb is one such training, and MonoCal adds the disagreement target to it. With scale calibration alone, the self-distilled σ obtains a higher ENCE med and a higher SI-ENCE med than MonoCal but a lower ENCE. Adding con-stants per ( σ, depth) bin makes it comparable to MonoCal on KITTI. However, these constants form a table fitted to KITTI. When reused on Argoverse 1 and DrivingStereo, their SI-ENCE med is 0.242 and 0.094, higher than the 0.196 7(a) (b) (c) 
+
+> 0.1 110 ratio
+> 0.1 15meters image absolute depth error predicted uncertainty MonoProb + scale calibration MonoCal (ours, full) absolute depth error ÷ predicted uncertainty MonoProb + scale calibration MonoCal (ours, full)
+
+Figure 5. Qualitative results. With MonoCal, the ratio of error to uncertainty is closest to 1 (white). Top: on one color scale, a calibrated uncertainty is as bright as its error. Bottom: red where the uncertainty is too small, blue where it is too large. Three test images. 
+
+and 0.053 of MonoCal with only its constant re-measured (Tab. 3). The full comparison is in Tab. S8. The lightest alternative, a σ head trained on the frozen network with the same target, is worse than MonoCal on both consistency and SI-ENCE med .
+
+5.5. Qualitative Results 
+
+Fig. 5 shows that scale calibration changes how bright the uncertainty is, whereas MonoCal changes where it is bright. In the top rows, the error and the uncertainty share the same color scale in meters, so that a calibrated uncertainty is as bright as its error, and the uncertainty of MonoProb is visi-bly darker. The bottom rows show the error divided by the uncertainty at the LiDAR pixels. For MonoProb, the map is mostly red, indicating that the uncertainty is too small. Af-ter scale calibration, red and blue are balanced, but some regions remain red, such as the upper left of (b) and the roadsides in (c), and MonoCal makes these regions closer to white. The uncertainty of MonoCal is also smoother. It no longer follows image texture such as the road markings in (a), which the error does not follow either, while preserv-ing the structures where the error is large, such as the vehi-cles in (b). 
+
+## 6. Conclusion and Limitations 
+
+In this paper, we measured the magnitude of the uncertainty of self-supervised monocular depth as the ratio of error to predicted uncertainty, separating the scale from the shape. We showed that the scale is miscalibrated for every uncer-tainty estimate we evaluated, by a factor that varies across networks and datasets. To correct both the scale and the shape without labels, we proposed MonoCal. Scale calibra-tion measures this factor from stereo pairs and requires no retraining, while the disagreement target corrects the shape, which is unaffected by any constant, by training the uncer-tainty on the disagreement with a second self-supervised network. 
+
+Limitations. Although scale calibration is label-free, it still requires stereo pairs to measure the constant. On nuScenes, which provides no stereo pairs, reusing the constant mea-sured on KITTI results in a scale of 1.4, and on Argoverse 1 and DrivingStereo the constant is less close to the ground-truth constant than on KITTI. In addition, the uncertainty is retrained only on KITTI, and on the two other datasets we evaluate the same σ after re-measuring the constant. We leave measuring the constant without a second sensor for fu-ture work. 
+
+## Acknowledgments 
+
+We thank Laiyan Ding for many discussions that sharp-ened the research question and the scope of our claims, and for his critical feedback on the experimental design. 8References 
+
+[1] Gwangbin Bae, Ignas Budvytis, and Roberto Cipolla. Multi-view depth estimation by fusing single-view depth probabil-ity with multi-view geometry. In CVPR , pages 2842–2851, 2022. 6 [2] Dhaivat Bhatt, Kaustubh Mani, Dishank Bansal, Krishna Murthy, Hanju Lee, and Liam Paull. f-Cal: Aleatoric uncer-tainty quantification for robot perception via calibrated neural regression. In ICRA , pages 6533–6539, 2022. 3 [3] Simon Boche, Jaehyung Jung, Sebastián Barbas Laina, and Stefan Leutenegger. OKVIS2-X: Open keyframe-based visual-inertial SLAM configurable with dense depth or Li-DAR, and GNSS. IEEE Transactions on Robotics , 41:6064– 6083, 2025. 2, 3, 6 [4] Fabian Brickwedde, Steffen Abraham, and Rudolf Mester. Mono-SF: Multi-view geometry meets single-view depth for monocular scene flow estimation of dynamic traffic scenes. In ICCV , 2019. 3 [5] Holger Caesar, Varun Bankiti, Alex H. Lang, Sourabh Vora, Venice Erin Liong, Qiang Xu, Anush Krishnan, Yu Pan, Gi-ancarlo Baldan, and Oscar Beijbom. nuScenes: A mul-timodal dataset for autonomous driving. In CVPR , pages 11621–11631, 2020. 6 [6] Ming-Fang Chang, John Lambert, Patsorn Sangkloy, Jag-jeet Singh, Slawomir Bak, Andrew Hartnett, De Wang, Peter Carr, Simon Lucey, Deva Ramanan, and James Hays. Argo-verse: 3D tracking and forecasting with rich maps. In CVPR ,pages 8748–8757, 2019. 6 [7] Nanxing Nick Deng, Qing Cheng, Niclas Zeller, and Daniel Cremers. A calibration audit of confidence in feed-forward 3D reconstruction models. arXiv:2608.29705v3, 2026. 3 [8] David Eigen, Christian Puhrsch, and Rob Fergus. Depth map prediction from a single image using a multi-scale deep net-work. In NeurIPS , 2014. 6 [9] Andreas Geiger, Philip Lenz, Christoph Stiller, and Raquel Urtasun. Vision meets robotics: The KITTI dataset. IJRR ,32(11):1231–1237, 2013. 6 [10] Clément Godard, Oisin Mac Aodha, and Gabriel J. Bros-tow. Unsupervised monocular depth estimation with left-right consistency. In CVPR , pages 270–279, 2017. 2 [11] Clément Godard, Oisin Mac Aodha, Michael Firman, and Gabriel J. Brostow. Digging into self-supervised monocu-lar depth estimation. In ICCV , 2019. 2, 6 [12] Chuan Guo, Geoff Pleiss, Yu Sun, and Kilian Q. Weinberger. On calibration of modern neural networks. In ICML , pages 1321–1330, 2017. 3 [13] Fredrik K. Gustafsson, Martin Danelljan, and Thomas B. Schön. Evaluating scalable Bayesian deep learning methods for robust computer vision. In CVPR Workshops , 2020. 2, 3 [14] Heiko Hirschmüller. Stereo processing by semiglobal match-ing and mutual information. IEEE TPAMI , 30(2):328–341, 2008. 2, 4 [15] Julia Hornauer, Amir El-Ghoussani, and Vasileios Belagian-nis. Revisiting gradient-based uncertainty for monocular depth estimation. IEEE TPAMI , 47(6):4395–4408, 2025. 3 [16] Dapeng Hu, Jian Liang, Xinchao Wang, and Chuan-Sheng Foo. Pseudo-calibration: Improving predictive uncertainty estimation in unsupervised domain adaptation. In ICML ,pages 19304–19326, 2024. 3 [17] Mu Hu, Wei Yin, Chi Zhang, Zhipeng Cai, Xiaoxiao Long, Hao Chen, Kaixuan Wang, Gang Yu, Chunhua Shen, and Shaojie Shen. Metric3D v2: A versatile monocular geometric foundation model for zero-shot metric depth and surface nor-mal estimation. IEEE TPAMI , 46(12):10579–10596, 2024. 6[18] Eddy Ilg, Özgün Çiçek, Silvio Galesso, Aaron Klein, Osama Makansi, Frank Hutter, and Thomas Brox. Uncertainty es-timates and multi-hypotheses networks for optical flow. In 
+
+ECCV , 2018. 2 [19] Jaehyung Jung, Simon Boche, Sebastián Barbas Laina, and Stefan Leutenegger. Uncertainty-aware visual-inertial SLAM with volumetric occupancy mapping. In ICRA , pages 14550– 14556, 2025. 3 [20] Alex Kendall and Yarin Gal. What uncertainties do we need in Bayesian deep learning for computer vision? In NeurIPS ,2017. 2 [21] Maria Klodt and Andrea Vedaldi. Supervising the new with the old: Learning SFM from SFM. In ECCV , pages 713–728, 2018. 2, 3 [22] Anders Krogh and Jesper Vedelsby. Neural network ensem-bles, cross validation, and active learning. In NeurIPS , pages 231–238, 1994. 5 [23] Volodymyr Kuleshov, Nathan Fenner, and Stefano Ermon. Accurate uncertainties for deep learning using calibrated re-gression. In ICML , pages 2796–2804, 2018. 3 [24] Tristan Laidlow, Jan Czarnowski, and Stefan Leutenegger. DeepFusion: Real-time dense 3D reconstruction for monoc-ular SLAM using single-view depth and gradient predictions. In ICRA , pages 4068–4074, 2019. 2 [25] Balaji Lakshminarayanan, Alexander Pritzel, and Charles Blundell. Simple and scalable predictive uncertainty estima-tion using deep ensembles. In NeurIPS , 2017. 5 [26] Steven Landgraf, Rongjun Qin, and Markus Ulrich. A critical synthesis of uncertainty quantification and foundation mod-els in monocular depth estimation. ISPRS Open Journal of Photogrammetry and Remote Sensing , 21:100146, 2026. 3 [27] Max-Heinrich Laves, Sontje Ihler, Jacob F. Fast, Lüder A. Kahrs, and Tobias Ortmaier. Well-calibrated regression un-certainty in medical imaging with deep learning. In MIDL ,pages 393–412, 2020. 2, 3, 4 [28] Dan Levi, Liran Gispan, Niv Giladi, and Ethan Fetaya. Eval-uating and calibrating uncertainty prediction in regression tasks. Sensors , 22(15):5540, 2022. 3, 4 [29] Rémi Marsal, Florian Chabot, Angélique Loesch, William Grolleau, and Hichem Sahbi. MonoProb: Self-supervised monocular depth estimation with interpretable uncertainty. In 
+
+WACV , 2024. 1, 2, 5, 6, 7 [30] Robert McCraith, Lukas Neumann, and Andrea Vedaldi. Cal-ibrating self-supervised monocular depth estimation. arXiv preprint arXiv:2009.07714 , 2020. 3 [31] Alexander Millane, Helen Oleynikova, Emilie Wirbel, Remo Steiner, Vikram Ramasamy, David Tingdahl, and Roland Siegwart. nvblox: GPU-accelerated incremental signed dis-tance field mapping. In ICRA , pages 2698–2705, 2024. 2 
+
+9[32] Chuong V. Nguyen, Shahram Izadi, and David Lovell. Mod-eling Kinect sensor noise for improved 3D reconstruction and tracking. In 3DIMPVT , pages 524–530, 2012. [33] Helen Oleynikova, Zachary Taylor, Marius Fehr, Roland Siegwart, and Juan Nieto. Voxblox: Incremental 3D Eu-clidean signed distance fields for on-board MAV planning. In IROS , pages 1366–1373, 2017. 2 [34] Zador Pataki, Paul-Edouard Sarlin, Johannes L. Schönberger, and Marc Pollefeys. MP-SfM: Monocular surface priors for robust structure-from-motion. In CVPR , 2025. 3 [35] Pascal Pernot. Calibration in machine learning uncertainty quantification: Beyond consistency to target adaptivity. APL Machine Learning , 1(4):046121, 2023. 2, 3, 4, 7 [36] Pascal Pernot. Negative impact of heavy-tailed uncertainty and error distributions on the reliability of calibration statis-tics for machine learning regression tasks. arXiv preprint arXiv:2402.10043 , 2024. 4 [37] Matteo Poggi, Filippo Aleotti, Fabio Tosi, and Stefano Mat-toccia. On the uncertainty of self-supervised monocular depth estimation. In CVPR , 2020. 1, 2, 6 [38] Matteo Poggi, Seungryong Kim, Fabio Tosi, Sunok Kim, Fil-ippo Aleotti, Dongbo Min, Kwanghoon Sohn, and Stefano Mattoccia. On the confidence of stereo matching in a deep-learning era: A quantitative evaluation. IEEE TPAMI , 44(9): 5293–5313, 2022. 4 [39] Antoni Rosinol, John J. Leonard, and Luca Carlone. Prob-abilistic volumetric fusion for dense monocular SLAM. In 
+
+WACV , pages 3097–3105, 2023. 2 [40] Maximilian Seitzer, Arash Tavakoli, Dimitrije Antić, and Georg Martius. On the pitfalls of heteroscedastic uncertainty estimation with probabilistic neural networks. In ICLR , 2022. 2, 6 [41] Andrew Stirn, Harm Wessels, Megan Schertzer, Laura Pereira, Neville Sanjana, and David Knowles. Faithful het-eroscedastic regression with neural networks. In AISTATS ,pages 5593–5613, 2023. 2 [42] Yihong Sun and Bharath Hariharan. Dynamo-Depth: Fix-ing unsupervised depth estimation for dynamical scenes. In 
+
+NeurIPS , 2023. 7 [43] Onkar Susladkar, Rohit Pawar, Chirag Sehgal, Samaksh Uj-jawal, and Sparsh Mittal. Confidence through parallel atten-tion for depth and uncertainty estimation in dynamic environ-ments. In WACV , pages 4396–4406, 2026. 2 [44] Yifu Tao, Marija Popović, Yiduo Wang, Sundara Tejaswi Digumarti, Nived Chebrolu, and Maurice Fallon. 3D lidar re-construction with probabilistic depth completion for robotic navigation. In IROS , pages 5339–5346, 2022. 3 [45] Fabio Tosi, Filippo Aleotti, Matteo Poggi, and Stefano Mat-toccia. Learning monocular depth estimation infusing tradi-tional stereo knowledge. In CVPR , pages 9799–9809, 2019. 4[46] Jonas Uhrig, Nick Schneider, Lukas Schneider, Uwe Franke, Thomas Brox, and Andreas Geiger. Sparsity invariant CNNs. In 3DV , 2017. 6 [47] Guorun Yang, Xiao Song, Chaoqin Huang, Zhidong Deng, Jianping Shi, and Bolei Zhou. DrivingStereo: A large-scale dataset for stereo matching in autonomous driving scenarios. In CVPR , pages 899–908, 2019. 6 [48] Lihe Yang, Bingyi Kang, Zilong Huang, Zhen Zhao, Xiao-gang Xu, Jiashi Feng, and Hengshuang Zhao. Depth Any-thing V2. In NeurIPS , 2024. 3, 7 [49] Nan Yang, Lukas von Stumberg, Rui Wang, and Daniel Cre-mers. D3VO: Deep depth, deep pose and deep uncertainty for monocular visual odometry. In CVPR , pages 1281–1292, 2020. 2 [50] Ning Zhang, Francesco Nex, George Vosselman, and Nor-man Kerle. Lite-Mono: A lightweight CNN and transformer architecture for self-supervised monocular depth estimation. In CVPR , 2023. 6 [51] Chaoqiang Zhao, Youmin Zhang, Matteo Poggi, Fabio Tosi, Xianda Guo, Zheng Zhu, Guan Huang, Yang Tang, and Ste-fano Mattoccia. MonoViT: Self-supervised monocular depth estimation with a vision transformer. In 3DV , 2022. 5, 6 
+
+10
