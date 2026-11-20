@@ -1,0 +1,54 @@
+{
+  "label": "2026-11-20",
+  "date": "2026-11-20",
+  "generated_at": "2026-11-20T01:46:48",
+  "count": 3,
+  "papers": [
+    {
+      "paper_id": "202611/20/2611.24152v1-seer-semantic-evidence-for-executable-region-propagation-in-open-vocabulary-semantic-segmentation",
+      "section": "deep",
+      "title_en": "SEER: Semantic Evidence for Executable Region Propagation in Open-Vocabulary Semantic Segmentation",
+      "authors": "Junyang Chen, Xiao Li, Yiguo Qiao, Wenbin Li",
+      "date": "2026-11-18",
+      "pdf": "https://arxiv.org/pdf/2611.24152v1",
+      "score": "8.0",
+      "evidence": "训练无关的开放词汇语义分割修复",
+      "tldr": "免训练开放词汇语义分割虽借助CLIP类表征取得进展，但剩余错误常呈局部、结构化且受标签空间约束。SEER将后预测修复建模为证据条件标签传播：OVSS分数空间提出候选标签，冻结VLM验证区域证据，执行门控判断证据是否合法可操作。接受标签再按置信区域或风险场景进行宽泛或保守传播。八个基准平均mIoU达58.0且不更新OVSS权重，为测试时修复提供可执行框架。",
+      "tags": "query:seg",
+      "abstract_en": "Training-free open-vocabulary semantic segmentation (OVSS) has made strong progress by adapting CLIP-like representations to dense prediction, but its remaining errors are often local, structured, and tied to the active label space. A successful correction must be visually plausible, legal under the target vocabulary, and executable in the segmentation score field. We propose SEER, a training-free test-time repair layer for Semantic Evidence and Executable Region propagation. SEER casts post-prediction OVSS repair as evidence-conditioned label propagation. The OVSS score space proposes compact candidate labels, a frozen VLM verifies closed-set regional evidence, and an execution gate certifies whether the evidence is legally and semantically actionable. The accepted label is then propagated by an OVSS-side policy: coherent high-confidence regions allow broad propagation, while object- or boundary-risk cases use conservative score-grounded propagation. Across eight standard OVSS benchmarks, SEER reaches 58.0 average mIoU without updating OVSS weights. Matched-input controls isolate the repair mechanism, while resource measurements report the cost of the complete frozen system.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202611/20/2611.23958v1-dorms-image-segmentation-via-depth-ordered-region-merge-trees",
+      "section": "quick",
+      "title_en": "DORMS: Image Segmentation via Depth-Ordered Region Merge Trees",
+      "authors": "Furkan Mumcu, Yasin Yilmaz",
+      "date": "2026-11-18",
+      "pdf": "https://arxiv.org/pdf/2611.23958v1",
+      "score": "7.0",
+      "evidence": "利用单目深度图做区域合并分割",
+      "tldr": "现有图像分割多依赖学习型模型，而单目深度图本身蕴含几何结构信息。本文提出纯算法分割方法DORMS，利用现成深度估计器生成深度图，通过确定性并查集扫描构建深度有序合并树，并融合区域面积、深度持久性与空间接触约束来引导合并。在COCO Panoptic、Cityscapes和ADE20K上，该方法稳定优于经典分割基线，并在Cityscapes上超过所有评测的零样本神经分割模型。这表明无需学习分割模型的纯几何推理同样具有竞争力。",
+      "tags": "query:seg",
+      "abstract_en": "We introduce DORMS (Depth-Ordered Region Merging for Segmentation), a purely algorithmic approach to image segmentation from monocular depth maps, requiring no neural networks or learned parameters in the segmentation process. An off-the-shelf monocular depth estimator provides the input depth maps. Our method constructs depth-ordered merge trees through a deterministic union-find sweep, combining component area, depth persistence, and spatial contact constraints to guide region merging. A threshold search determines the segmentation granularity according to a specified target region count, while global depth detrending improves the separation of local geometric structures. Extensive experiments on COCO Panoptic, Cityscapes, and ADE20K demonstrate consistent improvements over classical segmentation baselines and competitive performance against zero-shot neural segmentation models. Notably, our method outperforms all evaluated zero-shot models on Cityscapes, while remaining competitive with several approaches on COCO and ADE20K. These results highlight the potential of purely algorithmic geometric reasoning for image segmentation without learned segmentation models.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202611/20/2611.24316v1-fuse-to-recognize-the-unseen-class-relative-infrared-visible-fusion-for-open-vocabulary-semantic-segmentation",
+      "section": "quick",
+      "title_en": "Fuse to Recognize the Unseen: Class-Relative Infrared-Visible Fusion for Open-Vocabulary Semantic Segmentation",
+      "authors": "Zehao Gao, Jie Feng, Wenda Zhao, Junpeng Zhang, Ronghua Shang, Weisheng Dong",
+      "date": "2026-11-18",
+      "pdf": "https://arxiv.org/pdf/2611.24316v1",
+      "score": "6.0",
+      "evidence": "基于RGB-红外融合的开放词汇语义分割",
+      "tldr": "开放词汇语义分割中，CLIP主要基于RGB预训练，直接引入红外热信息易破坏RGB-语言对齐，反而干扰未见类识别。EmergeFuse以RGB为锚，通过类相对线索选择筛选可校正RGB误判的热证据，并用文本对比图像校正将其转化为语义修正方向，门控更新特征。三基准上未见类mIoU最高提升4.755%，严格互补转换率提升15.730%，同时保持融合质量。",
+      "tags": "query:seg",
+      "abstract_en": "Visible-infrared image fusion leverages complementary thermal cues to enhance visual perception, particularly under challenging illumination. However, such perceptual complementarity does not readily translate into semantic gains in open-vocabulary semantic segmentation (OVSS), where CLIP-based models are predominantly pretrained on RGB imagery. Directly introducing IR information may instead disrupt RGB-language alignment, turning promising thermal cues into semantic interference that undermines unseen-class recognition. Our pixel-level RGB-IR semantic analysis reveals that class-relevant thermal cues can correct certain RGB misclassifications while preserving reliable RGB predictions, motivating RGB-anchored, class-relative thermal cue selection. Based on this insight, we propose EmergeFuse, an infrared-visible fusion framework for OVSS that selectively converts complementary thermal evidence into unseen-class semantic corrections. Specifically, class-relative cue selection evaluates RGB-IR semantic responses and calibrated thermal evidence relative to RGB predictions, generating class-relative correction requests through competitive selection. Text-contrast image rectification then translates these selected requests into semantic rectification directions through text contrasts, guiding evidence-gated feature updates to realize complementary thermal evidence for unseen-class recognition. Experiments on three benchmarks demonstrate gains of up to 4.755% in unseen-class mIoU and 15.730% in strict complementary conversion rate over existing fusion methods, while maintaining competitive fusion quality.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    }
+  ],
+  "errors": []
+}

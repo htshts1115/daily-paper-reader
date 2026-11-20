@@ -1,0 +1,1644 @@
+Fuse to Recognize the Unseen: Class-Relative Infrared–Visible Fusion for
+Open-Vocabulary Semantic Segmentation
+Zehao Gao1, Jie Feng2†, Wenda Zhao2, Junpeng Zhang3, Ronghua Shang4, Weisheng Dong3
+1 Xidian University, 2 Dalian University of Technology
+happybirthdayzh@gmail.com, jiefeng0109@163.com
+Abstract
+Visible–infrared image fusion leverages complementary
+thermal cues to enhance visual perception, particularly un-
+der challenging illumination.
+However, such perceptual
+complementarity does not readily translate into semantic
+gains in open-vocabulary semantic segmentation (OVSS),
+where CLIP-based models are predominantly pretrained on
+RGB imagery.
+Directly introducing IR information may
+instead disrupt RGB–language alignment, turning promis-
+ing thermal cues into semantic interference that undermines
+unseen-class recognition. Our pixel-level RGB–IR seman-
+tic analysis reveals that class-relevant thermal cues can
+correct certain RGB misclassifications while preserving re-
+liable RGB predictions, motivating RGB-anchored, class-
+relative thermal cue selection. Based on this insight, we
+propose EmergeFuse, an infrared–visible fusion framework
+for OVSS that selectively converts complementary thermal
+evidence into unseen-class semantic corrections. Specifi-
+cally, class-relative cue selection evaluates RGB–IR seman-
+tic responses and calibrated thermal evidence relative to
+RGB predictions, generating class-relative correction re-
+quests through competitive selection. Text-contrast image
+rectification then translates these selected requests into se-
+mantic rectification directions through text contrasts, guid-
+ing evidence-gated feature updates to realize complemen-
+tary thermal evidence for unseen-class recognition.
+Ex-
+periments on three benchmarks demonstrate gains of up to
+4.755% in unseen-class mIoU and 15.730% in strict com-
+plementary conversion rate over existing fusion methods,
+while maintaining competitive fusion quality.
+1. Introduction
+Infrared–visible image fusion integrates visible textures and
+complementary thermal cues into a unified image for visual
+interpretation and downstream perception [17, 41, 56, 57].
+By incorporating thermal information, fusion can bene-
+fit object detection [20, 31, 53] and semantic segmen-
+Figure 1. Comparison of RGB–IR fusion paradigm OVSS ap-
+proaches. (a) In a representative fusion-first pipeline, a pedes-
+trian can remain misclassified despite its clear thermal silhouette.
+(b) EmergeFuse uses each pixel’s RGB prediction as a reference
+to identify complementary thermal cues before fusion, selectively
+correcting ambiguous predictions while preserving reliable ones.
+tation [21, 30, 49, 55, 59], particularly under challeng-
+ing illumination conditions. To improve downstream per-
+formance, task-aware
+[2, 20, 30] methods employ task-
+specific losses or integrate downstream features into the
+fusion process [21, 38, 49, 53]. More recently, semantic
+feedback, language conditioning, and preference alignment
+have been explored to adapt image fusion to diverse percep-
+tion requirements [29, 36, 42–45, 50].
+However, improving performance on supervised tasks
+does not necessarily ensure generalization to unseen
+classes. Open-vocabulary semantic segmentation (OVSS)
+addresses this challenge by matching visual features with
+text descriptions via CLIP to recognize categories beyond
+task-specific training annotations
+[6, 14, 19, 25, 58].
+This capability motivates the integration of infrared-visible
+fusion with CLIP-based OVSS to enhance unseen-class
+recognition, where visual evidence must remain aligned
+with class semantics beyond supervised classes [5, 14, 60].
+Research on RGB–IR OVSS is still at an early stage,
+with recent methods such as OpenRSS [51] and Open-
+RGBT [47] exploring thermal information integration
+arXiv:2611.24316v1  [cs.CV]  18 Nov 2026
+
+
+Figure 2. Analysis of RGB class confusion and complementary
+infrared evidence for unseen categories. (a) Class-averaged distri-
+butions of incorrect RGB predictions across the top two competing
+classes and other classes on FMB, MFNet, and SemanticRT. (b)
+Dataset-averaged proportions of correctly classified RGB pixels
+(Keep RGB) and RGB-misclassified pixels correctly recognized
+by infrared (IR Correct).
+through multimodal prompting and vision–language match-
+ing. However, since CLIP is predominantly pretrained on
+RGB imagery, directly incorporating infrared information
+may disrupt its learned vision–language alignment. These
+fusion-then-recognition approaches (Fig. 1(a)) do not ex-
+plicitly distinguish whether thermal cues support or refute
+a queried category relative to the current RGB prediction.
+Consequently, complementary thermal evidence may fail to
+correct RGB misclassifications, while misleading cues may
+disrupt otherwise reliable RGB semantics.
+To investigate this issue, we apply the same frozen OVSS
+reader [13] separately to RGB and IR and analyze unseen-
+class predictions across FMB [21], MFNet [7], and Seman-
+ticRT [10]. As shown in Fig. 2 (a), under RGB-only input,
+the top two competing classes account for 73.7%, 76.1%,
+and 61.1% of RGB misclassifications across three datasets,
+respectively, revealing concentrated class-dependent confu-
+sion patterns. As shown in Fig. 2 (b), RGB correctly recog-
+nizes 43.1% of unseen-class pixels, while, when using IR
+alone, 45.3% of those misclassified by RGB are correctly
+identified.
+These observations motivate RGB-anchored,
+class-relative thermal cue selection to exploit complemen-
+tary IR evidence while preserving reliable RGB predictions.
+See Supplementary Materials for more class analysis.
+Guided by these observations, we propose EmergeFuse,
+which selectively exploits complementary thermal evidence
+while preserving reliable RGB semantics, as illustrated
+in Fig. 1(b).
+Class-relative cue selection (CRCS) takes
+the highest-scoring RGB class at each pixel as a refer-
+ence and evaluates RGB–IR semantic responses and ther-
+mal evidence to identify class-relevant thermal cues that
+can compensate for RGB misclassifications while suppress-
+ing potentially misleading cues.
+The selected thermal
+cues are then passed to text-contrast image rectification
+(TCIR), which derives semantic correction directions from
+candidate–reference text contrasts to guide their selective
+integration into multi-scale fusion features, enabling the
+fused image to express complementary thermal evidence as
+language-aligned category cues that enhance unseen-class
+segmentation.
+Our main contributions are summarized as follows:
+• We reveal a class-dependent challenge in transferring
+thermal complementarity to CLIP-based OVSS. Our
+RGB–IR pixel-level analysis uncovers concentrated class
+confusion in RGB predictions for unseen categories and
+substantial IR-only recovery of RGB errors, highlighting
+the need for class-relative thermal cue selection that bal-
+ances semantic correction and preservation.
+• We propose EmergeFuse, a class-relative semantic rec-
+tification framework that selects complementary thermal
+evidence to generate targeted rectification requests, then
+realizes these requests as language-aligned visual cues
+in fused images for unseen-class recognition without re-
+training.
+• Experiments on three benchmarks demonstrate gains of
+up to 4.755% and 15.730% in unseen-class mIoU and
+strict complementary conversion rate, respectively, while
+maintaining competitive fusion quality.
+2. Related Work
+2.1. Task and Language-Guided Image Fusion
+A key challenge in infrared–visible image fusion is to move
+beyond image-quality-oriented reconstruction and adapt the
+fusion process to downstream perception requirements. To
+this end, task-aware methods connect fusion with down-
+stream tasks through task supervision and semantic fea-
+ture interaction [3, 22, 23, 35, 39, 53, 54].
+TDFusion
+[2] learns fusion objectives from downstream losses via
+meta-learning, CLDyN [43] adapts fusion through closed-
+loop semantic compensation, and UniFusion [17] promotes
+cross-task fusion through modality-consistent representa-
+tions. DRFusion [28] incorporates task-specific objectives
+for adaptive image fusion.
+Beyond task-driven supervision, language-guided meth-
+ods exploit textual semantics to provide more flexible con-
+trol over the fusion process [15, 18, 29, 32, 52]. Text-IF [44]
+and GText-IF [45] leverage textual guidance to adapt fusion
+to different image degradations, while OmniFuse [50] ex-
+tends language-driven control to semantic object enhance-
+ment under composite degradations. These advances en-
+able fusion to accommodate diverse task objectives and se-
+mantic requirements. However, such adaptability does not
+necessarily translate into the ability to recognize categories
+unseen during task-specific training.
+2.2. Open-Vocabulary Semantic Segmentation
+Open-vocabulary semantic segmentation (OVSS) aims to
+assign pixel-level labels from text-defined categories, in-
+cluding classes unseen during task-specific training [11, 16,
+26, 27, 46, 48]. This generalization capability largely re-
+
+
+Figure 3. Overview of EmergeFuse. CRCS identifies complementary thermal evidence and produces class-relative correction requests,
+while TCIR translates them into semantic corrections through evidence-constrained text-contrast optimization and multi-scale feature
+fusion. Frozen readers provide semantic guidance during training and open-vocabulary prediction at inference.
+lies on CLIP’s pretrained vision–language alignment. To
+improve dense prediction, CAT-Seg [5] models image–text
+matching costs, while SED [40, 61] combines hierarchical
+encoding, gradual cost decoding, and category rejection.
+Training-free approaches, including SCLIP [34], Proxy-
+CLIP [12], and GLA-CLIP [13], further enhance spatial
+matching and contextual interactions. Despite their archi-
+tectural differences, these methods largely build upon visual
+representations pretrained on RGB imagery, posing chal-
+lenges for incorporating thermal information while main-
+taining reliable vision–language alignment.
+To extend open-vocabulary recognition beyond visible
+imagery, multimodal OVSS methods explore incorporating
+complementary information from additional sensing modal-
+ities [1, 4, 9, 33, 37].
+OpenRSS [51] introduces ther-
+mal prompts into SAM, while Open-RGBT [47] combines
+text and visual prompts for object localization and box-
+guided mask generation on fused RGB–IR images. These
+approaches extend the visual evidence available for open-
+vocabulary recognition, but incorporating thermal informa-
+tion does not necessarily ensure its effective semantic uti-
+lization.
+In contrast, EmergeFuse evaluates thermal evi-
+dence relative to RGB-predicted classes and selectively re-
+alizes complementary semantic corrections in fused image.
+3. Method
+3.1. Problem Formulation and Overview
+RGB–IR open-vocabulary semantic segmentation (OVSS)
+aims to enhance unseen-class recognition by exploiting
+complementary visible and infrared information. Given reg-
+istered RGB and IR images R ∈[0, 1]H×W ×3 and I ∈
+[0, 1]H×W , and a query vocabulary V, let TV = {tc}c∈V
+denote the corresponding embeddings from a frozen CLIP
+text encoder.
+Under an image-fusion paradigm, the ob-
+jective is to generate a fused image F that supports open-
+vocabulary recognition through a frozen reader:
+F = F(R, I, TV),
+ˆyp = arg max
+c∈V R(F, TV)p,c,
+(1)
+where F and R denote the trainable fusion network and
+frozen OVSS reader, respectively, and ˆyp is the predicted
+category at pixel p.
+To this end, we propose EmergeFuse, as illustrated in
+Fig. 3. A visual encoder extracts multi-scale RGB–IR fea-
+tures, while the frozen OVSS reader provides pixel-level se-
+mantic responses for both modalities. These responses, to-
+gether with calibrated thermal evidence, are fed into Class-
+Relative Cue Selection (CRCS) to identify complementary
+thermal cues relative to current RGB predictions and gen-
+erate class-relative correction requests (Sec. 3.2). The re-
+quests are then passed to Text-Contrast Image Rectifica-
+tion (TCIR), where text-contrast semantic directions guide
+
+
+evidence-gated multi-scale feature fusion through source-
+anchored counterfactual updates (Sec. 3.3). Finally, the up-
+dated features are decoded into a fused image for segmen-
+tation by the same frozen reader to enhance unseen-class
+recognition while preserving reliable RGB semantics.
+3.2. Class-Relative Cue Selection
+CRCS selects complementary thermal evidence relative to
+RGB predictions and selects class-relative correction re-
+quests. Let rp,c and ip,c denote the semantic scores of cat-
+egory c ∈V at pixel p, obtained by applying the same
+frozen OVSS reader to RGB image R and infrared im-
+age I, respectively. Taking the highest-scoring RGB class
+ap = arg maxc∈V rp,c as the reference, we estimate the rel-
+ative thermal advantage of candidate class c:
+eGLA
+p,c
+= clip
+(ip,c −ip,ap) −(rp,c −rp,ap)
+τe
+, 0, 1
+
+, (2)
+where eGLA
+p,c
+measures RGB-anchored complementary ther-
+mal evidence and τe controls its scale.
+An eight-
+dimensional source descriptor Ap,c ∈R8 is constructed
+by concatenating source scores, anchor-relative responses,
+thermal advantage, and cross-modal agreement. The text
+relation srel
+p,c = ⟨ˆtc,ˆtap⟩measures candidate-reference co-
+sine similarity, where ˆt denotes the ℓ2-normalized text em-
+bedding.
+Since frozen readers may overlook complementary ther-
+mal cues, we introduce two additional evidence sources.
+First, TIP-based evidence eTIP
+p,c captures text-aligned TIP-
+on/off context differences using the thermal information
+prompt (TIP) module of OpenRSS [51] retrained with seen-
+class supervision only.
+Second, an Evidence Calibrator
+projects infrared features into the frozen text space to obtain
+class-relative evidence ecal
+p,c, supervised by seen-class cross-
+entropy. The three evidence sources are adaptively fused as
+αp,c = Softmax
+ gα(Ap,c, Hp, srel
+p,c)
+
+,
+ep,c =
+X
+k∈{GLA,TIP,cal}
+αk
+p,cek
+p,c,
+(3)
+where gα predicts three normalized evidence weights from
+source descriptors, RGB-IR visual context, and text rela-
+tions. The resulting ep,c provides aggregated complemen-
+tary evidence for subsequent class-relative cue selection.
+Finally, a class-shared router hθ generates preliminary
+signed correction requests:
+˜dp,c = 4ep,c tanh
+ hθ(Ap,c, Hp, srel
+p,c, ep,c)
+
+.
+(4)
+To suppress unreliable cues,
+CRCS performs sparse
+competitive selection over candidate classes and a no-
+rectification option:
+w⋆
+p = arg max
+wp∈∆p
+" X
+c̸=ap
+wp,c| ˜dp,c| + wp,∅bkeep
+p
+−τr
+2 ∥wp∥2
+2
+#
+,
+(5)
+where ∆p denotes the probability simplex over candidate
+classes and the no-rectification option, and τr > 0 con-
+trols selection sparsity. The preservation score bkeep
+p
+= 1 −
+|V|−1 P
+c∈V ep,c favors no rectification when complemen-
+tary evidence is weak. The resulting class-selection weights
+w⋆
+p,c and no-rectification weight w⋆
+p,∅, together with ˜dp,c,
+guide subsequent text-contrast optimization. Eq. (5) is effi-
+ciently solved via batched simplex projection.
+3.3. Text-Contrast Image Rectification
+TCIR translates the correction requests from CRCS into
+text-guided feature updates, realizing complementary ther-
+mal evidence in the fused image rather than directly modi-
+fying segmentation predictions.
+Evidence-Constrained Text-Contrast Solving. Given the
+correction requests and selection weights from CRCS, we
+construct a text-contrast matrix Dp with rows ˆtc −ˆtap and
+a corresponding request vector ˜dp, both indexed by c̸ = ap.
+To balance selected semantic corrections with RGB-anchor
+preservation, we solve
+u⋆
+p = arg min
+u
+n
+∥Dpu −˜dp∥2
+Wp + u⊤Λpu
+o
+,
+(6)
+where Wp = diag(w⋆
+p,c)c̸=ap weights the selected class
+corrections, and Λp = λI + µw⋆
+p,∅ˆtapˆt⊤
+ap regularizes cor-
+rection magnitude and its component along RGB-anchor
+text direction. Here, ∥x∥2
+Wp = x⊤Wpx, with λ > 0 and
+µ ≥0. This class-shared optimization accommodates un-
+seen text queries without class-specific parameters. Eq. (6)
+admits a closed-form solution, evaluated in parallel across
+the feature grid.
+Source-Anchored Counterfactual Fusion. The visual en-
+coder extracts multi-scale RGB and infrared features ER
+and EI. The pixel-wise directions u⋆
+p form a spatial guid-
+ance map u, aligned with the multi-scale features. To isolate
+text-induced corrections from source fusion, we compare
+the responses of a shared semantic gate g with and without
+semantic guidance.
+Evidence-Gated Image Rectification. To regulate the text-
+induced corrections, an evidence gate ω ∈[0, 1] integrates
+CRCS thermal evidence, visual context, RGB prediction
+confidence, and text-visual alignment to regulate the feature
+updates:
+eZ = ER + φ(EI −ER)⊙
+
+g(0) + ω ⊙(g(u) −g(0))
+
+.
+(7)
+Here, φ transforms cross-modal feature differences, and ⊙
+denotes element-wise multiplication. These operations are
+applied at each feature scale. The updated multi-scale fea-
+tures are then reconstructed into a fused image F using a
+
+
+Table 1. Comparison of open-vocabulary semantic segmentation on FMB, MFNet, and SemanticRT (%). All conventional fusion methods
+and EmergeFuse are evaluated using the same frozen OVSS reader. OpenRSS is included as a cross-framework reference using its native
+segmentation pipeline. Best and second-best results are highlighted in light red and lavender, respectively.
+Method
+FMB
+MFNet
+SemanticRT
+Seen
+mIoU ↑
+Unseen
+mIoU ↑hIoU ↑Overall
+mIoU ↑
+Seen
+mIoU ↑
+Unseen
+mIoU ↑hIoU ↑Overall
+mIoU ↑
+Seen
+mIoU ↑
+Unseen
+mIoU ↑hIoU ↑Overall
+mIoU ↑
+CDDFuse (CVPR’23)[56]
+43.219
+25.773
+32.290
+37.851
+31.052
+21.251
+25.233
+27.377
+34.218
+19.467
+24.816
+29.301
+MRFS (CVPR’24)[49]
+43.451
+30.464
+35.817
+39.455
+30.546
+29.446
+29.986
+30.133
+36.704
+24.852
+29.637
+32.753
+TDFusion (CVPR’25)[2]
+46.568
+28.769
+35.566
+41.091
+34.931
+32.329
+33.580
+33.956
+38.125
+22.761
+28.505
+33.004
+DCEvo (CVPR’25)[22]
+44.609
+27.211
+33.803
+39.256
+33.579
+31.495
+32.504
+32.797
+35.819
+23.614
+28.463
+31.751
+DPOFusion (CVPR’26)[29] 43.173
+27.619
+33.687
+38.387
+29.442
+30.146
+29.790
+29.706
+33.992
+21.873
+26.618
+29.952
+UniFusion (CVPR’26)[17]
+44.922
+29.917
+35.915
+40.305
+33.485
+31.334
+32.373
+32.678
+37.466
+25.781
+30.544
+33.571
+DECC (CVPR’26)[24]
+45.010
+28.603
+34.978
+39.962
+28.251
+32.399
+30.183
+29.806
+34.710
+26.342
+29.953
+31.921
+DRFusion (CVPR’26)[28]
+43.747
+25.316
+32.072
+38.076
+30.207
+28.184
+29.160
+29.449
+33.276
+20.719
+25.537
+29.090
+CLDyN (CVPR’26)[43]
+41.614
+27.531
+33.138
+37.280
+31.064
+33.094
+32.047
+31.825
+32.591
+27.148
+29.622
+30.777
+GText-IF (TPAMI’26)[45]
+44.902
+30.042
+35.999
+40.330
+31.907
+31.740
+31.823
+31.844
+37.912
+26.881
+31.457
+34.235
+OpenRSS (ECCV’24)[51]
+42.800
+24.009
+30.762
+37.018
+30.907
+21.226
+25.168
+27.277
+36.189
+20.076
+25.825
+30.818
+Ours
+47.219
+33.772
+39.379
+43.081
+40.121
+37.849
+38.952
+39.269
+41.328
+30.194
+34.894
+37.617
+decoder Dψ with RGB detail skip connections, realizing
+complementary thermal evidence as language-aligned vi-
+sual cues while preserving reliable RGB semantics.
+3.4. Learning and Seen-to-Unseen Transfer
+Source-Conditioned Semantic Stopping. For each super-
+vised pixel p with seen-class label yp ∈Vt, let sX
+p,c de-
+note the frozen-reader score for image X ∈{R, I, F},
+where Vt is the current training vocabulary and sR
+p,c =
+rp,c, sI
+p,c = ip,c follow Sec. 3.2.
+We define the pre-
+dicted class ˆyX
+p
+= arg maxc∈Vt sX
+p,c and semantic margin
+mX
+p = sX
+p,yp −maxc∈Vt\{yp} sX
+p,c. Using detached source
+predictions, we define a target margin for semantic preser-
+vation and rectification:
+gp =
+
+
+
+
+
+ρkeep[mR
+p ]+,
+ˆyR
+p = yp,
+clip(mI
+p, gmin, gmax),
+ˆyR
+p̸ = yp, ˆyI
+p = yp,
+g0,
+otherwise,
+(8)
+where [x]+ = max(x, 0) and ρkeep controls RGB margin
+retention. Here, gmin and gmax bound IR-supported targets,
+while g0 is the fallback target. These conditions encourage
+the preservation of correct RGB predictions and the cor-
+rection of IR-supported RGB errors. We employ a class-
+balanced semantic stopping loss:
+Lsem =
+1
+|C+
+t |
+X
+c∈C+
+t
+1
+|Ωc|
+X
+p∈Ωc
+"
+gp −mF
+p
+τm
+#
++
+,
+(9)
+where Ωc contains supervised pixels of class c, C+
+t denotes
+the seen classes present in the current episode, and τm > 0
+controls the loss scale. Once the target margin is satisfied,
+the semantic penalty vanishes; otherwise, gradients propa-
+gate through the frozen reader to optimize the fusion net-
+work. During training, we instantiate the query vocabulary
+V in Sec. 3.2 as the current episode vocabulary Vt, such that
+the RGB reference class ap coincides with ˆyR
+p .
+Seen-to-Unseen Transfer.
+Pixel-level supervision is re-
+stricted to seen classes, including cross-entropy calibration
+of the shared infrared–text projection. To improve transfer-
+ability, we adopt episodic vocabulary variation and prompt
+consistency to reduce dependence on specific category sets
+and text prompts. The overall objective combines semantic
+stopping, evidence calibration, and prompt consistency with
+SSIM, edge, and color constraints to preserve image fidelity.
+At inference, CRCS and TCIR apply the same category-
+shared selection and rectification mechanisms to unseen
+text queries without retraining. Detailed loss formulations,
+inference settings, computational complexity, FLOPs,and
+training protocols are provided in Supplementary Materials.
+4. Experiments
+4.1. Experimental Settings
+Datasets and Protocol.
+We conduct experiments on
+FMB [21], MFNet [7], and SemanticRT [10] under a seen-
+to-unseen evaluation protocol. The unseen classes are traf-
+fic sign, person, truck, and motorcycle on FMB (bicycle has
+no ground-truth pixels in the test split); person, color cone,
+and bump on MFNet; and bicyclist, tricycle, traffic light,
+and person on SemanticRT. Pixel-level semantic supervi-
+sion is restricted to seen categories, and unseen categories
+are evaluated without retraining. All fusion methods are
+evaluated on the same test sets using consistent text queries
+and a frozen open-vocabulary reader. OpenRSS [51] is eval-
+uated using its native segmentation pipeline and included as
+
+
+Table 2. Semantic preservation and strict complementary conversion on FMB, MFNet, and SemanticRT (%).
+Method
+FMB
+MFNet
+SemanticRT
+Seen
+SPR ↑
+Unseen
+SPR ↑
+Seen
+SCC ↑
+Unseen
+SCC ↑
+Seen
+SPR ↑
+Unseen
+SPR ↑
+Seen
+SCC ↑
+Unseen
+SCC ↑
+Seen
+SPR ↑
+Unseen
+SPR ↑
+Seen
+SCC ↑
+Unseen
+SCC ↑
+CDDFuse (CVPR’23)[56]
+92.707
+78.177
+55.060
+74.907
+87.768
+82.064
+36.937
+63.708
+89.216
+77.538
+41.735
+60.214
+MRFS (CVPR’24)[49]
+92.031
+84.621
+39.897
+65.131
+87.148
+86.254
+40.991
+49.135
+90.378
+84.312
+46.529
+57.836
+TDFusion (CVPR’25)[2]
+93.382
+85.965
+41.537
+75.291
+91.563
+90.328
+50.000
+43.302
+92.416
+86.574
+49.331
+65.217
+DCEvo (CVPR’25)[22]
+95.869
+85.606
+54.723
+73.466
+93.483
+89.137
+68.018
+46.921
+94.157
+85.904
+62.517
+63.895
+DPOFusion (CVPR’26)[29] 93.217
+81.565
+49.776
+70.219
+89.139
+86.537
+47.229
+45.487
+90.781
+80.193
+45.842
+58.197
+UniFusion (CVPR’26)[17]
+94.574
+83.765
+46.069
+66.471
+92.451
+89.989
+53.604
+52.475
+93.084
+86.916
+57.463
+67.328
+DECC (CVPR’26)[24]
+93.416
+84.867
+41.675
+68.914
+82.608
+88.106
+59.459
+62.155
+88.596
+83.742
+52.139
+68.813
+DRFusion (CVPR’26)[28]
+91.500
+77.093
+38.621
+68.857
+87.324
+86.336
+57.207
+53.003
+89.637
+79.426
+47.280
+61.504
+CLDyN (CVPR’26)[43]
+90.842
+82.208
+37.263
+71.124
+88.784
+87.300
+55.856
+47.775
+90.125
+85.170
+50.478
+70.126
+GText-IF (TPAMI’26)[45]
+95.557
+84.763
+47.922
+59.557
+91.472
+90.446
+54.955
+55.378
+93.591
+88.429
+58.974
+66.409
+OpenRSS (ECCV’24)[51]
+91.287
+78.432
+37.816
+57.736
+84.791
+80.147
+34.129
+47.840
+88.562
+77.172
+56.598
+59.934
+Ours
+98.902
+95.219
+72.027
+89.349
+98.339
+95.541
+74.324
+79.438
+97.823
+94.168
+76.537
+82.946
+a separate cross-framework reference. GLA-CLIP [13] pro-
+vides semantic supervision during fusion training.
+Evaluation Metrics. We report seen, unseen, and overall
+mIoU, together with the harmonic mean (hIoU) of seen and
+unseen mIoU. To evaluate semantic preservation and com-
+plementary conversion, we measure semantic preservation
+rate (SPR) and strict complementary conversion rate (SCC)
+for both seen and unseen classes. SCC measures the recov-
+ery rate on a fixed set of pixels misclassified by RGB but
+correctly recognized by IR. Fusion quality is assessed using
+VIF, Qabf, SSIM, and SF. Detailed metric definitions are
+provided in Supplementary Materials.
+4.2. Open-Vocabulary Performance and Semantic
+Conversion
+Table 1 compares OVSS performance on FMB, MFNet,
+and SemanticRT. As few existing methods directly ad-
+dress open-vocabulary-aware infrared–visible fusion, we
+primarily compare against representative fusion methods.
+Open-RGBT [47] is excluded from the quantitative com-
+parison because its official implementation is unavailable.
+EmergeFuse achieves the highest hIoU. Its unseen mIoU
+reaches 33.772%, 37.849%, and 30.194%, outperforming
+the strongest conventional fusion baselines by 3.308, 4.755,
+and 3.046 percentage points, respectively. These improve-
+ments highlight the effectiveness of CRCS in selecting com-
+plementary thermal evidence and TCIR in rectifying fused-
+image semantics for unseen-class recognition.
+Table 2 evaluates semantic preservation and complemen-
+tary conversion on three datasets.
+EmergeFuse achieves
+SCC Unseen of 89.349%, 79.438%, and 82.946%, ex-
+ceeding the strongest competitors by 14.058%, 15.730%,
+and 12.820%, respectively.
+Compared with OpenRSS,
+EmergeFuse further improves SCC Unseen by 31.613%,
+Table 3. Ablation studies of EmergeFuse on FMB (%). “–” de-
+notes a component not instantiated in the corresponding variant.
+Variant
+CRCS TCIR Evidence
+Calibrator
+Semantic
+Gate
+Unseen
+mIoU ↑hIoU ↑Unseen
+SCC ↑
+Basic
+×
+×
+×
+×
+26.384 32.294 58.573
+CRCS-only
+✓
+×
+–
+–
+30.868 36.579 71.270
+TCIR-only
+×
+✓
+–
+–
+31.205 36.837 62.722
+w/o Calib
+✓
+✓
+×
+✓
+31.853 37.723 83.960
+w/o Gate
+✓
+✓
+✓
+×
+32.120 37.844 82.804
+Full
+✓
+✓
+✓
+✓
+33.772 39.379 89.349
+Table 4. Controlled comparison of semantic supervision and text-
+conditioned fusion on FMB (%).
+Method
+Seen
+mIoU ↑
+Unseen
+mIoU ↑hIoU ↑Unseen
+SCC ↑
+Unseen
+SPR ↑
+Basic
+41.617 26.384 32.294 58.573 84.729
+Basic+Sem
+45.127 30.836 36.637 78.146 90.853
+Basic+Sem+FiLM 46.039 32.118 37.839 82.327 92.741
+Ours
+47.219 33.772 39.379 89.349 95.219
+31.598%, and 23.012%. These results highlight the effec-
+tiveness of CRCS and TCIR in converting complementary
+thermal evidence into recognizable unseen-class semantics
+while preserving reliable RGB predictions.
+4.3. Ablation Studies
+Table 3 evaluates EmergeFuse components on FMB. Basic
+retains the fusion backbone and decoder with reconstruction
+losses only. CRCS-only replaces TCIR with lightweight
+evidence-conditioned fusion, while TCIR-only uses fixed
+source-relative evidence instead of learned routing. Both
+outperform Basic. The inclusion of calibration and gating
+yielded improvements of 1.919% and 1.652%, respectively,
+
+
+Table 5. Quantitative comparison of infrared-visible image fusion quality on FMB, MFNet, and SemanticRT. SSIM is computed with the
+RGB input as the reference. Additional metrics (such as ∆Margin, EN, SD, and AG) are provided in Supplementary Materials.
+Method
+FMB
+MFNet
+SemanticRT
+VIF ↑
+Qabf ↑SSIM ↑
+SF ↑
+VIF ↑
+Qabf ↑SSIM ↑
+SF ↑
+VIF ↑
+Qabf ↑SSIM ↑
+SF ↑
+CDDFuse (CVPR’23)[56]
+0.875
+0.688
+0.930
+14.575
+1.015
+0.699
+0.700
+11.422
+0.886
+0.682
+0.902
+14.914
+MRFS (CVPR’24)[49]
+0.467
+0.189
+0.829
+5.181
+0.567
+0.226
+0.517
+4.794
+0.493
+0.230
+0.813
+5.376
+TDFusion (CVPR’25)[2]
+0.840
+0.678
+0.919
+14.250
+1.012
+0.710
+0.795
+11.696
+0.901
+0.690
+0.915
+14.203
+DCEvo (CVPR’25)[22]
+0.888
+0.699
+0.932
+13.751
+0.909
+0.676
+0.727
+11.920
+0.922
+0.706
+0.925
+14.631
+DPOFusion (CVPR’26)[29]
+0.797
+0.628
+0.914
+13.172
+0.767
+0.582
+0.694
+9.298
+0.780
+0.615
+0.887
+12.845
+UniFusion (CVPR’26)[17]
+0.718
+0.635
+0.933
+14.404
+0.804
+0.624
+0.661
+11.782
+0.764
+0.648
+0.909
+13.624
+DECC (CVPR’26)[24]
+0.801
+0.668
+0.920
+13.860
+0.361
+0.568
+0.112
+12.982
+0.806
+0.671
+0.838
+16.302
+DRFusion (CVPR’26)[28]
+0.918
+0.670
+0.902
+13.103
+0.892
+0.615
+0.635
+11.293
+0.952
+0.666
+0.899
+13.518
+CLDyN (CVPR’26)[43]
+0.364
+0.602
+0.599
+10.457
+0.460
+0.630
+0.383
+9.299
+0.431
+0.587
+0.636
+10.743
+GText-IF (TPAMI’26)[45]
+0.814
+0.674
+0.944
+12.948
+0.880
+0.614
+0.658
+10.502
+0.843
+0.688
+0.936
+13.752
+Ours
+0.933
+0.736
+0.991
+18.817
+1.048
+0.736
+0.957
+11.941
+0.927
+0.747
+0.958
+15.486
+Figure 4. Mechanism visualization for the unseen person cate-
+gory. From left to right: RGB/IR inputs, CRCS response map,
+and TCIR-guided semantic outcomes (cyan: corrected RGB er-
+rors; green: preserved RGB-correct pixels).
+Table 6. Cross-reader generalization of EmergeFuse on FMB (%).
+RGB-U denotes unseen mIoU using RGB-only input. ∆U mIoU
+denotes the unseen-class mIoU gain over RGB-U.
+Reader
+RGB-U
+mIoU ↑
+Seen
+mIoU ↑
+Unseen
+mIoU ↑
+∆U
+mIoU ↑
+SCLIP[34]
+24.231
+27.501
+29.253
++5.022
+NACLIP[8]
+27.471
+44.079
+30.374
++2.903
+ProxyCLIP[12]
+28.727
+45.490
+31.260
++2.533
+GLA-CLIP[13]
+29.853
+47.219
+33.772
++3.919
+demonstrating the complementary benefits of cue selection
+and rectification in unseen-class recognition.
+Table 4 presents a controlled comparison on FMB, start-
+ing from the Basic variant in Table 3. We progressively in-
+troduce semantic supervision (+Sem) and text-conditioned
+feature modulation (+FiLM), with both variants using the
+same semantic loss as EmergeFuse.
+While these addi-
+tions improve unseen-class recognition, EmergeFuse fur-
+ther outperforms Basic+Sem+FiLM by 1.654 points in un-
+seen mIoU and 7.022 points in unseen SCC, while achiev-
+ing 95.219% unseen SPR. These gains demonstrate the ben-
+Table 7. Robustness to vocabulary perturbations and textual vari-
+ations on FMB (%).
+Condition
+Unseen
+mIoU ↑
+Unseen
+SPR ↑
+Unseen
+SCC ↑
+Random+4
+33.558
+95.087
+88.812
+Hard+4
+33.126
+94.704
+87.684
+Hard+8
+32.417
+94.109
+85.906
+Prompt Shift
+33.491
+94.992
+88.938
+Original
+33.772
+95.219
+89.349
+Table 8. Cross-dataset zero-shot generalization of EmergeFuse.
+Transfer
+In-Domain Cross-Data
+In-Domain
+Unseen ↑
+Unseen ↑
+Runner-up ↑
+FMB →MFNet
+37.849
+31.157
+33.094
+FMB →SemanticRT
+30.194
+28.347
+27.148
+efits of CRCS and TCIR beyond conventional semantic su-
+pervision and text-conditioned fusion.
+Fig. 4 illustrates how EmergeFuse selectively corrects
+RGB errors while preserving reliable predictions. CRCS
+highlights pedestrian regions with complementary thermal
+evidence, while TCIR realizes targeted semantic corrections
+without disrupting RGB-correct regions. This behavior re-
+flects RGB-anchored cue selection and text-contrast rectifi-
+cation, consistent with the improvements in SCC and SPR.
+4.4. Fusion Quality and Generalization
+Table 5 evaluates image fusion quality on FMB, MFNet,
+and SemanticRT. EmergeFuse achieves strong performance
+across standard fusion metrics, demonstrating that im-
+proved semantic recognition is accompanied by competi-
+tive fusion quality. EmergeFuse employs a compact train-
+able fusion core, with most of its parameters residing in the
+
+
+Figure 5. Qualitative comparison of open-vocabulary segmentation on FMB. The left panel shows two representative scenes with high-
+lighted unseen person regions, the middle panel presents corresponding RGB and IR crops and ground-truth masks, and the right panel
+compares segmentation predictions from different methods.
+Figure 6. Qualitative comparison of infrared–visible image fusion on FMB and MFNet. Two representative nighttime scenes are presented.
+The left panels show RGB and infrared inputs with highlighted regions, the middle panels compare the corresponding enlarged fusion
+results, and the right panels display the full-resolution fused images generated by EmergeFuse.
+frozen pretrained context extractor and OVSS reader. The
+trainable fusion network contains only 0.67M parameters.
+Cross-Reader Generalization.
+Table 6 evaluates cross-
+reader generalization on FMB. Beyond the training reader,
+SCLIP, NACLIP, and ProxyCLIP achieve unseen mIoU
+gains of 2.533–5.022 points over their RGB-only baselines.
+These results demonstrate the transferability of semantic ev-
+idence embedded in EmergeFuse outputs.
+Cross-Dataset Zero-Shot Generalization. As shown in
+Table 8, EmergeFuse trained solely on FMB achieves
+31.157% and 28.347% unseen mIoU on MFNet and Se-
+manticRT without target-domain adaptation, respectively.
+Notably, our model, trained on FMB and transferred di-
+rectly to SemanticRT in a zero-shot manner (28.347%),
+even outperforms CLDyN (27.148%), the strongest base-
+line trained on the SemanticRT domain itself. These re-
+sults demonstrate promising cross-dataset generalization,
+supporting the transferability of class-relative cue selection.
+Vocabulary Robustness.
+Table 7 evaluates vocabulary
+robustness by adding random (Random+4) or challenging
+(Hard +4/+8) distractor classes or varying text prompts
+(prompt shift) to the fusion-stage vocabulary, while keep-
+ing the evaluation vocabulary fixed. Under Hard+8, unseen
+mIoU decreases by only 1.355 points, while unseen SCC
+remains at 85.906%. These results demonstrate the robust-
+ness of EmergeFuse to vocabulary perturbations.
+4.5. Qualitative Results
+Fig. 5 presents OVSS comparisons on FMB. In both scenes,
+several fusion methods produce fragmented unseen-person
+regions or confuse targets with surrounding classes. In con-
+trast, EmergeFuse generates more complete segmentation
+masks with improved agreement. These observations com-
+plement the quantitative gains in unseen mIoU and SCC,
+supporting the effectiveness of CRCS and TCIR. Fig. 6
+presents fusion comparisons on FMB and MFNet.
+Sev-
+eral existing methods exhibit reduced contrast or weakened
+structural details in challenging nighttime scenes. In con-
+
+
+trast, EmergeFuse preserves recognizable thermal targets
+while producing visually coherent fused images.
+5. Conclusion
+Effective RGB–IR fusion for OVSS requires selectively
+translating complementary thermal evidence into language-
+aligned visual semantics. EmergeFuse achieves this through
+RGB-anchored guidance and image-level rectification, im-
+proving unseen-class recognition while preserving reli-
+able RGB predictions.
+Experiments on three bench-
+marks demonstrate improved unseen-class segmentation
+with competitive fusion quality.
+References
+[1] Tilemachos Aravanis, Vladan Stojni´c, Bill Psomas, Nikos
+Komodakis, and Giorgos Tolias.
+Retrieve and segment:
+Are a few examples enough to bridge the supervision gap
+in open-vocabulary segmentation?
+In Proceedings of the
+IEEE/CVF Conference on Computer Vision and Pattern
+Recognition (CVPR), pages 27621–27632, 2026. 3
+[2] Haowen Bai, Jiangshe Zhang, Zixiang Zhao, Yichen Wu,
+Lilun Deng, Yukun Cui, Tao Feng, and Shuang Xu. Task-
+driven image fusion with learnable fusion loss.
+In 2025
+IEEE/CVF Conference on Computer Vision and Pattern
+Recognition (CVPR), pages 7457–7468, 2025. 1, 2, 5, 6,
+7
+[3] Jun Chen, Liling Yang, Wei Yu, Wenping Gong, Zhanchuan
+Cai, and Jiayi Ma. Sdsfusion: A semantic-aware infrared
+and visible image fusion network for degraded scenes. IEEE
+Transactions on Image Processing, 34:3139–3153, 2025. 2
+[4] Siyu Chen, Ting Han, Chengzheng Fu, Changshe Zhang,
+Chaolei Wang, Jinhe Su, Guorong Cai, and Meiliu Wu.
+Leveraging depth and language for open-vocabulary domain-
+generalized semantic segmentation. Advances in Neural In-
+formation Processing Systems, 38:150592–150611, 2026. 3
+[5] Seokju Cho, Heeseong Shin, Sunghwan Hong, Anurag
+Arnab, Paul Hongsuck Seo, and Seungryong Kim. Cat-seg:
+Cost aggregation for open-vocabulary semantic segmenta-
+tion. In 2024 IEEE/CVF Conference on Computer Vision
+and Pattern Recognition (CVPR), pages 4113–4123, 2024.
+1, 3
+[6] Golnaz Ghiasi, Xiuye Gu, Yin Cui, and Tsung-Yi Lin. Scal-
+ing open-vocabulary image segmentation with image-level
+labels. In European conference on computer vision, pages
+540–557. Springer, 2022. 1
+[7] Qishen Ha, Kohei Watanabe, Takumi Karasawa, Yoshitaka
+Ushiku, and Tatsuya Harada. Mfnet: Towards real-time se-
+mantic segmentation for autonomous vehicles with multi-
+spectral scenes. In 2017 IEEE/RSJ International Conference
+on Intelligent Robots and Systems (IROS), pages 5108–5115,
+2017. 2, 5
+[8] Sina Hajimiri, Ismail Ben Ayed, and Jose Dolz. Pay attention
+to your neighbours: Training-free open-vocabulary semantic
+segmentation. In 2025 IEEE/CVF Winter Conference on Ap-
+plications of Computer Vision (WACV), pages 5061–5071,
+2025. 7
+[9] Sandeep Inuganti, Hideaki Kanayama, Kanta Shimizu,
+Mahdi Chamseddine, Soichiro Yokota, Didier Stricker, and
+Jason Rambach. Jopp-3d: Joint open vocabulary semantic
+segmentation on point clouds and panoramas, 2026. 3
+[10] Wei Ji, Jingjing Li, Cheng Bian, Zhicheng Zhang, and Li
+Cheng. Semanticrt: A large-scale dataset and method for
+robust semantic segmentation in multispectral images.
+In
+Proceedings of the 31st ACM International Conference on
+Multimedia, pages 3307–3316, 2023. 2, 5
+[11] Zihang Lai.
+Exploring simple open-vocabulary semantic
+segmentation.
+In 2025 IEEE/CVF Conference on Com-
+puter Vision and Pattern Recognition (CVPR), pages 30221–
+30230, 2025. 2
+[12] Mengcheng Lan, Chaofeng Chen, Yiping Ke, Xinjiang
+Wang, Litong Feng, and Wayne Zhang. Proxyclip: Proxy
+attention improves clip for open-vocabulary segmentation.
+In European Conference on Computer Vision, pages 70–88.
+Springer, 2024. 3, 7
+[13] ByeongCheol Lee, Hyun Seok Seong, Sangeek Hyun,
+Gilhan Park, WonJun Moon, and Jae-Pil Heo. Looking be-
+yond the window: Global-local aligned clip for training-free
+open-vocabulary semantic segmentation, 2026. 2, 3, 6, 7
+[14] Boyi Li, Kilian Q Weinberger, Serge Belongie, Vladlen
+Koltun, and Ren´e Ranftl.
+Language-driven semantic seg-
+mentation. arXiv preprint arXiv:2201.03546, 2022. 1
+[15] Jiayang Li, Chengjie Jiang, Junjun Jiang, Pengwei Liang, Ji-
+ayi Ma, and Liqiang Nie. Towards unified semantic and con-
+trollable image fusion: A diffusion transformer approach.
+IEEE transactions on pattern analysis and machine intelli-
+gence, 2025. 2
+[16] Jiahao Li, Yang Lu, Yachao Zhang, Fangyong Wang, Yuan
+Xie, and Yanyun Qu. Direct segmentation without logits op-
+timization for training-free open-vocabulary semantic seg-
+mentation.
+In Proceedings of the IEEE/CVF Conference
+on Computer Vision and Pattern Recognition, pages 13168–
+13178, 2026. 2
+[17] Xingyuan Li, Songcheng Du, Yang Zou, Haoyuan Xu, Zhiy-
+ing Jiang, and Jinyuan Liu. Unifusion: A unified image fu-
+sion framework with robust representation and source-aware
+preservation. In Proceedings of the IEEE/CVF Conference
+on Computer Vision and Pattern Recognition (CVPR), pages
+33869–33880, 2026. 1, 2, 5, 6, 7
+[18] Xilai Li, Xiaosong Li, and Weijun Jiang. Text-guided chan-
+nel perturbation and pre-trained knowledge integration for
+unified multi-modality image fusion.
+In Proceedings of
+the AAAI Conference on Artificial Intelligence, pages 6521–
+6529, 2026. 2
+[19] Feng Liang, Bichen Wu, Xiaoliang Dai, Kunpeng Li, Yinan
+Zhao, Hang Zhang, Peizhao Zhang, Peter Vajda, and Diana
+Marculescu. Open-vocabulary semantic segmentation with
+mask-adapted clip. In 2023 IEEE/CVF Conference on Com-
+puter Vision and Pattern Recognition (CVPR), pages 7061–
+7070, 2023. 1
+[20] Jinyuan Liu, Xin Fan, Zhanbo Huang, Guanyao Wu, Risheng
+Liu, Wei Zhong, and Zhongxuan Luo.
+Target-aware dual
+adversarial learning and a multi-scenario multi-modality
+benchmark to fuse infrared and visible for object detection.
+
+
+In 2022 IEEE/CVF Conference on Computer Vision and Pat-
+tern Recognition (CVPR), pages 5792–5801, 2022. 1
+[21] Jinyuan Liu, Zhu Liu, Guanyao Wu, Long Ma, Risheng Liu,
+Wei Zhong, Zhongxuan Luo, and Xin Fan. Multi-interactive
+feature learning and a full-time multi-modality benchmark
+for image fusion and segmentation. In 2023 IEEE/CVF In-
+ternational Conference on Computer Vision (ICCV), pages
+8081–8090, 2023. 1, 2, 5
+[22] Jinyuan Liu, Bowei Zhang, Qingyun Mei, Xingyuan Li,
+Yang Zou, Zhiying Jiang, Long Ma, Risheng Liu, and
+Xin Fan. Dcevo: Discriminative cross-dimensional evolu-
+tionary learning for infrared and visible image fusion.
+In
+2025 IEEE/CVF Conference on Computer Vision and Pat-
+tern Recognition (CVPR), pages 2226–2235, 2025. 2, 5, 6,
+7
+[23] Jinyuan Liu, Bowei Zhang, Ludan Sun, Xingyuan Li, Long
+Ma, Risheng Liu, and Xin Fan.
+Symbiotic evolutionary
+learning for task-adaptive infrared and visible image fusion.
+IEEE Transactions on Pattern Analysis and Machine Intelli-
+gence, 2026. 2
+[24] Xiaowen Liu, Jing Li, Hongtao Huo, Haozhe Cao, Ren-
+hua Wang, and Xu Dong.
+More than meets the eye: A
+unified image fusion framework via semantic-pixel entropy
+trade-off for zero-shot generalization.
+In Proceedings of
+the IEEE/CVF Conference on Computer Vision and Pattern
+Recognition (CVPR), pages 41510–41520, 2026. 5, 6, 7
+[25] Yang Liu, Yufei Yin, Chenchen Jing, Muzhi Zhu, Hao Chen,
+Yuling Xi, Bo Feng, Hao Wang, Shiyu Li, and Chunhua
+Shen. Unified open-world segmentation with multi-modal
+prompts. In 2025 IEEE/CVF International Conference on
+Computer Vision (ICCV), pages 21557–21567, 2025. 1
+[26] Gensheng Pei, Xiruo Jiang, Xinhao Cai, Tao Chen, Yazhou
+Yao, and Byeungwoo Jeon. Pearl: Geometry aligns seman-
+tics for training-free open-vocabulary semantic segmenta-
+tion. arXiv preprint arXiv:2603.21528, 2026. 2
+[27] Zelin Peng, Zhengqin Xu, Feilong Tang, and Wei Shen. Cp-
+clip: Customized parameter generation for open-vocabulary
+semantic segmentation. In Proceedings of the AAAI Confer-
+ence on Artificial Intelligence, pages 8394–8402, 2026. 2
+[28] Yu Shi, Yu Liu, Zhong-Cheng Wu, Juan Cheng, Huafeng
+Li, and Xun Chen. Degradation-robust fusion: An efficient
+degradation-aware diffusion framework for multimodal im-
+age fusion in arbitrary degradation scenarios. In Proceedings
+of the IEEE/CVF Conference on Computer Vision and Pat-
+tern Recognition (CVPR), pages 33848–33858, 2026. 2, 5,
+6, 7
+[29] Weijian Su, Songqian Zhang, Yuqi Han, Jian Zhuang, Yong-
+dong Huang, and Qiang Zhang. Fusion in your way: Align-
+ing image fusion with heterogeneous demands via direct
+preference optimization. In Proceedings of the IEEE/CVF
+Conference on Computer Vision and Pattern Recognition
+(CVPR), pages 41499–41509, 2026. 1, 2, 5, 6, 7
+[30] Linfeng Tang, Jiteng Yuan, and Jiayi Ma. Image fusion in
+the loop of high-level vision tasks: A semantic-aware real-
+time infrared and visible image fusion network. Information
+Fusion, 82:28–42, 2022. 1
+[31] Linfeng Tang, Chunyu Li, and Jiayi Ma. Mask-difuser: A
+masked diffusion model for unified unsupervised image fu-
+sion. IEEE Transactions on Pattern Analysis and Machine
+Intelligence, 48(1):591–608, 2026. 1
+[32] Linfeng Tang, Yeda Wang, Zhanchuan Cai, Junjun Jiang,
+and Jiayi Ma.
+Controlfusion: A controllable image fu-
+sion network with language-vision degradation prompts.
+Advances in Neural Information Processing Systems, 38:
+118304–118327, 2026. 2
+[33] Xujing Tao,
+Chuxin Wang,
+Yubo Ai,
+Zhixin Cheng,
+Zhuoyuan Li, Liangsheng Liu, Yujia Chen, Xinjun Li, Qiao
+Li, Wenfei Yang, and Tianzhu Zhang. Geoguide: Hierar-
+chical geometric guidance for open-vocabulary 3d semantic
+segmentation. In Proceedings of the IEEE/CVF Conference
+on Computer Vision and Pattern Recognition (CVPR), pages
+26855–26866, 2026. 3
+[34] Feng Wang, Jieru Mei, and Alan Yuille.
+Sclip: Rethink-
+ing self-attention for dense vision-language inference.
+In
+European conference on computer vision, pages 315–332.
+Springer, 2024. 3, 7
+[35] Liying Wang, Xiaoli Zhang, Chuanmin Jia, and Siwei Ma.
+Mafs: Masked autoencoder for infrared-visible image fusion
+and semantic segmentation.
+IEEE Transactions on Image
+Processing, 34:6490–6505, 2025. 2
+[36] Zeyu Wang, Jizheng Zhang, Haiyu Song, Mingyu Ge, Jiayu
+Wang, and Haoran Duan. Highlight what you want: Weakly-
+supervised instance-level controllable infrared-visible image
+fusion.
+In 2025 IEEE/CVF International Conference on
+Computer Vision (ICCV), pages 12637–12647, 2025. 1
+[37] Yimin Wei, Aoran Xiao, Hongruixuan Chen, Junshi Xia, and
+Naoto Yokoya. MM-OVSeg: Multimodal Optical-SAR Fu-
+sion for Open-Vocabulary Segmentation in Remote Sens-
+ing. In Proceedings of the IEEE/CVF Conference on Com-
+puter Vision and Pattern Recognition (CVPR), pages 42202–
+42212, 2026. 3
+[38] Guanyao Wu, Haoyu Liu, Hongming Fu, Yichuan Peng,
+Jinyuan Liu, Xin Fan, and Risheng Liu.
+Every sam drop
+counts: Embracing semantic priors for multi-modality image
+fusion and beyond. In 2025 IEEE/CVF Conference on Com-
+puter Vision and Pattern Recognition (CVPR), pages 17882–
+17891, 2025. 1
+[39] Guobao Xiao, Xinyu Liu, Zebin Lin, and Rui Ming. Smr-net:
+Semantic-guided mutually reinforcing network for cross-
+modal image fusion and salient object detection. In Proceed-
+ings of the AAAI conference on artificial intelligence, pages
+8637–8645, 2025. 2
+[40] Bin Xie, Jiale Cao, Jin Xie, Fahad Shahbaz Khan, and
+Yanwei Pang.
+Sed: A simple encoder-decoder for open-
+vocabulary semantic segmentation.
+In 2024 IEEE/CVF
+Conference on Computer Vision and Pattern Recognition
+(CVPR), pages 3426–3436, 2024. 3
+[41] Han Xu, Jiayi Ma, Junjun Jiang, Xiaojie Guo, and Haibin
+Ling. U2fusion: A unified unsupervised image fusion net-
+work. IEEE Transactions on Pattern Analysis and Machine
+Intelligence, 44(1):502–518, 2022. 1
+[42] Zengyi Yang, Yafei Zhang, Huafeng Li, and Yu Liu.
+Instruction-driven fusion of infrared–visible images: Tailor-
+ing for diverse downstream tasks. Information Fusion, 121:
+103148, 2025. 1
+
+
+[43] Zengyi Yang, Yu Liu, Juan Cheng, Zhiqin Zhu, Yafei Zhang,
+and Huafeng Li. Customized fusion: A closed-loop dynamic
+network for adaptive multi-task-aware infrared-visible im-
+age fusion. In Proceedings of the IEEE/CVF Conference on
+Computer Vision and Pattern Recognition, pages 188–198,
+2026. 2, 5, 6, 7
+[44] Xunpeng Yi, Han Xu, Hao Zhang, Linfeng Tang, and Ji-
+ayi Ma.
+Text-if: Leveraging semantic text guidance for
+degradation-aware and interactive image fusion.
+In 2024
+IEEE/CVF Conference on Computer Vision and Pattern
+Recognition (CVPR), pages 27016–27025, 2024. 2
+[45] Xunpeng Yi, Han Xu, Yibing Zhang, Hao Zhang, Linfeng
+Tang, and Jiayi Ma.
+Gtext-if: Leveraging text-driven se-
+mantics for degradation-aware image fusion. IEEE Transac-
+tions on Pattern Analysis and Machine Intelligence, 48(11):
+15440–15456, 2026. 1, 2, 5, 6, 7
+[46] Jianjian Yin, Tao Chen, Yi Chen, Gensheng Pei, Xiangbo
+Shu, Yazhou Yao, and Fumin Shen. Pca-seg: Revisiting cost
+aggregation for open-vocabulary semantic and part segmen-
+tation. In Proceedings of the IEEE/CVF Conference on Com-
+puter Vision and Pattern Recognition (CVPR), pages 27633–
+27643, 2026. 2
+[47] Meng Yu, Yufeng Yue, Luojie Yang, Xunjie He, Yi Yang, and
+Mengyin Fu. Open-rgbt: Open-vocabulary rgb-t zero-shot
+semantic segmentation in open-world environments. In 2025
+IEEE International Conference on Robotics and Automation
+(ICRA), pages 1–7, 2025. 1, 3, 6
+[48] Dengke Zhang, Fagui Liu, and Quan Tang. Corrclip: Recon-
+structing patch correlations in clip for open-vocabulary se-
+mantic segmentation. In 2025 IEEE/CVF International Con-
+ference on Computer Vision (ICCV), pages 24677–24687,
+2025. 2
+[49] Hao Zhang, Xuhui Zuo, Jie Jiang, Chunchao Guo, and Jiayi
+Ma. Mrfs: Mutually reinforcing image fusion and segmen-
+tation. In 2024 IEEE/CVF Conference on Computer Vision
+and Pattern Recognition (CVPR), pages 26964–26973, 2024.
+1, 5, 6, 7
+[50] Hao Zhang, Lei Cao, Xuhui Zuo, Zhenfeng Shao, and Jiayi
+Ma. Omnifuse: Composite degradation-robust image fusion
+with language-driven semantics. IEEE Transactions on Pat-
+tern Analysis and Machine Intelligence, 47(9):7577–7595,
+2025. 1, 2
+[51] Guoqiang Zhao, Junjie Huang, Xiaoyun Yan, Zhaojing
+Wang, Junwei Tang, Yangjun Ou, Xinrong Hu, and Tao
+Peng. Open-vocabulary rgb-thermal semantic segmentation.
+In European Conference on Computer Vision, pages 304–
+320. Springer, 2024. 1, 3, 4, 5, 6
+[52] Libo Zhao, Xiaoli Zhang, and Zeyu Wang.
+Controlfuse:
+Instruction-guided multi-granularity controllable image fu-
+sion. In Proceedings of the AAAI Conference on Artificial
+Intelligence, pages 13199–13207, 2026. 2
+[53] Wenda Zhao, Shigeng Xie, Fan Zhao, You He, and Huchuan
+Lu. Metafusion: Infrared and visible image fusion via meta-
+feature embedding from object detection. In 2023 IEEE/CVF
+Conference on Computer Vision and Pattern Recognition
+(CVPR), pages 13955–13965, 2023. 1, 2
+[54] Wenda Zhao, Wenbo Wang, Haipeng Wang, You He, and
+Huchuan Lu. Cdtfusion: Crossing domain and task for in-
+frared and visible image fusion. IEEE Transactions on Pat-
+tern Analysis and Machine Intelligence, 2025. 2
+[55] Zixian Zhao and Xingchen Zhang. Ssvif: Self-supervised
+segmentation-oriented visible and infrared image fusion.
+IEEE Transactions on Image Processing, 35:7063–7075,
+2026. 1
+[56] Zixiang Zhao, Haowen Bai, Jiangshe Zhang, Yulun Zhang,
+Shuang Xu, Zudi Lin, Radu Timofte, and Luc Van Gool.
+Cddfuse: Correlation-driven dual-branch feature decompo-
+sition for multi-modality image fusion. In 2023 IEEE/CVF
+Conference on Computer Vision and Pattern Recognition
+(CVPR), pages 5906–5916, 2023. 1, 5, 6, 7
+[57] Zixiang Zhao, Haowen Bai, Jiangshe Zhang, Yulun Zhang,
+Kai Zhang, Shuang Xu, Dongdong Chen, Radu Timofte, and
+Luc Van Gool. Equivariant multi-modality image fusion. In
+2024 IEEE/CVF Conference on Computer Vision and Pat-
+tern Recognition (CVPR), pages 25912–25921, 2024. 1
+[58] Ziyu Zhao, Xiaoguang Li, Linjia Shi, Nasrin Imanpour, and
+Song Wang. Dpseg: Dual-prompt cost volume learning for
+open-vocabulary semantic segmentation. In 2025 IEEE/CVF
+Conference on Computer Vision and Pattern Recognition
+(CVPR), pages 25346–25356, 2025. 1
+[59] Zixian Zhao, Andrew Howes, and Xingchen Zhang. Mul-
+titaskvif: Segmentation-oriented visible and infrared image
+fusion via multi-task learning. IEEE Transactions on Image
+Processing, 35:8275–8290, 2026. 1
+[60] Ziqin Zhou, Yinjie Lei, Bowen Zhang, Lingqiao Liu, and Yi-
+fan Liu. Zegclip: Towards adapting clip for zero-shot seman-
+tic segmentation. In 2023 IEEE/CVF Conference on Com-
+puter Vision and Pattern Recognition (CVPR), pages 11175–
+11185, 2023. 1
+[61] Wenqi Zhu, Bin Xie, Jiale Cao, Jin Xie, Fahad Shahbaz
+Khan, and Yanwei Pang. Sed++: A simple encoder-decoder
+for improved open-vocabulary semantic segmentation. IEEE
+Transactions on Pattern Analysis and Machine Intelligence,
+48(3):2528–2543, 2026. 3
