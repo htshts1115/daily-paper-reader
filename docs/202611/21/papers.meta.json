@@ -1,0 +1,54 @@
+{
+  "label": "2026-11-21",
+  "date": "2026-11-21",
+  "generated_at": "2026-11-21T00:21:50",
+  "count": 3,
+  "papers": [
+    {
+      "paper_id": "202611/21/2611.26603v1-depth-pro-2-sharp-and-temporally-consistent-metric-monocular-depth",
+      "section": "deep",
+      "title_en": "Depth Pro 2: Sharp and Temporally Consistent Metric Monocular Depth",
+      "authors": "Peiyun Hu, Marko Mihajlovic, Lyndon Duong, Lahav Lipson, Wei Dong, Amaël Delaunoy, Stephan R. Richter, Vladlen Koltun",
+      "date": "2026-11-19",
+      "pdf": "https://arxiv.org/pdf/2611.26603v1",
+      "score": "10.0",
+      "evidence": "稠密度量单目深度估计，边界锐利且时序一致",
+      "tldr": "单目深度估计长期存在边界锐度与视频时序一致性的取舍：多帧方法更稳但边界偏糊，单帧方法更锐但视频抖动。Depth Pro 2 用单一可扩展网络同时处理图像与视频，并在原生分辨率预测稠密度量深度。它在度量精度、边界锐度和时序一致性上同时领先，并发布覆盖精度、锐度、一致性与运行时的新帕累托前沿模型族，开源代码与权重。",
+      "tags": "query:mono-depth",
+      "abstract_en": "We present Depth Pro 2, an approach to estimating dense metric depth for images and video at full resolution. By analyzing prior methods for monocular depth estimation, we find that they commonly trade off temporal consistency and boundary sharpness: multi-frame methods favor consistency, single-frame methods favor sharpness. To overcome this trade-off, we train a single, scalable network that processes both images and video and predicts depth maps at native resolution. Depth Pro 2 produces depth maps that are metrically accurate, sharp, and temporally consistent all at once, outperforming prior work in all of these dimensions. We release a family of models that define a new Pareto frontier in terms of metric accuracy, sharpness, temporal consistency, and runtime. We release code and weights at https://apple-aiml-research.github.io/ml-depth-pro-2/",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202611/21/2611.26072v1-dfd-gs-defocus-image-prior-for-metric-scale-single-view-depth-estimation-and-view-synthesis",
+      "section": "deep",
+      "title_en": "DfD-GS: Defocus Image Prior for Metric-Scale Single-View Depth Estimation and View Synthesis",
+      "authors": "Shiori Ueda, Rinto Yagawa, Hideo Saito, Shohei Mori",
+      "date": "2026-11-19",
+      "pdf": "https://arxiv.org/pdf/2611.26072v1",
+      "score": "8.0",
+      "evidence": "利用散焦模糊作为物理线索的度量尺度单视图深度估计",
+      "tldr": "单视角恢复度量尺度几何本质病态，现有单目深度先验易受尺度模糊与数据集偏置影响。DfD-GS将散焦模糊作为物理度量深度线索，从全聚焦—散焦图像对估计度量视差并对齐细化单目先验。随后预测可见与隐藏3D高斯，实现遮挡感知的新视角合成。在合成散焦与真实数据上，其度量深度和新视角合成优于单图像基线，并在视场变化下保持更稳定尺度。",
+      "tags": "query:mono-depth",
+      "abstract_en": "Recovering metric-scale geometry from observations at a single viewpoint remains fundamentally ill-posed, limiting the reliability of novel view synthesis. Recent methods rely on learned monocular depth priors, which provide strong structural estimates but can suffer from scale ambiguity and dataset-dependent biases. We propose DfD-GS, a feed-forward framework that predicts a metric-scale 3D Gaussian scene representation from a single-view all-in-focus--defocused image pair. The key idea is to exploit defocus blur as a physical metric depth cue. DfD-GS first estimates a defocus-based metric disparity map from the all-in-focus--defocused image pair and the corresponding defocus strength. This estimate is used to align and refine a monocular depth prior to metric scale. Visible and hidden 3D Gaussians are then predicted for occlusion-aware novel view synthesis. Experiments on synthetic-defocus datasets constructed from Booster and Middlebury show that DfD-GS outperforms single-image baselines in metric depth estimation and novel view synthesis. On WildRGB-D, DfD-GS achieves lower AbsRel and LPIPS but higher depth RMSE than the single-image baselines. Additional analyses show that DfD-GS maintains a more stable metric scale under field-of-view changes. Qualitative results on a real dataset show recovery of the main scene structure under optical defocus.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202611/21/2611.25747v1-sam-3-sees-more-than-it-detects-promptable-concept-maps-beyond-categories",
+      "section": "quick",
+      "title_en": "SAM 3 Sees More Than It Detects: Promptable Concept Maps Beyond Categories",
+      "authors": "Yu-Huan Wu, Yun Liu, Liangli Zhen",
+      "date": "2026-11-19",
+      "pdf": "https://arxiv.org/pdf/2611.25747v1",
+      "score": "6.0",
+      "evidence": "可提示概念图将开放词汇分割扩展到透明物体等概念",
+      "tldr": "面向稠密预测的类别无关概念定位中，SAM 3 的语义路径虽能响应概念，却常因图像级存在分数过低而阻断实例检测。作者提出 UNVEIL：在 SAM 3 语义路径副本上用 LoRA 训练概念图，并用独立存在解码器从验证负样本学习概念是否出现。仅需一个短语即可输出显著物、伪装物、阴影、透明物、镜子及边缘骨架等概念图，且不改变原 SAM 3 输出。在 PCM-Bench 七项任务上均优于对比的提示式模型，包括官方微调与多模态大模型流水线。",
+      "tags": "query:seg",
+      "abstract_en": "Promptable segmenters answer what a thing is. Dense prediction tasks also ask class-agnostic questions, such as what stands out or hides, how light is blocked, transmitted or reflected, and where structure lies. Robots, surveillance systems and image editors build on their answers. We study promptable concept maps (PCM), which extend SAM 3's promptable concept segmentation from noun instances to maps of concepts named by short noun phrases such as `\"transparent object\", with \"none\" as an answer. PCM-Bench groups the standard test sets of seven such tasks by the question they ask. On it, we find that SAM 3 sees more than it detects. Its semantic path responds to many of these concepts, yet a low image-level presence score can block every detection of its instance path. We present UNVEIL, which trains a copy of SAM 3's semantic path for these maps, with LoRA on copies of its last blocks. A separate presence decoder learns from verified negatives whether a concept occurs. With one text phrase per query, UNVEIL maps region concepts such as salient and camouflaged objects, shadows, transparent objects and mirrors. The same weights map thin structures such as edges and skeletons as well as object categories. Run next to SAM 3, it leaves SAM 3's own outputs unchanged. On each of the seven tasks, UNVEIL reaches the highest score among the compared promptable models, including SAM 3's official fine-tuning and pipelines built on multimodal LLMs. Code is available at https://github.com/yuhuan-wu/UNVEIL.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    }
+  ],
+  "errors": []
+}
