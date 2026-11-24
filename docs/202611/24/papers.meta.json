@@ -1,0 +1,69 @@
+{
+  "label": "2026-11-24",
+  "date": "2026-11-24",
+  "generated_at": "2026-11-24T04:47:24",
+  "count": 4,
+  "papers": [
+    {
+      "paper_id": "202611/24/2611.27423v1-adept-adaptive-monocular-depth-estimation-via-model-in-the-loop-photometric-tuning-with-capture-risk-prediction",
+      "section": "deep",
+      "title_en": "ADEPT: Adaptive Monocular Depth Estimation via Model-In-The-Loop Photometric Tuning with Capture Risk Prediction",
+      "authors": "GiHyun Kim, JinMo Yang, Hyung-Sin Kim",
+      "date": "2026-11-20",
+      "pdf": "https://arxiv.org/pdf/2611.27423v1",
+      "score": "8.0",
+      "evidence": "利用冻结深度模型反馈的自适应单目深度估计",
+      "tldr": "单目深度估计依赖曝光与增益提供的视觉证据，机器人运动又带来进光量与运动模糊的权衡。ADEPT用冻结深度模型的反馈学习拍摄风险：训练时以真值深度选出低误差参考，预测候选相对参考的深度分歧；部署时结合相机、运动与光照上下文评分，并用高斯过程控制器选择曝光增益。在九类场景光照条件下，其平均尺度平移对齐 Abs_rel 较内置自动曝光降低14.6%，较最佳对比控制器降低10.0%。",
+      "tags": "query:mono-depth",
+      "abstract_en": "Exposure and gain determine the visual evidence available to monocular depth estimation (MDE), particularly when robot motion creates a tradeoff between light collection and motion blur. We present ADEPT, a framework that adapts these settings using learned feedback from a frozen depth model. During training, ground-truth depth identifies the lowest-error reference within a group of physically evaluated camera settings. A compact predictor learns reference-relative disagreement (RRD) between each candidate's depth prediction and the reference prediction using regression and ranking losses. At deployment, it scores observed captures using frozen-model features and camera, motion, and illumination context, without ground truth or reference images. A contextual Gaussian-process controller uses recent scores to select subsequent exposure and gain settings under motion and photometric constraints. We evaluate offline camera selection with relative and metric Depth Anything v2 and demonstrate online control with the affine-invariant variant on a mobile robot. Across nine equally weighted scene-illumination conditions, ADEPT reduces mean scale-and-shift-aligned $\\mathrm{Abs}_{\\mathrm{rel}}$ by 14.6% relative to built-in auto-exposure and by 10.0% relative to the best-performing evaluated prior controller.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202611/24/2611.28489v1-open-vision-banana-an-open-framework-for-unified-visual-perception-through-generation-in-rgb-space",
+      "section": "deep",
+      "title_en": "Open Vision Banana: An Open Framework for Unified Visual Perception through Generation in RGB Space",
+      "authors": "Xu Lin, Ruilin Yao, Haoran Xu, Zixiang Wang, Ming Ma, Yu Zhao, Pu Miao, Chonghan Liu",
+      "date": "2026-11-21",
+      "pdf": "https://arxiv.org/pdf/2611.28489v1",
+      "score": "8.0",
+      "evidence": "单一指令模型统一度量深度与语义、实例、指代分割",
+      "tldr": "论文检验闭源图像生成器的通用感知能力能否迁移到开源生成器，并提出 OVB：用单一共享 LoRA 将 Qwen-Image-2.1 的 7B 扩散生成器适配为统一指令驱动模型，覆盖深度、语义、实例与指代分割。作者以任务契约约束训练，并系统评估 42 个检查点、权重合并与受控短训练。结果显示几何学得早但绝对尺度难学，十种子集成把未对齐 δ1 从 0.348 提到 0.516；深度与 2D 分割争夺适配器，验证流损失与 Cityscapes mIoU 约 -0.9 相关，难以用于选模。",
+      "tags": "query:mono-depth",
+      "abstract_en": "Vision Banana showed that a closed image generator, instruction-tuned to paint perception outputs as RGB images, becomes a generalist vision model. Does this carry over to \\emph{open} generators, and if not, what fails? We answer with \\textbf{Open Vision Banana (OVB)}, an open framework that adapts the 7B diffusion generator of Qwen-Image-2.1 into one instruction-driven model for metric depth, semantic, instance, and referring segmentation, using a single shared low-rank adapter and public data. Each task is a \\emph{task contract} whose RGB encoder, instruction, and decoder share one specification and are checked before training. Studying 42 externally evaluated checkpoints from two 100k-update runs, six exact weight-space merges, and eight controlled shorter runs, we find that the gap to the closed system is specific and measurable. Geometry is learned early while absolute scale is not: median-aligned NYUv2 $δ_1$ stays at 0.89--0.93 throughout training as unaligned $δ_1$ wanders between 0.11 and 0.50. The scale is not committed by a single sample: a ten-seed ensemble lifts unaligned $δ_1$ from 0.348 to 0.516 without retraining. Depth and 2D segmentation compete for the shared adapter, and weight merging moves along this trade-off without escaping it. Finally, lower validation flow loss comes with lower Cityscapes accuracy (Spearman $ρ\\approx-0.9$ between loss reduction and mIoU), so the loss cannot select checkpoints. We release code, contracts, training data, and all evaluation outputs.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202611/24/2611.28966v1-what-the-background-hides-thresholds-vocabularies-and-collisions-in-training-free-open-vocabulary-segmentation",
+      "section": "quick",
+      "title_en": "What the Background Hides: Thresholds, Vocabularies and Collisions in Training-Free Open-Vocabulary Segmentation",
+      "authors": "Wendong Yao, Binhua Huang, Soumyabrata Dev",
+      "date": "2026-11-21",
+      "pdf": "https://arxiv.org/pdf/2611.28966v1",
+      "score": "7.0",
+      "evidence": "免训练开放词汇语义分割的评测审计",
+      "tldr": "训练无关开放词汇语义分割常以mIoU排名，但含背景类数据集依赖未统一的逐数据集阈值与背景词表。作者审计13种方法、复跑7个官方代码库，在预注册契约下比较官方配置与严格统一协议。结果显示协议差距从VOC21的22.8个mIoU点到ADE20K的0.1点，并改变方法排序；后续CLIP-only方法相对SCLIP约79%的已报告增益仍保留。背景词与目标名碰撞（如“bed”）还会使受影响类别不可预测。",
+      "tags": "query:seg",
+      "abstract_en": "Training-free open-vocabulary semantic segmentation (OVSS) built on CLIP has advanced rapidly, with methods typically ranked by mean intersection-over-union (mIoU) across standard benchmarks. On datasets with a background class, however, implementations rely on per-dataset thresholds and background word lists that are rarely documented or unified (11 of 13 surveyed methods configure per-dataset background decisions). We audit configurations and papers of 13 training-free OVSS methods, re-run seven from official codebases, and compare official settings against a strict unified protocol under pre-registered contracts. The protocol gap depends strongly on the benchmark---ranging from 22.8 mIoU points on PASCAL VOC (VOC21) to 0.1 points (indistinguishable from zero) on ADE20K---and alters pairwise method rankings. Despite large shifts in absolute mIoU, most of the reported improvement of later CLIP-only methods over SCLIP remains under the unified protocol (roughly 79% of the published gain). Decomposing official background handling shows that it combines numeric settings and class-name files whose dominant component reverses across benchmarks, while no tested tuning-free rule transfers reliably across all datasets. Moreover, exact collisions between background words and target names---present in six of seven official COCO-Object configurations through \"bed\"---make affected classes unpredictable under official post-processing, while the main per-class drops under language-model-generated vocabularies on VOC21 are largely attributable to a few generated terms. We offer reporting recommendations and release our evaluation code, frozen configurations, contracts, and a collision-check tool.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202611/24/2611.26764v1-tachoi-contact-aware-object-reconstruction-and-tracking-for-egocentric-videos",
+      "section": "quick",
+      "title_en": "TacHOI: Contact-Aware Object Reconstruction and Tracking for Egocentric Videos",
+      "authors": "Jackson Codd, Haoyu Li, Xianyi Cheng",
+      "date": "2026-11-19",
+      "pdf": "https://arxiv.org/pdf/2611.26764v1",
+      "score": "6.0",
+      "evidence": "从含手持物体的单目视频恢复度量深度与几何",
+      "tldr": "第一人称视频可为机器人学习提供大规模示范，但单目重建受尺度深度歧义与手部遮挡影响，仅靠图像先验难以确定公制尺度。TacHOI无需训练，融合触觉接触与单目视觉，联合重建和跟踪手物，并用标定手部上的分离触点作为物体尺寸的物理标尺。在ARCTIC和HO3D共100段序列上，其ADD-S*中位误差最低，ARCTIC由15.6降至3.6厘米，HO3D为2.8厘米。该工作无需模板或深度传感器，为触觉增强的第一人称手物重建提供了实用方案。",
+      "tags": "query:mono-depth",
+      "abstract_en": "Egocentric videos offer a scalable source of human demonstrations for robot learning. However, recovering metric object geometry and motion from monocular video is hindered by scale-depth ambiguity and hand-induced occlusion, while image-derived contact and shape priors alone cannot uniquely determine metric scale. We introduce TacHOI, a training-free framework that integrates tactile contact with monocular vision for joint hand-object reconstruction and tracking, without requiring object templates or depth sensors. Starting from pretrained visual estimates, TacHOI uses tactile contact to constrain object depth relative to the estimated hand, while spatially separated contacts on a metrically calibrated hand provide a physical ruler for object extent. It incorporates these constraints into a joint optimization of hand poses, object trajectories, and anisotropic object scale alongside visual alignment. Across 100 ARCTIC and HO3D sequences with synthesized tactile observations, TacHOI achieves the lowest median ADD-S* among the evaluated baselines, reducing error from 15.6 to 3.6 cm on ARCTIC and achieving 2.8 cm on HO3D. Additional experiments on OpenTouch demonstrate its applicability to measured tactile observations.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    }
+  ],
+  "errors": []
+}

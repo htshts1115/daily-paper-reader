@@ -1,0 +1,631 @@
+Title: TacHOI: Contact-Aware Object Reconstruction and Tracking for Egocentric Videos
+
+URL Source: https://arxiv.org/pdf/2611.26764v1
+
+Published Time: Mon, 23 Nov 2026 01:10:59 GMT
+
+Number of Pages: 8
+
+Markdown Content:
+# TacHOI: Contact-Aware Object Reconstruction and Tracking for Egocentric Videos 
+
+Jackson Codd, Haoyu Li, Xianyi Cheng 
+
+Abstract — Egocentric videos offer a scalable source of human demonstrations for robot learning. However, recovering metric object geometry and motion from monocular video is hindered by scale–depth ambiguity and hand-induced occlusion, while image-derived contact and shape priors alone cannot uniquely determine metric scale. We introduce TacHOI, a training-free framework that integrates tactile contact with monocular vision for joint hand–object reconstruction and tracking, without requiring object templates or depth sensors. Starting from pretrained visual estimates, TacHOI uses tactile contact to constrain object depth relative to the estimated hand, while spatially separated contacts on a metrically calibrated hand provide a physical ruler for object extent. It incorporates these constraints into a joint optimization of hand poses, object trajectories, and anisotropic object scale alongside visual alignment. Across 100 ARCTIC and HO3D sequences with synthesized tactile observations, TacHOI achieves the lowest median ADD-S* among the evaluated baselines, reducing error from 15.6 to 3.6 cm on ARCTIC and achieving 2.8 cm on HO3D. Additional experiments on OpenTouch demonstrate its applicability to measured tactile observations. 
+
+I. I NTRODUCTION 
+
+Humans effortlessly manipulate objects in daily life, from pouring a drink to assembling a tool. The growing adoption of smart glasses [1] offers new opportunities to capture these everyday interactions at scale, turning daily activities into a rich source of demonstrations for robots to learn manipulation skills [2]. However, a key challenge of learning manipulation skills from egocentric videos is the ambiguity in estimating precise hand-object trajectories, especially for monocular observation. Hand-induced occlusion and self-occlusion further complicate accurate reconstruction and tracking [13]. A fundamental challenge in monocular reconstruction is scale ambiguity: an object scaled by a factor of k and placed 
+
+k times farther from the camera produces the same image projection. Even accurate masks and 2D tracks therefore cannot uniquely determine its metric scale and depth. When demonstrations are retargeted to a robot, scale errors can lead to misplaced grasps and incorrect motion trajectories. Exist-ing methods rely on additional information, including known instance-level 3D meshes [4], depth measurements [21], multiple camera views [6], object scans [7], or learned shape and grasp priors [8]. These requirements constrain their ap-plicability to in-the-wild human demonstrations. Meanwhile, growing efforts to capture such demonstrations with tactile gloves [9]–[11] offer a complementary source of geometric constraints. Unlike contact inferred from vision, measured tactile contact provides direct physical evidence of hand– object contact, which can constrain reconstruction when Scale Ambiguity! Monocular Videos Inaccurate Pose Estimation   
+
+> Monocular Videos Tactile Scale Aligned Pose Estimation
+
+Fig. 1: Monocular observations allow for multiple object depths and scales with similar image projections. TacHOI uses tactile contact with a metrically calibrated hand to constrain the object’s camera-space depth and anisotropic scale. paired with calibrated hand geometry. To address these challenges, we introduce TacHOI ,a training-free hand-object reconstruction framework that leverages tactile contact as an additional geometric con-straint for hand-object reconstruction and tracking. Unlike contact inferred from vision, measured tactile contact pro-vides physical evidence that is independent of the object’s image projection. TacHOI uses this evidence in two ways. First, tactile contact pulls the reconstructed hand and object together. Second, TacHOI uses the calibrated hand as a physical ruler. Spatially separated contacts provide a caliper-like measurement of the object extent between the contacting parts of the hand. This gives the optimizer a metric constraint on object scale without requiring a known object template or depth sensor. Based on the constraints, the framework jointly optimizes the object’s per-frame pose, anisotropic scale, and the hand pose. In summary, our main contributions are:  
+
+> •
+
+We present a framework that requires no task-specific training for jointly refining object reconstruction, metric scale, 6-DoF pose, and hand pose from monocular egocentric video and tactile contact.  
+
+> •
+
+We show that spatially separated tactile contacts on a calibrated hand act as a metric constraint, resolving the monocular scale-depth ambiguity without object templates or depth sensing.  
+
+> •
+
+We evaluate TacHOI on 100 ARCTIC and HO3D clips under a controlled tactile-synthesis protocol, showing consistent improvements in object scale and camera-space localization over vision-based initialization. arXiv:2611.26764v1 [cs.RO] 19 Nov 2026 II. R ELATED WORK 
+
+A. Model-Free Object Pose Estimation 
+
+Most object-pose estimators assume a CAD model at test time. Model-free methods instead construct object rep-resentations from reference observations or learned geo-metric priors. FoundationPose [4] at its core is a CAD-based method, but it supports model-free pose estimation from reference images. Any6D [5] reconstructs an object representation from a single RGB-D observation and jointly estimates metric size and 6-DoF pose. Although effective on unseen objects, these approaches still rely on reference observations or depth and generally do not exploit physical constraints from hand-object interaction. Recent methods instead reconstruct object motion directly from monocular interaction videos. Do-as-I-Do [12], MagicHOI [13], Follow My HOLD [14], Grasp in Gaussians [15], AGILE [16], and CHOIR [17] combine hand-object interaction cues with learned geometric, generative, or contact priors to improve reconstruction and tracking. These methods demonstrate the value of interaction context, but their contact constraints are inferred from images and therefore remain sensitive to occlusion and errors in monocular depth, scale, and hand pose. TacHOI instead uses measured pressure to provide direct evidence of when and where contact occurs. 
+
+B. Object Reconstruction 
+
+Classical geometry-based methods such as GSLAM [18] recover scene structure through multi-view consistency and camera motion estimation. Reconstruction of handheld ob-jects is more challenging because both the camera and the object may move. Hands also cause severe occlusion, and monocular geometry remains ambiguous in scale. Sequence-level neural reconstruction methods address these challenges by jointly modeling hands and objects. HOLD [3] uses compositional implicit fields for category-agnostic recon-struction, while G-HOP [8] and MagicHOI [13] introduce learned generative or novel-view priors to recover geometry under limited observations. Such priors enable plausible completion of occluded regions but do not necessarily re-cover the metric configuration of the specific observed object. Feed-forward models provide a faster alternative. SAM 3D Objects [19] reconstructs complete objects from masked images, while ForeHOI [20] incorporates video evidence and hand-object-specific completion. These models provide useful geometric priors, but image plausibility and silhouette consistency alone do not determine metric scale or depth. Additionally, pretrained models are limited by the scope of their training data. For naturally ambiguous objects, like bananas, SAM 3D cannot reconstruct with the correct aspect ratios. TacHOI complements pretrained reconstruction with measured contact, introducing a new information source to ground metric pose estimation and reconstruction. 
+
+C. Visuotactile Hand–Object Estimation 
+
+Contact has previously been used as a geometric prior without direct tactile sensing. Contact Potential Fields (CPF) [22] optimize predicted hand-object contacts toward physically plausible configurations, but the contact itself is inferred visually and is therefore unreliable under severe occlusion. Physical tactile sensing can provide stronger con-straints. Tac2Pose [23] estimates object pose from optical tactile observations, while NeuralFeels [24] combines RGB-D, tactile sensing, and robot proprioception to jointly esti-mate object shape and pose. The ViTaM family [25], [26] similarly fuses vision with distributed tactile sensing for reconstruction during deformable or forceful interactions. Mack et al. [27] further show that low-resolution binary con-tact improves RGB-D object-pose estimation within a factor-graph formulation. These approaches demonstrate the value of tactile information but typically assume known object geometry, depth sensing, calibrated robot kinematics, spe-cialized tactile hardware, or learned object-specific models. TacHOI targets a complementary setting: monocular recon-struction of an unknown-category object manipulated by an instrumented human hand. Rather than reconstructing local surface geometry from tactile images, TacHOI converts low-resolution pressure measurements into contact constraints between the estimated hand and object, providing metric information for object depth, scale, and pose without a CAD template, depth sensor, or calibrated robot proprioception. III. M ETHOD 
+
+A. Overview and Initialization 
+
+TacHOI jointly refines hand pose, object pose, and anisotropic object scale using complementary visual and tactile cues. Silhouettes and sparse tracks align the object with the image, tactile contact anchors it to the hand, and the metrically calibrated hand constrains object extent through caliper and contact-spread measurements. The OpenTouch [9] dataset provides a 16 × 16 pressure map. For benchmarks without tactile measurements, we synthesize maps from ground-truth hand and object poses by assigning palmar-facing MANO vertices to their nearest tax-els and measuring their distance to the object mesh. Pressure activates within 3 mm of contact and increases linearly to 1 as the distance approaches zero, approximating sensor com-pliance while preserving pressure magnitude as a continuous per-taxel weight. A YOLO-based detector [39] localizes each hand, and HaMeR [33] initializes its MANO [34] parameters and 2-D joints. Metric hand scale is obtained from Rokoko measurements on OpenTouch [9] and ground-truth MANO bone lengths on ARCTIC [37] and HO3D [38]. For the object, Qwen3-VL [28] and SAM 3 [29] produce a modal mask, which Diffusion-VAS [30] completes to an amodal mask Mt. SAM 3D Objects [19] reconstructs a canonical mesh V0 = {vj }Jj=1 , Do-As-I-Do [12] initializes its camera-space pose and trajectory, and CoTracker3 [31] supplies sparse 2-D tracks for when the object is off-screen. ViPE [32] provides camera-to-world transforms. We convert HaMeR’s weak-perspective translation into a metric wrist-depth estimate ˆdht using the focal length and calibrated hand size. For contact confidence ght > 0.3, these estimates provide a sparse object-depth proxy. We use it to Input 
+
+> RGB video
+> Tactile maps (16 × 16, per hand)
+
+Init 
+
+> HaMeR SAM 3 SAM-3D ViPE
+
+Hand 
+
+> 3D mesh
+
+Object 
+
+> 3D mesh
+
+Joint optimization Mask term 
+
+Lsil , Lattr 
+
+Contact term 
+
+Ltac , Lpen 
+
+Metric term 
+
+Lcal , Lspread 
+
+Hand term 
+
+Lreproj , Ldepth , Lprior 
+
+Regularize 
+
+Ltemp , Lreg , Ltrack  
+
+> Adam
+
+θh, ξo, s
+
+> Hand pose
+> θh
+> Object pose
+> ξo
+> Metric scale
+> s
+
+Refined reconstruction 
+
+> metric, contact-consistent
+
+Qualitative results Fig. 2: Overview of TacHOI. Off-the-shelf models initialize the hands, object, camera trajectory, and amodal masks from monocular RGB. TacHOI jointly refines hand and object trajectories and anisotropic object scale. Image-space terms constrain projected alignment, while measured contact constrains relative depth and supplies metric object-extent measurements. compute one robust metric conversion for the complete Do-As-I-Do trajectory: 
+
+dobj  
+
+> t
+
+=
+
+P 
+
+> h
+
+1[ght > 0.3] ˆdht
+
+P 
+
+> h
+
+1[ght > 0.3] ,κmetric = median 
+
+> t∈T d
+
+dobj 
+
+> t
+
+[ettrk  
+
+> t
+
+]z
+
+, s0 = κmetric estrk  
+
+> ta
+
+.
+
+(1) Here, Td contains valid contact-depth frames and ta is the SAM 3D anchor frame. This conversion initializes metric object scale but does not impose the wrist-depth estimate independently in every frame. 
+
+B. Hand and Object Parameterization 
+
+For each frame, we optimize object rotation rot ∈ R6,translation tot ∈ R3, and a global log-scale correction α ∈
+
+R3 along the canonical principal axes. Anisotropic scaling allows refinement of aspect ratios that are weakly observed from the single SAM 3D anchor view. With mesh centroid 
+
+c0 and principal-axis basis UPCA , the scaled and transformed vertices are 
+
+Aα(v) = c0 + U⊤ 
+
+> PCA
+
+diag( eα)UPCA (v − c0),
+
+xot,j = s0R(rot )Aα(vj ) + tot . (2) Object parameters are optimized in world coordinates. Then, fixed ViPE-estimated camera extrinsics transform them into the camera frame for projection. For each hand h, we optimize one shared MANO shape 
+
+βh ∈ R10 and per-frame articulation θht ∈ R45 , wrist rotation 
+
+rht ∈ R6, and translation tht ∈ R3. We denote the collective hand parameterization by Ψh.
+
+C. Joint Refinement 
+
+We optimize both hands and the object jointly. At each iteration, we sample a shared frame batch B ⊆ { 1, . . . , N }
+
+with |B| = 12 . For any validity set TX , let BX = B ∩ T X .Unless otherwise stated, all refinement losses are evaluated over their corresponding valid minibatch. For each EMA-normalized image term with raw minibatch loss ℓX , we use 
+
+N (ℓX ) = ℓX
+
+sg(EMA[ ℓX ]) + ϵ . (3) For the image-space terms, lowercase ℓX denotes the raw loss, and uppercase LX denotes the value normalized by a stop-gradient exponential moving average. 
+
+minimize Lobj +
+
+> H
+
+X
+
+> h=1
+
+Lh
+
+> hand
+
+over {ξot }Nt=1 , α, {Ψh}Hh=1 
+
+(4) The object objective combines image, tactile, and prior terms. We selected the loss coefficients empirically by evaluating a range of values on representative sequences and iteratively adjusting them based on reconstruction accuracy and opti-mization stability. The complete object objective is: 
+
+Lobj = 1 .5Lsil + Lattr + 10 Ltrack 
+
++Ltac + 3 Lcal + Lreg 
+
+(5) All contact locations, nearest surface points, and penetration gates are recomputed from the current hand and object parameters at every iteration. The image terms Lsil , Lattr ,
+
+Ltrack , and Lh 
+
+> reproj
+
+are normalized by exponential moving averages. Consequently, their coefficients specify target con-tributions rather than raw-loss weights. 
+
+D. Object Measurement Terms 
+
+Let π : R3 → R2 denote perspective projection with known camera intrinsics, let η = HI + WI normalize pixel distances, and let sg( ·) denote stop-gradient. 1) Silhouette Alignment and Mask Attraction: Let St(p) ∈
+
+[0 , 1] be the differentiable rendered silhouette and Mt(p) ∈{0, 1} the amodal mask. Frames without a valid pose, cam-era, or object mask are excluded from the object objective altogether. To down-weight truncated masks, we define a border weight: 
+
+wborder  
+
+> t
+
+= 1 − Bt
+
+Ct
+
+(6) Here Bt is the length of the mask contour coincident with the image border and Ct is its total contour length. For valid-mask frames BM ,
+
+ℓsil = 1
+
+|B M |
+
+X
+
+> t∈B M
+
+wborder 
+
+> t
+
+1
+
+HI WI
+
+X
+
+> p
+
+ St(p) − Mt(p)2
+
+(7) Silhouette overlap provides a strong local signal for projected extent, but its gradients can vanish when the initial projection and mask do not overlap. We therefore sample pixels from the target mask and attract them to projected mesh vertices. The per-pixel cost is the distance to the nearest vertex, discounted by that vertex’s visibility confidence. 
+
+dt(p) = 1
+
+η min 
+
+> j
+
+ ∥p − π(xot,j )∥2 − τv log wvis 
+
+> t,j
+
+ (8) Here wvis  
+
+> t,j
+
+is a detached confidence that discounts self-occluded vertices and vertices near the image boundary. The attraction term complements the silhouette term by computing the pixel distance rather than the pixel overlap of the mask and object projection. Therefore, the attraction term remains active even when the object render does not overlap the mask. Pixels are importance-sampled toward the part of the mask the current silhouette does not yet cover (2000 samples per frame), so the term concentrates on the region the silhouette has not reached. 
+
+ℓattr = 1
+
+|B M |
+
+X
+
+> t∈B M
+
+Ep∼qt
+
+dt(p)
+
+(9) The attraction term guides the object toward the observed mask when the initial overlap is poor, after which the silhouette term provides dense alignment. 
+
+2) Sparse Point Tracks: Silhouettes don’t provide surface correspondence and become ambiguous when truncated. Therefore, we use tracks only when the object leaves the image. Tracks are lifted from up to six frames to improve surface coverage as the object rotates. The lifting frames are the SAM 3D anchor and the frame with the largest fully visible mask in each of five clip segments. We compare each lifted point qm with its observed projection but,m :
+
+et,m = ∥π(Got (qm)) − but,m ∥2
+
+η ,ρc(e) = e2
+
+1 + e2/c 2 .
+
+(10) For minibatch Btrk , the gated track loss is defined with 
+
+ctrk = 30 px /η as 
+
+¯γBtrk = 1
+
+|B trk |
+
+X
+
+> t∈B trk
+
+(1 − wborder  
+
+> t
+
+)2 (11) 
+
+ℓtrack =
+
+P 
+
+> t∈B trk ,m
+
+γtvt,m ρctrk (et,m )
+
+P 
+
+> t∈B trk ,m
+
+γtvt,m + ϵ (12) Here, vt,m denotes track visibility. The inner gate emphasizes truncated frames, while the outer factor ¯γBtrk preserves the gate’s effect after EMA normalization. This prevents tracks, which inherit stage-1 lifting error, from overriding reliable silhouettes on fully visible frames while retaining their correspondence signal under truncation. 
+
+3) Initialization and Static-Scene Priors: Let ut be the fraction of the initial rendering not covered by the mask and at = [1 + ( ut/0.15) 2]−1. We regularize well-initialized frames toward their initial poses. Within each confidently static interval, all frames share one rotation variable, and adjacent translations are encouraged to remain constant. The combined regularizer is 
+
+Lreg = 1
+
+|B| 
+
+X
+
+> t∈B
+
+at
+
+
+
+20 ∥tot − to, 0 
+
+> t
+
+∥22 + 5 ∥rot − ro, 0 
+
+> t
+
+∥22
+
+
+
++ 3 × 10 4
+
+|S static |
+
+X
+
+> (t,t +1) ∈S static
+
+∥tot+1 − tot ∥22. (13) 
+
+E. Tactile Measurement Terms 1) Correspondence-Free Tactile Contact: We compute a contact confidence ght ∈ [0 , 1] from the pressure signal and consider contact active when ght > 0.3. Let Ch
+
+> DGN
+
+contain the 84 contact-candidate entries provided by the official DexGraspNet [36] MANO implementation. Rather than assigning each tactile observation to a specific vertex, we compute a soft minimum over the entire candidate set: 
+
+dh, min  
+
+> t
+
+= −τc log X
+
+> c∈C h
+> DGN
+
+exp 
+
+
+
+− d(c, Got (V0)) 
+
+τc
+
+
+
+,τc = 5 mm .
+
+(14) This correspondence-free constraint resolves along-ray depth ambiguity by requiring the object surface to reach the hand somewhere. Finger identity is used only by the scale constraints below. We define eωtac ,h t from the pressure confidence, retaining plausible contacts when visual evidence is weak and down-weighting initial hand–object offsets that are primarily lateral to the camera ray. The filter is fixed before refinement to prevent lateral hand-tracking errors from pulling the object away from image support. The tactile loss is 
+
+Ltac = 10 3
+
+P
+
+> t∈B tac
+
+P 
+
+> h
+
+eωtac ,h t ρctac (dh, min  
+
+> t
+
+)
+
+P
+
+> t∈B tac
+
+P 
+
+> h
+
+eωtac ,h t + ϵ ,ctac = 10 cm .
+
+(15) Input 
+
+> Ketchup
+
+BundleSDF ForeHOI SAM 3D Ours 
+
+> Mixer Sugar
+
+Fig. 3: Qualitative reconstruction comparison. Each benchmark row shows a common canonical view of the reconstruction baselines, SAM 3D initialization, TacHOI, and ground truth. The results are very similar to SAM 3D since we do not refine object shape. Instead, only the anisotropic axes are modified, allowing us to optimize the reconstruction without distorting the object. 
+
+2) Hand-as-Caliper Scale Constraint: The calibrated hand provides a metric constraint. We use the taxel-to-finger mapping to construct contact patches and treat two patches 
+
+(i, j ) as opposed when their associated object-surface nor-mals have a dot product below −0.9, allowing contacts from either one or two hands. For each opposed pair, we compare the distance between the hand-patch centroids cht,i and cht,j 
+
+with the distance between their nearest object-surface points 
+
+cot,i and cot,j . When the hand grips the object with fingers on opposite sides, ℓobj  
+
+> t,ij
+
+and ℓhand  
+
+> t,ij
+
+should be equal. If not, the object’s anisotropic scale is corrected until they match. 
+
+ℓobj  
+
+> t,ij
+
+= ∥cot,i − cot,j ∥2, ℓhand  
+
+> t,ij
+
+= ∥cht,i − cht,j ∥2,rcal  
+
+> t,ij
+
+= ℓobj  
+
+> t,ij
+
+− ℓhand  
+
+> t,ij
+
+. (16) Let Ot denote the valid opposed pairs and wt,ij their confidence. We define the caliper loss as 
+
+Lcal = 10 3
+
+X
+
+> t∈B cal
+> (i,j )∈O t
+
+wt,ij ρctac 
+
+ rcal 
+
+> t,ij
+
+X
+
+> t∈B cal
+> (i,j )∈O t
+
+wt,ij + ϵ . (17) 
+
+3) Contact-Spread Scale Floor: Any two simultaneous contact patches, from the same or different hands, provide a lower bound on the object’s diameter. Unlike the caliper term, this constraint does not require opposed surface nor-mals. To reduce errors from uncertain wrist depth and finite patch size, we retain only the separation perpendicular to the camera ray and subtract both patch radii. 
+
+∆cht,ij = cht,j − cht,i ,ℓfloor  
+
+> t,ij
+
+= (I3 − dt,ij d⊤ 
+
+> t,ij
+
+)∆ cht,ij 2 − ϱt,i − ϱt,j . (18) We estimate a robust scale floor from readings near the clip’s 95 th percentile. Let r be the ratio of this floor to the prior’s longest extent. When r ∈ [1 .03 , 1.6] , we initialize the corresponding log-scale correction with log r and prevent optimization from shrinking the object below the measured floor. Smaller ratios are uninformative, while larger ratios are rejected as likely outliers. 
+
+F. Hand Objective 
+
+For each hand h, the hand objective is defined as follows. 
+
+Lh 
+
+> hand
+
+=Lh 
+
+> reproj
+
++ 10 Lh 
+
+> depth
+
++ Lh 
+
+> prior
+
++ 5 Lh
+
+> range
+
++ λtemp Lh 
+
+> temp
+
++ 100 Lh
+
+> pen
+
+(19) The hand objective uses an EMA-normalized mean 2-D joint reprojection loss Lh 
+
+> reproj
+
+to anchor the hand in the image plane. A wrist-depth loss Lh 
+
+> depth
+
+penalizes the squared difference between the optimized wrist depth and the HaMeR estimate, interpolated when unavailable. The initialization prior Lh 
+
+> prior
+
+regularizes MANO pose and shape toward their stage-1 estimates, while Lh 
+
+> range
+
+penalizes pose parameters with magnitude above 2 radians. The temporal loss Lh 
+
+> temp
+
+discourages abrupt hand motion by penalizing second-order differences in translation, 6-D wrist rotation, and articulation. We set λtemp = 10 
+
+for sequences recorded at 30 fps and reduce it to 0.1 for the temporally subsampled ARCTIC and HO3D sequences, where adjacent frames are farther apart. The penetration loss Lh 
+
+> pen
+
+prevents implausible hand– object intersections. For each candidate hand vertex vht,q , we find its nearest object-surface point cot,q and outward normal 
+
+not,q , and compute δht,q = ( vht,q − cot,q )⊤not,q . Negative values indicate that the vertex lies inside the object. We activate the loss for vertices with more than 1 cm of penetration, apply a 5 mm residual offset, and cap the residual at 4 cm to limit extreme gradients. The nearest surface points and normals are detached during optimization, so this term updates the hand without moving the object. G. Implementation Details 
+
+We optimize Eq. (4) with Adam [40] for 600 iterations using an initial learning rate of 3 × 10 −3 and cosine anneal-ing [41]. Each iteration samples 12 frames for the shared hand-object terms and up to eight additional frames from those on which the hand is detected. We freeze α for the first 33% of iterations so that pose converges before scale can absorb pose error. We render soft silhouettes with PyTorch3D [35], and contact-candidate vertices follow DexGraspNet [36]. Across 54 ARCTIC fits, joint refinement required a median of 50 s per clip, with a range of 42 –111 s. PyTorch3D’s nondeterministic CUDA atomics produce run-to-run mIoU differences of approximately 2 × 10 −5.IV. E XPERIMENTS 
+
+We evaluate whether tactile contact can serve as an effec-tive metric constraint for object pose and reconstruction. We assess camera-space tracking accuracy, analyze the contribu-tions of individual loss groups, evaluate object geometry and scale, and demonstrate the complete pipeline using measured tactile data on in-the-wild OpenTouch clips. 
+
+A. Experimental Setup 
+
+Datasets and tactile observations. ARCTIC [37] con-tributes 55 egocentric bimanual clips spanning 11 articulated objects and seven subjects. It provides object and MANO ground truth but no sensor depth. HO3D [38] contributes 45 single-hand clips covering nine YCB objects and provides object, hand, and RGB-D ground truth. We evaluate five clips per object and subsample each clip to at most 150 frames. Neither benchmark records touch, so we synthesize the map from ground truth object and hand pose. OpenTouch [9] provides 30 in-the-wild clips with a measured 16 ×16 pressure glove and motion-capture hand skeleton, but no object-pose, object-geometry, or depth ground truth. 
+
+Baselines and coverage. We compare TacHOI against FoundationPose [4], BundleSDF [21], and ForeHOI [20]. FoundationPose is provided the ground-truth CAD model. On HO3D, FoundationPose, Do As I Do, and BundleSDF use sensor depth, and on ARCTIC they use ViPE-estimated monocular depth. These comparisons are therefore informa-tive but not strictly input-matched. We exclude HOLD [3] and Magic HOI [13] because their per-sequence runtime makes evaluation at our benchmark scale impractical. Vi-TaM [25] is not directly comparable because it relies on a learned distributed-tactile framework and targets dynamic interaction reconstruction rather than metric object pose and scale. 
+
+Metrics. ADD-S ∗ is the directed mean nearest-surface dis-tance from the posed prediction to ground truth. The asterisk distinguishes this non-corresponding-mesh variant, which includes both reconstruction and pose error. We also report centroid error, along-ray error, and rotation error. Shape metrics use similarity ICP followed by bidirectional Chamfer distance (CD) and F-score at 5 and 10 mm. Similarity align-ment removes translation, rotation, and scale and therefore evaluates shape rather than metric reconstruction. Scale error is reported analogously as the magnitude of the signed median. We compute a statistic per clip and report the median across all clips per dataset. 
+
+B. Metric Camera-Space Tracking 
+
+TABLE I: Metric camera-space tracking without alignment or scale normalization.                                 
+
+> Method / Metric Constraint ADD-S ∗
+> (cm) ↓
+> Centroid (cm) ↓
+> Along-Ray Error (cm) ↓
+> Rotation (◦)↓
+> ARCTIC
+> Do As I Do track / ViPE 15.6 16.4 17.5 41.5 FoundationPose / ViPE 35.2 39.2 35.0 70.4 BundleSDF / ViPE 21.4 22.5 21.4 62.7
+> TacHOI / hand + contact 3.6 5.6 1.8 40.1
+> HO3D
+> Do As I Do track / sensor 3.6 5.3 3.4 58.2 FoundationPose / sensor 7.4 7.6 4.8 43.1
+> BundleSDF / sensor 3.3 2.8 0.6 51.7
+> TacHOI / hand + contact 2.8 4.4 0.6 57.6
+
+Table I reports the primary result. On ARCTIC, which has no depth sensor, TacHOI reduces ADD-S ∗ from 15.6 cm for the closest baseline to 3.6 cm and centroid error from 16.4 to 5.6 cm. TacHOI reduces along-ray error from 17.5 to 1.8 cm. On HO3D, TacHOI achieves the lowest ADD-S ∗ at 2.8 cm with full coverage, while BundleSDF obtains lower centroid and along-ray errors on the 77% of frames for which it returns a pose. Rotation remains challenging on HO3D, even though FoundationPose benefits from the ground-truth CAD model. Overall, these results show that contact with a calibrated hand provides an effective metric constraint for monocular object tracking. 
+
+C. Object Shape and Scale 
+
+TABLE II: Shape after similarity ICP and relative metric scale error. 
+
+Method F@5 mm (%) ↑
+
+F@10 mm (%) ↑
+
+CD (cm) ↓
+
+Scale Error (%) ↓
+
+ARCTIC 
+
+BundleSDF 30.4 49.5 2.59 31.0 ForeHOI 38.2 60.7 1.98 55.0 SAM 3D prior 45.0 71.2 1.61 12.0 
+
+TacHOI 47.3 71.5 1.49 4.0 
+
+HO3D 
+
+BundleSDF 40.9 68.3 1.58 7.0 ForeHOI 70.2 90.9 0.87 24.0 SAM 3D prior 73.9 92.9 0.78 11.0 
+
+TacHOI 77.4 94.2 0.76 5.0 
+
+Table II evaluates canonical geometry after similarity alignment. TacHOI achieves the strongest scores on both datasets, but improvements over the SAM 3D prior are modest: F@5 increases by 2.3 points on ARCTIC and 3.5 points on HO3D. This is expected because TacHOI adjusts anisotropic extent rather than explicitly refining mesh shape, Input Do As I Do FoundationPose BundleSDF Ours 
+
+no pose 
+
+> Box Mixer Sugar
+
+Fig. 4: Qualitative camera-space pose comparison. These overlays place the ground truth mesh at the predicted pose, isolating the pose produced by each method. BundleSDF fails to produce a pose for 48/150 frames on the box clip. so most object geometry is inherited from SAM 3D Objects. Tactile observations also provide limited shape information in these sequences, since subjects typically maintain a similar grasp throughout each clip, leaving very little data for tactile-based refinement to work with. 
+
+D. Sources of Metric Accuracy 
+
+TABLE III: Ablation of the loss groups.                                                                                   
+
+> Centroid (cm) ↓Along-Ray Error (cm) ↓Scale Error (%) ↓
+> MPJPE (cm) ↓
+> Configuration Median Mean Median Mean
+> ARCTIC (n= 22 )Full objective 4.9 0.1 1.1 1.9 0.8 3.5 w/o hand terms 4.8 0.7 1.6 1.2 1.8 6.4 w/o image terms 5.9 1.1 0.3 3.6 0.8 3.5 w/o contact + occl. 4.8 0.9 1.6 1.2 1.6 3.4
+> w/o metric scale 4.7 1.6 2.2 1.6 3.5 3.5 w/o regularizers 5.2 0.3 1.0 0.7 0.9 3.5
+> HO3D (n= 18 )Full objective 4.2 0.3 0.5 4.3 11.9 3.8
+> w/o hand terms 4.7 0.1 0.8 4.6 12.1 7.4 w/o image terms 6.7 2.2 1.7 1.0 7.6 4.3 w/o contact + occl. 5.1 1.2 1.4 4.7 12.1 4.0 w/o metric scale 3.9 0.2 1.0 8.2 13.1 3.8
+> w/o regularizers 4.5 0.2 0.7 5.0 12.3 3.8
+
+Grouped ablation. Table III shows a loss-group ablation on a balanced subset containing two clips per object (22 ARCTIC and 18 HO3D clips). Each row removes one group from the full objective. Every arm starts from the same stage-1 initialization on the same frames. Removing the image terms lowers scale error but nothing then anchors the object to the mask, so centroid error rises to 5.9 and 6.7 cm. Along-ray error grows to over 1 cm. Removing the contact terms leaves object placement nearly unchanged but raises along-ray error from 0.1 to 0.9 cm on ARCTIC and 0.3 to 1.2 cm on HO3D, since depth is no longer tied to the hand. Removing the metric-scale terms yields the lowest centroid error on both datasets but nearly doubles HO3D scale error (4.3 to 8.2%), and removing the hand terms barely affects the object while doubling hand error (3.5 to 6.4 cm, 3.8 to 7.4 cm). The full objective is the only configuration that avoids a large loss in any column, and it gives the lowest along-ray error on ARCTIC, the quantity contact is meant to constrain. 
+
+E. OpenTouch Evaluation Input Pose Reconstruction 
+
+> Cup  Bottle Bottle
+
+Fig. 5: Measured-tactile OpenTouch qualitative results on three objects in the grocery subset. OpenTouch dataset is particularly challenging due to high clutter and quick movements. TacHOI often struggles with these clips, but, on clips where SAM 3D can create a good enough mesh, and the hand can be tracked well, our method produces exceptional results. This experiment establishes end-to-end operation with measured pressure, but metric accuracy on real data requires independently measured object pose or dimensions. V. C ONCLUSION 
+
+We presented TacHOI, a framework that jointly refines hand poses, object motion, and metric scale by combining monocular visual estimates with tactile contact. Our results show that contact with a calibrated hand provides a metric reference beyond image consistency: contact constrains ob-ject depth, while separated contacts constrain object extent. The resulting gains primarily concern metric placement and scale, highlighting the value of touch for grounding visually plausible reconstructions in physical dimensions. REFERENCES [1] J. Engel et al., “Project Aria: A new tool for egocentric multi-modal AI research,” arXiv preprint arXiv:2308.13561, 2023. [2] S. Kareer et al., “EgoMimic: Scaling imitation learning via egocentric video,” in Proc. IEEE Int. Conf. Robot. Autom. (ICRA) , 2025, pp. 13226–13233. [3] Z. Fan, M. Parelli, M. E. Kadoglou, M. Kocabas, X. Chen, M. J. Black, and O. Hilliges, “HOLD: Category-agnostic 3D reconstruction of interacting hands and objects from video,” in Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit. (CVPR) , 2024, pp. 494–504. [4] B. Wen, W. Yang, J. Kautz, and S. Birchfield, “FoundationPose: Unified 6D pose estimation and tracking of novel objects,” in Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit. (CVPR) , 2024, pp. 17868–17879. [5] T. Lee, B. Wen, M. Kang, G. Kang, I. S. Kweon, and K.-J. Yoon, “Any6D: Model-free 6D pose estimation of novel objects,” in Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit. (CVPR) , 2025, pp. 11633–11643. [6] J. Zhang, H. Luo, H. Yang, X. Xu, Q. Wu, Y. Shi, J. Yu, L. Xu, and J. Wang, “NeuralDome: A neural modeling pipeline on multi-view human-object interactions,” in Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit. (CVPR) , 2023, pp. 8834–8845. [7] C. Zhao, J. Zhang, J. Du, Z. Shan, J. Wang, J. Yu, J. Wang, and L. Xu, “I’m HOI: Inertia-aware monocular capture of 3D human-object interactions,” in Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit. (CVPR) , 2024, pp. 729–741. [8] Y. Ye, A. Gupta, K. Kitani, and S. Tulsiani, “G-HOP: Generative hand-object prior for interaction reconstruction and grasp synthesis,” in 
+
+Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit. (CVPR) , 2024, pp. 1911–1920. [9] Y. R. Song et al., “OPENTOUCH: Bringing full-hand touch to real-world interaction,” in Proc. Int. Conf. Learn. Represent. (ICLR) , 2026. [10] A. Adeniji et al., “Feel the force: Contact-driven learning from humans,” arXiv preprint arXiv:2506.01944, 2025. [11] J. Yin et al., “OSMO: Open-source tactile glove for human-to-robot skill transfer,” arXiv preprint arXiv:2512.08920, 2025. [12] B. Paliwal, H. Etukuru, W. Liang, P. Abbeel, N. M. M. Shafiullah, and J. Malik, “Do as I do: Dexterous manipulation data from everyday human videos,” arXiv preprint arXiv:2606.19333, 2026. [13] S. Wang, H. He, M. Parelli, C. Gebhardt, Z. Fan, and J. Song, “Magi-cHOI: Leveraging 3D priors for accurate hand-object reconstruction from short monocular video clips,” in Proc. IEEE/CVF Int. Conf. Comput. Vis. (ICCV) , 2025, pp. 5957–5968. [14] A. I. Aytekin, H. Rhodin, R. Dabral, and C. Theobalt, “Follow My Hold: Hand-object interaction reconstruction through geometric guidance,” in Proc. Int. Conf. 3D Vis. (3DV) , 2026, pp. 795–805. [15] A. I. Aytekin et al., “Grasp in Gaussians: Fast monocular re-construction of dynamic hand-object interactions,” arXiv preprint arXiv:2604.12929, 2026. [16] J.-C. Shi et al., “AGILE: Hand-object interaction reconstruction from video via agentic generation,” in Proc. ACM SIGGRAPH Conf. Papers ,2026, pp. 1–11. [17] H. Xu, Y. Liu, Y. Wang, C.-W. Fu, and N. J. Mitra, “CHOIR: Contact-aware 4D hand-object interaction reconstruction,” arXiv preprint arXiv:2605.20992, 2026. [18] C. Tang, O. Wang, and P. Tan, “GSLAM: Initialization-robust monocu-lar visual SLAM via global structure-from-motion,” in Proc. Int. Conf. 3D Vis. (3DV) , 2017, pp. 155–164. [19] X. Chen et al., “SAM 3D: 3Dfy anything in images,” in Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit. (CVPR) , 2026, pp. 7220–7232. [20] Y. Chen et al., “ForeHOI: Feed-forward 3D object reconstruction from daily hand-object interaction videos,” in Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit. (CVPR) , 2026, pp. 8868–8879. [21] B. Wen et al., “BundleSDF: Neural 6-DoF tracking and 3D recon-struction of unknown objects,” in Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit. (CVPR) , 2023, pp. 606–617. [22] L. Yang, X. Zhan, K. Li, W. Xu, J. Li, and C. Lu, “CPF: Learning a contact potential field to model the hand-object interaction,” in Proc. IEEE/CVF Int. Conf. Comput. Vis. (ICCV) , 2021, pp. 11077–11086. [23] M. Bauza, A. Bronars, and A. Rodriguez, “Tac2Pose: Tactile object pose estimation from the first touch,” Int. J. Robot. Res. , vol. 42, no. 13, pp. 1185–1209, 2023. [24] S. Suresh et al., “NeuralFeels with neural fields: Visuotactile percep-tion for in-hand manipulation,” Sci. Robot. , vol. 9, no. 96, Art. no. eadl0628, 2024. [25] C. Jiang et al., “Capturing forceful interaction with deformable ob-jects using a deep learning-powered stretchable tactile array,” Nat. Commun. , vol. 15, no. 1, Art. no. 9513, 2024. [26] Z. Yu, W. Xu, P. Xie, Y. Li, B. W. Anthony, Z. Zhang, and C. Lu, “Dynamic reconstruction of hand-object interaction with distributed force-aware contact representation,” in Proc. IEEE/CVF Int. Conf. Comput. Vis. (ICCV) , 2025, pp. 8590–8599. [27] L. Mack, F. Gr¨ uninger, B. A. Richardson, R. Lendway, K. J. Kuchen-becker, and J. Stueckler, “Visuo-tactile object pose estimation for a multi-finger robot hand with low-resolution in-hand tactile sensing,” in Proc. IEEE Int. Conf. Robot. Autom. (ICRA) , 2025, pp. 12401– 12407. [28] S. Bai et al., “Qwen3-VL technical report,” arXiv preprint arXiv:2511.21631, 2025. [29] N. Carion et al., “SAM 3: Segment anything with concepts,” in Proc. Int. Conf. Learn. Represent. (ICLR) , 2026, pp. 138846–138923. [30] K. Chen, D. Ramanan, and T. Khurana, “Using diffusion priors for video amodal segmentation,” in Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit. (CVPR) , 2025, pp. 22890–22900. [31] N. Karaev, Y. Makarov, J. Wang, N. Neverova, A. Vedaldi, and C. Rupprecht, “CoTracker3: Simpler and better point tracking by pseudo-labelling real videos,” in Proc. IEEE/CVF Int. Conf. Comput. Vis. (ICCV) , 2025, pp. 6013–6022. [32] J. Huang et al., “ViPE: Video pose engine for 3D geometric percep-tion,” NVIDIA Res. White Papers , 2025. [33] G. Pavlakos, D. Shan, I. Radosavovic, A. Kanazawa, D. Fouhey, and J. Malik, “Reconstructing hands in 3D with transformers,” in Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit. (CVPR) , 2024, pp. 9826–9836. [34] J. Romero, D. Tzionas, and M. J. Black, “Embodied hands: Modeling and capturing hands and bodies together,” ACM Trans. Graph. , vol. 36, no. 6, Art. no. 245, pp. 1–17, 2017. [35] J. Johnson, N. Ravi, J. Reizenstein, D. Novotny, S. Tulsiani, C. Lass-ner, and S. Branson, “Accelerating 3D deep learning with PyTorch3D,” in Proc. ACM SIGGRAPH Asia Courses , 2020, pp. 1–1. [36] R. Wang, J. Zhang, J. Chen, Y. Xu, P. Li, T. Liu, and H. Wang, “DexGraspNet: A large-scale robotic dexterous grasp dataset for general objects based on simulation,” in Proc. IEEE Int. Conf. Robot. Autom. (ICRA) , 2023, pp. 11359–11366. [37] Z. Fan, O. Taheri, D. Tzionas, M. Kocabas, M. Kaufmann, M. J. Black, and O. Hilliges, “ARCTIC: A dataset for dexterous bimanual hand-object manipulation,” in Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit. (CVPR) , 2023, pp. 12943–12954. [38] S. Hampali, M. Rad, M. Oberweger, and V. Lepetit, “HOnnotate: A method for 3D annotation of hand and object poses,” in Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit. (CVPR) , 2020, pp. 3193–3203. [39] J. Redmon, S. Divvala, R. Girshick, and A. Farhadi, “You only look once: Unified, real-time object detection,” in Proc. IEEE Conf. Comput. Vis. Pattern Recognit. (CVPR) , 2016, pp. 779–788. [40] D. P. Kingma and J. Ba, “Adam: A method for stochastic optimiza-tion,” in Proc. Int. Conf. Learn. Represent. (ICLR) , 2015. [41] I. Loshchilov and F. Hutter, “SGDR: Stochastic gradient descent with warm restarts,” in Proc. Int. Conf. Learn. Represent. (ICLR) , 2017.

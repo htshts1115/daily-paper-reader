@@ -1,0 +1,907 @@
+Title: What the Background Hides: Thresholds, Vocabularies and Collisions in Training-Free Open-Vocabulary Segmentation
+
+URL Source: https://arxiv.org/pdf/2611.28966v1
+
+Published Time: Tue, 24 Nov 2026 02:31:53 GMT
+
+Number of Pages: 33
+
+Markdown Content:
+# Highlights 
+
+## What the Background Hides: Thresholds, Vocabularies and Collisions in Training-Free Open-Vocabulary Segmentation 
+
+Wendong Yao, Binhua Huang, Soumyabrata Dev • Seven training-free OVSS methods re-run from official code under two protocols • The official-vs-unified gap ranges from 22.8 mIoU on VOC21 to 0.1 on ADE20K • Most reported progress over SCLIP survives the strict unified protocol • Which part of background handling matters most reverses across benchmarks • Exact name collisions with background words make classes unpredictable arXiv:2611.28966v1 [cs.CV] 21 Nov 2026 What the Background Hides: Thresholds, Vocabularies and Collisions in Training-Free Open-Vocabulary Segmentation ⋆
+
+## Wendong Yao a,b , Binhua Huang a,b and Soumyabrata Dev a,b,c ,∗
+
+> a
+
+ADAPT Research Centre, O’Reilly Institute, Trinity College Dublin, Dublin 2, Ireland 
+
+> b
+
+School of Computer Science, University College Dublin, Belfield, Dublin 4, Ireland 
+
+> c
+
+School of Computer Science and Statistics, Trinity College Dublin, College Green, Dublin 2, Ireland 
+
+A R T I C L E I N F O 
+
+Keywords :Open-vocabulary segmentation Semantic segmentation Vision-language models CLIP Evaluation protocol Background modeling Reproducibility 
+
+A B S T R A C T 
+
+Training-free open-vocabulary semantic segmentation (OVSS) built on CLIP has advanced rapidly, with methods typically ranked by mean intersection-over-union (mIoU) across standard benchmarks. On datasets with a background class, however, implementations rely on per-dataset thresholds and background word lists that are rarely documented or unified (11 of 13 surveyed methods configure per-dataset background decisions). We audit configurations and papers of 13 training-free OVSS methods, re-run seven from official codebases, and compare official settings against a strict unified protocol under pre-registered contracts. The protocol gap depends strongly on the benchmark—ranging from 22.8 mIoU points on PASCAL VOC (VOC21) to 0.1 points (indistinguishable from zero) on ADE20K—and alters pairwise method rankings. Despite large shifts in absolute mIoU, most of the reported improvement of later CLIP-only methods over SCLIP remains under the unified protocol (roughly 79% of the published gain). Decomposing official background handling shows that it combines numeric settings and class-name files whose dominant component reverses across benchmarks, while no tested tuning-free rule transfers reliably across all datasets. Moreover, exact collisions between background words and target names—present in six of seven official COCO-Object configurations through “bed”—make affected classes unpredictable under official post-processing, while the main per-class drops under language-model-generated vocabularies on VOC21 are largely attributable to a few generated terms. We offer reporting recommendations and release our evaluation code, frozen configurations, contracts, and a collision-check tool. 
+
+## 1. Introduction 
+
+Semantic segmentation assigns a semantic label to every pixel of an image and is a basic step towards dense scene understanding Long, Shelhamer and Darrell (2015). Conventional models are trained under a closed-set assumption: they can only predict the categories in their training label set, and recognizing new ones requires new annotations and retraining. Open-vocabulary semantic segmentation (OVSS) removes this restriction by letting users specify the target categories with free-form text at inference time Li, Weinberger, Belongie, Koltun and Ranftl (2022); Ghiasi, Gu, Cui and Lin (2022). Most OVSS methods build on CLIP Radford, Kim, Hallacy, Ramesh, Goh, Agarwal, Sastry, Askell, Mishkin, Clark, Krueger and Sutskever (2021), which is trained contrastively on hundreds of millions of image–text pairs so that images and texts share one embedding space; a new category can be recognized simply by encoding its name. However, CLIP is trained to match whole images with their captions, so its patch-level features carry little spatial information. Used directly for pixel-level prediction, CLIP therefore produces poorly localized masks Wang, Mei and Yuille (2024). Current OVSS models follow two main technical routes to address this limitation: training-based and training-free methods. Training-based methods learn dense visual-language alignment through pixel- or region-level supervision Li et al. (2022); Ghiasi et al. (2022); Cho, Shin, Hong, Arnab, Seo and Kim (2024), or train using only image-text pairs Xu, De Mello, Liu, Byeon, Breuel, Kautz and Wang (2022); Cha, Mun and Roh (2023). However, these methods require additional data and training costs, and may be biased towards training categories. In contrast, training-free methods perform segmentation by adjusting the inference process of frozen pretrained models, without additional  
+
+> ⋆
+
+Code, configuration scripts, derived-dataset scripts, the collision-check tool and pre-registered contracts: https://github.com/ WendongYao/ovss-background-audit ; run outputs and per-image statistics: https://doi.org/10.5281/zenodo.24338613 .
+
+> ∗
+
+Corresponding author 
+
+devs@tcd.ie (S. Dev) 
+
+> ORCID
+
+(s): 
+
+W. Yao et al.: Preprint submitted to Elsevier Page 1 of 32 Background handling in training-free OVSS 
+
+task-specific training or segmentation annotations Kombol, Martinović and Šegvić (2025). This makes them suitable for annotation-scarce domains, such as remote sensing Li, Liu, Cao, Bai, Zhou, Meng and Wang (2025a). MaskCLIP pioneered the extraction of dense visual features for OVSS Zhou, Loy and Dai (2022). Subsequent methods focus on improving CLIP’s final-layer feature aggregation: SCLIP introduces correlative self-attention, NACLIP adds a spatial neighborhood prior, and ClearCLIP removes residual connections and the feed-forward network (FFN) to reduce noise Wang et al. (2024); Hajimiri, Ben Ayed and Dolz (2025); Lan, Chen, Ke, Wang, Feng and Zhang (2024a). Beyond the final layer, ResCLIP uses intermediate-layer attention weights and scores to improve spatial correspondence, while SC-CLIP repairs anomaly tokens and fuses multi-layer features Yang, Deng, Li and Duan (2025); Bai, Liu, Han, Zhang, Tang, Zhou and Lu (2025). Other methods leverage external visual foundation models, such as DINO and SAM Caron, Touvron, Misra, Jégou, Mairal, Bojanowski and Joulin (2021); Kirillov, Mintun, Ravi, Mao, Rolland, Gustafson, Xiao, Whitehead, Berg, Lo et al. (2023): ProxyCLIP computes proxy attention from DINO or SAM features, while Trident combines local feature concatenation, SAM-guided global aggregation, and mask refinement Lan, Chen, Ke, Wang, Feng and Zhang (2024b); Shi, Dong and Xu (2025). These methods are commonly evaluated using mean intersection-over-union (mIoU) on PASCAL VOC, PASCAL Context, COCO-Object, COCO-Stuff, Cityscapes, and ADE20K Everingham, Van Gool, Williams, Winn and Zisserman (2010); Mottaghi, Chen, Liu, Cho, Lee, Fidler, Urtasun and Yuille (2014); Lin, Maire, Belongie, Hays, Perona, Ramanan, Dollár and Zitnick (2014); Caesar, Uijlings and Ferrari (2018); Cordts, Omran, Ramos, Rehfeld, Enzweiler, Benenson, Franke, Roth and Schiele (2016); Zhou, Zhao, Puig, Fidler, Barriuso and Torralba (2017). However, even when background is treated as an evaluation category, methods may use different rules to decide which pixels belong to background, despite being evaluated under the same standard and mIoU metric. In official implementations, background may be determined through foreground confidence thresholds or predefined lists of background terms. Foreground category names may also be rephrased, and these choices are not always documented in detail. Among the 13 methods reviewed in our literature audit, 9 used a list of words rather than the single word "background" to represent background on VOC21 (Table 1). Such variation makes it difficult to determine whether reported performance improvements arise from the methods themselves or from their background settings based on reported mIoU scores alone. To our knowledge, no study has quantified this contribution. Moreover, these variations can affect comparisons between methods: 6 of the 21 method pairs reversed their relative rankings on VOC21 when their official settings were replaced by a unified protocol (this result reflects the overall impact of protocol differences, rather than background processing alone). These choices also present challenges in practical applications. In new domains without annotated validation data, foreground confidence thresholds cannot be selected through validation. Background word lists may also conflict with target categories. Among the 7 reproduced official configurations, 6 included "bed" in their COCO-Object background word lists, even though "bed" is itself a target category in COCO-Object (Section 4.4). Such conflicts already occur on the original benchmark and may become more likely when users change the set of target categories. Therefore, controlling and fully disclosing background settings would help distinguish methodological contributions from background-related effects, enable comparisons under a common protocol, and provide a reproducible, tuning-free starting point for new domains lacking annotations. This motivates our research question: How much do dataset-specific background settings contribute to reported mIoU on benchmarks with a background class, and can they be replaced by rules requiring no per-dataset tuning? To answer this question, we re-run seven representative training-free OVSS methods using their official code, covering four technical routes: last-layer attention modification (SCLIP, NACLIP), residual removal (ClearCLIP), intermediate-layer feature utilization (ResCLIP, SC-CLIP), and external vision foundation models (ProxyCLIP, Trident). First, we compare the reproduced results with the numbers published by the authors to verify the reliability of our experiments. We then compare each method’s official setting (O) with a strictly unified protocol (P*) based on Text-grounded Contrastive Learning (TCL) Cha et al. (2023). Compared with TCL, P* is stricter in three aspects: it uses only the word "background" with a threshold of zero, ignores dataset-specific hyperparameter settings, and disables optional pixel-level post-processing such as PAMR, while retaining method-specific components. Based on P*, we restore the official numerical settings (THR), followed by the official class-name files (BGB), and then remove background words that collide with target categories (NC). This allows us to examine how different settings contribute to the reported benchmark results. Besides that, we construct derived benchmarks from PASCAL Context and COCO-Stuff with different proportions of background pixels to examine how protocol differences vary with background coverage. Finally, we define and freeze the research hypotheses, decision thresholds, and decision rules before each experiment, with any subsequent deviations appended to the contract.   
+
+> W. Yao et al.: Preprint submitted to Elsevier Page 2 of 32 Background handling in training-free OVSS
+
+Our evaluation reveals three main findings. First, the performance gap between official settings and the unified protocol varies considerably across benchmark datasets. Averaged over the seven methods, mIoU increases by 22.8 points on VOC21 when moving from P* to official settings, compared with only 2.0 points on Context-60. The gains from official background settings also increase with the proportion of background pixels, although background coverage alone cannot explain their magnitude. Second, different components dominate the gains from restoring official background settings across benchmarks. On VOC21, about 77% of the gain comes from class-name files, while on COCO-Object, 77% comes from numeric settings, such as probability thresholds, logit scales, and area thresholds. Third, on two derived benchmarks based on COCO-Stuff, removing background words that conflict with target categories improves average mIoU by 1.3 points. A smaller but consistent gain is also observed on the original COCO-Object benchmark. However, the tuning-free rules and LLM-generated vocabularies we test cannot yet consistently replace settings tuned for each dataset. Importantly, for the evaluated later CLIP-only methods, most of their reported improvements over SCLIP are retained under the unified protocol. Our main contributions are as follows: 1. We audit the background configurations of 13 training-free OVSS methods and reproduce seven of them using their official code. Based on this, we compare their official settings with a strictly unified benchmark protocol (P ∗) derived from TCL Cha et al. (2023), providing a consistent evaluation condition for fair comparison. We also release the code and configurations to support reproducibility (Section 2.2). 2. We use controlled experiments to separate the contributions of numeric background settings and class-name files to segmentation performance. We further investigate the effects of background pixel proportion, conflicts between background words and target categories, and tuning-free replacement rules to identify the sources of performance variation across benchmark settings (Section 4.4). 3. We develop conflict-checking rules and their implementation, which we will release as a standalone tool to identify overlaps between background words and target categories. We also provide a benchmark reporting checklist to help researchers disclose key background settings and report experimental results in a reproducible manner (Section 5.2). The remainder of this paper is organized as follows. Section 2 reviews related work on OVSS, benchmark protocols, and background modeling. Section 3 introduces the scope of the audit, experimental settings, benchmark protocols, preregistered analysis, and reproduction procedures. Section 4 presents the experimental results, focusing on how variations in benchmark protocols and background processing settings affect segmentation performance. Section 5 discusses the transferability of background handling, a recommended reporting protocol, and the limitations of this study. Section 6 concludes the paper. The appendices provide supplementary results, details of the derived benchmarks, and the full preregistration contracts and their corresponding decisions. 
+
+## 2. Related work 
+
+2.1. Training-free open-vocabulary segmentation 
+
+Training-based OVSS method can utilize pixel-level or masked supervision to learn mapping relationship in dense vision-language, such as LSeg, OpenSeg and CAT-Seg Li et al. (2022); Ghiasi et al. (2022); Cho et al. (2024); and is also able to run weakly supervised learning by only depending on image-text pair, such as GroupViT and TCL Xu et al. (2022); Cha et al. (2023). In this paper, we define training-free method as method without the need of extra parameter optimization for segmentation tasks after pre-training; It is not equal when comparing training-free in this paper with not using pixel-annotation or freezing the backbone itself. For example, CLIP-DINOiser needs to Train the spatial refinement module while CLIP is frozen Wysoczańska, Siméoni, Ramamonjisoa, Bursuc, Trzciński and Pérez (2024); Talk2DINO also needs to training the mapping from text feature to DINO feature space Barsellotti, Bianchi, Messina, Carrara, Cornia, Baraldi, Falchi and Cucchiara (2025). For training-free OVSS, one type of method reuses the internal visual representations of frozen CLIP models to generate spatial predictions. For example, MaskCLIP utilizes value features to extract dense predictions, while CLIP Surgery improves spatial localization through a dual-path architecture and value–value attention correlations Zhou et al. (2022); Li, Wang, Duan, Zhang and Li (2025b). GEM takes a step further by extending self-self attention to query-query, key-key, and value-value interactions, and facilitates token clustering through iterative self-attention and regularization during inference Bousselham, Petersen, Ferrari and Kuehne (2024). Other methods optimize attention or residual connections in the final layer, or utilize intermediate-layer features to recover spatial structure. Another   
+
+> W. Yao et al.: Preprint submitted to Elsevier Page 3 of 32 Background handling in training-free OVSS
+
+line of work uses external vision models to provide spatial information: FreeDA builds visual prototypes offline, ProxyCLIP uses external feature correlations to construct proxy attention, Trident combines local features with cross-window aggregation, and CorrCLIP utilizes SAM-based regional constraints and DINO feature correlations to improve spatial consistency Barsellotti, Amoroso, Cornia, Baraldi and Cucchiara (2024); Lan et al. (2024b); Shi et al. (2025); Zhang, Liu and Tang (2025). Complementary to these visual modifications, ITACLIP adjusts the input through image enhancement and category descriptions generated by language models, while FreeCP focuses on reducing redundant candidate categories and visual-language ambiguity Aydın, Cırpar, Abdinli, Unal and Sahin (2025); Chen, Yang, Chen, Zhao, Lai, Shao and Xie (2025). The mechanisms illustrated mainly make optimization on model structure, feature processing and input, while the technical configurations, compared with the benchmark settings when the methods are actually applied, are from the different phase. In addition, training-free does not mean that the methods are independent from offline resources, or there is no need for configuration on datasets during inferencing. Because of this, section 2.2 audits benchmark configuration OVSS implemented; and section 3.1 introduces reproductions based on the 7 typical training-free methods’ official codes. 
+
+2.2. Evaluation protocols and fair comparison 
+
+When making comparisons among open-vocabulary segmentation methods, TCL established a standardized benchmark protocol Cha et al. (2023). To be specific, TCL applies MMSegmentation’s default category names, not allowing extensions or modifications depending on the target category, and resizes the shorter side of images while preserving the aspect ratio. TCL excludes dense CRF, which incurs high computational overhead, while maintaining PAMR, and analyzes its impact specifically. For datasets containing a background category, it also notes that a probability threshold can be considered. Because of this, mentioning following TCL does not mean that all methods follow the same rule for deciding the background category. In subsequent works, including SCLIP and ResCLIP, computationally expensive post-processing is not implemented in the main evaluations, while SCLIP still uses its own image resizing and sliding-window settings Wang et al. (2024); Yang et al. (2025). Subsequent studies have controlled method comparisons in different aspects. NACLIP distinguished whether external pre-training knowledge is applied from whether post-processing is applied, and pointed out that some methods’ hyperparameters would vary by dataset Hajimiri et al. (2025). ClearCLIP made a comparison on benchmarks where background existed and did not exist, and offered a SCLIP comparison using fixed, unmodified class names; SC-CLIP re-evaluated baselines under its stated protocol Lan et al. (2024a); Bai et al. (2025). These studies show that how we interpret comparisons between methods would be affected by additional pre-training priors, class names, and benchmark reproduction setups. In addition to model realization and inference settings, existing studies also analyzed the impact of datasets, annotations, and vocabulary on benchmark performance. MESS assesses trained zero-shot segmentation models across various domains and points out that its PASCAL VOC figures vary from previous reports because it includes a background class. It also notes that associating extra Context labels with the background, as done in some studies, might produce better results than simply using a uniform ’background’ label Blumenstiel, Jakubik, Kühne and Vössing (2023). RENOVATE focused on assigning more specific, fine-grained names to annotated visual regions rather than simply modifying the vocabulary of the entire dataset Huang, Peng, Zhang and Geiger (2024). OpenBench reduced semantic overlap between training and testing categories, and discovered that there were already fine-tuned CLIP models whose advantages failed to transfer to the new setting under its investigations Liu, Wu, Bai, Wang, Wang and Tang (2025). Šarić et al. distinguished the bottlenecks of mask generation, selection, and classification through oracle experiments, and pointed out that a substantial number of valid masks may be discarded because they are evaluated as no-object, a mask-level decision that differs from assigning a pixel-level background class Šarić, Martinović, Kristan and Šegvić (2025). In Vocabulary-Free Semantic Segmentation, the predicted class names need to align with the reference labels, while Reichard et al. found that there is no universally optimal matching threshold across datasets Reichard, Rizzoli, Gasperini, Hoyer, Zanuttigh, Navab and Tombari (2025). Kombol et al. pointed out that the definition of background varies across different methods, and an overlap may occur between background vocabulary and target classes, such as sky Kombol et al. (2025). Similar evaluation principles have been embraced in other areas: Musgrave et al. established standardized compar-isons for metric learning; Oliver et al. managed implementations and data conditions in semi-supervised learning; Gulrajani & Lopez-Paz focused on cross-domain evaluation and model selection; and Sincan et al. synchronized preprocessing, encoders, and training settings in sign-language translation Musgrave, Belongie and Lim (2020); Oliver,   
+
+> W. Yao et al.: Preprint submitted to Elsevier Page 4 of 32
+
+Background handling in training-free OVSS 
+
+Odena, Raffel, Cubuk and Goodfellow (2018); Gulrajani and Lopez-Paz (2021); Sincan, Low, Asasi and Bowden (2025). We draw on their common-condition approach to examine attribution in OVSS. Our audit covered 13 selected papers on OVSS methods and their reproducible official implementations, of which 12 were available for settings checking. The audit included CLIP-DINOiser, which contains a lightweight module for training, while all 7 reproductions in our paper are training-free from additional tasks. Based on the standards of this paper’s audit, 11 of the 13 methods specified dataset-specific background decision settings (i.e., probability thresholds or saliency switches) in their official configurations, and 9 of the methods used multiple background words on VOC21. Of the 13 papers, 2 completely described background selection for auditing, 4 described it partially, 6 did not provide a description, and one was not applicable. SCLIP, NACLIP, and ResCLIP shared the same class name file and a 0.1 probability threshold on 3 benchmarks that included a background category. Based on our investigation, existing comparisons do not systematically quantify to what extent background processing settings could contribute to the differences in performance between official settings and a unified protocol in recent training-free OVSS methods. This paper utilizes the same group of official implementations, conducts evaluations under both official settings and unified protocols, and analyzes the contributions of numerical background settings and class name files in sequence. These studies examine trained models, change the benchmark or its names, or compile published numbers; none re-runs training-free methods from official code with background handling as the variable. 
+
+Table 1 
+
+Literature and configuration audit of training-free OVSS methods (official repositories and paper text, checked November 2026). Thr.: per-dataset background decision in the official configs (VOC21/COCO-Object/Context-60); #bg: background words in the official class-name file (VOC21/COCO-Object); Ren.: class renaming or synonyms; Post.: pixel-level post-processing in the main table; Res.: resolution or window differs across datasets; Doc.: the paper text documents the background choices; Untuned: results without the dataset-specific choices are reported. ✓ yes, ◦ partial, ✗ no, ? not verifiable from public material, – not applicable.                                                                                                                 
+
+> Method Venue Thr. #bg Ren. Post. Res. Doc. Untuned MaskCLIP ECCV 2022 none –minor opt. ✓–✓
+> GEM CVPR 2024 0.85 (VOC) –?–✗✓✗
+> CLIP-DINOiser ECCV 2024 saliency (VOC/Object) 1/1 minor –✗✓✓
+> SCLIP ECCV 2024 0.1/0.1/0.1 26/26 ✓–✗✗◦
+> ClearCLIP ECCV 2024 0.5/0.4/0.15 1/1 minor –✗◦✓
+> ProxyCLIP ECCV 2024 0.2/0.25/0.15 26/17 minor –✓✗✗
+> NACLIP WACV 2025 0.1/0.1/0.1 26/26 ✓PAMR ✓✗◦
+> SC-CLIP IEEE TIP 2025 0.15/0.35/0.15 26/26 ✓–✗◦✗
+> ResCLIP CVPR 2025 0.1/0.1/0.1 26/26 ✓–✓✗✗
+> ITACLIP CVPR-W 2025 0.1/0.1/0.1 44/26 ✓PAMR + closing ✓◦◦
+> Trident ICCV 2025 0.2/0.25/0.15 26/17 minor SAM refine ✓✗◦
+> CorrCLIP ICCV 2025 0.2/0.25/0.15 26/16 ✓mask correction ✓✗◦
+> FreeCP ICCV 2025 purification thr 26/26 ✓–✗◦◦
+
+2.3. Background modeling and vocabularies 
+
+For benchmarks containing a background category, models must decide how to handle pixels that do not belong to any target class. One approach is to classify a pixel as background when the prediction confidence is low across all foreground categories, as adopted by GEM on PASCAL VOC Bousselham et al. (2024). Another approach is to leverage background-related textual concepts; for example, SC-CLIP employs stuff classes (such as sky and river) to represent the background Bai et al. (2025). As summarized in Table 1, these strategies can also be combined. Consequently, merely detecting background words in text prompts is insufficient to identify a method’s background handling mechanism. Furthermore, background can be inferred directly from visual responses. For example, FSeg-LLaVA activates regions based on detected foreground objects and derives the background response map from them without requiring any explicit background class names Zhang, Yu, Li, Lin, Wang and Xiao (2026). Predefining a background vocabulary becomes challenging when target categories are dynamically specified by users. To address this, Contrastive Concepts generates a group of competing concepts for each target query, which are sourced from contextual word co-occurrences in image captions and scene-related concepts prompted from language models Wysoczańska, Vobecky, Cardiel, Trzcinski, Marlet, Bursuc and Siméoni (2025). Consequently, the model not only predicts whether a pixel belongs to the target query, but also determines if it corresponds to visually or semantically confusable objects. When handling multiple query categories, the method aggregates competing concepts across all queries and filters out suggested terms that are overly similar to the target queries based on CLIP text embedding 
+
+W. Yao et al.: Preprint submitted to Elsevier Page 5 of 32 Background handling in training-free OVSS 
+
+similarity. However, competing concepts can still introduce ambiguity in target regions due to spatial relationships such as occlusion and co-occurrence: for instance, the authors report a failure case where ’blanket’ is introduced as a competing concept against ’bed’, even though a blanket naturally covers and coexists with a bed. Contrastive Concepts doesn’t just overlook synonyms and parts; it also filters concepts by applying a CLIP similarity threshold of 0.9. However, it focuses specifically on a single query and earlier base methods. We examine if these collisions remain in the official class-name files of seven recent methods, as well as in the generated lists following both the similarity filter and an extra LLM conflict check (Sections 4.4 and 4.5). Related work also shows that it is worth paying attention to the expression of class names and the redundant or ambiguous candidate classes: RENOVATE, ITACLIP, and FreeCP addressed regional naming, class descriptions, and ambiguous candidates separately Huang et al. (2024); Aydın et al. (2025); Chen et al. (2025). Our analysis focuses on 2 types of vocabulary interactions that can be tested through controlled experiments, which differ from the broader class semantic processing illustrated earlier. For official class name files, we delete terms from the background vocabulary that overlap with current target names based on predefined lexical rules, and observe the segmentation results. For automatically generated background vocabulary, we compare the performance of the list filtered by CLIP similarity before and after language model conflict checking is applied. 
+
+## 3. Audit setup 
+
+3.1. Methods and official configurations 
+
+We re-run seven representative training-free OVSS methods from their official repositories, selected for public availability of code and weights and coverage of the four branches in Section 1: five CLIP-only methods—SCLIP Wang et al. (2024), ClearCLIP Lan et al. (2024a), NACLIP Hajimiri et al. (2025), ResCLIP Yang et al. (2025), and SC-CLIP Bai et al. (2025)—and two VFM-assisted methods—ProxyCLIP Lan et al. (2024b) (using DINO ViT-B/8 Caron et al. (2021)) and Trident Shi et al. (2025) (using DINO ViT-B/16 and SAM ViT-B Kirillov et al. (2023)). All seven methods use the OpenAI CLIP ViT-B/16 backbone Radford et al. (2021). All official codebases run under a unified software stack: PyTorch 2.1.2, CUDA 12.1, mmcv 2.1.0, mmengine 0.10.1, and mmsegmentation 1.2.2. 1 While most repositories specify mmcv 2.0.1 and mmsegmentation 1.1.1 (Trident specifies 2.1.0 and 1.2.2), any version sensitivity is verified directly by the reproduction gate in Section 3.5. Experiments ran on RTX 4080 SUPER (32 GB) and RTX 3090 (24 GB) GPUs (cross-GPU noise is quantified in Section 3.5). External weights were downloaded from official sources and verified via SHA-256 checksums recorded in the released repository. Table 2 summarizes official per-dataset settings touching background handling: “#var” counts model keys (excluding the class-name file) that differ across official VOC21, VOC20, COCO-Object, and ADE20K configs; 𝜏 is the background probability threshold ( prob_thd ), 𝑠 the logit scale ( logit_scale ), 𝑎 the area threshold ( area_thd ), and “#bg” the count of background terms in the official class-name file. Every method varies 1–5 keys across datasets: e.g., ClearCLIP sets 𝜏 to 0.5, 0.4, and 0.15 across VOC21, COCO-Object, and Context-60, while background vocabularies range from 1 term (ClearCLIP across all datasets, and all seven methods on Context-60) to 17 on COCO-Object (ProxyCLIP, Trident) and 26 on VOC21 (all methods except ClearCLIP) as well as on COCO-Object (SCLIP, NACLIP, ResCLIP, SC-CLIP). Three method-intrinsic choices define the boundary between O and P *: (1) ClearCLIP’s repository base config specifies model_type=‘vanilla’ , which we set to ClearCLIP (ignore_residual=True ) in both O and P *
+
+to run the published method; (2) Trident enables SAM refinement ( –sam_refine ) per its README main-table commands, kept enabled in both O and P * as an architectural component; and (3) NACLIP defaults to 10-step PAMR, which we retain in O and disable in P *. We release the evaluation code, the scripts that build all official and derived configurations, derived-dataset scripts and merge lists, the collision-checking tool, frozen pre-registration contracts with deviations, and per-cell JSON and per-image statistics; code, configurations and contracts are at 
+
+https://github.com/WendongYao/ovss-background-audit (Yao, Huang and Dev, 2026a), and run outputs and per-image statistics are archived at https://doi.org/10.5281/zenodo.24338613 (Yao, Huang and Dev, 2026b) (see Data and code availability).                                                                                                       
+
+> 1With repository-required dependencies transformers 4.37.2, fairscale 0.4.13, and scikit-image 0.22.0.
+> W. Yao et al.: Preprint submitted to Elsevier Page 6 of 32 Background handling in training-free OVSS
+> Table 2
+> Official per-dataset settings that touch background handling. “#var” counts model keys (other than the class-name file) whose value differs across the official VOC21/VOC20/COCO-Object/ADE20K configs. 𝜏 : probability threshold for background; 𝑠 : logit scale; 𝑎 : area threshold; “#bg”: number of background words in the official class-name file. “–”: not set (class default). VOC21 COCO-Object Context-60 Method #var 𝜏 𝑠 𝑎 #bg 𝜏 𝑠 #bg 𝜏 𝑠 #bg SCLIP 30.1 65 0.1 26 0.1 50 26 0.10 50 1ClearCLIP 10.5 ––10.4 –10.15 –1NACLIP 20.1 ––26 0.1 –26 0.10 –1ResCLIP 50.1 ––26 0.1 –26 0.10 –1SC-CLIP 30.15 50 0.1 26 0.35 55 26 0.15 –1ProxyCLIP 10.2 ––26 0.25 –17 0.15 –1Trident 50.2 ––26 0.25 –17 0.15 –1
+
+3.2. Datasets and background share 
+
+We evaluate on five benchmarks: VOC21 (VOC 2012 val Everingham et al. (2010), 1,449 images, 20 fore-ground classes plus background), VOC20 (same 1,449 images, 20 classes, no background), COCO-Object (COCO 
+
+val2017 Lin et al. (2014), 5,000 images, converted from COCO-Stuff Caesar et al. (2018) with 80 thing classes and all stuff/unlabeled pixels merged into background), ADE20K (val Zhou et al. (2017), 2,000 images, 150 classes, no background), and Context-60 (PASCAL Context val Mottaghi et al. (2014), 5,104 images, 59 foreground classes plus background). Annotation maps were verified file-by-file against our earlier stage with zero mismatches (5,000 COCO-Stuff label maps via an MD5 manifest, and 1,449 VOC2012 and 2,000 ADE20K validation masks against the earlier copies); for images, we verified the COCO val2017.zip archive MD5 and the ADE20K archive byte size. For Context-60, the official .mat archive and CodaLab JSON were inaccessible (HTTP 404 and 409), so we used PyTorch-Encoding’s converted val.pth annotations (ETag-verified, loaded via a restricted unpickler, paired with VOC2012 images). This file holds 5,104 images—one fewer than the 5,105 count commonly cited—which cannot be supplemented without the official source. The missing image shifts mIoU by roughly 1∕5105 , and all seven methods reproduce published Context-60 scores within ±0 .05 under O (Table 3), confirming the conversion. For splits with a background class, we define the background pixel share at original annotation resolution over the full split as bg_frac =
+
+∑ 𝕀 [label = 0] 
+
+∑ 𝕀 [label ≠ 255] , (1) where label 0 is background and label 255 is ignored. Original background shares are 73.3% (VOC21), 70.5% (COCO-Object), and 12.6% (Context-60); VOC20 and ADE20K are assigned bg_frac = 0 for reference only and excluded from correlation analyses. Following the construction of COCO-Object from COCO-Stuff, we build two controlled derived sequences by merging selected classes into background (label 0) and dropping them from the query list, leaving images unchanged. In the Context sequence , all 59 Context-60 foreground classes are ranked by descending validation pixel frequency (ties by class ID) and merged cumulatively until bg_frac first reaches 30%, 50%, and 70%. Merging 3, 6, and 11 classes yields 57, 54, and 49 classes (including background) with actual background shares of 34.9%, 53.0%, and 70.7% (Ctx 35%, Ctx 53%, Ctx 71% in Table A.2). Because ranking is purely by frequency without separating stuff from objects, the merged classes include object classes such as person , cat , and dog alongside stuff classes. In the 
+
+COCO-Stuff sequence , starting from COCO-Stuff-171 (80 thing and 91 stuff classes, with unlabeled 255 mapped to background), only the 91 stuff classes are ranked by descending frequency and merged until bg_frac first reaches 30% and (30% + 70 .5%)∕2 ≈ 50 .2% , keeping remaining stuff and all 80 thing classes as queries. Merging 7 and 21 stuff classes yields 165 and 151 classes (including background) with actual background shares of 31.5% and 50.6% (COCO 31% and COCO 51%). Merge lists were frozen prior to GPU inference without consulting any predictions. Merging also reduces query-set size, an inherent confound noted in Section 5; full merge lists appear in Appendix B.   
+
+> W. Yao et al.: Preprint submitted to Elsevier Page 7 of 32
+
+Background handling in training-free OVSS (a) Official background handling at inference 
+
+> post-processing shared by all seven repositories
+> input image
+> class names + background words
+> text queries
+> CLIP
+> image CLIP text
+
+⊗  
+
+> f(x)
+> tq
+> zq(x)softmax
+> s
+> max over names
+> Pc(x)P0
+> Pbed
+> area filter
+> a
+> threshold
+
+τ   
+
+> ŷ(x)
+> prediction
+> ground truth
+> NACLIP (O only): PAMR refines zqbefore the softmax; Trident: SAM refines ŷ.
+
+(b) Evaluation settings compared 
+
+O P* THR BGB NC             
+
+> O−P*
+> protocol gap
+> + official s,
+> τ,a
+> Δthr
+> + class-name file
+> Δname
+> −colliding words
+> Δvoc
+> ΔBG = BGB −P*=Δthr +Δname
+
+Figure 1: Overview of the evaluation settings. Thumbnails show SCLIP on one COCO-Object validation image (the 90th-percentile image of Fig. 7); colors follow the PASCAL VOC palette and heat maps show class probabilities from 0 (dark) to 1 (bright). (a) Official background handling at inference (maps from the bgb run): query similarities 𝑧 𝑞 (𝑥 ) are normalized by a softmax over all class and background names with logit scale 𝑠 (Eq. (2) ), merged per class by a maximum (Eq. (3) ), filtered by an area threshold 𝑎 (Eq. (5) ) and thresholded at 𝜏 (Eq. (4) ). Because “ bed ” is also a background word, the background probability 𝑃 0 equals or exceeds the bed probability 𝑃 bed at every pixel and bed is not predicted in this image. (b) Final predictions of the compared settings on the same image. Starting from P *, adding the official numeric settings gives thr , adding the official class-name file gives bgb , and removing colliding background words gives 
+
+nc , so that ΔBG = Δ thr + Δ name . Single-image panels are illustrative only. The diagram was drawn with AI assistance (see the declaration of generative AI use). 
+
+3.3. Evaluation settings 
+
+Across all seven repositories, dense inference follows a shared post-processing structure that converts raw patch– text cosine similarities into pixel predictions (Fig. 1a): 
+
+𝑝 𝑞 (𝑥 ) = exp (𝑠 𝑧 𝑞 (𝑥 ))∑𝑞 ′∈ exp (𝑠 𝑧 𝑞 ′ (𝑥 )) , 𝑧 𝑞 (𝑥 ) = 𝐟 (𝑥 )⊤𝐭 𝑞 , (2) 
+
+𝑃 𝑐 (𝑥 ) = max 
+
+> 𝑞 ∈𝑐
+
+𝑝 𝑞 (𝑥 ), 𝑐 = 0 , 1, … , 𝐶, (3) ̂𝑦 (𝑥 ) = 
+
+{
+
+0, max 𝑐 𝑃 𝑐 (𝑥 ) < 𝜏, 
+
+arg max 𝑐 𝑃 𝑐 (𝑥 ), otherwise. (4) Here, 𝐟 (𝑥 ) is the normalized visual feature at pixel 𝑥 and 𝐭 𝑞 is the normalized text embedding of query term 𝑞 (averaged across templates), so 𝑧 𝑞 (𝑥 ) is cosine similarity; 𝑐 collects all query terms on row 𝑐 of the class-name file (with 𝑐 = 0 
+
+denoting the background vocabulary 0, and  = ⋃𝐶 𝑐 =0 𝑐 ); 𝑠 is the logit scale; and 𝜏 is the background probability threshold (when 𝜏 = 0 , the threshold branch in Eq. (4) never triggers because probabilities are non-negative). When an area threshold 𝑎 is specified, the relative predicted area of each foreground class, 
+
+𝐴 𝑐 =
+
+|||{𝑥 ∶̂𝑐 (𝑥 ) = 𝑐 } |||∑𝐶 𝑐 ′=1 
+
+|||{𝑥 ∶̂𝑐 (𝑥 ) = 𝑐 ′}|||
+
+,̂ 𝑐 (𝑥 ) = arg max  
+
+> 𝑐
+
+𝑃 𝑐 (𝑥 ), (5) is computed prior to Eq. (4), and 𝑃 𝑐 (𝑥 ) is zeroed across the image for any foreground class 𝑐 ≥ 1 satisfying 𝐴 𝑐 ≤ 𝑎 .Method-specific steps act outside this core: NACLIP’s PAMR refines 𝑧 𝑞 before Eq. (2), whereas Trident’s SAM 
+
+W. Yao et al.: Preprint submitted to Elsevier Page 8 of 32 Background handling in training-free OVSS 
+
+refinement operates on ̂ 𝑦 after Eq. (4). Importantly, because the softmax in Eq. (2) normalizes over all terms in 
+
+jointly, any background term in 0 competes directly with foreground queries. We define all evaluation settings in three groups, using these short names throughout (Fig. 1b; experimental stages are labeled V2–V5 and S1–S5 and listed in Appendix C). 
+
+Protocols. 
+
+O (Official configuration ): each repository’s per-dataset configuration used verbatim. 
+
+P* (Strict unified protocol, TCL-derived ): derived from TCL Cha et al. (2023) to isolate background handling via seven fixed rules: (1) the class-name files of the ClearCLIP repository for all methods and datasets (these follow the 
+
+mmseg names except for ship and table on VOC and joined multi-word names on ADE20K); (2) 80 OpenAI ImageNet templates; (3) short side resized to 448 pixels preserving aspect ratio; (4) method base crop/stride, or 
+
+224∕112 when unspecified; (5) no pixel-level post-processing such as PAMR (architecture-intrinsic components like Trident’s SAM refinement are kept); (6) a single “ background ” prompt ( 0 = { background }) with 𝜏 = 0 
+
+and no area threshold 𝑎 ; and (7) base hyperparameters only (including the base logit scale 𝑠 ), ignoring per-dataset overrides. Unlike TCL Cha et al. (2023), which keeps PAMR and suggests thresholding background probabilities, P* disables both so that background handling can be cleanly isolated when comparing BGB , THR , and NC against P* (whereas O and P * also differ in non-background choices such as class names, resolution, and PAMR). For ResCLIP, whose base_config.py leaves required constructor parameters unset, a pre-registered fallback rule assigns keys identical across the four official configs as method-intrinsic and takes paper values (when stated) or config medians (otherwise) for varying keys. 2
+
+Decomposition of official background handling.  
+
+> BGB
+
+(Transplanted official trick ): P * with official per-dataset numeric keys ( 𝜏 , 𝑠 , 𝑎 ) and official class-name files ( 0
+
+and 𝑐 ; derived variants inherit their parent dataset’s settings, appending unified COCO-Stuff names for retained stuff queries).  
+
+> THR
+
+(Numeric settings only ): P * with official numeric keys ( 𝜏 , 𝑠 , 𝑎 ) only, keeping P *’s unified class-name file (0 = { background }).  
+
+> NC
+
+(Collision-free vocabulary ): BGB with colliding terms deleted from the background vocabulary 0 (falling back to {background } if empty). Averaging mIoU over the seven methods (denoted by overlines), the decomposition quantities and threshold share are defined as 
+
+ΔBG = BGB − 𝑃 *, Δthr = THR − 𝑃 *, Δname = BGB − THR ,
+
+Δvoc = NC − BGB , share thr = Δ thr ∕Δ BG , (6) where methods with zero collisions take their BGB score under NC (yielding Δvoc = 0 per the S2 and S3 contracts). Thus, ΔBG gives the total background-handling effect, Δthr isolates the numeric settings, Δname isolates the official class-name file, and Δvoc measures the collision cost. Because background words enter the shared softmax over  in Eq. (2), any background term matching a foreground query directly competes for the same pixels. Our deterministic collision rule (defining the released tool) inspects only class-name strings: 1. Tokenize : split background and query lines by the method’s separator ( ; for ProxyCLIP/Trident; , otherwise) and trim whitespace. 2. Normalize : lowercase, convert - and _ to spaces, drop trailing “ other ” or “ merged ”, and trim whitespace. 3. Match : background word 𝑤 collides with query word 𝑞 iff 𝑤 = 𝑞 , or 𝑤 is a space-separated token of 𝑞 , or 𝑞 is a token of 𝑤 (e.g., sky vs. sky-other ; wall vs. wall-concrete ). 4. Filter : remove colliding words from the background line only; query lines are untouched and “ background ” is never removed. 5. Data independence : execute strictly pre-inference without predictions.           
+
+> 2This gives delete_same_entity=True ,attn_rcs_weights=[2.0, 0.5] ,attn_sfr_weights=[2.1, 0.7] , and temp_thd=0.18
+> (median of [0 .5,0.1,0.11 ,0.25] ). No other method had missing required base-config keys.
+> W. Yao et al.: Preprint submitted to Elsevier Page 9 of 32 Background handling in training-free OVSS
+
+Tuning-free background rules.  
+
+> OTSU
+
+(Per-image Otsu ): under P *, computes softmax with CLIP logit scale 𝑠 = 100 and assigns pixels whose maximum foreground probability falls below a 256-bin per-image Otsu threshold to background. 3
+
+> SEL
+
+26 (Development-selected rule ): chosen from 120 pre-enumerated combinations (two vocabularies, 𝑠 ∈ {40 , 70 ,
+
+100} , class-presence filter 𝑟 ∈ {0 , 0.2, 0.4, 0.6} , and five decision rules: argmax, Otsu, or fixed 𝑡 ∈ {0 .3, 0.5,
+
+0.7} ) solely on training splits (all 1,464 VOC2012 train images and 2,000 COCO train2017 images, seed 20261105) across three methods (SCLIP, SC-CLIP, Trident), holding out the other four. The selected rule pairs “background ” plus SCLIP’s 26 VOC21 words with 𝑠 = 100 , presence filter 𝑟 = 0 .6 (retaining classes whose top-1% probability mean is ≥ 0.6 of the image maximum), and per-image Otsu. None of these components are novel; they serve strictly as an existing-heuristic baseline.  
+
+> CC
+
+(LLM Contrastive Concepts vocabulary ): SEL 26 with the 26 words replaced by per-dataset vocabularies generated without images following Contrastive Concepts Wysoczańska et al. (2025) and filtered at CLIP cosine similarity 
+
+𝛽 = 0 .9. Due to 24 GB VRAM limits, we used Qwen2.5-7B-Instruct (fp16, greedy, max_new_tokens =128) instead of Mixtral-8x7B-Instruct.  
+
+> CF
+
+(Conflict-filtered LLM vocabulary ): removes non-ASCII terms from CC and queries Qwen2.5-7B-Instruct once per word (greedy) to discard any target category, synonym, subtype, or part, without tuning on any split. 
+
+3.4. Pre-registered analysis 
+
+Before running the computations for each stage (V2–V5, S1–S5), we froze an analysis contract defining the questions, settings, datasets, decision metrics, numerical gates, and pre-committed conclusions (S5 being a descriptive follow-up; Appendix C). Contracts were never altered post hoc; hardware changes, data substitutions, and implemen-tation discoveries were appended as dated deviations with timestamp, cause, and impact. All contracts and deviations are released and summarized in Appendix C. Negative outcomes were kept and reported as findings: in V2-P2 both primary gates failed ( DISCUSS_STOP ), showing that post-SCLIP progress mostly survives P * and simple Otsu trails tuned tricks; in V5 the Context-60 gap missed the 5.0-mIoU gate ( STOP ), motivating our dataset-dependent framing. All transcribed tables were checked cell-by-cell against archive JSONs with zero mismatches. To measure image-sampling uncertainty (Figs. 2 and 4), we perform image-level paired bootstrap resampling (𝐵 = 2 ,000 , fixed per-task seeds). In each resample 𝑏 , mIoU is recomputed from summed intersection and union areas over non-empty-union classes as in mmsegmentation :
+
+mIoU (𝑏 ) = 100 
+
+|𝑏 |∑
+
+> 𝑐 ∈𝑏
+
+∑𝑖 𝜔 (𝑏 ) 
+
+> 𝑖
+
+𝐼 𝑖,𝑐 
+
+∑𝑖 𝜔 (𝑏 ) 
+
+> 𝑖
+
+𝑈 𝑖,𝑐 
+
+, 𝑏 =
+
+{
+
+𝑐 ∶ ∑𝑖 𝜔 (𝑏 ) 
+
+> 𝑖
+
+𝑈 𝑖,𝑐 > 0
+
+}
+
+, (7) where 𝐼 𝑖,𝑐 and 𝑈 𝑖,𝑐 are the intersection and union pixel counts of class 𝑐 in image 𝑖 , and 𝜔 (𝑏 ) 
+
+> 𝑖
+
+is the multiplicity of image 𝑖 
+
+in resample 𝑏 . Within each dataset, all methods and settings share identical weights 𝜔 (𝑏 ) 
+
+> 𝑖
+
+, yielding 95% percentile intervals (2.5th–97.5th percentiles) that capture image-sampling variance only, excluding GPU numerical noise. 
+
+3.5. Reproduction 
+
+Before running O, we fixed reproduction targets from published main-table ViT-B/16 scores (ClearCLIP, ResCLIP, SC-CLIP, ProxyCLIP, Trident) or official READMEs (SCLIP, NACLIP), and pre-recorded all Context-60 targets. Gates required each method to stay within ±1 .0 mIoU on ≥ 3∕4 benchmarks (V2-P2) and ≥ 4∕7 methods within 
+
+±1 .0 mIoU on Context-60 (V5). All seven methods pass (Table 3): 34 of 35 cells reproduce within ±0 .06 mIoU of their target. The sole exception is NACLIP on ADE20K ( 18 .18 vs. 19 .05 , −0 .87 , still within ±1 .0), which we report without unverified speculation. Re-running identical settings across an RTX 4080 SUPER and RTX 3090 shifts mIoU by roughly 0.03 (≤ 0.01 in S1/S2 checks), whereas changing the query-word set alters fp16 arithmetic by roughly 0.1–0.15 mIoU (cosine-similarity shifts up to 3.7 × 10 −4 flipping borderline pixels and Otsu thresholds); differences below 0.15 mIoU are therefore                                                
+
+> 3In V2-P2, OTSU replaced postprocess_result , bypassing Trident’s SAM refinement; we note this wherever V2-P2 OTSU values appear and verified in V3 via a wrapper that restoring SAM leaves conclusions unchanged.
+> W. Yao et al.: Preprint submitted to Elsevier Page 10 of 32 Background handling in training-free OVSS
+> Table 3
+> Official configurations (O) re-run from the official code, with the difference to the number reported by each method in parentheses. Reported targets were fixed before running. Method VOC21 VOC20 COCO-Object ADE20K Context-60 SCLIP 59.63 ( +0.00) 81.53 ( −0.01) 33.52 ( +0.00) 16.45 ( +0.00) 31.75 ( +0.01) ClearCLIP 51.80 ( +0.00) 80.93 ( +0.03) 33.04 ( +0.04) 16.65 ( −0.05) 32.57 ( −0.03) NACLIP 64.06 ( −0.01) 83.02 ( −0.01) 36.20 ( +0.01) 18.18 ( −0.87) 34.99 ( +0.00) ResCLIP 61.05 ( −0.05) 86.02 ( +0.02) 34.95 ( −0.05) 18.02 ( +0.02) 33.50 ( +0.00) SC-CLIP 64.61 ( +0.01) 84.29 ( −0.01) 37.72 ( +0.02) 20.06 ( −0.04) 36.81 ( +0.01) ProxyCLIP 61.24 ( −0.06) 80.33 ( +0.03) 37.54 ( +0.04) 20.17 ( −0.03) 35.30 ( +0.00) Trident 67.08 ( −0.02) 84.49 ( −0.01) 41.07 ( −0.03) 21.92 ( +0.02) 38.65 ( +0.05)
+
+not interpreted. For 10 BGB cells on COCO-Stuff variants in S1 exceeding 32 GB VRAM, we used an algebraically equivalent per-class loop verified bitwise identical ( torch.equal ) up to 165 × 200 queries (hardware allocations and pixel-level cross-GPU checks appear in Appendix F). 
+
+## 4. Results 
+
+4.1. Protocol gap across datasets 
+
+The performance gap between official configurations (O) and the strict unified protocol (P *) varies strongly across benchmarks, ranging from 22.8 mIoU points on VOC21 to 0.1 points on ADE20K. Averaged over the seven methods, O exceeds P * by 22.81 points on VOC21 (95% CI [21.90, 23.75]; per-method range 14.03–27.27 points), whereas on ADE20K the mean gap is 0.10 points (95% CI [ −0 .05 , 0.25]; range −0 .57 to +1 .21 ), which is not distinguishable from zero (Fig. 2 and Table 4). Across the remaining three benchmarks, O exceeds P * by 13.14 points on COCO-Object (95% CI [12.47, 13.70]; range 9.72–16.17), 5.18 points on VOC20 (95% CI [4.49, 5.90]; range 0.00–12.59), and 2.01 points on Context-60 (95% CI [1.81, 2.22]; range 0.82–4.34). On Context-60, the pre-registered V5 generalization gate ( ≥ 5.0 points) was therefore not met ( STOP ), showing that large protocol gaps are not uniform across all benchmarks with a background class. Transplanting official background handling alone ( BGB ) recovers most of the gap on the three benchmarks that include a background class, lifting mean mIoU over P * by 21.83 points on VOC21, 12.24 points on COCO-Object, and 1.49 points on Context-60 (Table 4). For ClearCLIP, ProxyCLIP, and Trident on VOC21, BGB matches O almost exactly (51.80 vs. 51.80, 61.27 vs. 61.24, and 67.08 vs. 67.08), indicating that their gap arises almost exclusively from background handling. By contrast, NACLIP remains below O under BGB by 7.04 points on VOC21 (57.02 vs. 64.06) and 3.10 points on Context-60 (31.89 vs. 34.99), indicating that its official configuration also relies on non-background settings (in V2 single-factor runs on VOC21, removing its default 10-step PAMR accounts for roughly 5.2 points; PAMR was not isolated separately on Context-60). Crucially, VOC20 exhibits a mean gap of 5.18 points despite having no background class, concentrated in NACLIP (12.59 points) and ResCLIP (10.79 points). Earlier single-factor substitutions on three methods (SCLIP, ClearCLIP, NACLIP in V2) attribute roughly 3.6–3.9 points on VOC20 to class-name rewrites and 3.3 points to NACLIP’s PAMR, with resolution and sliding-window changes shifting scores by at most about 2.4 points. 4 Thus, O and P * differ in non-background choices as well, which motivates isolating background handling explicitly via BGB , THR , and NC in Section 4.4. Protocol differences also affect relative method orderings in a dataset-dependent manner. Out of 21 method pairs, pairwise rankings reverse between O and P * for 6 pairs on VOC21, 5 on COCO-Object, and 2 on Context-60 (Fig. 3; ADE20K likewise shows 2 swaps). On Context-60, the pre-registered V5 ranking gate ( ≥ 3 discordant pairs) was not met, and the top three methods (Trident, SC-CLIP, ProxyCLIP) retain identical orderings. Conversely, VOC20 exhibits 12 discordant pairs out of 21, underscoring that non-background configuration choices such as class-name rewrites and PAMR can reshape rankings even without a background class.   
+
+> 4From V2 single-factor runs varying one setting at a time relative to each method’s official package on SCLIP, ClearCLIP, and NACLIP.
+> W. Yao et al.: Preprint submitted to Elsevier Page 11 of 32
+
+Background handling in training-free OVSS VOC21 COCO-Object VOC20 Context-60 ADE20K 0510 15 20 25 O − P* (mIoU) 
+
+22.8 13.1 5.2 2.0 0.1 gray: 7 methods blue: mean, 95% CI 
+
+Figure 2: Protocol gap (O − 𝑃 *) across the five original benchmarks. Gray dots denote the seven individual methods and blue markers denote the seven-method mean with 95% image-level paired bootstrap confidence intervals. The gap depends strongly on the benchmark, spanning from 22.8 mIoU points on VOC21 to 0.1 points (indistinguishable from zero) on ADE20K. 
+
+Table 4 
+
+mIoU under the official configuration (O), the strict unified protocol (P*), and P* with only the official background handling transplanted (BGB). BGB is defined only for datasets with a background class.                                                                                                                                            
+
+> VOC21 VOC20 COCO-Object ADE20K Context-60 Method OP* BGB OP* BGB OP* BGB OP* BGB OP* BGB SCLIP 59.63 35.91 60.76 81.53 75.59 –33.52 21.68 33.07 16.45 17.02 –31.75 30.41 31.93 ClearCLIP 51.80 37.77 51.80 80.93 80.93 –33.04 23.32 33.04 16.65 16.65 –32.57 31.45 32.57 NACLIP 64.06 36.79 57.02 83.02 70.43 –36.20 21.55 32.34 18.18 17.69 –34.99 30.65 31.89 ResCLIP 61.05 36.66 60.35 86.02 75.23 –34.95 22.00 34.56 18.02 18.43 –33.50 31.84 33.41 SC-CLIP 64.61 42.07 64.34 84.29 78.65 –37.72 24.74 36.75 20.06 20.11 –36.81 34.49 36.33 ProxyCLIP 61.24 40.57 61.27 80.33 79.66 –37.54 23.89 36.69 20.17 20.17 –35.30 34.48 35.74 Trident 67.08 40.02 67.08 84.49 83.84 –41.07 24.90 41.29 21.92 20.71 –38.65 36.17 38.03 Mean 61.35 38.54 60.37 82.94 77.76 –36.29 23.15 35.39 18.78 18.68 –34.80 32.78 34.27
+
+4.2. Relative progress under the unified protocol 
+
+Most of the reported improvement of later CLIP-only methods over SCLIP remains intact under the strict unified protocol P *. Following our pre-registered V2-P2 definition (test T1), we measure relative progress as the mean gain over SCLIP across  = { VOC21 , VOC20 , COCO-Object , ADE20K }:
+
+𝐺 = 1
+
+||∑
+
+> 𝑑 ∈
+
+(
+
+max  
+
+> 𝑚 ∈′
+
+𝑆 𝑚,𝑑 − 𝑆 SCLIP ,𝑑 
+
+)
+
+, (8) where ′ = { ClearCLIP , NACLIP , ResCLIP , SC-CLIP } and 𝑆 𝑚,𝑑 is the mIoU of method 𝑚 on benchmark 𝑑 . Using published scores without heavy post-processing, this reported improvement averages 𝐺 rep = 5 .58 mIoU points. Under P*, the measured improvement is 𝐺 f ix = 4 .41 points, retaining approximately 79% of the reported gain (with a 90th-percentile image-bootstrap bound of 4.70 points). Our pre-registered hypothesis that protocol variation accounts for at least half of the reported gain required 𝐺 f ix ≤ 2.79 points; this gate was not met ( DISCUSS_STOP ). Thus, while absolute mIoU values shift dramatically under protocol unification, later architectural designs still outperform SCLIP under a common protocol—for example, SC-CLIP leads all CLIP-only methods on VOC21, COCO-Object, and ADE20K under P * (Table 4). Descriptively, replacing ′ with the two VFM-assisted methods (ProxyCLIP and Trident), which were excluded from the pre-registered CLIP-only gate by contract, yields 𝐺 rep = 7 .13 points versus 𝐺 f ix = 4 .96 points. 
+
+W. Yao et al.: Preprint submitted to Elsevier Page 12 of 32 Background handling in training-free OVSS O P* 
+
+> SCLIP SCLIP ClearCLIP ClearCLIP NACLIP NACLIP ResCLIP ResCLIP SC-CLIP SC-CLIP ProxyCLIP ProxyCLIP Trident Trident
+
+VOC21: 6/21 swaps O P*      
+
+> SCLIP SCLIP ClearCLIP ClearCLIP NACLIP NACLIP ResCLIP ResCLIP SC-CLIP SC-CLIP ProxyCLIP ProxyCLIP Trident Trident
+
+COCO-Object: 5/21 swaps O P*     
+
+> SCLIP SCLIP ClearCLIP ClearCLIP NACLIP NACLIP ResCLIP ResCLIP SC-CLIP SC-CLIP ProxyCLIP ProxyCLIP Trident Trident
+
+Context-60: 2/21 swaps  
+
+> Figure 3: Method rankings under the official configuration (O) and the strict unified protocol (P *) on the three benchmarks with a background class. Blue lines mark methods whose rank changes between settings. Pairwise rank swaps number 6/21 on VOC21, 5/21 on COCO-Object, and 2/21 on Context-60 (where the top three methods keep their order).
+
+4.3. Effect of background share 
+
+The mIoU gain from transplanted official background handling increases with background pixel share, yet background share alone does not explain the size of the gain. Across the eight evaluation splits with a background class (VOC21, COCO-Object, Context-60, and the five derived variants in Fig. 4), the pre-registered S1 test (H1) was met ( SUPPORTED ): (a) background share and mean BGB − 𝑃 * exhibit a Spearman correlation of 𝜌 = 0 .857 (gate ≥ 0.8); (b) the least-squares slope is 24.6 mIoU points per unit share with a 90% method-level bootstrap confidence interval of [22.4, 26.9] (excluding zero; unlike the image-level 95% intervals elsewhere, this interval resamples across the seven methods); and (c) within the Context sequence, six of the seven methods increase monotonically from Context-60 through Ctx 35%, Ctx 53%, and Ctx 71% (gate ≥ 5), with ResCLIP as the sole exception (3.82 on Ctx 35%, 3.74 on Ctx 53%, and 3.44 on Ctx 71%). Nevertheless, matched background coverage yields widely different gains across benchmarks. Around 70–73% background share, BGB −𝑃 * averages only 5.35 points on Ctx 71% (70.7% background), compared with 12.24 points on COCO-Object (70.5%) and 21.83 points on VOC21 (73.3%). Within the Context sequence, gains rise from 1.49 points on Context-60 to 4.43 points on Ctx 35% once high-frequency categories ( sky , person , wall ) are merged, and then level off (5.03 points on Ctx 53%, 5.35 points on Ctx 71%; per-method scores appear in Appendix Table A.2, and recall from Section 3.2 that merging also reduces query-set size). At the per-image level within single datasets (H2, which tests O − 𝑃 * rather than BGB − 𝑃 * across five equal-count image quintiles of background share), the pre-registered monotonicity gate ( 𝜌 ≥ 0.9 on at least two of the three original datasets) was not met ( NOT_SUPPORTED ): only VOC21 reached 𝜌 = 0 .9, while COCO-Object and Context-60 both yielded 𝜌 = 0 .7.Conversely, on the COCO-Stuff variants that retain stuff classes as queries, transplanting official background handling is harmful or indistinguishable from zero. On COCO 31%, BGB − 𝑃 * averages −2 .59 points (95% CI [ −2 .91 ,
+
+−2 .27 ]), with all seven methods negative; on COCO 51%, the mean is −0 .18 points (95% CI [ −0 .52 , 0.16]), whose interval includes zero. A plausible explanation, not tested within S1 itself, is that official COCO-Object background lists contain terms such as wall , road , floor , mountain , wood , and bed that collide with retained query categories; we test this hypothesis directly in Section 4.4. 
+
+4.4. Decomposition of the official background handling 
+
+Official background handling combines numeric settings and class-name files whose relative contributions reverse across benchmarks, while collisions between background words and target query names impose measurable accuracy losses wherever they occur.               
+
+> W. Yao et al.: Preprint submitted to Elsevier Page 13 of 32 Background handling in training-free OVSS 10% 20% 30% 40% 50% 60% 70% Background pixel share 0510 15 20 BGB  − P* (mIoU, mean of 7)
+> VOC21 COCO-Object Context-60 Ctx 71% COCO 31% COCO 51% Original datasets Context-60 variants COCO-Stu ff variants
+> Figure 4: Background pixel share versus seven-method mean gain from official background handling ( bgb −P*) across original datasets and controlled derived variants; vertical bars show 95% image-level paired bootstrap confidence intervals. Gains rise with background share overall ( 𝜌 = 0 .857 ), yet diverge sharply near 71% coverage and turn negative on COCO 31% when stuff queries remain.
+
+On the original benchmarks (S3; Fig. 5 and Appendix Table A.3), the decomposition in Eq. (6) attributes the bulk of the gain to opposite components on VOC21 and COCO-Object. On VOC21, the 21.83-point gain splits into 
+
+Δthr = 4 .98 points from numeric keys ( THR − 𝑃 *) and Δname = 16 .85 points from the official class-name file (BGB − THR ), giving share thr = 0 .23 ; under our pre-registered S3 reading rule ( ≤ 0.33 ), gains on VOC21 come mainly from the class-name file. On COCO-Object, the split reverses ( 12 .24 = 9 .38 + 2 .86 points, share thr = 0 .77 ≥ 0.67 ), so gains come mainly from numeric thresholds and scaling. Individually, numeric keys alone add almost nothing on VOC21 for several methods (NACLIP +0 .21 , ResCLIP +0 .18 ). ClearCLIP provides a notable counterexample: its official file uses only “ background ”, so its entire 14.03-point gain on VOC21 stems from 𝜏 = 0 .5 alone, showing that class-name dominance reflects the tested repositories’ configurations rather than a universal necessity. Note that 
+
+Δname bundles background synonyms with foreground renamings (such as person and tvmonitor variants), which S3 does not separate further. Fig. 6 illustrates these transitions on representative validation images (further examples in Appendix D). Testing the collision hypothesis from Section 4.3 on the COCO-Stuff variants (S2; Table 5), the pre-registered collision gate was met ( COLLISION_SUPPORTED ): deleting colliding background words ( NC vs. BGB ) improves mIoU by +1 .30 points averaged over all 14 method–variant pairs (ClearCLIP has zero collisions and enters the seven-method average as 0, meeting the ≥ +1 .0 gate), and six of seven methods gain on COCO 31% (gate ≥ 5∕7 ). Across the six methods with collisions (after deleting 13–15 of 26 terms in the SCLIP family and 8–9 of 17 terms in ProxyCLIP/Trident), every method improves by 1.19–1.87 points, averaging +1 .63 points (95% CI [1.54, 1.71]) on COCO 31% and +1 .39 points (95% CI [1.28, 1.49]) on COCO 51% (six-method means, whereas +1 .30 averages all seven methods). After removing collisions, NC stays within 0.3 points of THR for most methods, indicating that the remaining non-colliding background words contribute little here. By contrast, the numeric component ( THR − 𝑃 *)averages −1 .15 points on COCO 31% (165 classes) before turning positive ( +0 .94 points) on COCO 51% (151 classes). A plausible explanation, not tested here, is that thresholds set for 81 classes and 70.5% background (e.g., ClearCLIP’s 
+
+𝜏 = 0 .4 or ProxyCLIP’s 0.25 ) over-suppress foreground when background covers only 31.5% of pixels. On the Ctx 71% control, where all official files use “ background ” only, THR and BGB differed by at most 0.01 points across the three completed methods. Finally, collisions also occur on the standard COCO-Object benchmark (S3; Appendix Table A.3). Six of the seven official configurations include “ bed ” in their background list despite “ bed ” being one of the 80 target classes. Deleting   
+
+> W. Yao et al.: Preprint submitted to Elsevier Page 14 of 32
+
+Background handling in training-free OVSS SCLIP ClearCLIP NACLIP ResCLIP SC-CLIP ProxyCLIP Trident 
+
+0510 15 20 25 BGB  − P* (mIoU) VOC21: threshold share 0.23 
+
+> SCLIP ClearCLIP NACLIP ResCLIP SC-CLIP ProxyCLIP Trident
+
+0.0 2.5 5.0 7.5 10.0 12.5 15.0 COCO-Object: threshold share 0.77 
+
+numeric threshold part (THR − P*) offi cial name fi le (BGB − THR) 
+
+Figure 5: Decomposition of official background handling ( bgb − P*) into numeric settings ( thr − P*) and official class-name files ( bgb − thr ) on VOC21 and COCO-Object. The primary driver reverses across datasets, shifting from class-name files on VOC21 (threshold share 0.23) to numeric thresholds on COCO-Object (threshold share 0.77). 
+
+Table 5 
+
+Trick decomposition on COCO-Stuff variants that keep stuff classes as queries (background share 31% and 51%). NC: BGB with colliding background words removed; “#rm”: number of removed words; Δvoc =NC −BGB. ClearCLIP’s official file has no background words.                                                                                                  
+
+> COCO 31% background (165 classes) COCO 51% background (151 classes) Method P* THR BGB NC #rm Δvoc P* THR BGB NC #rm Δvoc
+> SCLIP 21.11 20.99 19.19 20.73 15 +1.54 20.30 21.75 20.35 21.71 13 +1.36 ClearCLIP 22.64 18.12 18.12 –0–21.73 19.31 19.31 –0–NACLIP 21.54 21.65 19.91 21.63 15 +1.72 20.35 22.08 20.81 22.21 13 +1.40 ResCLIP 22.67 24.17 22.53 24.40 15 +1.87 21.34 24.22 23.31 24.74 13 +1.43 SC-CLIP 23.97 24.39 22.56 24.39 15 +1.83 22.70 25.21 23.66 25.27 13 +1.61 ProxyCLIP 24.99 21.12 19.67 20.97 9+1.30 23.46 22.50 21.15 22.34 8+1.19 Trident 26.06 24.47 22.89 24.41 9+1.52 24.44 25.83 24.48 25.84 8+1.36
+
+this single colliding word improves mIoU by +0 .54 points averaged over all seven methods (ClearCLIP scored as 0,meeting the pre-registered S3 reading rule of ≥ +0 .5), with all six affected methods gaining +0 .57 to +0 .73 points. 5
+
+Descriptively, a follow-up mechanistic check (Appendix E) shows that exact single-name collisions force zero predicted foreground pixels across all 92 tested cases (including bed on COCO-Object) and account for 70–97% of Δvoc across the COCO benchmarks. Fig. 7 illustrates this recovery on COCO-Object images containing bed (further examples in Appendix D). Together, S2 and S3 show that while expanded background vocabularies drive most of the gain on VOC21 (where no collisions occur under our rule), colliding terms in the official COCO-Object lists degrade performance on both the COCO-Stuff variants and the original COCO-Object benchmark. 
+
+4.5. Tuning-free background rules and generated vocabularies 
+
+None of the tested tuning-free background rules consistently matches per-dataset official background handling across benchmarks, and LLM-generated background vocabularies suffer from collisions with foreground class names. 
+
+> 5
+
+On COCO-Object, SCLIP’s collision-free NC score (33.68) slightly exceeds its complete official configuration O (33.52), though O also differs in non-background settings. 
+
+W. Yao et al.: Preprint submitted to Elsevier Page 15 of 32 Background handling in training-free OVSS VOC21 p10                 
+
+> Image GT
+> 2.6
+> P*
+> 4.0
+> THR
+> 26.6
+> BGB
+> 22.3
+> O
+> VOC21 p50
+> 5.0 20.8 53.9 52.0
+> VOC21 p90
+> 10.7 55.9 89.1 83.1
+> COCO-Obj. p10
+> 9.4 13.2 15.5 20.8
+> COCO-Obj. p50
+> 3.6 16.9 20.5 13.0
+> COCO-Obj. p90
+> 8.9 25.1 49.0 44.4
+
+Figure 6: Qualitative SCLIP predictions under P *, thr , bgb and the official configuration (O). For each benchmark, rows are the validation images whose per-image gain bgb − 𝑃 * lies closest to the 10th, 50th and 90th percentiles among images with at least one foreground class and 20–80% background pixels (VOC21: 760 of 1,449 images; COCO-Object: 2,495 of 5,000); selection used frozen per-image statistics only. Numbers give per-image mIoU of the original runs. Black denotes background. Images from PASCAL VOC 2012 and COCO val2017 .
+
+Simple per-image Otsu thresholding ( OTSU ) improves over plain “ background ” (P *) on VOC21 and COCO-Object, yet falls well behind BGB by −8 .37 points on average ( −12 .15 on VOC21 and −4 .58 on COCO-Object; pre-registered V2-P2 gate ≥ −1 .0 not met; Table 6). Selected solely on training splits with three methods, SEL 26 matches 
+
+BGB closely on VOC21 ( +0 .07 points) and COCO-Object ( −0 .26 points), averaging Δtrick = −0 .10 points (meeting the V3 gate ≥ −2 .0), with the three selection methods averaging 49.91 mIoU on the training splits versus 48.87 on the validation splits and the four held-out methods averaging +1 .09 points above BGB . However, when applied unchanged to Context-60, SEL 26 drops below P * for all seven methods by 6.94 –8.80 points (mean −7 .90 points below P *, and 
+
+−9 .38 below BGB ). This drop is consistent with a rule selected on background-heavy benchmarks over-predicting background when background occupies only 12.6% of pixels. 
+
+W. Yao et al.: Preprint submitted to Elsevier Page 16 of 32 Background handling in training-free OVSS p10     
+
+> Image GT
+> bed IoU 0.0
+> BGB
+> bed IoU 21.6
+> NC
+> p50
+> bed IoU 0.0 bed IoU 55.8
+> p90
+> bed IoU 0.0 bed IoU 78.3 bed background
+
+Figure 7: Effect of removing the colliding background word “ bed ” on COCO-Object (SCLIP). Rows are the images whose per-image bed IoU change ( nc − bgb ) lies closest to the 10th, 50th and 90th percentiles among the 137 validation images with at least 5% bed pixels; selection used frozen per-image statistics only. Under bgb , bed is absorbed into background (bed IoU 0 in all three images); with the colliding word removed ( nc ), it is recovered. 
+
+Replacing the 26 fixed words with Contrastive Concepts LLM vocabularies ( CC , generated with Qwen2.5-7B-Instruct; Section 3.3) yields Δtrick (CC ) = −1 .70 points across VOC21 and COCO-Object. Although this passes the V4 gate ( ≥ −2 .0), the two benchmarks move in opposite directions: +0 .98 points on COCO-Object offsets −4 .37 points on VOC21 (where VOC21 alone falls into the stop range). Adding the non-ASCII and LLM conflict filter ( CF ) across all three benchmarks gives Δtrick (CF ) = −2 .12 points ( −3 .23 on VOC21, +1 .32 on COCO-Object, and −4 .44 on Context-60); the pre-registered V5 Q2 gate ( ≥ −2 .0) was not met. Per-class IoU on VOC21 (Fig. 8; per-method rule scores in Appendix Table A.1) shows that CC losses relative to the 26-word rule concentrate in specific object classes: boat (−30 .0 points), tvmonitor (−13 .7), diningtable (−12 .7), 
+
+person (−12 .2), bottle (−10 .9), bird (−10 .4), and train (−7 .9). On VOC21, CF removes only 9 of 83 terms (including tugboat , feather , and pedestrian ), partially recovering boat (to −22 .1) and bird (to −2 .9), while terms such as sailboat , rider , and remote (associated with boat , person , and tvmonitor ) remain unfiltered and losses on tvmonitor , diningtable , and bottle persist. Although individual generated terms were not ablated separately in V4/V5, this class-specific pattern is consistent with the vocabulary-collision mechanism established in Section 4.4: even after CLIP similarity filtering ( 𝛽 = 0 .9) and an LLM conflict check, generated background lists still overlap with foreground subtypes, co-occurring objects, and parts. A subsequent leave-one-word-out ablation on the VOC21 training split (Appendix E) isolates 10 terms whose removal on validation recovers 𝐹 = 0 .70 of the per-class drop across these seven classes, providing descriptive support for this mechanism. 
+
+Summary of findings. First, protocol unification reveals dataset-dependent gaps that alter method rankings, although most published progress of later CLIP-only methods over SCLIP survives unification. Second, official background gains scale with background coverage but are governed by different mechanisms across benchmarks—class-name files on VOC21 versus numeric thresholds on COCO-Object—and fail to transfer cleanly across datasets via tuning-free heuristics. Third, collisions between background words and target categories represent a measurable source of error in 
+
+W. Yao et al.: Preprint submitted to Elsevier Page 17 of 32 Background handling in training-free OVSS 
+
+Table 6 
+
+Background handling rules, mean mIoU over the seven methods. The tuning-free rules (Otsu, SEL26, CC, CF) use no per-dataset parameters; SEL26 was selected on training splits only. Otsu for Trident lacks its SAM refinement (corrected run: conclusions unchanged; see Appendix Table A.1). “–”: not run. Per-method values are in Appendix Table A.1. Rule VOC21 COCO-Object Context-60 P* (plain “background”) 38.54 23.15 32.78 Otsu rule 48.22 30.81 –SEL26 (26 words + Otsu) 60.44 35.13 24.89 LLM vocabulary (CC) 56.00 36.37 –Conflict-filtered (CF) 57.14 36.71 29.83 Official trick (BGB) 60.37 35.39 34.27 −30 −25 −20 −15 −10 −5 0 5      
+
+> ΔIoU on VOC21 (mean of 7 methods)
+> boat tvmonitor diningtable person bottle bird train motorbike sofa background cow bus cat dog chair bicycle aeroplane pottedplant sheep car horse LLM vocabulary (CC) −26 words Con fl ict-fi ltered (CF) −26 words
+
+Figure 8: Per-class IoU change on VOC21 (seven-method mean) for the LLM-generated vocabulary (CC) and conflict-filtered vocabulary (CF) relative to the 26-word rule (SEL26). Losses concentrate in specific classes such as boat ,
+
+tvmonitor , diningtable , and person , and are only partially reduced by LLM conflict filtering. 
+
+the tested official COCO configurations, and LLM-generated vocabularies exhibit class-specific drops consistent with the same mechanism. All pre-registered hypotheses, gates, and outcomes are compiled in Appendix C. 
+
+## 5. Discussion 
+
+5.1. Transferability of background handling 
+
+Across OVSS benchmarks, “background” does not correspond to a single visual concept; rather, it is a dataset-defined residual class whose semantic scope varies with the foreground label set. On VOC21, background covers everything outside 20 object categories, including stuff regions such as sky, wall, and ground. On COCO-Object, background absorbs all 91 stuff categories and unlabeled pixels, leaving only the 80 thing categories as queries. On Context-60, by contrast, common stuff categories are foreground queries themselves, so background narrows to unlabeled and infrequent residual pixels covering just 12.6% of the split (Section 3.2). A background prompt or word list set to match the residual class on one benchmark can therefore overlap directly with foreground queries on another. 
+
+W. Yao et al.: Preprint submitted to Elsevier Page 18 of 32 Background handling in training-free OVSS 
+
+A plausible hypothesis—consistent with Sections 4.1 and 4.3, though not isolated across all factors—is that thing-only benchmarks require a strong background prior, whereas stuff-rich benchmarks do not. Official background handling adds 21.8 mIoU points on VOC21 and 12.2 points on COCO-Object, compared with only 1.5 points on Context-60 (Section 4.1); within the Context sequence, gains jump by roughly 3 points only once high-frequency classes such as sky , person , and wall are merged into background (Section 4.3). This hypothesis is consistent with 
+
+> SEL
+
+26 failing on Context-60 ( −7 .9 points below P *; Section 4.5), as would occur if a rule selected on background-heavy splits over-predicted background on a stuff-rich split. It also offers a plausible, untested explanation for why the same official numeric settings ( THR ) hurt on COCO 31% (165 classes) yet help on COCO 51% (151 classes; Section 4.4). Controlled ablations that transplant Context-60 thresholds separately from background prompts, or sweep thresholds across COCO-Stuff variants, would directly test this mechanism. These findings limit plug-and-play transfer to annotation-scarce domains Li et al. (2025a). In our literature audit, 11 of 13 methods rely on dataset-specific background rules (Table 1), the primary driver reverses between VOC21 and COCO-Object (Section 4.4), and no tested tuning-free rule transfers reliably across benchmarks (Section 4.5). Moreover, official repositories do not always match paper descriptions—for instance, whole-image VOC inference in NACLIP and ResCLIP, or per-dataset hyperparameters in SC-CLIP despite text stating consistent values. 6 Practitioners applying training-free OVSS to new domains therefore have no universally transferable background setting; at minimum, background vocabularies should be checked against target queries and paired with an untuned P *-style baseline. 
+
+5.2. Recommended reporting protocol 
+
+Based on Sections 4.1–4.5 and following reporting checklists in machine learning evaluation Dodge, Gururangan, Card, Schwartz and Smith (2019); Pineau, Vincent-Lamarre, Sinha, Larivière, Beygelzimer, d’Alché Buc, Fox and Larochelle (2021), we recommend six practices for OVSS benchmarks: 
+
+R1. Report official configurations (O), a strict unified protocol (P *), and transplanted background han-dling ( BGB ) together. Official-versus-unified gaps range from 0.1 to 22.8 points and reverse method rankings (Section 4.1), while 11/13 audited methods specify per-dataset background decisions (Table 1). 
+
+R2. Report numeric background parameters ( 𝜏 , 𝑠 , 𝑎 ) separately from class-name files. Their relative contribu-tions reverse across benchmarks—class-name files supply 77% of the gain on VOC21 whereas numeric settings supply 77% on COCO-Object (Section 4.4)—yet only 2/13 audited papers fully document background choices (Table 1). 
+
+R3. Run a collision check against the target class list and disclose all removed terms. Colliding background words appear in 6/7 reproduced official COCO-Object configs (“ bed ”), cost 1.30 points on average across COCO-Stuff variants (Section 4.4), and coincide with class-specific drops in LLM vocabularies (Section 4.5); our collision tool is released for this step. 
+
+R4. Report benchmarks with a background class separately from background-free benchmarks, avoiding cross-type averages. Gaps reach 13–23 points on VOC21 and COCO-Object versus 0.1 points on ADE20K and 5.2 points on VOC20 (Section 4.1), so eight-benchmark averages (e.g., Wang et al. (2024)) conflate background priors with dense alignment. 7
+
+R5. Select background settings on a training split and document the selection rule, rather than tuning on the evaluation split. In Section 4.5, SEL 26 was chosen strictly on training splits and transferred to the validation splits without apparent overfitting, whereas 6 of 13 audited papers omit background choices altogether and 4 document them only partially (Table 1). 
+
+R6. Release per-dataset configurations and class-name files, and specify post-processing and inference win-dows. Even without a background class, VOC20 shows a 5.2-point gap and 12/21 rank swaps; in V2 single-factor runs on three methods, class-name rewrites, PAMR, and window or resolution differences each shifted VOC20 scores (Section 4.1; Table 1). 
+
+5.3. Limitations 
+
+1. Methods and backbone scope. We re-ran seven training-free methods using OpenAI CLIP ViT-B/16; reserve candidate CorrCLIP (MetaCLIP backbone, pre-computed region masks) and trained OVSS models were   
+
+> 6Repository files and commits for each case are listed in the released audit notes.
+> 7We do not suggest omitting the background class when evaluating benchmarks that define one, as we did not test that metric and Blumenstiel et al. (2023) note that ignoring false positives on background pixels is misleading.
+> W. Yao et al.: Preprint submitted to Elsevier Page 19 of 32 Background handling in training-free OVSS
+
+excluded. Absolute protocol gaps may vary with backbone capacity, though dataset dependence and lexical collisions arise from label definitions and vocabularies and should remain relevant across backbones (untested). 2. Data and numerical precision. PyTorch-Encoding’s Context-60 conversion contains 5,104 images instead of 5,105 (shifting mIoU by roughly 1∕5105 ; confirmed by 7/7 reproductions within ±0 .05 in Table 3). Moreover, our 95% bootstrap intervals capture image-sampling variance only, excluding cross-GPU noise ( ≈ 0 .03 points) and query-set fp16 noise ( ≈ 0 .1–0.15 points); differences below 0.15 points are left uninterpreted (Section 3.5). 3. Derived-variant confounds. Merging classes into background simultaneously reduces query-set size, so back-ground share and class count cannot be separated in S1 (and Context merging includes object classes such as 
+
+person , cat , and dog ; Section 3.2). Because the eight S1 splits share underlying images and methods, H1’s correlation and slope should be read descriptively rather than as independent-sample inference. 4. Decomposition and collision rules. Our string-matching rule ignores synonyms and part-whole relations, so measured collision losses may underestimate true lexical interference (we do not claim a formal lower bound, as removing synonyms was not tested). In addition, BGB −THR mixes background terms with foreground renamings (Section 4.4), and the S2 Ctx 71% control completed only 3/7 methods (reported descriptively). 5. Generated vocabularies. Rules CC and CF used Qwen2.5-7B-Instruct with one prompt rather than Mixtral-8x7B-Instruct (Section 3.3); although a subsequent training-split leave-one-word-out check (Appendix E) attributes most of the VOC21 drop to 10 terms, absolute scores in Section 4.5 may vary across LLMs and prompts, and the attribution set is descriptive rather than a standalone rule. 6. Adaptive study sequence and audit snapshot. Each experimental stage was frozen under its own pre-registered contract prior to inference, yet the choice of each subsequent stage was adapted after inspecting earlier results (such as pivoting to an audit-focused paper before V5, and reframing our claim from universal protocol gaps to dataset-dependent gaps after V5’s STOP ). Individual tests are pre-registered, whereas the overall sequence is adaptive. Finally, our literature audit reflects repositories and papers checked in November 2026. 
+
+## 6. Conclusion 
+
+This paper audited the configurations and documentation of 13 methods from the training-free OVSS literature, re-ran seven from their official codebases, and compared their official settings against a strict unified protocol derived from TCL under pre-registered analysis contracts. We found that the protocol gap depends strongly on the benchmark— ranging from large shifts on VOC21 and COCO-Object to a modest gap on Context-60 and a near-zero difference on ADE20K—and can alter pairwise method rankings. Decomposing official background handling showed that it combines numeric settings and class-name files whose dominant component reverses across benchmarks, while none of the tested tuning-free rules transfers reliably across all datasets. We also showed that collisions between background words and target category names cause measurable accuracy losses in the tested official COCO configurations, with exact collisions making the affected class unpredictable, and that class-specific drops observed on VOC21 with LLM-generated vocabularies are largely attributable to a few generated terms that name subtypes, parts, or co-occurring objects. Still, despite substantial shifts in absolute mIoU, most of the reported improvement of later CLIP-only methods over SCLIP remains under the unified protocol. To keep methodological progress separable from background priors, we encourage the research community to adopt the six reporting recommendations (R1–R6) in Section 5.2. Our evaluation code, official and derived configurations, collision-check tool, frozen contracts, and per-image statistics are released with this paper (see Data and code availability). Extending this audit to additional backbones and trained models while treating background handling as an explicit design choice remains worthwhile future work. 
+
+## Data and code availability 
+
+The evaluation code, the scripts that build every evaluated configuration (with the pinned commits of the official repositories), the derived-dataset scripts and merge lists, the collision-check tool, the frozen pre-registered contracts with their deviations, and the per-cell result tables are available at https://github.com/WendongYao/ ovss-background-audit (Yao et al., 2026a) (code under the MIT License; data and documents under CC BY 4.0). The per-stage run outputs, including per-cell JSON files, run logs and the per-image statistics behind the bootstrap in-tervals, are archived on Zenodo at https://doi.org/10.5281/zenodo.24338613 (Yao et al., 2026b) (CC BY 4.0). The datasets (PASCAL VOC 2012, COCO-Stuff, PASCAL Context and ADE20K), the model weights and the official method repositories are not redistributed; they are available from their original sources under their own terms.   
+
+> W. Yao et al.: Preprint submitted to Elsevier Page 20 of 32
+
+Background handling in training-free OVSS 
+
+## Declaration of competing interest 
+
+The authors declare that they have no known competing financial interests or personal relationships that could have appeared to influence the work reported in this paper. 
+
+## Funding 
+
+This research was conducted with the financial support of Science Foundation Ireland (now Taighde Éireann – Research Ireland) under Grant Agreement No. 13/RC/2106_P2 at the ADAPT SFI Research Centre at University College Dublin, and partly funded by the China Scholarship Council (CSC, Grant No. 202306540013). The funders had no role in study design, data collection and analysis, decision to publish, or preparation of the manuscript. 
+
+## CRediT authorship contribution statement 
+
+Wendong Yao: Conceptualization, Methodology, Software, Validation, Formal analysis, Investigation, Data curation, Writing – original draft, Visualization. Binhua Huang: Writing – review & editing. Soumyabrata Dev: 
+
+Conceptualization, Supervision, Project administration, Funding acquisition, Writing – review & editing. 
+
+## Declaration of generative AI and AI-assisted technologies in the manuscript preparation process 
+
+During the preparation of this work the authors used Claude (Anthropic) in order to assist with writing and running the experiment code on cloud GPU instances, preparing figures and tables, and reviewing the language and structure of the manuscript. The authors designed the study, defined and froze all analysis contracts before computation, directed and checked every experiment, interpreted the results, and wrote the manuscript. After using this tool/service, the authors reviewed and edited the content as needed and take full responsibility for the content of the published article. 
+
+## References 
+
+Aydın, M.A., Cırpar, E.M., Abdinli, E., Unal, G., Sahin, Y.H., 2025. ITACLIP: Boosting training-free semantic segmentation with image, text, and architectural enhancements, in: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) Workshops, pp. 4181–4191. Bai, S., Liu, Y., Han, Y., Zhang, H., Tang, Y., Zhou, J., Lu, J., 2025. Self-calibrated CLIP for training-free open-vocabulary segmentation. IEEE Transactions on Image Processing . Barsellotti, L., Amoroso, R., Cornia, M., Baraldi, L., Cucchiara, R., 2024. Training-free open-vocabulary segmentation with offline diffusion-augmented prototype generation, in: 2024 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR), IEEE. pp. 3689–3698. Barsellotti, L., Bianchi, L., Messina, N., Carrara, F., Cornia, M., Baraldi, L., Falchi, F., Cucchiara, R., 2025. Talking to DINO: Bridging self-supervised vision backbones with language for open-vocabulary segmentation, in: 2025 IEEE/CVF International Conference on Computer Vision (ICCV), IEEE. pp. 22025–22035. Blumenstiel, B., Jakubik, J., Kühne, H., Vössing, M., 2023. What a MESS: Multi-domain evaluation of zero-shot semantic segmentation. Advances in Neural Information Processing Systems 36, 73299–73311. Bousselham, W., Petersen, F., Ferrari, V., Kuehne, H., 2024. Grounding everything: Emerging localization properties in vision-language transformers, in: 2024 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR), IEEE. pp. 3828–3837. Caesar, H., Uijlings, J., Ferrari, V., 2018. COCO-Stuff: Thing and stuff classes in context, in: 2018 IEEE/CVF Conference on Computer Vision and Pattern Recognition, IEEE. pp. 1209–1218. Caron, M., Touvron, H., Misra, I., Jégou, H., Mairal, J., Bojanowski, P., Joulin, A., 2021. Emerging properties in self-supervised vision transformers, in: 2021 IEEE/CVF International Conference on Computer Vision (ICCV), IEEE. pp. 9630–9640. Cha, J., Mun, J., Roh, B., 2023. Learning to generate text-grounded mask for open-world semantic segmentation from only image-text pairs, in: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR), pp. 11165–11174. Chen, Q., Yang, L., Chen, Y., Zhao, N., Lai, J., Shao, J., Xie, X., 2025. Training-free class purification for open-vocabulary semantic segmentation, in: 2025 IEEE/CVF International Conference on Computer Vision (ICCV), IEEE. pp. 23124–23134. Cho, S., Shin, H., Hong, S., Arnab, A., Seo, P.H., Kim, S., 2024. CAT-Seg: Cost aggregation for open-vocabulary semantic segmentation, in: 2024 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR), IEEE. pp. 4113–4123. Cordts, M., Omran, M., Ramos, S., Rehfeld, T., Enzweiler, M., Benenson, R., Franke, U., Roth, S., Schiele, B., 2016. The Cityscapes dataset for semantic urban scene understanding, in: Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition, pp. 3213–3223. Dodge, J., Gururangan, S., Card, D., Schwartz, R., Smith, N.A., 2019. Show your work: Improved reporting of experimental results, in: Proceedings of the 2019 Conference on Empirical Methods in Natural Language Processing and the 9th International Joint Conference on Natural Language Processing (EMNLP-IJCNLP), pp. 2185–2194. 
+
+W. Yao et al.: Preprint submitted to Elsevier Page 21 of 32 Background handling in training-free OVSS 
+
+Everingham, M., Van Gool, L., Williams, C.K., Winn, J., Zisserman, A., 2010. The Pascal visual object classes (VOC) challenge. International Journal of Computer Vision 88, 303–338. Ghiasi, G., Gu, X., Cui, Y., Lin, T.Y., 2022. Scaling open-vocabulary image segmentation with image-level labels, in: European Conference on Computer Vision, Springer. pp. 540–557. Gulrajani, I., Lopez-Paz, D., 2021. In search of lost domain generalization, in: International Conference on Learning Representations. URL: 
+
+https://openreview.net/forum?id=lQdXeXDoWtI .Hajimiri, S., Ben Ayed, I., Dolz, J., 2025. Pay attention to your neighbours: Training-free open-vocabulary semantic segmentation, in: Proceedings of the IEEE/CVF Winter Conference on Applications of Computer Vision, pp. 5061–5071. Huang, H., Peng, S., Zhang, D., Geiger, A., 2024. Renovating names in open-vocabulary segmentation benchmarks. Advances in Neural Information Processing Systems 37, 88410–88442. Kirillov, A., Mintun, E., Ravi, N., Mao, H., Rolland, C., Gustafson, L., Xiao, T., Whitehead, S., Berg, A.C., Lo, W.Y., et al., 2023. Segment anything, in: 2023 IEEE/CVF International Conference on Computer Vision (ICCV), IEEE. pp. 3992–4003. Kombol, N., Martinović, I., Šegvić, S., 2025. A survey on training-free open-vocabulary semantic segmentation. arXiv preprint arXiv:2505.22209 .Lan, M., Chen, C., Ke, Y., Wang, X., Feng, L., Zhang, W., 2024a. ClearCLIP: Decomposing CLIP representations for dense vision-language inference, in: European Conference on Computer Vision, Springer. pp. 143–160. Lan, M., Chen, C., Ke, Y., Wang, X., Feng, L., Zhang, W., 2024b. ProxyCLIP: Proxy attention improves CLIP for open-vocabulary segmentation, in: European Conference on Computer Vision, Springer. pp. 70–88. Li, B., Weinberger, K.Q., Belongie, S., Koltun, V., Ranftl, R., 2022. Language-driven semantic segmentation, in: International Conference on Learning Representations. URL: https://openreview.net/forum?id=RriDjddCLN .Li, K., Liu, R., Cao, X., Bai, X., Zhou, F., Meng, D., Wang, Z., 2025a. SegEarth-OV: Towards training-free open-vocabulary segmentation for remote sensing images, in: 2025 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR), IEEE. pp. 10545–10556. Li, Y., Wang, H., Duan, Y., Zhang, J., Li, X., 2025b. A closer look at the explainability of contrastive language-image pre-training. Pattern Recognition 162, 111409. Lin, T.Y., Maire, M., Belongie, S., Hays, J., Perona, P., Ramanan, D., Dollár, P., Zitnick, C.L., 2014. Microsoft COCO: Common objects in context, in: European Conference on Computer Vision, Springer. pp. 740–755. Liu, Y., Wu, S.L., Bai, S., Wang, J., Wang, Y., Tang, Y., 2025. Stepping out of similar semantic space for open-vocabulary segmentation, in: 2025 IEEE/CVF International Conference on Computer Vision (ICCV), IEEE. pp. 22664–22675. Long, J., Shelhamer, E., Darrell, T., 2015. Fully convolutional networks for semantic segmentation, in: Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition, pp. 3431–3440. Mottaghi, R., Chen, X., Liu, X., Cho, N.G., Lee, S.W., Fidler, S., Urtasun, R., Yuille, A., 2014. The role of context for object detection and semantic segmentation in the wild, in: Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition, pp. 891–898. Musgrave, K., Belongie, S., Lim, S.N., 2020. A metric learning reality check, in: European Conference on Computer Vision, Springer. pp. 681–699. Oliver, A., Odena, A., Raffel, C., Cubuk, E.D., Goodfellow, I., 2018. Realistic evaluation of deep semi-supervised learning algorithms. Advances in Neural Information Processing Systems 31. Pineau, J., Vincent-Lamarre, P., Sinha, K., Larivière, V., Beygelzimer, A., d’Alché Buc, F., Fox, E., Larochelle, H., 2021. Improving reproducibility in machine learning research (a report from the NeurIPS 2019 reproducibility program). Journal of Machine Learning Research 22, 1–20. Radford, A., Kim, J.W., Hallacy, C., Ramesh, A., Goh, G., Agarwal, S., Sastry, G., Askell, A., Mishkin, P., Clark, J., Krueger, G., Sutskever, I., 2021. Learning transferable visual models from natural language supervision, in: Meila, M., Zhang, T. (Eds.), Proceedings of the 38th International Conference on Machine Learning, PMLR. pp. 8748–8763. URL: https://proceedings.mlr.press/v139/radford21a.html .Reichard, K., Rizzoli, G., Gasperini, S., Hoyer, L., Zanuttigh, P., Navab, N., Tombari, F., 2025. From open-vocabulary to vocabulary-free semantic segmentation. Pattern Recognition Letters . Šarić, J., Martinović, I., Kristan, M., Šegvić, S., 2025. What holds back open-vocabulary segmentation?, in: 2025 IEEE/CVF International Conference on Computer Vision Workshops (ICCVW), IEEE. pp. 4315–4325. Shi, Y., Dong, M., Xu, C., 2025. Harnessing vision foundation models for high-performance, training-free open vocabulary segmentation, in: 2025 IEEE/CVF International Conference on Computer Vision (ICCV), IEEE. pp. 23487–23497. Sincan, O.M., Low, J.H., Asasi, S., Bowden, R., 2025. Gloss-free sign language translation: An unbiased evaluation of progress in the field. Computer Vision and Image Understanding , 104498. Wang, F., Mei, J., Yuille, A., 2024. SCLIP: Rethinking self-attention for dense vision-language inference, in: European Conference on Computer Vision, Springer. pp. 315–332. Wysoczańska, M., Siméoni, O., Ramamonjisoa, M., Bursuc, A., Trzciński, T., Pérez, P., 2024. CLIP-DINOiser: Teaching CLIP a few DINO tricks for open-vocabulary semantic segmentation, in: European Conference on Computer Vision, Springer. pp. 320–337. Wysoczańska, M., Vobecky, A., Cardiel, A., Trzcinski, T., Marlet, R., Bursuc, A., Siméoni, O., 2025. Test-time contrastive concepts for open-world semantic segmentation with vision-language models. Transactions on Machine Learning Research URL: https://openreview.net/forum? id=wyOv4kGkbU .Xu, J., De Mello, S., Liu, S., Byeon, W., Breuel, T., Kautz, J., Wang, X., 2022. GroupViT: Semantic segmentation emerges from text supervision, in: 2022 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR), IEEE. pp. 18113–18123. Yang, Y., Deng, J., Li, W., Duan, L., 2025. ResCLIP: Residual attention for training-free dense vision-language inference, in: 2025 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR), IEEE. pp. 29968–29978. Yao, W., Huang, B., Dev, S., 2026a. ovss-background-audit: code and data for an audit of background handling in training-free open-vocabulary semantic segmentation. Computer software, GitHub repository. URL: https://github.com/WendongYao/ovss-background-audit .Accessed 18 November 2026. 
+
+W. Yao et al.: Preprint submitted to Elsevier Page 22 of 32 Background handling in training-free OVSS 
+
+Yao, W., Huang, B., Dev, S., 2026b. ovss-background-audit: run outputs and per-image statistics. Zenodo, version 1.0. doi: 10.5281/zenodo. 24338613 . [dataset]. Zhang, B., Yu, S., Li, H., Lin, J., Wang, W., Xiao, J., 2026. The power of prior: Training-free open-vocabulary semantic segmentation with LLaVA, in: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition, pp. 6336–6345. Zhang, D., Liu, F., Tang, Q., 2025. CorrCLIP: Reconstructing patch correlations in CLIP for open-vocabulary semantic segmentation, in: 2025 IEEE/CVF International Conference on Computer Vision (ICCV), pp. 24677–24687. doi: 10.1109/ICCV51701.2025.02288 .Zhou, B., Zhao, H., Puig, X., Fidler, S., Barriuso, A., Torralba, A., 2017. Scene parsing through ADE20K dataset, in: 2017 IEEE Conference on Computer Vision and Pattern Recognition (CVPR), pp. 5122–5130. doi: 10.1109/CVPR.2017.544 .Zhou, C., Loy, C.C., Dai, B., 2022. Extract free dense labels from CLIP, in: Avidan, S., Brostow, G., Cissé, M., Farinella, G.M., Hassner, T. (Eds.), Computer Vision – ECCV 2022, Springer Nature Switzerland, Cham. pp. 696–712. 
+
+W. Yao et al.: Preprint submitted to Elsevier Page 23 of 32 Background handling in training-free OVSS 
+
+## A. Additional results 
+
+This appendix provides the per-method breakdowns underlying Section 4: Table A.1 reports per-method mIoU for all background-handling rules in Table 6, Table A.2 reports P * and BGB on the five controlled derived variants in Section 4.3, and Table A.3 reports the per-method decomposition of official background handling on VOC21 and COCO-Object in Section 4.4. 
+
+Table A.1 
+
+Per-method mIoU for the background rules of Table 6. Otsu for Trident is the V2-P2 run without SAM refinement (corrected values 50.99/33.48 in V3; conclusions unchanged). 
+
+VOC21 COCO-Object Context-60 Method P* Otsu SEL26 CC CF BGB P* Otsu SEL26 CC CF BGB P* Otsu SEL26 CC CF BGB SCLIP 35.91 49.79 57.61 52.63 53.45 60.76 21.68 30.26 33.16 31.78 32.41 33.07 30.41 – 23.47 – 25.19 31.93 ClearCLIP 37.77 47.65 58.43 56.40 56.90 51.80 23.32 30.59 34.36 35.01 35.58 33.04 31.45 – 24.45 – 28.76 32.57 NACLIP 36.79 45.48 55.89 50.37 51.80 57.02 21.55 28.52 32.97 33.07 33.48 32.34 30.65 – 22.72 – 27.44 31.89 ResCLIP 36.66 44.91 58.52 53.63 55.05 60.35 22.00 29.76 34.47 36.34 36.59 34.56 31.84 – 24.18 – 29.66 33.41 SC-CLIP 42.07 48.61 62.51 57.21 58.98 64.34 24.74 30.73 35.52 37.87 37.96 36.75 34.49 – 25.69 – 32.08 36.33 ProxyCLIP 40.57 50.33 64.09 59.51 60.61 61.27 23.89 32.40 37.07 39.10 39.35 36.69 34.48 – 26.26 – 32.09 35.74 Trident 40.02 50.77 66.05 62.24 63.22 67.08 24.90 33.44 38.38 41.42 41.58 41.29 36.17 – 27.44 – 33.59 38.03 
+
+Table A.2 
+
+Derived variants with controlled background share: P*/BGB per method. 
+
+Method Ctx 35% Ctx 53% Ctx 71% COCO 31% COCO 51% SCLIP 27.33/31.90 25.12/30.34 20.08/25.31 21.11/19.19 20.30/20.35 ClearCLIP 29.02/32.38 26.45/30.29 21.68/26.01 22.64/18.12 21.73/19.31 NACLIP 27.64/31.17 25.08/28.83 19.98/23.75 21.54/19.91 20.35/20.81 ResCLIP 28.72/32.54 26.14/29.88 21.14/24.58 22.67/22.53 21.34/23.31 SC-CLIP 31.19/36.20 28.41/34.14 23.00/29.13 23.97/22.56 22.70/23.66 ProxyCLIP 31.24/36.18 28.19/34.35 22.71/29.88 24.99/19.67 23.46/21.15 Trident 32.48/38.23 29.20/36.00 23.72/31.10 26.06/22.89 24.44/24.48 
+
+Table A.3 
+
+Where the official background gain comes from on the original datasets. THR: P* plus only the numeric part of the official trick ( 𝜏 , 𝑠 , 𝑎 ); BGB: THR plus the official class-name file. Δthr =THR −P*, Δname =BGB −THR; Δvoc : gain from removing background words that collide with a query class name (“bed” on COCO-Object; VOC21 has none). Threshold share = Δ thr ∕BGB − P*. 
+
+VOC21 COCO-Object Method P* THR BGB Δthr Δname P* THR BGB Δthr Δname Δvoc 
+
+SCLIP 35.91 38.25 60.76 +2.34 +22.51 21.68 29.72 33.07 +8.04 +3.35 +0.61 ClearCLIP 37.77 51.80 51.80 +14.03 +0.00 23.32 33.04 33.04 +9.72 +0.00 –NACLIP 36.79 37.00 57.02 +0.21 +20.02 21.55 27.72 32.34 +6.17 +4.62 +0.57 ResCLIP 36.66 36.84 60.35 +0.18 +23.51 22.00 28.10 34.56 +6.10 +6.46 +0.58 SC-CLIP 42.07 43.99 64.34 +1.92 +20.35 24.74 33.87 36.75 +9.13 +2.88 +0.61 ProxyCLIP 40.57 48.80 61.27 +8.23 +12.47 23.89 36.21 36.69 +12.32 +0.48 +0.71 Trident 40.02 47.96 67.08 +7.94 +19.12 24.90 39.08 41.29 +14.18 +2.21 +0.73 Mean +4.98 +16.85 +9.38 +2.86 +0.54 Threshold share 0.23 0.77 
+
+W. Yao et al.: Preprint submitted to Elsevier Page 24 of 32 Background handling in training-free OVSS 
+
+## B. Derived datasets 
+
+This appendix lists the classes merged into background for the controlled derived datasets used in Section 3.2. Following the construction rule defined there, foreground classes are ranked in descending order of validation pixel frequency (with COCO variants restricted to stuff classes) and merged cumulatively into label 0 until bg_frac first reaches each target. All merge lists were frozen prior to GPU inference in tier1_bgfrac_frozen.json (SHA-256 
+
+cc5d61b6... ) without consulting any model predictions. Table B.1 records the resulting background pixel shares, total class counts (including background), and merged classes. Notably, the Context sequence merges object categories (person , cat , and dog ) alongside stuff categories, and COCO 51% merges the stuff category table .
+
+Table B.1 
+
+Classes merged into background for the derived datasets (frozen before inference). Classes are merged cumulatively in descending order of validation pixel frequency; COCO variants merge stuff classes only. Variant bg _frac #classes Merged classes (cumulative) Ctx 35% 0.349 57 sky , person , wall 
+
+Ctx 53% 0.530 54 + grass , ground , tree 
+
+Ctx 71% 0.707 49 + building , cat , floor , dog , water 
+
+COCO 31% 0.315 165 sky-other , tree , wall-concrete , grass , building-other ,
+
+pavement , sea 
+
+COCO 51% 0.506 151 + road , clouds , playingfield , snow , wall-other ,
+
+furniture-other , metal , dirt , table , sand , wall-tile ,
+
+window-other , ceiling-other , fence 
+
+W. Yao et al.: Preprint submitted to Elsevier Page 25 of 32 Background handling in training-free OVSS 
+
+## C. Pre-registered contracts and decisions 
+
+This appendix summarizes the analysis contracts, frozen decision rules, outcomes, and dated deviations across all experimental stages introduced in Section 3.4 (Table C.1). Each pre-registered stage froze a contract before GPU inference; results were never modified post hoc, and any hardware migrations, data-source substitutions, or implementation discoveries were appended with timestamps. Negative outcomes ( DISCUSS_STOP in V2-P2, Q1 STOP 
+
+in V5, and H2 NOT_SUPPORTED in S1) are retained verbatim and reported as empirical findings—in particular, V5’s 
+
+STOP outcome shifted our framing from universal protocol gaps to dataset-dependent gaps rather than being overridden. Stage S5 was initiated descriptively after an observation in S4, with all readouts fixed prior to calculation. 
+
+Table C.1 
+
+Pre-registered stages: question, frozen decision rule, outcome, and number of dated deviations. All contracts, deviations, and result files are released. 
+
+Stage Question Frozen rule (abridged) Outcome Dev. V2 Do protocol differences rival method differences? median protocol effect ≥ median method gap; ranking changes in ≥ 50% of 12 cells 
+
+ADVANCE_TO_DESIGN 5V2-P2 T1: how much reported progress over SCLIP survives P *? T2: can a tuning-free rule match tuned tricks? T1: 𝐺 f ix ≤ 0.5 𝐺 rep (and bootstrap p90 
+
+≤ 𝐺 rep ); T2: otsu − bgb ≥ −1 .0 and 
+
+otsu − 𝑃 * ≥ +3 .0
+
+DISCUSS_STOP (T1, T2 not met) 9V3 Can a rule selected on training splits approach tuned tricks? 
+
+Δtrick ≥ −2 .0 and Δplain ≥ +3 .0 ADVANCE 2V4 Does the rule survive an LLM-generated vocabulary? 
+
+Δtrick (cc ) ≥ −2 .0 (STOP if < −4 .0) PASS (−1 .70 ; VOC21 alone −4 .38 ) 4V5 Q1: does the protocol effect repli-cate on Context-60? Q2: conflict-filtered vocabulary Q1: mean (O − 𝑃 *) ≥ 5.0 and ≥ 3∕21 swaps; Q2: Δtrick (cf ) ≥ −2 .0
+
+Q1 STOP (2.01); Q2 vocabulary-sensitive ( −2 .12 )5S1 Does the gain grow with back-ground share? H1: 𝜌 ≥ 0.8, slope CI excludes 0, monotone for ≥ 5∕7 methods; H2: per-image bins 
+
+𝜌 ≥ 0.9 on ≥ 2∕3 datasets H1 SUPPORTED ; H2 NOT_SUPPORTED 8S2 Are losses on COCO variants caused by colliding words? mean Δvoc ≥ +1 .0 and ≥ 5∕7 methods positive on COCO 31% 
+
+COLLISION_SUPPORTED 4S3 Thresholds vs. class-name files on original datasets 
+
+share thr ≥ 0.67 / ≤ 0.33 ; collision loss if mean Δvoc ≥ +0 .5 and ≥ 4 methods positive VOC21: class-name files; COCO-Object: thresholds; collision loss measurable 2S4 Qualitative examples (no quanti-tative claim) percentile-based image selection from frozen statistics; render gate |ΔmIoU | ≤ 0.5
+
+main-figure cells pass; 2 supplemen-tary cells failed on a different GPU; identical on original GPU type 9S5 Mechanism of collision losses (ini-tiated after an observation in S4) P1: exact sole-name collisions yield zero predictions; attribution 𝐹 ≥ 0.5 / 0.2
+
+P1 holds (92/92); 𝐹 = 0 .70 5
+
+W. Yao et al.: Preprint submitted to Elsevier Page 26 of 32 Background handling in training-free OVSS 
+
+## D. Additional qualitative results 
+
+Figures D.1, D.2, and D.3 show additional qualitative SCLIP examples selected by the same deterministic percentile criteria used in Figs. 6 and 7. 
+
+W. Yao et al.: Preprint submitted to Elsevier Page 27 of 32 Background handling in training-free OVSS VOC21 p5 
+
+Image GT 
+
+> 6.6
+
+P* 
+
+> 18.4
+
+THR 
+
+> 24.5
+
+BGB 
+
+> 46.5
+
+O                           
+
+> VOC21 p15
+> 24.8 49.6 53.1 53.7
+> VOC21 p25
+> 13.8 39.7 48.9 54.6
+> VOC21 p35
+> 10.5 43.9 51.4 83.5
+> VOC21 p45
+> 12.3 23.2 58.5 56.6
+> VOC21 p55
+> 11.2 24.2 63.4 49.3
+> VOC21 p65
+> 15.5 41.7 76.1 81.3
+> VOC21 p75
+> 11.9 71.4 80.2 86.4
+> VOC21 p85
+> 13.6 50.6 88.2 81.0
+> VOC21 p95
+> 6.5 50.6 87.3 79.1
+
+Figure D.1: Additional qualitative SCLIP predictions on VOC21. Rows are the images whose per-image gain bgb − 𝑃 * lies closest to the 5th, 15th, . . . , 95th percentiles among eligible validation images (images shown in Fig. 6 excluded); selection used frozen per-image statistics only. Numbers give per-image mIoU of the original runs. W. Yao et al.: Preprint submitted to Elsevier Page 28 of 32 Background handling in training-free OVSS COCO-Obj. p5 
+
+Image GT 
+
+0.4 
+
+P* 
+
+3.6 
+
+THR 
+
+4.7 
+
+BGB 
+
+5.2 
+
+O
+
+> COCO-Obj. p15
+
+3.2 7.3 10.6 14.9 
+
+> COCO-Obj. p25
+
+5.7 8.5 15.8 15.5 
+
+> COCO-Obj. p35
+
+4.7 15.1 17.4 14.2 
+
+> COCO-Obj. p45
+
+4.2 16.5 19.6 15.6 
+
+> COCO-Obj. p55
+
+6.8 20.1 25.3 24.3 
+
+> COCO-Obj. p65
+
+5.1 15.4 27.0 30.6 
+
+> COCO-Obj. p75
+
+6.3 12.6 32.7 22.3 
+
+> COCO-Obj. p85
+
+6.9 39.0 41.0 43.5 
+
+> COCO-Obj. p95
+
+2.8 32.4 52.9 51.8 
+
+Figure D.2: Additional qualitative SCLIP predictions on COCO-Object, selected as in Fig. D.1. W. Yao et al.: Preprint submitted to Elsevier Page 29 of 32 Background handling in training-free OVSS p5 
+
+Image GT 
+
+> bed IoU 0.0
+
+BGB 
+
+> bed IoU 7.7
+
+NC      
+
+> p15
+> bed IoU 0.0 bed IoU 26.2
+> p25
+> bed IoU 0.0 bed IoU 37.7
+> p35
+> bed IoU 0.0 bed IoU 45.6
+> p45
+> bed IoU 0.0 bed IoU 51.5 bed background p55
+
+Image GT 
+
+> bed IoU 0.0
+
+BGB 
+
+> bed IoU 59.5
+
+NC      
+
+> p65
+> bed IoU 0.0 bed IoU 62.8
+> p75
+> bed IoU 0.0 bed IoU 68.7
+> p85
+> bed IoU 0.0 bed IoU 74.8
+> p95
+> bed IoU 0.0 bed IoU 82.3 bed background
+
+Figure D.3: Additional examples for the colliding word “ bed ” on COCO-Object (SCLIP): images closest to the 5th–45th (left) and 55th–95th (right) percentiles of the per-image bed IoU change nc − bgb (images shown in Fig. 7 excluded). Bed IoU is 0 under bgb in all ten images. W. Yao et al.: Preprint submitted to Elsevier Page 30 of 32 Background handling in training-free OVSS 
+
+## E. Collision mechanism 
+
+This appendix details the descriptive mechanistic follow-up (S5) referenced in Sections 4.4 and 4.5; it was initiated after an observation in S4, with all readouts fixed prior to computation, and is reported descriptively without altering any pre-registered gate from V2–S4. 
+
+Proposition (structural zeroing under exact sole-name collisions). Suppose foreground class 𝑐 ≥ 1 has a single query string 𝑞 (𝑐 = { 𝑞 }) that also appears verbatim in the background vocabulary ( 𝑞 ∈ 0). By Eq. (3), 
+
+𝑃 0(𝑥 ) = max 
+
+> 𝑞 ′∈0
+
+𝑝 𝑞 ′ (𝑥 ) ≥ 𝑝 𝑞 (𝑥 ) = 𝑃 𝑐 (𝑥 ) (E.1) holds at every pixel 𝑥 . Because PyTorch’s arg max breaks ties in favor of the smallest class index ( 0 for background), class 𝑐 is never selected prior to thresholding; applying 𝜏 or 𝑎 can only reassign pixels to class 0 and preserves zero predictions. For methods with post-arg max refinement (such as Trident’s SAM refinement), Eq. (E.1) serves as an empirical expectation tested below. 
+
+Layer 1: verification on frozen outputs. Across the frozen S2 and S3 collision manifests, we classify each (method, dataset, background word, query) collision as exact sole-name (E-type : verbatim string equality with |𝑐 | = 1 ;92 instances across 17 dataset–class pairs and 18 cells, involving bed , curtain , fence , hill , mountain , river ,
+
+road , shelf , and wood ) or other (T-type : normalized/token-level match or multi-synonym 𝑐 ; 188 instances). Exact collisions make a class unpredictable under the official post-processing: all 92/92 E-type instances receive 0 predicted pixels under BGB (and 6/6 receive 0 under O on original COCO-Object), including Trident with SAM refinement, whereas 0/92 remain zero under NC . By contrast, T-type collisions are not structurally zeroed, retaining a median predicted pixel count of approximately 0.75 of NC .
+
+Layer 2: per-class decomposition of Δvoc . Table E.1 decomposes Δvoc = mIoU( NC ) − mIoU( BGB ) into contributions from E-type classes, T-type classes, and all remaining classes averaged over the six methods with collisions. E-type classes (which have IoU 0 under BGB and recover to 0.2–56.0 under NC , e.g., 45.0–56.0 for bed 
+
+on COCO-Object) account for 97% of Δvoc on COCO-Object and 70–71% on the COCO-Stuff variants.                       
+
+> Table E.1
+> Decomposition of Δvoc (six-method mean over methods with collisions) into contributions from structurally zeroed exact sole-name collisions (E-type), other colliding classes (T-type), and remaining classes. Dataset Δvoc E-type contrib. T-type contrib. Rest contrib. E-type share COCO-Object +0.635 +0.614 +0.000 +0.021 0.97 COCO 31% +1.631 +1.153 +0.186 +0.292 0.71 COCO 51% +1.393 +0.971 +0.163 +0.259 0.70
+
+Layer 3: leave-one-word-out ablation of the LLM vocabulary. To test whether the VOC21 per-class losses of  
+
+> CC
+
+in Section 4.5 can be attributed to specific generated words, we evaluated all 83 single-word removals from CC on the VOC21 training split (1,464 images, six methods excluding Trident due to SAM cost). Selecting words 𝑤 that raise any target class 𝑐 ∈ 𝐾 = { ship , tvmonitor , table , person , bottle , bird , train } by ≥ 1.0 IoU points on average yields a 10-word attribution set 𝐴 (Table E.2): subtypes ( sailboat , tugboat → ship ), parts ( feather → bird , engine →
+
+train ), contents or co-occurring items ( wine → bottle , napkin → table , collar → person ), and co-occurring scene objects ( laptop , tv_stand , stereo → tvmonitor ). Removing all 10 words once on the VOC21 validation split across all seven methods recovers 𝐹 = ∑𝑐 ∈𝐾 𝑅 𝑐 ∕ ∑𝑐 ∈𝐾 𝐷 𝑐 = 68 .23∕97 .70 = 0 .70 of the per-class drop across 𝐾 
+
+(with non-𝐾 classes changing by +0 .38 on average, range −0 .07 to +1 .22 ). Because 𝐴 was selected using ground-truth class labels, CC − 𝐴 is reported solely as descriptive attribution and must not be interpreted as a new tuning-free rule or performance claim. Notably, none of these 10 terms match the string-collision rule in Section 3.3, explaining why our lexical check does not detect subtypes, parts, or co-occurring scene objects.   
+
+> W. Yao et al.: Preprint submitted to Elsevier Page 31 of 32
+
+Background handling in training-free OVSS 
+
+Table E.2 
+
+Layer 3 leave-one-word-out attribution on VOC21 (seven-method mean on validation). 𝐷 𝑐 = IoU 𝑐 (sel26 ) − IoU 𝑐 (cc );
+
+𝑅 𝑐 = IoU 𝑐 (cc − 𝐴 ) − IoU 𝑐 (cc ). Overall recovery 𝐹 = ∑𝑐 ∈𝐾 𝑅 𝑐 ∕ ∑𝑐 ∈𝐾 𝐷 𝑐 = 0 .70 . Class names follow P * (where boat and 
+
+diningtable are written ship and table ). Class 𝑐 Attributed words in 𝐴 𝐷 𝑐 𝑅 𝑐 Relation 
+
+ship sailboat , tugboat 29.97 23.48 subtype 
+
+tvmonitor laptop , tv_stand , stereo 13.70 14.83 scene object 
+
+table napkin 12.69 4.55 co-occurring item 
+
+person collar 12.21 2.77 co-occurring item 
+
+bottle wine 10.89 12.57 content 
+
+bird feather 10.36 7.75 part 
+
+train engine 7.89 2.29 part 
+
+## F. Implementation and numerical reproducibility 
+
+This appendix documents hardware allocation and pixel-level cross-GPU reproducibility supporting Section 3.5. All experiments from V2-P2 through S5 ran under PyTorch 2.1.2, CUDA 12.1, mmcv 2.1.0, mmengine 0.10.1, and mmsegmentation 1.2.2 (V2 ran on an RTX 3090 Ti with PyTorch 2.6.0+cu124); V2-P2, V4, and S1 used RTX 4080 SUPER (32 GB) GPUs, whereas V3, V5, S2, S3, and S5 ran on RTX 3090 (24 GB) GPUs, and S4 rendered on both (RTX 4080 SUPER, then RTX 3090). Repository commits and SHA-256 checksums for weights and frozen files are recorded in the released archive. In S4, re-rendering 39 SCLIP THR and NC image–setting pairs on the original RTX 3090 reproduced all 39 per-image class intersection and union counts bit-for-bit (0.000 difference). Rendering the same pairs on an RTX 4080 SUPER produced small numerical pixel flips—specifically 349 of 230,400 pixels and 204 of 307,200 pixels on two COCO-Object THR images—of which 1 and 8 pixels fell on classes absent from ground truth, shifting single-image mIoU by −0 .96 and −1 .83 points. Such flips affect only borderline pixels; consistent with Section 3.5, we do not interpret dataset-level differences below 0.15 mIoU. 
+
+W. Yao et al.: Preprint submitted to Elsevier Page 32 of 32
