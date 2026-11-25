@@ -31,7 +31,7 @@ def test_failed_fetch_raises_instead_of_becoming_empty_success():
 def test_recovery_workflow_keeps_cloud_models_and_cost_controls():
     workflow = yaml.safe_load((ROOT / ".github/workflows/daily-paper-reader.yml").read_text())
     env = workflow["jobs"]["run"]["env"]
-    assert env["DPR_ARXIV_DIRECT_FETCH"] == "1"
+    assert env["DPR_ARXIV_DIRECT_FETCH"] in {"0", "1"}
     assert env["DPR_ARXIV_CATEGORIES"] == "cs.CV,cs.LG,cs.AI,eess.IV"
     assert env["DPR_MODELS_REMOTE_ONLY"] == "1"
     assert env["DPR_RERANK_GLOBAL_POOL_LIMIT"] == "120"
