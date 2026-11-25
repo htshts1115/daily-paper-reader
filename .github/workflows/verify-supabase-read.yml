@@ -1,0 +1,68 @@
+name: Verify shared arXiv reads
+on:
+  push:
+    branches: [verify-supabase-read-20261125]
+    paths: ['.github/workflows/verify-supabase-read.yml']
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - run: python -m pip install requests pyyaml
+      - name: Read recent count, keyword hits and vector hits
+        env:
+          PYTHONPATH: src
+          DPR_ARXIV_DIRECT_FETCH: "0"
+        run: |
+          python - <<'PY'
+          from datetime import datetime, timedelta, timezone
+          import json
+
+          from source_config import load_config_with_source_migration
+          from supabase_source import (
+              count_papers_by_date_range, get_supabase_read_config,
+              match_papers_by_bm25, match_papers_by_embedding,
+          )
+
+          config = load_config_with_source_migration("config.yaml", write_back=False)
+          backend = get_supabase_read_config(config)
+          if not (backend["enabled"] and backend["use_bm25_rpc"] and backend["use_vector_rpc"]):
+              raise SystemExit("Configured arXiv database retrieval is not enabled.")
+          for profile in config["subscriptions"]["intent_profiles"]:
+              if profile["tag"] == "mono-depth":
+                  vector = next(
+                      json.loads(cache["embedding_json"])
+                      for item in profile["keywords"]
+                      if (cache := item.get("embedding_cache")) and cache.get("embedding_json")
+                  )
+                  break
+          else:
+              raise SystemExit("No cached mono-depth query embedding.")
+          if len(vector) != 384:
+              raise SystemExit("Unexpected cached embedding dimensions.")
+          end = datetime.now(timezone.utc)
+          args = dict(url=backend["url"], api_key=backend["anon_key"],
+                      schema=backend["schema"], start_dt=end - timedelta(days=7), end_dt=end)
+          count, _ = count_papers_by_date_range(**args, papers_table=backend["papers_table"], timeout=10)
+          keywords, keyword_status = match_papers_by_bm25(
+              **args, rpc_name=backend["bm25_rpc"], query_text="depth", match_count=3, timeout=20,
+          )
+          vectors, vector_status = match_papers_by_embedding(
+              **args, rpc_name=backend["vector_rpc"], query_embedding=vector, match_count=3, timeout=25,
+          )
+          print(f"Supabase 7-day arXiv count: {count}")
+          print(f"Supabase keyword hits: {len(keywords)}")
+          print(f"Supabase vector hits: {len(vectors)}")
+          if not (count and keywords and vectors):
+              print(f"Keyword request successful: {keyword_status.startswith('rpc 查询成功')}")
+              print(f"Vector request successful: {vector_status.startswith('rpc 查询成功')}")
+              raise SystemExit("At least one Supabase check failed; keep the daily source unchanged.")
+          PY
