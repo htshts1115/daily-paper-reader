@@ -1,0 +1,54 @@
+{
+  "label": "2026-11-25",
+  "date": "2026-11-25",
+  "generated_at": "2026-11-25T03:04:30",
+  "count": 3,
+  "papers": [
+    {
+      "paper_id": "202611/25/2611.30734v1-egodepth-bench-benchmarking-metric-depth-for-egocentric-manipulation",
+      "section": "quick",
+      "title_en": "EgoDepth-Bench: Benchmarking Metric Depth for Egocentric Manipulation",
+      "authors": "Yuan Gao, Dongchen Wei, Xinyang Lin, Shuhua Cao, Xueliang Guo, Zhuohan Li, Yihao Wang",
+      "date": "2026-11-23",
+      "pdf": "https://arxiv.org/pdf/2611.30734v1",
+      "score": "7.0",
+      "evidence": "度量深度基准，评测单目模型与泛化性",
+      "tldr": "第一人称操作缺少大规模度量深度评测。EgoDepth-Bench汇集37个环境、94万余同步样本，含6路校准RGB与鱼眼度量深度，由五个主动红外立体模块重建，并按环境留出评估泛化。基准测试单目、立体和多视图模型的深度精度与覆盖；球杆标定中位误差1.27毫米，MapAnything微调后在未见环境将度量AbsRel从0.708降至0.091。该基准提供有效监督与严格评测，推动第一人称操作深度估计研究。",
+      "tags": "query:mono-depth",
+      "abstract_en": "We introduce EgoDepth-Bench, comprising 941,233 synchronized samples collected across 37 distinct physical environments. Each sample combines six calibrated RGB views with metric depth in the native fisheye view, reconstructed from five active-infrared stereo modules. A calibrated ball-bar confirms millimeter-level geometric accuracy, with a median error of 1.27 mm on a known sphere spacing. Environment-held-out splits enable evaluation of generalization to unseen environments. Across monocular, stereo, and multi-view models, the benchmark measures both depth accuracy and prediction coverage, including on hands and objects. Fine-tuning MapAnything on EgoDepth-Bench reduces metric AbsRel from 0.708 to 0.091 and scale-aligned AbsRel from 0.327 to 0.072 on unseen environments. These results demonstrate that EgoDepth-Bench provides effective supervision and enables rigorous evaluation of metric and relative depth estimation in egocentric manipulation. The project page provides the evaluation code and interactive RGB-depth sequences.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202611/25/2611.29896v1-segment-anything-in-context-via-visual-demonstrations",
+      "section": "quick",
+      "title_en": "Segment Anything In-Context via Visual Demonstrations",
+      "authors": "Yuzhu Wang, Manni Duan, Hongliang Ye, Shu Kong",
+      "date": "2026-11-23",
+      "pdf": "https://arxiv.org/pdf/2611.29896v1",
+      "score": "6.0",
+      "evidence": "可泛化到未见任务的上下文提示分割基础模型",
+      "tldr": "现有分割模型难以处理需要隐性视觉知识、或概念难以用语言明确描述的任务。SAYD将提示图像及其分割掩码作为视觉示例，在查询图像中建立视觉对应，从而分割目标物体或其部件等连贯区域。该方法引入轻量掩码解码器实现与提示无关的掩码生成，并设计识别提示中未出现新类别的学习机制。在覆盖自然、生物、医学、病理和卫星图像等24个域外基准上，SAYD显著优于现有上下文分割与开放词汇分割方法。",
+      "tags": "query:seg",
+      "abstract_en": "We present the Segment Anything Model via Visual Demonstrations (SAYD), a foundation model for in-context segmentation. Given visual demos comprising prompt images and their segmentation masks, SAYD segments coherent regions (e.g., objects or their parts) in a query image by establishing visual correspondences between the prompts and the query. SAYD generalizes to previously-unseen segmentation tasks, including those requiring tacit visual knowledge or involving concepts that are difficult to articulate unambiguously in language. We train SAYD on 12 public datasets originally curated for panoptic segmentation using our proposed techniques, including a lightweight mask decoder for prompt-agnostic mask generation and a learning mechanism for recognizing novel query classes absent in the prompts. These innovations enhance both computational efficiency and out-of-domain generalization. Consequently, SAYD significantly outperforms existing methods of in-context segmentation and open-vocabulary segmentation across 24 out-of-domain benchmarks, spanning natural, biological, ecological, cosmological, medical, pathological, and satellite imagery.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202611/25/2611.30787v1-bridgemvs-bridging-multi-view-stereo-and-monodepth-via-bidirectional-dynamic-fusion",
+      "section": "quick",
+      "title_en": "BridgeMVS: Bridging Multi-View Stereo and Monodepth via Bidirectional Dynamic Fusion",
+      "authors": "Jianfei Jiang, Haochen Yu, Qiankun Liu, Rui Yang, Hongyuan Liu, Xianglong Meng, Jiansheng Chen, Huimin Ma",
+      "date": "2026-11-23",
+      "pdf": "https://arxiv.org/pdf/2611.30787v1",
+      "score": "6.0",
+      "evidence": "通过双向融合将单目深度估计与多视图立体结合",
+      "tldr": "MVS依赖显式几何但弱纹理/重复区域匹配不稳，MDE结构先验强却尺度模糊，现有混合方法多为单向利用。BridgeMVS提出级联多阶段框架，以双向动态融合BDF在每个阶段进行单目到代价体、代价体到单目的动态更新，实现互增强。融合特征由粗到细传播，并受相对尺度MDE与度量尺度MVS监督。在DTU、Tanks-and-Temples、ETH3D取得SOTA，并提升单目深度精度。",
+      "tags": "query:mono-depth",
+      "abstract_en": "Multi-View Stereo (MVS) and Monocular Depth Estimation (MDE) provide complementary cues for dense 3D reconstruction. While MVS leverages explicit geometry for metric depth, it struggles in challenging regions where feature matching is unreliable. Conversely, MDE provides robust structural priors but typically yields scale-ambiguous results. Existing hybrid methods mainly exploit monocular cues in a unidirectional manner, leaving the mutual enhancement between MDE and MVS insufficiently explored. To address this limitation, we propose BridgeMVS, a unified cascaded multi-stage MVS framework that bridges monocular depth features and multi-view cost volume representations through Bidirectional Dynamic Fusion (BDF). At each stage, BDF performs dynamic mono-to-cost and cost-to-mono updates, where monocular structural features guide cost volume refinement for more robust MVS depth estimation, while multi-view geometric evidence recalibrates monocular representations to improve their metric-scale consistency. Furthermore, the fused monocular and multi-view representations are progressively propagated from coarse to fine stages and constrained by stage-wise relative-scale MDE supervision and metric-scale MVS supervision, enabling cross-branch interactions to benefit subsequent high-resolution depth estimation. In addition, BDF is designed as a plug-and-play module that can be conveniently integrated into existing cascaded MVS frameworks. Extensive experiments demonstrate that BridgeMVS achieves state-of-the-art performance on the DTU, Tanks-and-Temples, and ETH3D benchmarks, while simultaneously boosting the accuracy of monocular depth estimation. Notably, BridgeMVS ranks first on both the Tanks-and-Temples Intermediate and Advanced benchmarks. The source code is available at \\href{https://github.com/JianfeiJ/BridgeMVS}{https://github.com/JianfeiJ/BridgeMVS}.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    }
+  ],
+  "errors": []
+}

@@ -1,0 +1,420 @@
+Title: EgoDepth-Bench: Benchmarking Metric Depth for Egocentric Manipulation
+
+URL Source: https://arxiv.org/pdf/2611.30734v1
+
+Published Time: Tue, 24 Nov 2026 05:41:20 GMT
+
+Number of Pages: 8
+
+Markdown Content:
+# EgoDepth-Bench: Benchmarking Metric Depth for Egocentric Manipulation 
+
+Yuan Gao *, Dongchen Wei †, Xinyang Lin, Shuhua Cao, Xueliang Guo, Zhuohan Li, Yihao Wang 
+
+GenRobot 
+
+https://egodepth-bench.github.io 
+
+Abstract — We introduce EgoDepth-Bench, comprising 941,233 synchronized samples collected across 37 distinct physical environments. Each sample combines six calibrated RGB views with metric depth in the native fisheye view, reconstructed from five active-infrared stereo modules. A calibrated ball-bar confirms millimeter-level geometric accuracy, with a median error of 1.27 mm on a known sphere spacing. Environment-held-out splits enable evaluation of generalization to unseen environments. Across monocular, stereo, and multi-view models, the benchmark measures both depth accuracy and prediction coverage, including on hands and objects. Fine-tuning MapAnything on EgoDepth-Bench reduces metric AbsRel from 0.708 to 0.091 and scale-aligned AbsRel from 0.327 to 0.072 on unseen environments. These results demonstrate that EgoDepth-Bench provides effective supervision and enables rigorous evaluation of metric and relative depth estimation in egocentric manipulation. The project page provides the evaluation code and interactive RGB-depth sequences. 
+
+I. I NTRODUCTION 
+
+Egocentric demonstrations provide a rich source of train-ing data for robot manipulation [1]. Recovering the metric geometry of hands, manipulated objects, and the surrounding workspace can further support learning from these demon-strations [2], [3]. However, depth estimation in egocentric manipulation is particularly challenging: head motion is cou-pled with independent hand and object motion, occlusions change continuously, and fisheye cameras with a wide field of view introduce strong viewing-angle variation. Evaluating depth in this setting therefore requires metric ground truth on dynamic surfaces, together with measurements that explicitly characterize the interacting hands and objects. Existing datasets address only subsets of these require-ments. HOI4D captures real egocentric manipulation using perspective RGB-D cameras [4], while WideDepth evaluates fisheye depth using imagery rendered from static laser-scanned scenes [5]. Aria Digital Twin (ADT) provides real egocentric interaction and native-fisheye depth rendered from registered scene and object models, but is limited to two physical environments [6]. Thus, existing resources do not jointly provide native-fisheye metric depth for real dynamic manipulation, broad coverage across physical environments, held-out-location evaluation, and interaction-specific depth analysis. We introduce EgoDepth-Bench, a metric depth dataset and benchmark of real egocentric manipulation. A head-mounted camera rig records 941,233 synchronized samples            
+
+> *Corresponding author: gaoyuan100@outlook.com .†Project lead. Camera 2 RGB Camera 2 GT Z-depth
+> 0.25 1.00 2.00
+> 012345mSix synchronized RGB views
+> Fig. 1. EgoDepth-Bench records head-worn interaction at 37 physical sites. Six synchronized RGB views accompany ground-truth Z-depth aligned with camera 2’s fisheye image. Gray pixels have no valid ground truth; the displayed color scale saturates outside 0.25–2 m. This training-set example illustrates the dataset.
+
+across 37 distinct physical environments (Fig. 1). Each sample contains six synchronized and calibrated RGB views, enabling monocular, stereo, and multi-view evaluation on the same interactions. Disjoint training, validation, and test environments support evaluation of generalization to unseen physical locations. Metric Z-depth for the target fisheye camera is re-constructed from five active-infrared stereo modules us-ing learned stereo estimation followed by calibrated multi-view fusion in the target camera’s native fisheye image coordinates. Unlike approaches based on prebuilt room or object models, this reconstruction captures dynamic hands and manipulated objects directly. We independently validate its metric accuracy using a calibrated ball-bar across depth ranges, viewing directions, and motion conditions, obtaining millimeter-level geometric agreement (Section III-C). We evaluate 18 publicly available depth models under ex-plicit input and scale conventions. The benchmark measures both depth accuracy and prediction coverage over the full image and separately on hand and object regions. Joint depth-angle analysis and matched comparisons across region and motion conditions characterize how performance varies with interaction geometry. Controlled experiments further isolate the effects of input views, camera-rig geometry, and training on EgoDepth-Bench. Our evaluation shows that low depth error alone can obscure incomplete predictions, particularly on manipulated objects, motivating the joint use of accuracy and coverage. 
+
+> This work has been submitted to the IEEE for possible publication. Copyright may be transferred without notice, after which this version may no longer be accessible. arXiv:2611.30734v1 [cs.CV] 23 Nov 2026
+
+Training on EgoDepth-Bench substantially improves both metric and relative depth estimation at held-out sites. With rig geometry fixed, fine-tuning MapAnything [7] reduces test AbsRel from 0.708 to 0.091, with substantial gains remaining after per-frame scale alignment. Our contributions are: 1) A real egocentric manipulation dataset spanning 37 distinct physical environments, with six synchronized RGB views, native-fisheye metric Z-depth, and inde-pendent ball-bar validation of reconstructed geometry. 2) A depth benchmark that jointly evaluates accuracy and prediction coverage, including dedicated measurements on hands and manipulated objects and diagnostics over viewing geometry and motion. 3) A systematic evaluation of public monocular, stereo, and multi-view models, together with controlled stud-ies of input views, rig geometry, and cross-environment generalization and adaptation. II. R ELATED WORK 
+
+A. Depth Benchmarks 
+
+NYUv2, KITTI Depth, and DIODE evaluate depth in indoor RGB-D scenes, driving, and indoor–outdoor imagery, respectively [8]–[10]. Bonn RGB-D Dynamic includes real moving scenes and object manipulation, while Dynamic Replica provides synthetic stereo sequences with moving people and animals [11], [12]. Camera geometry and capture viewpoint motivate more targeted benchmarks. ScanNet++ registers fisheye pho-tographs to laser-scanned geometry [13]. WideDepth ren-ders its indoor fisheye benchmark from scans and provides separate real outdoor training data with LiDAR depth [5]. AerialMetric combines targeted evaluation of UAV imaging conditions with model adaptation [14]. EgoDepth-Bench examines real head-worn manipulation through local depth diagnostics and adaptation across physical sites. 
+
+B. Egocentric Interaction Geometry 
+
+HOI4D uses head-mounted RGB-D sensors [4]. ADT records one RGB and two monochrome views and renders aligned fisheye depth from registered scene and object mod-els [6]. HOT3D and SHOW3D provide hand and object poses and meshes for interaction geometry [15], [16]. The Ego-1K research release offers 12 rectified RGB views and evaluates stereo consistency [17]. EgoLive recon-structs depth from rectified RGB stereo pairs and validates it against physical targets [18]; Xperience-10M provides stereo-derived depth for egocentric interaction [19]. These resources already support depth evaluation: EgoM2P evaluates video depth on HOI4D with sequence-level scale and shift alignment [20], and UniK3D reports zero-shot results on ADT [21]. EgoDepth-Bench reconstructs native fisheye ground-truth depth from dedicated active-IR pairs, retaining six RGB views as model inputs and separat-ing training and evaluation across physical sites (Table I). 
+
+C. Depth Models and Geometric Inputs 
+
+Depth Anything v2 and Marigold predict relative depth [22], [23]; Metric3D v2 and UniDepth v2 estimate metric depth [24], [25]. Depth Any Camera and UniK3D support a broader range of camera projections [21], [26]. Foun-dationStereo uses rectified image pairs [27], while VGGT and MapAnything recover geometry from multiple images; MapAnything also accepts supplied calibration [7], [28]. Our evaluation groups models by these input and scale assumptions, separating metric accuracy from accuracy after alignment to ground truth. III. T HE EGO DEPTH -B ENCH DATASET 
+
+EgoDepth-Bench pairs six synchronized RGB views of head-worn interaction with metric ground-truth Z-depth pixel-aligned with camera 2’s fisheye RGB image, supporting monocular, stereo, and multi-view comparisons on the same observations. 
+
+A. Data Collection and Coverage 
+
+Five participants performed freely chosen activities such as folding clothes, tidying tables, cleaning, and mopping, without prescribed head or hand movements. Their 1,155 recordings span 37 physical sites and 8.72 hours. Table II summarizes the environments and data partitions. The head-mounted rig combines six global-shutter RGB cameras with five Gemini 336L active-infrared (IR) stereo modules whose views overlap in the workspace (Fig. 2). RGB is recorded at 1600 × 1296 . Camera 2 has a calibrated RGB field of view of approximately 163 ◦ horizontally and 
+
+136 ◦ vertically, exceeding 200 ◦ diagonally. Each IR module records 848 × 480 stereo pairs with a nominal 95 mm baseline. A shared hardware trigger synchronizes RGB and IR acquisition at 30 Hz. The dataset contains 941,233 synchronized timestamps, each with six RGB images and one camera-2 ground-truth depth map, totaling 5,647,398 RGB images. RGB images and depth maps are provided at 512 × 416 and approximately 30 Hz, accompanied by calibration at this resolution and original timestamps. 
+
+B. Ground-Truth Depth Construction 
+
+The pipeline in Fig. 2 reconstructs depth from five IR viewpoints and fuses it in camera 2. IR pairs and onboard depth are matched to camera 2 by timestamp; incomplete timestamps are skipped. We apply FoundationStereo [27] to rectified IR pairs from the five Gemini 336L modules for smoother depth maps and extended near-range coverage. For module m, the estimated disparity dm yields metric depth 
+
+zm(p) = fmBm
+
+dm(p) , (1) where fm is the rectified horizontal focal length in pixels and 
+
+Bm is the calibrated baseline in meters. We remove invalid correspondences and small disparity components. Onboard depth from the 336L’s built-in algorithm provides a consistency check. We filter isolated components and locally inconsistent background returns from both onboard TABLE I COMPARISON OF DEPTH DATASETS AND EGOCENTRIC INTERACTION RESOURCES .Capture conditions Visual observations Depth annotations Dataset scale Dataset Type Head-worn Manip. RGB views RGB HFoV Fisheye depth Construction Reported size Scenes / sites 
+
+General and dynamic depth datasets 
+
+NYUv2 (labeled) [8] Real – – 1 NR – RGB-D 1.4K pairs 464 scenes KITTI Depth [9] Real – – 2 NR – LiDAR >93K maps NR DIODE (train/val) [10] Real – – 1 60 ◦ – LiDAR 26.2K pairs 25 scenes Bonn RGB-D Dynamic [11] Real – ✓ 1 NR – RGB-D 26 seq. NR Dynamic Replica [12] Synth. – – 2 NR – Scene rendering 169.2K stereo pairs NR 
+
+Wide-angle depth datasets 
+
+ScanNet++ (DSLR, v1) [13] Real – – 1 NR ✓ Scan rendering 280K images 460 scenes WideDepth (bench.) [5] Scan render – – 2 120 –195 ◦ ✓ Scan rendering ∼5K stereo pairs 101 scenes WideDepth (train) [5] Real – – 2 ∼ 180 ◦ ✓ LiDAR 18K samples NR 
+
+Egocentric interaction datasets 
+
+HOI4D [4] Real ✓ ✓ 2a NR – RGB-D 2.4M frames 610 rooms Aria Digital Twin [6] Real ✓ ✓ 1 110 ◦ ✓ Tracked-asset rendering 200 seq. 2 sites Ego-1K (research) [17] Real ✓ ✓ 12 120 ◦ – NR 491K frames NR EgoLive [18] Real ✓ ✓ 2 130 ◦ NR RGB stereo 1680 h NR 
+
+EgoDepth-Bench Real ✓ ✓ 6 ∼ 163 ◦ ✓ 5× active-IR stereo + fusion 941K pairs 37 sites  
+
+> Manip.: hand–object interaction with object motion. Fisheye depth: depth annotations in the native fisheye projection; coverage may be partial. HFoV: horizontal RGB field of view. NR: not specified in the cited source; –: absent. Scale entries retain their stated units. aHOI4D captures two synchronized RGB views; released clips are organized per sensor.
+
+TABLE II DATASET COVERAGE BY ENVIRONMENT AND SITE -DISJOINT SPLITS .
+
+Environment Sites Recordings Train Val. Test Domestic 5 0 2 220 Retail 7 1 1 215 Hospitality & dining 4 0 1 311 Leisure & entertainment 4 1 1 199 Commercial services 2 1 1 57 Institutional 1 1 1 76 Other environments 1 1 1 77 
+
+Total 24 5 8 1,155 
+
+Partition Train Val. Test Recordings 755 163 237 Timestamps 609,652 134,637 196,944 
+
+and learned depth. Where filtered onboard depth hm is valid, learned depth must satisfy |zm − hm|/h m ≤ 0.05 .Where onboard depth is invalid, only learned disparities 
+
+dm > 128 px in the rectified IR images remain eligible, allowing reconstruction in the onboard algorithm’s near blind zone. All retained depth values come from learned IR stereo. We transform each retained source pixel p into camera 2 and project it into its fisheye image: 
+
+P2 = R2m
+
+ zm(p)K−1 
+
+> m
+
+˜p + t2m, q = π2(P2), (2) where ˜p is the homogeneous pixel, Km contains rectified intrinsics, and (R2m, t2m) maps the left IR frame to cam-era 2. The calibrated double-sphere model π2 [29] maps the transformed point to image coordinates. A neighbor-hood visibility check uses camera-to-point range to remove occluded background points. A z-buffer then retains the smallest positive camera-2 Z at each pixel within a module, and fusion takes the minimum across modules. The fused output stores camera-2 optical-axis depth in meters, with zero at unsupported pixels and a separate validity mask. The convex hull of valid ground-truth pixels spans 83.1% of the image area on average, with depth measurements available at 66.9% of all image pixels. 
+
+C. Geometric Accuracy Validation 
+
+We assess recovered dimensions using a ball-bar with certified center spacing Lgt = 499 .9903 ± 0.005 mm. Static and moving captures span distances and fisheye positions, including orientations with the spheres at different depths (Fig. 3). After localizing sphere-pair candidates using appear-ance and depth checks, we back-project their depth pixels and fit centers by Tukey-weighted least squares with fixed certified radii (approximately 25 mm). The recovered centers 
+
+ˆc1, ˆc2 give the spacing error 
+
+eL = |∥ ˆc1 − ˆc2∥ − Lgt | . (3) Sphere fits require at least 20 inliers and RMS ≤ 4 mm; between-sphere maximum/minimum ratios must be ≤ 3 for Target Pixel                 
+
+> (u,v)
+> Gated FS Depth
+> M0 M1 M2 M3 M4
+> Project to Cam2
+> M0 M1 M2 M3 M4
+> Projection
+> Z-buffer Fusion
+> M0 M1 M2 M3 M4
+> Cam2
+> d1 d2 d3 d4 d5
+> Keep nearest
+> valid depth
+> Collect 5 gated
+> depth maps
+
+Capture Rig      
+
+> M0
+> FS-HW
+> Consistency
+> Gate
+> Rectified IR Pair
+> FoundationStereo
+> Onboard
+> Hardware Depth HW Pre-filter
+> M1
+> FS-HW
+> Consistency
+> Gate
+> Rectified IR Pair
+> FoundationStereo
+> Onboard
+> Hardware Depth HW Pre-filter
+> M2
+> FS-HW
+> Consistency
+> Gate
+> Rectified IR Pair
+> FoundationStereo
+> Onboard
+> Hardware Depth HW Pre-filter
+> M3
+> FS-HW
+> Consistency
+> Gate
+> Rectified IR Pair
+> FoundationStereo
+> Onboard
+> Hardware Depth HW Pre-filter
+> M4
+> FS-HW
+> Consistency
+> Gate
+> Rectified IR Pair
+> FoundationStereo
+> Onboard
+> Hardware Depth HW Pre-filter
+
+Per-Module GT Construction  Projection and GT Fusion      
+
+> Primary benchmark view
+> 512 ×416 px
+> float16 · metric depth
+> Eval. range: 0.25 –2.0 m
+> Egocentric manipulation
+> Reception Lobby Beverage Counter
+> Utility Room Clinical Workspace
+
+… 
+
+> Cam5
+> M0
+> M1
+> M2
+> M3
+> M4
+> Cam0
+> Cam1
+> Cam2 Cam3
+> Cam4
+> 6 Fisheye RGB 5 Active-IR Stereo
+> GT Z-depth (Cam2)
+
+Fig. 2. Ground-truth depth construction. The rig records six fisheye RGB views and five active-IR stereo pairs during manipulation. Per-module IR depth is checked against filtered onboard depth, with a near-range exception where onboard depth is unavailable, then projected and fused in camera 2. The output is a 512 × 416 optical-axis Z-depth map aligned with camera 2’s fisheye image. 1. Capture Modes                         
+
+> Static (artifact fixed,
+> Wearer moves)
+> Dynamic (artifact moves,
+> Wearer moves)
+> 2. Sampling Coverage
+> 0.25-0.5m
+> Fisheye Position (Cam2) Pose
+> Transverse Oblique
+> 3. Measurement Pipeline
+> Distance (to Cam2)
+> 0.5-0.8m 0.8-1.2m 1.2-2.0m
+> (a) Cam2 RGB (b) RGB Localization (c) Cam2 GT Depth
+> (d) Back-project
+> to 3D
+> (e) Fixed-Radius
+> Robust Sphere Fitting
+> 12
+> 3
+> 4
+> 5
+> 4. Physical Validation
+> Certified length
+> c1 c2
+> 𝐩 𝑖 = 𝜋 𝐶 2
+> −1 𝑢 𝑖 𝑣 𝑖 𝐷 𝑖
+> ∥ 𝐩 𝑖 −Ƹ𝐜 𝑘 ∥2≈ 𝑅
+> 𝐿 pred =∥ Ƹ𝐜 1−Ƹ𝐜 2∥2
+> 𝐿 𝑔𝑡
+> 𝑒 𝐿 = 𝐿 pred − 𝐿 gt
+> R fixed
+
+Fig. 3. Ball-bar validation across distances, viewing directions, and motion conditions. Sphere pixels are back-projected and fitted with fixed radii; the recovered center spacing is compared with the certified length. Here Di is camera-2 optical-axis Z-depth, and π−1
+
+C2 denotes calibrated back-projection using this depth. 
+
+RMS and ≤ 10 for inlier counts. These fit-quality checks yield 1,220 accepted measurements (38.8% of localized frames) for accuracy analysis. Accepted measurements have a median absolute center-spacing error of 1.27 mm (P95: 6.66 mm). Median error rises from 1.11 mm at 0.25–0.8 m to 9.79 mm in the 1.2–2.0 m bin (Table III). 
+
+D. Data Curation and Splits 
+
+We verify image and depth-map readability and dimen-sions, calibration, and validity masks for every observation. Exact duplicate recordings are removed by matching times-tamps, RGB, depth, masks, and calibration. We preserve temporal order and partial ground-truth coverage, without fil-tering by image blur, scene difficulty, or model performance. All recordings and synchronized views of each physical site, including revisits, belong to one partition (Table II). 
+
+TABLE III ABSOLUTE BALL -BAR SPACING ERROR , GROUPED SEPARATELY BY DISTANCE AND FIELD ANGLE . D ISTANCE IS THE RANGE OF THE RECONSTRUCTED MIDPOINT ; FIELD ANGLE IS ITS ANGLE FROM THE OPTICAL AXIS .
+
+Condition Median (mm) P95 (mm) 
+
+Distance (m) 
+
+[0 .25 , 0.8) 1.11 4.57 
+
+[0 .8, 1.2) 3.01 9.15 
+
+[1 .2, 2.0) 9.79 22.78 
+
+Field angle (degrees) 
+
+[0 , 20) 1.11 5.09 
+
+[20 , 40) 1.50 10.20 
+
+[40 , 60) 3.08 9.79 
+
+Training and test sets each cover all seven environment groups. The eight test sites comprise a fruit store, a gaming arcade, a real-estate agency, a guesthouse, a horticultural gar-den, a training center, a domestic dining room, and a living room. Validation sites are used for checkpoint selection; test sites are held out from fine-tuning. The data package includes masks, calibrated rays, site assignments, and manifests linking RGB and depth. Training and evaluation use fixed temporal subsets of these partitions, as specified in Section IV-A. Sampling rules and evaluation code will accompany the data. IV. E XPERIMENTS 
+
+A. Experimental Setup 
+
+Data and inputs. From the disjoint site partitions (Table II), we sample 61,085 timestamps for training at 3 Hz, 4,491 for TABLE IV PUBLIC -CHECKPOINT EVALUATION ON EIGHT TEST SITES WITH EQUAL WEIGHTS . F ULL -IMAGE SCORES USE THE MAIN TEST SET ; ROI ENTRIES GIVE                                                                                                                                                        
+
+> MAE Z(CM ) / COVERAGE (%) ON 291 HAND AND 257 OBJECT FRAMES . O RACLE ROWS ALIGN TO TARGET -FRAME GROUND TRUTH ; “+ RIG ”ADDS METRIC CAMERA -TO -RIG POSES .Main test set Annotated subset Method Views AbsRel ↓
+> MAE Z
+> (cm) ↓δ1↑
+> Coverage (%) ↑
+> Hand MAE Z↓/Cov. ↑
+> Object MAE Z↓/Cov. ↑
+> Metric monocular: camera 2; model-supported calibration; no alignment
+> UniDepth v2 [25] 10.201 15.44 0.706 100.0 15.05/100.0 11.52/100.0 Depth Pro [30] 12.152 149.66 0.019 100.0 78.01/100.0 90.91/100.0 Metric3D v2 [24] 10.452 37.37 0.296 100.0 17.95/100.0 20.66/100.0 DA3 Metric-Large [31] 10.458 31.61 0.414 100.0 10.72/100.0 12.19/100.0 ZoeDepth [32] 12.457 159.24 0.006 100.0 115.11/100.0 116.82/100.0 UniK3D [21] 10.392 30.63 0.387 100.0 33.77/100.0 31.33/100.0 DAC [26] 10.411 38.91 0.246 96.7 9.92/99.3 17.74/99.9 UniDAC [33] 10.242 20.30 0.519 99.2 16.88/100.0 14.04/100.0
+> Calibrated RGB stereo: cameras 2–3; rectified overlap; no alignment
+> FoundationStereo [27] 20.068 7.35 0.951 35.4 2.15/72.8 2.52/81.0 GeoStereo [34] 20.078 8.24 0.954 35.4 2.28/72.8 2.75/81.0
+> Metric reconstruction from RGB: no supplied rig poses; no alignment
+> MASt3R [35] 21.499 93.22 0.074 100.0 70.06/100.0 66.06/100.0 CUT3R [36] 61.100 64.58 0.184 100.0 64.17/100.0 62.93/100.0
+> Metric multi-view with calibration: synchronized RGB and per-camera rays; no alignment
+> MapAnything [7] 63.168 200.76 0.031 100.0 198.23/100.0 179.28/100.0 MapAnything + rig [7] 60.708 49.07 0.204 100.0 36.51/100.0 33.81/100.0
+> Oracle-aligned multi-view: synchronized RGB; scale-only alignment
+> VGGT [28] 60.428 30.59 0.365 100.0 21.90/100.0 16.83/100.0 VGGT-Ω[37] 60.284 19.60 0.553 100.0 10.43/100.0 12.66/100.0
+> Oracle-aligned monocular: camera 2; representation-specific alignment
+> Depth Anything v2 [22] 10.247 20.55 0.533 100.0 6.57/100.0 11.51/100.0 Marigold [23] 10.275 19.01 0.569 100.0 13.44/100.0 12.51/100.0 MoGe [38] 10.323 21.13 0.497 100.0 14.13/100.0 12.77/100.0
+
+validation at 1 Hz, and 6,574 for testing at 1 Hz. At frequency 
+
+f , times t0 + ( k + 0 .5) /f are matched to the nearest eligible timestamp within 50 ms, with t0 the recording start and ties favoring earlier frames. Monocular models receive camera 2, stereo models cameras 2/3, and multi-view models the listed synchronized views and supported calibration. Predictions map to camera 2’s 512 × 416 image coordinates, preserving crop and rectification support. We retain checkpoint preprocessing. Depth Pro estimates focal length from RGB; ZoeDepth uses NYU weights. Met-ric3D and DA3 use camera-2 focal parameters at the evalu-ation resolution for metric scaling under a pinhole approxi-mation. UniDepth v2 and UniK3D use an extended unified camera model (EUCM), with maximum ray deviation 0.27 ◦
+
+across five rig calibrations. DAC and UniDAC use double-sphere rays for equirectangular (ERP) projection and back-projection. Stereo baselines, including FoundationStereo, re-ceive camera 2/3 RGB pairs rectified from the native fisheye views to 800 ×640 at 90 ◦ horizontal FoV. MapAnything uses Apache weights and per-camera calibrated rays; + rig adds metric camera-to-rig poses. Other reconstruction conditions receive no poses. CUT3R resets state per timestamp and processes camera 2 last to use all six views. 
+
+Depth, support, and scale. We score optical-axis depth Z. Range converts as z = ru z for calibrated unit ray u; camera-frame point maps use their third coordinate. Ground-truth domain G contains valid pixels with z∗ ∈ [0 .25 , 2.0] m; P
+
+contains finite, positive predictions on actual output support. AbsRel, MAE Z (cm), and δ1 at 1.25 use G ∩ P ; coverage is |G ∩ P |/|G|. Predictions are not clipped. Scores cover the full image unless a region mask is specified. Metric outputs remain unaligned. Separate oracle groups fit least-squares positive Z scale for VGGT, VGGT-Ω, and MoGe, affine inverse depth for Depth Anything v2, and affine Z for Marigold. Each inference call uses one fit over full-target 
+
+G and representation-valid output support, reused across regions. Oracle scores use test ground truth and do not establish metric scale recovery. 
+
+Aggregation. Pixels pool within sites; sites receive equal weight. Paired 95% intervals use 2,000 shared site bootstrap resamples; specified model pairs also use common prediction support. A site with ground truth but no predictions has zero coverage and undefined error, leaving the complete error mean undefined. 
+
+B. Zero-Shot Benchmark 
+
+Table IV compares 18 public models by input and scale convention. UniDepth v2 has the lowest metric monocular AbsRel (0.201) and 15.44 cm MAE with complete coverage. Within its stereo overlap, FoundationStereo reaches 7.35 cm MAE with 35.4% coverage. On common support, its AbsRel is 0.068 versus 0.215 for UniDepth v2, a paired reduction of 0.146 [0.121, 0.178]. 
+
+C. Depth During Interaction 
+
+Diagnostic subset. UniDepth v2, FoundationStereo, and MapAnything + rig represent monocular, stereo, and multi-(a) Regional error di ff erence                           
+
+> †Raw only; adjusted unavailable
+> Raw Adjusted −15 −10 −5 05
+> ROI − full-image MAE Z(cm)
+> UniDepth F. Stereo †
+> Map + rig UniDepth F. Stereo †
+> Map + rig
+> Hand Object
+> (b) Accuracy within tolerance
+> UniDepth F. Stereo Map + rig
+> Hand Object
+> 0510
+> Z-error tolerance (cm)
+> 050 100
+> Aτ (%)
+> (c) Motion error di ff erence
+> †Raw only; adjusted unavailable
+> Raw Adjusted 020 40 60
+> Active minus low MAE Z(cm)
+> UniDepth F. Stereo †
+> Map + rig
+> 0–20 20–40 40–60 60–80 80–90
+> Field angle (deg)
+> .25–.8 .8–1.2 1.2–2.0
+> GT Z-depth (m)
+> 2.72M (8) 9.47M (8) 16.4M (8) 23.7M (8) 1.05M (8) 1.99M (8) 4.39M (8) 8.11M (8) 8.15M (8) 49.4k (7) 1.66M (8) 6.64M (8) 9.91M (8) 3.57M (8) 5.3k (6)
+> (d) GT pixels (sites)
+> 0–20 20–40 40–60 60–80 80–90
+> Field angle (deg)
+> 14 100% 14 100% 13 100% 9100% 8100% 17 100% 19 100% 17 100% 14 100% 21 100% 24 100% 26 100% 24 100% 22 100% 39 100%
+> UniDepth v2: cm / cov.
+> 0–20 20–40 40–60 60–80 80–90
+> Field angle (deg)
+> 3100% 399% 421% —0% —0% 5100% 699% 919% —0% —0% 10 100% 13 99% 17 31% —0% —0%
+> FoundationStereo: cm / cov.
+> 0–20 20–40 40–60 60–80 80–90
+> Field angle (deg)
+> 36 100% 34 100% 35 100% 47 100% 60 100% 46 100% 43 100% 49 100% 52 100% 84 100% 69 100% 69 100% 69 100% 74 100% 91 100%
+> Map + rig: cm / cov.
+> 030 60 90
+> MAE Z(cm)
+
+Fig. 4. Interaction diagnostics for public checkpoints. (a) Regional-minus-full-image MAE at eight sites; negative values indicate lower regional error. (b) 
+
+Aτ : fraction of eligible GT pixels predicted within τ ; missing predictions fail. (c) Motion contrasts on nine shared cells at four sites. In (a,c), adjustment uses within-site GT Z–angle distributions; bars: 95% site-bootstrap intervals. †: missing cell predictions prevent adjustment. (d) Pooled GT counts (sites; log shading) and site-mean MAE Z /coverage on 800 frames. MAE uses available predictions. 
+
+view inputs. Recording-balanced sampling selects 800 test samples (100 per site) before annotation, independently of errors. RGB context at ±0.5 and ±1 s uses a 100 ms toler-ance. Qwen3-VL proposes descriptions, Rex-Omni grounds objects, and SAM3 supplies masks [39]–[41]. We manually review RGB context and mask overlays, inspecting ambigu-ous cases at native resolution. Accepted hand/object masks contain valid ground truth in 291/257 frames across eight sites each. Unaccepted regions remain unknown; the main test set is unchanged. Ground truth covers 89.8%/87.9% of accepted hand/object masks; 80.2%/79.7% fall within the Z interval (site means). 
+
+Local accuracy and coverage. For region of interest (ROI) 
+
+R, accuracy within Z-error tolerance τ is 
+
+Aτ (R) = 
+
+P 
+
+> x∈G∩R∩P
+
+1[|ˆz(x) − z∗(x)| ≤ τ ]
+
+|G ∩ R| . (4) Missing predictions count as failures. At τ = 5 cm, object Aτ
+
+is 28.0% for UniDepth v2 (complete coverage) and 73.7% for FoundationStereo (81.0% coverage). Figure 4b reports depth accuracy over 0–10 cm tolerances. 
+
+Depth and viewing angle. To compare regions at similar geometry, we cross Z intervals [0 .25 , 0.8) , [0 .8, 1.2) , and 
+
+[1 .2, 2.0] m with field angles θ = arccos uz in [0 , 20) ,
+
+[20 , 40) , [40 , 60) , [60 , 80) , and [80 , 90) degrees. Compar-isons pair each ROI with the full image (including the ROI) on frames with ROI ground truth. Site–Z–angle cells require at least 200 valid ROI depth pixels, retaining 99.6/99.8% of hand/object ground-truth pixels. Raw and adjusted differ-ences share cells; adjustment weights full-image errors by each ROI’s within-site ground-truth distribution (Fig. 4a). UniDepth v2’s adjusted regional-minus-full-image MAE is 1.92 [0.21, 4.22] cm for hands and −0.89 [−1.99 , 0.14] cm for objects. MapAnything + rig’s object MAE is 5.15 [1.75, 8.73] cm below its matched full-image error, yet remains 33.81 cm. Figure 4d shows stereo’s coverage gap beyond 60 ◦.UniDepth v2’s error does not increase uniformly with angle at fixed Z; extreme-angle support is limited, especially at larger Z. 
+
+Motion conditions. RGB context labels hand activity, object motion relative to the environment, and background-image motion. Active clips show hand-driven object motion; low-motion clips have little change in all three, allowing holding jitter. Review of the fixed samples yields 59 active and 36 low-motion object frames across seven sites each. Requiring 200 ground-truth pixels per condition retains nine of 50 oc-cupied site–Z–angle cells across four sites, all at Z < 0.8 m. Raw and adjusted contrasts share these cells; adjustment uses within-site pooled ground-truth distributions. Adjusted active-minus-low differences are −1.21 [−7.67 ,5.20] cm for UniDepth v2 and 28.29 [5.37, 46.57] cm for MapAnything + rig (Fig. 4c). MapAnything without poses gives −30 .17 [−73 .24 , 6.21] cm. These contrasts are obser-vational: groups differ in objects and potentially in occlusion and appearance. 
+
+D. Effects of Views and Rig Geometry 
+
+With MapAnything’s Apache checkpoint fixed, we sepa-rate view count from rig geometry: camera 2, cameras 2/3, or all six views, each with calibrated rays. A fourth adds six metric camera-to-rig poses (Table V). All omit depth hints and optional confidence filtering. Additional views give no clear accuracy gain: on common support, six-minus-one AbsRel is 0.368 [ −0.191 , 1.036] (a)      
+
+> RGB + ROI GT Z-depth UniDepth v2 FoundationStereo Map + rig: Public Map + rig: FT
+> 01.5 3m
+> (b)
+> 02.75 5.5
+> (c)
+> 01.25 2.5
+
+Fig. 5. Qualitative depth at three test sites. Pink and green contours mark hands and objects. Each row shares a metric Z-depth scale; gray denotes invalid depth. Methods retain their own support. Public and FT share six RGB views, calibrated rays, and rig poses. TABLE V ONE APACHE MAP ANYTHING CHECKPOINT WITH 1/2/6 VIEWS AND CALIBRATED RAYS ; “+ RIG ” ALSO SUPPLIES METRIC POSES . MAE Z IS IN CM . F ULL -IMAGE COVERAGE IS AT LEAST 99.99%; OBJECT COVERAGE IS 100%. C OST IS MEDIAN FORWARD TIME (MS ) / PEAK ALLOCATED MEMORY (GB), BATCH ONE , BF16, ON RTX 4090. Full image Objects Views AbsRel ↓ MAE Z ↓ MAE Z ↓ A5cm (%) ↑ Cost 1 2.800 176.70 173.19 0.01 58/7.7 2 3.392 211.34 188.00 0.03 88/8.2 6 3.168 200.76 179.28 0.01 233/10.1 6 + rig 0.708 49.07 33.81 11.91 235/10.1 
+
+across eight sites, while median forward time rises from 58 to 233 ms. Rig poses primarily improve metric scale, reducing six-view AbsRel from 3.168 to 0.708. Independent per-frame oracle scale fits on shared support give 0.334 without poses and 0.327 with poses, a difference of −0.008 [−0.014 ,
+
+−0.002 ]. VGGT-Ω reaches 0.284 under the same oracle scale rule and shared support. 
+
+E. Adaptation to Held-Out Sites 
+
+We assess adaptation on EgoDepth-Bench against global scale calibration. Public, Scale-only, and fine-tuned (FT) models share Apache initialization, six RGB views, cali-brated rays, and metric rig poses. Scale-only fits a positive multiplier to the frozen model on 1,024 unique training sam-ples using frame-mean log-Z Huber loss ( δ = 0 .1). FT uses the same loss on camera 2 to update cross-view/ray modules and dense/scale heads, with image and pose encoders frozen. Training uses 6,000 AdamW steps, batch 36, learning rate 
+
+10 −5, weight decay 0.01, and 200 warmup steps followed by cosine decay. We sample with replacement, uniformly over sites, recordings within sites, and timestamps within recordings. Six RTX 4090 GPUs use BF16 and activation checkpointing at 518 × 406 . Validation at 512 × 416 every 
+
+TABLE VI MAP ANYTHING ADAPTATION (A PACHE WEIGHTS ) WITH SIX RGB 
+
+> VIEWS
+
+, RAYS AND METRIC RIG POSES . A LIGNED ROWS FIT SCALE PER FRAME AND ARM ON FULL -IMAGE COMMON SUPPORT , REUSING THE FIT FOR OBJECTS .Evaluation Public Scale-only Fine-tuned 
+
+Full image 
+
+AbsRel ↓ 0.708 0.601 0.091 MAE Z (cm) ↓ 49.07 43.05 7.03 Coverage (%) ↑ 100.0 100.0 100.0 Hand MAE Z (cm) ↓ 36.51 30.55 3.82 Object MAE Z (cm) ↓ 33.81 29.05 5.21 Object A5cm (%) ↑ 11.91 12.02 59.96 Object coverage (%) ↑ 100.0 100.0 100.0 Active-object A5cm (%) ↑ 14.12 13.65 61.79 Active-object coverage (%) ↑ 100.0 100.0 100.0 Aligned AbsRel ↓ 0.327 0.327 0.072 Aligned object MAE Z (cm) ↓ 12.44 12.44 4.78 
+
+500 steps selects step 6,000 by lowest site-mean AbsRel; training and validation take 12.1 hours. One seed (20260912) is used; site intervals do not measure seed variability. Fine-tuning reduces AbsRel at all eight test sites (Ta-ble VI). Training-fitted scale sC = 0.88071 lowers test AbsRel from 0.708 to 0.601; FT reaches 0.091. On com-mon support, FT-minus-Public AbsRel is −0.617 [−0.802 ,
+
+−0.451 ]. Object MAE falls from 33.81 to 29.05 cm with scale calibration and 5.21 cm with FT, all at full coverage. Relative depth also improves. Independent positive per-frame scale fits on full-image common test support, reused for objects, give both controls aligned AbsRel 0.327 and ob-ject MAE 12.44 cm; FT reduces these to 0.072 and 4.78 cm. Figure 5 shows three test examples. Local errors persist: FT places 60.0% of eligible object pixels within 5 cm. V. C ONCLUSION 
+
+EgoDepth-Bench benchmarks metric depth during real egocentric manipulation using six synchronized RGB views and native fisheye ground truth, with ball-bar validation of recovered dimensions. Shared observations and separate training and test sites support model comparisons and adap-tation. Hand and object diagnostics show that low local error can coexist with incomplete prediction coverage. The current protocol scores individual frames. Extending it to temporal depth consistency would use the synchronized sequences to assess predicted geometry through motion and visibility changes during interaction. REFERENCES [1] S. Kareer, et al. , “EgoMimic: Scaling imitation learning via egocentric video,” in IEEE International Conference on Robotics and Automation (ICRA) , 2025, pp. 13 226–13 233. [2] M. Shridhar, L. Manuelli, and D. Fox, “Perceiver-actor: A multi-task transformer for robotic manipulation,” in Conference on Robot Learning (CoRL) , ser. Proceedings of Machine Learning Research, vol. 205, 2023, pp. 785–799. [3] Y. Ze, G. Zhang, K. Zhang, C. Hu, M. Wang, and H. Xu, “3D diffusion policy: Generalizable visuomotor policy learning via simple 3D representations,” in Robotics: Science and Systems (RSS) , 2024. [4] Y. Liu, et al. , “HOI4D: A 4D egocentric dataset for category-level human-object interaction,” in IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , 2022, pp. 21 013–21 022. [5] I. Indyk, I. Penshin, I. Sosin, M. Monastyrny, A. Valenkov, and I. Makarov, “WideDepth: Millimeter-accurate benchmark for fisheye depth estimation,” in IEEE International Conference on Robotics and Automation (ICRA) , 2026. [6] X. Pan, et al. , “Aria digital twin: A new benchmark dataset for egocen-tric 3D machine perception,” in IEEE/CVF International Conference on Computer Vision (ICCV) , 2023, pp. 20 133–20 143. [7] N. Keetha, et al. , “MapAnything: Universal feed-forward metric 3D reconstruction,” in International Conference on 3D Vision (3DV) ,2026, pp. 499–509. [8] N. Silberman, D. Hoiem, P. Kohli, and R. Fergus, “Indoor seg-mentation and support inference from RGBD images,” in European Conference on Computer Vision (ECCV) , 2012, pp. 746–760. [9] J. Uhrig, N. Schneider, L. Schneider, U. Franke, T. Brox, and A. Geiger, “Sparsity invariant CNNs,” in International Conference on 3D Vision (3DV) , 2017, pp. 11–20. [10] I. Vasiljevic, et al. , “DIODE: A dense indoor and outdoor depth dataset,” arXiv preprint arXiv:1908.00463 , 2019. [11] E. Palazzolo, J. Behley, P. Lottes, P. Gigu` ere, and C. Stachniss, “ReFusion: 3D reconstruction in dynamic environments for RGB-D cameras exploiting residuals,” in IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , 2019, pp. 7855–7862. [12] N. Karaev, I. Rocco, B. Graham, N. Neverova, A. Vedaldi, and C. Rupprecht, “DynamicStereo: Consistent dynamic depth from stereo videos,” in IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , 2023, pp. 13 229–13 239. [13] C. Yeshwanth, Y.-C. Liu, M. Nießner, and A. Dai, “ScanNet++: A high-fidelity dataset of 3D indoor scenes,” in IEEE/CVF International Conference on Computer Vision (ICCV) , 2023, pp. 12–22. [14] Z. Song, et al. , “AerialMetric: Benchmarking and adapting UAV monocular metric depth estimation in the real world,” in European Conference on Computer Vision (ECCV) , 2026. [15] P. Banerjee, et al. , “HOT3D: Hand and object tracking in 3D from egocentric multi-view videos,” in IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , 2025, pp. 7061–7071. [16] P. Rim, et al. , “SHOW3D: Capturing scenes of 3D hands and objects in the wild,” in IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , 2026, pp. 7111–7120. [17] J. Y. Lee, et al. , “Ego-1K – a large-scale multiview video dataset for egocentric vision,” in IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , 2026, pp. 19 854–19 863. [18] Y. Li, et al. , “EgoLive: A large-scale egocentric dataset from real-world human tasks,” arXiv preprint arXiv:2604.23570, 2026. [19] Ropedia, “Xperience-10M: A large-scale egocentric multimodal dataset with structured 3D/4D annotations,” Hugging Face dataset, 2026. [20] G. Li, Y. Chen, Y. Wu, K. Zhao, M. Pollefeys, and S. Tang, “EgoM2P: Egocentric multimodal multitask pretraining,” in IEEE/CVF Interna-tional Conference on Computer Vision (ICCV) , 2025, pp. 10 830– 10 843. [21] L. Piccinelli, et al. , “UniK3D: Universal camera monocular 3D esti-mation,” in IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , 2025, pp. 1028–1039. [22] L. Yang, et al. , “Depth Anything V2,” in Advances in Neural Informa-tion Processing Systems (NeurIPS) , vol. 37, 2024, pp. 21 875–21 911. [23] B. Ke, A. Obukhov, S. Huang, N. Metzger, R. C. Daudt, and K. Schindler, “Repurposing diffusion-based image generators for monocular depth estimation,” in IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , 2024, pp. 9492–9502. [24] M. Hu, et al. , “Metric3D v2: A versatile monocular geometric founda-tion model for zero-shot metric depth and surface normal estimation,” 
+
+IEEE Transactions on Pattern Analysis and Machine Intelligence ,vol. 46, no. 12, pp. 10 579–10 596, 2024. [25] L. Piccinelli, et al. , “UniDepthV2: Universal monocular metric depth estimation made simpler,” IEEE Transactions on Pattern Analysis and Machine Intelligence , vol. 48, no. 3, pp. 2354–2367, 2026. [26] Y. Guo, S. Garg, S. M. H. Miangoleh, X. Huang, and L. Ren, “Depth Any Camera: Zero-shot metric depth estimation from any camera,” in 
+
+IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , 2025, pp. 26 996–27 006. [27] B. Wen, M. Trepte, J. Aribido, J. Kautz, O. Gallo, and S. Birchfield, “FoundationStereo: Zero-shot stereo matching,” in IEEE/CVF Confer-ence on Computer Vision and Pattern Recognition (CVPR) , 2025, pp. 5249–5260. [28] J. Wang, M. Chen, N. Karaev, A. Vedaldi, C. Rupprecht, and D. Novotny, “VGGT: Visual geometry grounded transformer,” in 
+
+IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , 2025, pp. 5294–5306. [29] V. Usenko, N. Demmel, and D. Cremers, “The double sphere camera model,” in International Conference on 3D Vision (3DV) , 2018, pp. 552–560. [30] A. Bochkovskiy, et al. , “Depth Pro: Sharp monocular metric depth in less than a second,” in International Conference on Learning Representations (ICLR) , 2025. [31] H. Lin, et al. , “Depth Anything 3: Recovering the visual space from any views,” in International Conference on Learning Representations (ICLR) , 2026. [32] S. F. Bhat, R. Birkl, D. Wofk, P. Wonka, and M. M¨ uller, “ZoeDepth: Zero-shot transfer by combining relative and metric depth,” arXiv preprint arXiv:2302.12288 , 2023. [33] G. C. Ganesan, Y. Guo, L. Ren, and X. Liu, “UniDAC: Universal metric depth estimation for any camera,” in IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , 2026, pp. 26 953– 26 963. [34] Q. Wei, X. Guo, S. Xu, H. Li, R. Yang, and H. Zhao, “GeoStereo: A unified stereo geometry estimation framework for disparity and surface normal,” in ACM International Conference on Multimedia (ACM MM) ,2026, to appear. [35] V. Leroy, Y. Cabon, and J. Revaud, “Grounding image matching in 3D with MASt3R,” in European Conference on Computer Vision (ECCV) ,2024, pp. 71–91. [36] Q. Wang, Y. Zhang, A. Holynski, A. A. Efros, and A. Kanazawa, “Continuous 3D perception model with persistent state,” in IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) ,2025, pp. 10 510–10 522. [37] J. Wang, et al. , “VGGT-Ω,” in IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , 2026, pp. 21 486–21 499. [38] R. Wang, et al. , “MoGe: Unlocking accurate monocular geometry estimation for open-domain images with optimal training supervision,” in IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , 2025, pp. 5261–5271. [39] S. Bai, et al. , “Qwen3-VL technical report,” arXiv preprint arXiv:2511.21631, 2025. [40] Q. Jiang, et al. , “Detect anything via next point prediction,” in 
+
+IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , 2026, pp. 25 472–25 483. [41] N. Carion, et al. , “SAM 3: Segment anything with concepts,” in 
+
+International Conference on Learning Representations (ICLR) , 2026.
