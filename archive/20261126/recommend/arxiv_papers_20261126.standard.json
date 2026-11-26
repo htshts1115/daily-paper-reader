@@ -1,0 +1,283 @@
+{
+  "mode": "standard",
+  "generated_at": "2026-11-26T02:34:58.846661+00:00",
+  "stats": {
+    "mode": "standard",
+    "tag_count": 4,
+    "deep_divecandidates": 3,
+    "deep_cap": 9,
+    "deep_selected": 3,
+    "quick_candidates": 3,
+    "quick_skim_target": 14,
+    "quick_selected": 3
+  },
+  "deep_dive": [
+    {
+      "id": "2611.32675v1",
+      "source": "arxiv",
+      "title": "TokenMatte: Unlocking T2V Diffusion Priors for Pixel-Native Video Matting",
+      "abstract": "High-resolution video matting requires accurate recovery of continuous alpha values, including fine hair, soft boundaries, and motion blur, yet dense alpha supervision remains scarce. Pretrained text-to-video diffusion transformers (DiTs) offer rich spatio-temporal priors, whereas existing generative video matting approaches typically route alpha predictions through RGB-trained VAE latents, which can attenuate fine details and introduce additional decoding overhead. We present TokenMatte, which adapts a pretrained video DiT into a single-pass, auxiliary-free RGB-to-alpha predictor with a pixel-native output interface. At its core is a single shared linear readout that maps each spatio-temporal token directly to its corresponding ($t \\times p \\times p$) block of alpha pixels, predicting spatial details and temporal variations within the same local video block. Tiling these blocks produces the full-resolution alpha sequence without a convolutional decoder or learned upsampling. The predicted alpha is supervised directly in pixel space, while the ground-truth alpha never enters the VAE, eliminating target-side alpha encoding and output-side VAE decoding. Leveraging the pretrained video prior, TokenMatte is trained using only existing public matting datasets, without additional data curation or auxiliary inputs at inference. Compared with a matched latent-output baseline, our pixel-native interface improves matting accuracy while achieving a 1.51$\\times$ inference speedup. TokenMatte establishes a new auxiliary-free state of the art on VideoMatte, YouTubeMatte, and V-HIM60.",
+      "authors": [
+        "Zanyi Wang",
+        "Dengyang Jiang",
+        "Fengfei Yu",
+        "Shilong Liu"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-11-24T14:21:32+00:00",
+      "link": "https://arxiv.org/pdf/2611.32675v1",
+      "tags": [
+        "keyword:matting",
+        "keyword:mono-depth",
+        "keyword:neural-bokeh",
+        "keyword:seg",
+        "query:matting",
+        "query:mono-depth",
+        "query:neural-bokeh",
+        "query:seg"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "auxiliary-free RGB-to-alpha video matting with fine hair and soft boundaries",
+      "llm_evidence_cn": "无需辅助输入的视频抠图，处理发丝与软边界",
+      "llm_evidence": "无需辅助输入的视频抠图，处理发丝与软边界",
+      "canonical_evidence": "无需辅助输入的视频抠图，处理发丝与软边界",
+      "llm_tldr_en": "TokenMatte tackles high-resolution video matting with scarce alpha supervision by adapting a pretrained video diffusion transformer into a single-pass RGB-to-alpha predictor with pixel-native token readout, preserving fine hair and soft boundaries.",
+      "llm_tldr_cn": "高分辨率视频抠图需要精确的连续 alpha，涵盖发丝、软边界与运动模糊，但稠密 alpha 监督稀缺，且现有生成式方法经 RGB 训练的 VAE 潜变量会削弱细节。作者提出 TokenMatte，将预训练视频扩散 Transformer 改造为单次前向、无需辅助输入的 RGB 到 alpha 预测器，用共享线性读出把时空 token 直接映射为像素级 alpha。实验表明其在发丝与边界细节上优于既有方法。该工作为无 trimap 的高质量视频抠图提供了新范式。",
+      "llm_tldr": "高分辨率视频抠图需要精确的连续 alpha，涵盖发丝、软边界与运动模糊，但稠密 alpha 监督稀缺，且现有生成式方法经 RGB 训练的 VAE 潜变量会削弱细节。作者提出 TokenMatte，将预训练视频扩散 Transformer 改造为单次前向、无需辅助输入的 RGB 到 alpha 预测器，用共享线性读出把时空 token 直接映射为像素级 alpha。实验表明其在发丝与边界细节上优于既有方法。该工作为无 trimap 的高质量视频抠图提供了新范式。",
+      "llm_tags": [
+        "query:matting"
+      ],
+      "matched_query_tag": "query:matting",
+      "matched_query_text": "video matting without trimap",
+      "matched_requirement_id": "req-15",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2611.32970v1",
+      "source": "arxiv",
+      "title": "FocusAnchor: Zero-Shot Metric Depth by Anchoring a Depth Foundation Prior to Focus Cues",
+      "abstract": "Existing depth-from-focus methods can struggle with weak focus cues, new cameras, or fewer focal slices. We present FocusAnchor, a recurrent model that uses focus-volume lookups to refine metric depth and repeatedly aligns a relative depth prior from a frozen foundation model to the current depth estimate. The aligned prior guides subsequent refinement in a feedback loop, carrying metric scale recovered from textured regions into regions where focus cues are weak while preserving scene structure. To support transfer across cameras, we synthesize training stacks with randomized camera parameters and focus distances. However, stack synthesis blurs existing image noise differently across slices, creating artificial depth cues even on textureless surfaces. We add independent per-slice noise to suppress these cues. We also introduce variable-stack training to improve robustness with fewer focal slices and support more practical mobile capture. Compared with FOSSA ViT-B, FocusAnchor reduces AbsRel by 36% on NYU Depth V2 and by 9% on DDFF-12 after fine-tuning. In zero-shot evaluation, FocusAnchor and its variable-stack variant, FocusAnchor-flex, achieve the two lowest AbsRel values on all five benchmarks. On ZEDD test, FocusAnchor achieves 9% lower AbsRel than the best competing method, FOSSA ViT-B, while FocusAnchor-flex achieves lower AbsRel with 40% fewer focal slices on ZEDD validation.",
+      "authors": [
+        "Ashkan Ganj",
+        "Hang Su",
+        "Tian Guo"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-11-24T17:07:24+00:00",
+      "link": "https://arxiv.org/pdf/2611.32970v1",
+      "tags": [
+        "keyword:matting",
+        "keyword:mono-depth",
+        "keyword:neural-bokeh",
+        "keyword:seg",
+        "query:matting",
+        "query:mono-depth",
+        "query:neural-bokeh",
+        "query:seg"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "zero-shot metric depth by anchoring frozen depth foundation prior to focus cues",
+      "llm_evidence_cn": "将冻结深度基础先验锚定到对焦线索实现零样本度量深度",
+      "llm_evidence": "将冻结深度基础先验锚定到对焦线索实现零样本度量深度",
+      "canonical_evidence": "将冻结深度基础先验锚定到对焦线索实现零样本度量深度",
+      "llm_tldr_en": "FocusAnchor refines metric depth from focus volumes with a recurrent model that repeatedly aligns a frozen depth-foundation relative prior to the current estimate, carrying metric scale into weak-cue regions and generalizing zero-shot across cameras.",
+      "llm_tldr_cn": "该文针对基于对焦的深度方法在弱对焦线索、新相机或焦点切片稀少时性能下降的问题，提出FocusAnchor循环模型。方法通过焦点体查表细化度量深度，并反复把冻结深度基础模型的相对深度先验对齐到当前估计，形成反馈回路，将纹理区域恢复的度量尺度传递到线索薄弱区域，同时保持场景结构；并用随机化相机参数与对焦距离合成训练堆栈以支持跨相机迁移。结果实现零样本度量深度估计，验证了基础先验与对焦线索结合的有效性。",
+      "llm_tldr": "该文针对基于对焦的深度方法在弱对焦线索、新相机或焦点切片稀少时性能下降的问题，提出FocusAnchor循环模型。方法通过焦点体查表细化度量深度，并反复把冻结深度基础模型的相对深度先验对齐到当前估计，形成反馈回路，将纹理区域恢复的度量尺度传递到线索薄弱区域，同时保持场景结构；并用随机化相机参数与对焦距离合成训练堆栈以支持跨相机迁移。结果实现零样本度量深度估计，验证了基础先验与对焦线索结合的有效性。",
+      "llm_tags": [
+        "query:mono-depth"
+      ],
+      "matched_query_tag": "query:mono-depth",
+      "matched_query_text": "zero-shot depth estimation",
+      "matched_requirement_id": "req-4",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2611.32718v1",
+      "source": "arxiv",
+      "title": "Seeing to Drive on a Single Board: Attention-Free Depth for Onboard Robot Navigation",
+      "abstract": "A small ground robot can carry one camera and a few watts of compute, but the depth foundation models that could turn that camera into a range sensor are vision transformers sized for GPUs. We bring one to a Raspberry Pi 5 with the Hailo-8L, an accelerator that runs every layer in integer arithmetic, attention included. Quantised for it, Depth Anything V2 loses large parts of the scene, and we measure why: at 449 tokens, 91% of softmax weights fall below one int8 step while carrying 17-33% of the attention mass. Our answer is to distil, not quantise. An attention-free ResNet-34 U-Net student of Depth Anything V2-Large (24.5M parameters) runs at 27.1 FPS on the chip, its int8 output matches its float twin (Pearson 0.99993), and on held-out scenes of its simulated yard it is the most accurate depth network on the chip (AbsRel 0.269 against 0.354-0.530). On 1,000 stereo-verified points of a real outdoor drive it is not resolvably different from the vendor's Depth Anything V2-Small build, while running faster (27.1 vs 21.6 FPS). Ranging obstacles by where they meet the floor needs only the camera height, so mapping, hybrid-A* planning and SLAM run on the Pi's own CPU. In real-time hardware-in-the-loop tests in a Gaussian-splat reconstruction of a real yard, the stack reaches the goal without contact in 7.9$\\pm$1.1 of 10 scenes, against 9.2$\\pm$0.4 with exact obstacles, and in 7.7$\\pm$0.7 on its own pose with simulated wheel odometry (ten seeds each; 8.2$\\pm$0.4 with the real Pi and Hailo-8L in the loop, five seeds). The source code, pre-trained models and data are available at https://github.com/itaim18/DANIEL.",
+      "authors": [
+        "Itai Mizlish",
+        "Boaz Ben-Moshe"
+      ],
+      "primary_category": "cs.RO",
+      "categories": [
+        "cs.RO",
+        "cs.CV",
+        "cs.LG"
+      ],
+      "published": "2026-11-24T14:39:05+00:00",
+      "link": "https://arxiv.org/pdf/2611.32718v1",
+      "tags": [
+        "keyword:mono-depth",
+        "query:mono-depth"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "distils Depth Anything V2 into a 24.5M lightweight student running on edge accelerator",
+      "llm_evidence_cn": "将 Depth Anything V2 蒸馏为可跑在边缘加速器上的 24.5M 轻量学生模型",
+      "llm_evidence": "将 Depth Anything V2 蒸馏为可跑在边缘加速器上的 24.5M 轻量学生模型",
+      "canonical_evidence": "将 Depth Anything V2 蒸馏为可跑在边缘加速器上的 24.5M 轻量学生模型",
+      "llm_tldr_en": "Depth foundation models are too heavy for low-power robots; quantising Depth Anything V2 breaks attention, so the authors distil an attention-free ResNet-34 U-Net student that runs at 27.1 FPS with int8 output matching float accuracy.",
+      "llm_tldr_cn": "论文针对深度基础模型体积过大、难以部署在低功耗边缘设备的问题，将 Depth Anything V2 迁移到树莓派加边缘加速器上。作者发现直接量化会破坏注意力机制，导致大范围场景信息丢失，遂改用蒸馏训练一个无注意力的 ResNet-34 U-Net 学生模型，仅约 2450 万参数。该模型在芯片上达到 27.1 FPS，int8 输出与浮点版本高度一致。工作为移动端轻量深度模型部署提供了可行方案。",
+      "llm_tldr": "论文针对深度基础模型体积过大、难以部署在低功耗边缘设备的问题，将 Depth Anything V2 迁移到树莓派加边缘加速器上。作者发现直接量化会破坏注意力机制，导致大范围场景信息丢失，遂改用蒸馏训练一个无注意力的 ResNet-34 U-Net 学生模型，仅约 2450 万参数。该模型在芯片上达到 27.1 FPS，int8 输出与浮点版本高度一致。工作为移动端轻量深度模型部署提供了可行方案。",
+      "llm_tags": [
+        "query:mono-depth"
+      ],
+      "matched_query_tag": "query:mono-depth",
+      "matched_query_text": "lightweight depth model for mobile devices",
+      "matched_requirement_id": "req-8",
+      "selection_source": "fresh_fetch"
+    }
+  ],
+  "quick_skim": [
+    {
+      "id": "2611.29389v1",
+      "source": "arxiv",
+      "title": "PINE: Point, Instance and Normal Estimation in One-Step Diffusion Model",
+      "abstract": "Understanding a scene requires both geometry and semantics: geometry recovers its spatial structure, and semantics separates it into objects. Current models obtain the two from separate networks or separate passes. We present PINE, a one-step Omni Diffusion Transformer that predicts the point map, the surface normals, and the instance map of an image in one forward pass. PINE treats each map as a token stream, and a stream mask decides which streams interact. A camera-aware ray encoding positions every token by its camera ray rather than its pixel. Grounding attention adds the affinity of pretrained DINOv3 features to the attention logits. Trained on only 139K synthetic images for geometry, PINE achieves state-of-the-art point maps whether or not intrinsics are given and the best average rank on surface normals. It also exceeds SAM on large objects with less than 1 percent of its training images, and it predicts all three maps 5.7x faster than MoGe-3 with SAM.",
+      "authors": [
+        "Zeyu Ren",
+        "Jie Ni",
+        "Rui Qian",
+        "Jiahao Wei",
+        "Hao Tang",
+        "Yongtai Liu",
+        "Zeyu Zhang"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-11-22T11:03:20+00:00",
+      "link": "https://arxiv.org/pdf/2611.29389v1",
+      "tags": [
+        "keyword:matting",
+        "keyword:mono-depth",
+        "keyword:neural-bokeh",
+        "keyword:seg",
+        "query:matting",
+        "query:mono-depth",
+        "query:neural-bokeh",
+        "query:seg"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "predicts instance map together with geometry in one forward pass",
+      "llm_evidence_cn": "单次前向同时预测实例图与几何",
+      "llm_evidence": "单次前向同时预测实例图与几何",
+      "canonical_evidence": "单次前向同时预测实例图与几何",
+      "llm_tldr_en": "PINE uses a one-step Omni Diffusion Transformer to jointly predict point maps, surface normals and instance maps, coupling geometry and semantics in a single pass for scene understanding.",
+      "llm_tldr_cn": "现有场景理解通常用独立网络分别获取几何与语义，流程割裂且计算冗余。PINE 提出一步式全扩散 Transformer，将点图、表面法线与实例图视为并行 token 流，并通过相机射线编码和 DINOv3 注意力实现单次前向联合预测。仅用 13.9 万张合成图像训练，该方法在点图估计上取得领先，并同时输出实例分割结果。该工作展示了统一几何与语义感知的可行性，为高效场景理解提供了新思路。",
+      "llm_tldr": "现有场景理解通常用独立网络分别获取几何与语义，流程割裂且计算冗余。PINE 提出一步式全扩散 Transformer，将点图、表面法线与实例图视为并行 token 流，并通过相机射线编码和 DINOv3 注意力实现单次前向联合预测。仅用 13.9 万张合成图像训练，该方法在点图估计上取得领先，并同时输出实例分割结果。该工作展示了统一几何与语义感知的可行性，为高效场景理解提供了新思路。",
+      "llm_tags": [
+        "query:seg"
+      ],
+      "matched_query_tag": "query:seg",
+      "matched_query_text": "instance segmentation",
+      "matched_requirement_id": "req-22",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2611.25417v2",
+      "source": "arxiv",
+      "title": "MIR-Depth: Multi-Range Refinement for Single-View RGB-D Depth Completion of Transparent Objects",
+      "abstract": "Recovering accurate visible-surface depth from a single RGB-D image and an object mask is essential for robotic grasping and manipulation of transparent objects. Specular reflections cause missing depth, while refraction corrupts nonzero returns with background depth, making raw measurements unreliable as surface anchors. Under a fixed sampling budget, refining an initial single-view prediction within a single search interval either misses large refraction offsets or sacrifices fine local resolution. To resolve this single-view trade-off, MIR-Depth constructs Coordinate-Aware Multi-Range Hypotheses: a 3D-aggregated global inverse-depth volume and depth-axis-filtered pixel-wise local volumes around a prior-guided initial depth. Selective Recurrent Refinement then introduces out-of-bounds lookup masking and validity-masked softmax fusion to iteratively update inverse depth from these volumes using a multi-scale ConvGRU. Finally, Spatially Gated Correction applies a learned per-pixel spatial gate to the full-resolution residual, preserving accurate initial geometry without imposing raw sensor readings as hard constraints. Experiments on TransCG, TODD, TRansPose, ClearPose, and HouseCat6D show that MIR-Depth achieves lower error than ReMake, DFNet, BP-Net, and PSD. Real-robot evaluations confirm accurate surface geometry for 6-DoF grasp pose prediction. Code and pretrained models will be publicly available.",
+      "authors": [
+        "Xinzhe Fu",
+        "Qi Shao",
+        "Yuanfei Xie",
+        "Taoyu Wu",
+        "Zhihao Cao",
+        "Long Hu",
+        "Hong Liang",
+        "Xianzhi Li",
+        "Anh Nguyen",
+        "Baoru Huang",
+        "Rongsheng Li"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV",
+        "cs.RO"
+      ],
+      "published": "2026-11-19T02:58:17+00:00",
+      "link": "https://arxiv.org/pdf/2611.25417v2",
+      "tags": [
+        "keyword:matting",
+        "keyword:mono-depth",
+        "keyword:neural-bokeh",
+        "keyword:seg",
+        "query:matting",
+        "query:mono-depth",
+        "query:neural-bokeh",
+        "query:seg"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "single-view depth completion for transparent objects with refraction offsets",
+      "llm_evidence_cn": "针对透明物体的单视图深度补全与折射偏移",
+      "llm_evidence": "针对透明物体的单视图深度补全与折射偏移",
+      "canonical_evidence": "针对透明物体的单视图深度补全与折射偏移",
+      "llm_tldr_en": "MIR-Depth targets visible-surface depth recovery for transparent objects from a single RGB-D image and mask, where specularity causes missing depth and refraction contaminates returns. It builds coordinate-aware multi-range hypotheses to refine a prior-guided initial depth.",
+      "llm_tldr_cn": "该文针对透明物体抓取中镜面反射导致深度缺失、折射使非零深度被背景污染的问题，提出MIR-Depth单视图RGB-D深度补全方法。方法在固定采样预算下构建坐标感知的多范围假设，包括三维聚合的全局逆深度体素与沿深度轴滤波的像素级局部体素，围绕先验引导的初始深度进行细化。该设计缓解了单搜索区间难以兼顾大折射偏移与局部精细分辨率的矛盾，为透明物体表面深度恢复提供了可行方案。",
+      "llm_tldr": "该文针对透明物体抓取中镜面反射导致深度缺失、折射使非零深度被背景污染的问题，提出MIR-Depth单视图RGB-D深度补全方法。方法在固定采样预算下构建坐标感知的多范围假设，包括三维聚合的全局逆深度体素与沿深度轴滤波的像素级局部体素，围绕先验引导的初始深度进行细化。该设计缓解了单搜索区间难以兼顾大折射偏移与局部精细分辨率的矛盾，为透明物体表面深度恢复提供了可行方案。",
+      "llm_tags": [
+        "query:mono-depth"
+      ],
+      "matched_query_tag": "query:mono-depth",
+      "matched_query_text": "monocular depth estimation for thin structures transparent objects and handheld objects",
+      "matched_requirement_id": "req-9",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2611.32518v1",
+      "source": "arxiv",
+      "title": "HS-OVSeg: Multi-Granularity Open-Vocabulary Semantic Segmentation in Remote Sensing via Heterogeneous Supervision",
+      "abstract": "Open-vocabulary semantic segmentation (OVSS) enables flexible, text-driven mapping of remote sensing (RS) imagery beyond predefined categories. Despite advances in segmentation foundation models, RS-OVSS remains constrained by the scarcity of large-scale, semantically diverse datasets with accurate pixel-level annotations. Meanwhile, existing RS datasets contain abundant scene- and object-level annotations that offer valuable semantic information but lack precise pixel-wise supervision. To exploit these complementary sources, we propose HS-OVSeg, a unified training framework that integrates heterogeneous scene-, object-, and pixel-level supervision for RS-OVSS. Specifically, we generate pixel-wise pseudo-labels using SAM3, conditioned on scene-level class names and object-level class names with bounding boxes. Combined with ground-truth semantic masks, these pseudo-labels enable joint training across all three annotation granularities through LoRA-based fine-tuning of SAM3. Our unified training spans 20 RS datasets, including 3 scene classification, 4 object detection, and 13 semantic segmentation datasets, with 1,000 images from the 7 classification and detection datasets manually annotated for pixel-level evaluation. HS-OVSeg substantially outperforms existing RS-OVSS models across both the 20 training-source and 5 held-out datasets, demonstrating strong multi-granularity segmentation capabilities under heterogeneous supervision. The code will be publicly available upon publication.",
+      "authors": [
+        "Wei Huang",
+        "Chenying Liu",
+        "Xudong Kang",
+        "Xiao Xiang Zhu"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-11-24T12:45:09+00:00",
+      "link": "https://arxiv.org/pdf/2611.32518v1",
+      "tags": [
+        "keyword:matting",
+        "keyword:mono-depth",
+        "keyword:neural-bokeh",
+        "keyword:seg",
+        "query:matting",
+        "query:mono-depth",
+        "query:neural-bokeh",
+        "query:seg"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "open-vocabulary semantic segmentation with text-driven mapping",
+      "llm_evidence_cn": "文本驱动的开放词汇语义分割",
+      "llm_evidence": "文本驱动的开放词汇语义分割",
+      "canonical_evidence": "文本驱动的开放词汇语义分割",
+      "llm_tldr_en": "Remote sensing open-vocabulary semantic segmentation is limited by scarce pixel-level annotations; HS-OVSeg unifies scene-, object-, and pixel-level heterogeneous supervision with generated pseudo-labels to enable flexible text-driven segmentation beyond predefined categories.",
+      "llm_tldr_cn": "遥感开放词汇语义分割受限于缺乏大规模且语义多样的像素级标注数据，现有数据集仅有场景级和物体级标注。本文提出HS-OVSeg统一训练框架，将场景级、物体级与像素级异构监督相结合，并生成像素级伪标签补充监督信号。该框架在遥感影像上实现了更灵活的文本驱动分割，使模型能够超越预定义类别进行像素级语义映射。",
+      "llm_tldr": "遥感开放词汇语义分割受限于缺乏大规模且语义多样的像素级标注数据，现有数据集仅有场景级和物体级标注。本文提出HS-OVSeg统一训练框架，将场景级、物体级与像素级异构监督相结合，并生成像素级伪标签补充监督信号。该框架在遥感影像上实现了更灵活的文本驱动分割，使模型能够超越预定义类别进行像素级语义映射。",
+      "llm_tags": [
+        "query:seg"
+      ],
+      "matched_query_tag": "query:seg",
+      "matched_query_text": "open-vocabulary segmentation",
+      "matched_requirement_id": "req-21",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    }
+  ]
+}

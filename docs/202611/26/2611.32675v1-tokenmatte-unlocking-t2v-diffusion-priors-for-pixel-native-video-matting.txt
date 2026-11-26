@@ -1,0 +1,279 @@
+Title: TokenMatte: Unlocking T2V Diffusion Priors for Pixel-Native Video Matting
+
+URL Source: https://arxiv.org/pdf/2611.32675v1
+
+Published Time: Wed, 25 Nov 2026 03:28:11 GMT
+
+Number of Pages: 13
+
+Markdown Content:
+# TokenMatte: Unlocking T2V Diffusion Priors for Pixel-Native Video Matting 
+
+# Zanyi Wang 1 Dengyang Jiang 2 Fengfei Yu 1 Shilong Liu 31UC San Diego 2HKUST 3Princeton University 
+
+# Abstract 
+
+High-resolution video matting requires accurate recovery of continuous alpha values, including fine hair, soft bound-aries, and motion blur, yet dense alpha supervision re-mains scarce. Pretrained text-to-video diffusion transform-ers (DiTs) offer rich spatio-temporal priors, whereas exist-ing generative video matting approaches typically route al-pha predictions through RGB-trained VAE latents, which can attenuate fine details and introduce additional decod-ing overhead. We present TokenMatte, which adapts a pre-trained video DiT into a single-pass, auxiliary-free RGB-to-alpha predictor with a pixel-native output interface. At its core is a single shared linear readout that maps each spatio-temporal token directly to its corresponding (t × p × p)
+
+block of alpha pixels, predicting spatial details and tem-poral variations within the same local video block. Tiling these blocks produces the full-resolution alpha sequence without a convolutional decoder or learned upsampling. The predicted alpha is supervised directly in pixel space, while the ground-truth alpha never enters the VAE, elimi-nating target-side alpha encoding and output-side VAE de-coding. Leveraging the pretrained video prior, TokenMatte is trained using only existing public matting datasets, with-out additional data curation or auxiliary inputs at inference. Compared with a matched latent-output baseline, our pixel-native interface improves matting accuracy while achieving a 1.51 × inference speedup. TokenMatte establishes a new auxiliary-free state of the art on VideoMatte, YouTubeMatte, and V-HIM60. 
+
+# 1. Introduction 
+
+Video matting is a core component of modern video edit-ing, compositing, background replacement, and visual ef-fects. In the most practical setting, the user provides only an RGB video and expects a temporally coherent alpha se-quence at the original resolution, without trimaps, masks, point prompts, or first-frame annotations [1, 5, 23, 29]. This auxiliary-free setting minimizes user interaction and sim-plifies deployment, but it is also one of the most challeng-ing operating points for matting: the model must recover fine boundary transitions, hair structures, motion blur, trans-parent regions, and foreground semantics directly from the video without any additional cues [14, 23]. A central bottleneck is supervision. Unlike segmenta-tion masks, alpha mattes are continuous pixel-space quan-tities that encode fractional opacity. A mask can iden-tify foreground regions, but it does not directly supervise hair-level structures, semi-transparent boundaries, motion-blurred transitions, or soft foreground-background mix-tures [3]. Accurate alpha labels are therefore expensive to annotate at scale, especially for real high-resolution videos with long temporal variation [35, 37]. As a result, much of the publicly available video matting supervision is green-screen captured, composited, synthetic, pseudo-labeled, short, or limited in scale [12, 22, 32]. This data bottleneck is particularly severe for auxiliary-free matting, where no external mask or reference annotation is available at inference time. Recent video matting research has actively sought to overcome this bottleneck [8, 20, 36, 37]. One line of work improves matting by scaling or curating task-specific data, including large real-video or pseudo-labeled video mat-ting datasets, learned quality evaluators, and mask-to-matte pipelines [12, 20, 36, 37]. These methods have substan-tially advanced the field, but they also shift progress to-ward increasingly large self-curated data resources and ad-ditional guidance signals. Another line of work exploits generative video priors, showing that pretrained video gen-eration models can help bridge the gap between limited al-pha supervision and real-world appearance variation [8, 33]. However, supervising in this lossy latent space limits mat-ting performance because the VAE round-trip destroys fine-grained details (e.g., hair) and propagates reconstruction errors during training; even an oracle round-trip of the ground-truth matte through the VAE already loses fine de-tail, and this ceiling is largest on the most detail-heavy benchmarks (Fig. 1(a),(c)). In this work, we present TokenMatte, which takes a dif-ferent path to bypass the data bottleneck. Instead of scal-ing task-specific data or relying on auxiliary prompts, we directly adapt a well-pretrained video DiT into an RGB-to-alpha predictor. Since a large-scale video DiT already orga-1arXiv:2611.32675v1 [cs.CV] 24 Nov 2026 Video Model   
+
+> VAE
+> Encoder
+> VAE
+> Encoder
+> VAE
+> Decoder
+> GT Matte Reconstruction
+> Matte
+> Error
+> Latent Space
+> Supervision Error Propagation
+
+Video Model 
+
+> VAE
+> Encoder
+> GT Matte
+> Readout
+> Module
+> Pixel Space Supervision
+> Precise Supervision
+
+(b) Native Pixel-Based Training (ours) 
+
+(a) Latent-Based Training 
+
+(d) Speed Bottleneck (1.51 
+
+× saving) (c) Quality Bottleneck (VAE α round -trip) Figure 1. Latent-based vs. our native pixel-based training. (a) Latent supervision encodes the GT matte through a frozen VAE and supervises in latent space; the alpha target must survive a VAE round-trip, and the pixel objective only reaches the model through the decoder. (b) We never encode the alpha target: a readout module unfolds each token directly into pixels, supervised in pixel space. (c)            
+
+> Quality bottleneck—the GT matte incurs reconstruction error after a VAE round-trip, revealing an empirical ceiling for alpha reconstruc-tion, especially on detail-heavy data (VideoMatte 3.50 , V-HIM60 1.22 , YouTubeMatte 0.54 , MAD). (d) Speed bottleneck—removing the VAE-decode stage cuts per-clip latency from 576 ms to 382 ms, a 1.51 ×saving at equal depth.
+
+nizes video inputs into rich spatio-temporal tokens that en-code appearance, motion, and temporal continuity [4, 31], extracting the alpha matte becomes a “readout” task of an inherited representation rather than a heavy synthesis pro-cess. Publicly available alpha data, without any self-curated resources, is fully sufficient to teach this translation. To exploit this prior, existing methods typically follow standard diffusion models by applying supervision in the latent space [8, 20], specifically, compressing the ground-truth alpha through a video VAE and supervising the model in latent space. However, as illustrated in Fig. 1(a) and (c), even a simple VAE “round-trip” (compressing the ground-truth matte into the latent space and decoding it back) in-curs significant reconstruction error and information loss, revealing a strong empirical reconstruction ceiling for alpha mattes. Supervising the model within this lossy latent space inevitably propagates these VAE-induced errors back to the video backbone during training (Fig. 1 (a)), compounding the optimization difficulty and preventing the network from capturing true pixel-level boundaries. We show that the tar-get interfaces of existing generative methods are unneces-sarily indirect, and circumvent this limitation by directly supervising the model in pixel space (Fig. 1(b)). Specifi-cally, we leverage the DiT’s fixed patch-aligned token grid, where each spatio-temporal token corresponds to a fixed lo-cal region, and employ a lightweight readout module to map tokens directly to alpha pixels. This native pixel-space training enables pristine super-vision, preserves delicate boundaries, and drastically im-proves efficiency. By completely bypassing the expensive VAE-decoding stage during inference, we eliminate a ma-jor computational bottleneck, reducing per-clip latency by 21.51 × (Fig. 1(d)). Ultimately, this design clarifies the roles of the prior and the data: pretraining provides the spatio-temporal foundation, while public alpha data merely cali-brates the token-to-alpha translation, unlocking the DiT as an efficient, RGB-only, alpha-native predictor. In summary, our main contributions are as follows: • We present TokenMatte, which adapts a pretrained video DiT into an auxiliary-free matting model, while retaining a lightweight token-to-pixel output interface. • We show this translation needs only a single per-token lin-ear readout that decodes each spatio-temporal token into its (t × p × p) block of alpha pixels—no alpha encoding, latent denoising, or VAE decoding. • Our model sets a new auxiliary-free state of the art on VideoMatte, YouTubeMatte, and V-HIM60, and runs 1.51× faster than the latent interface baseline. 
+
+# 2. Related Work 
+
+## 2.1. Auxiliary-free video matting 
+
+Video matting predicts, for every frame of an RGB video, an alpha matte that is accurate within each frame and stable over time. It is closely related to segmentation but harder: rather than a discrete label per pixel, matting estimates a continuous opacity that captures the soft transitions of hair, motion blur, and semi-transparent boundaries [10, 35], and unlike its image counterpart [19, 24, 25], it must also stay temporally coherent, since individually plausible frames can still flicker as a sequence [16, 17, 42]. To reduce this ill-posedness, most methods take an auxiliary input: a per-frame trimap, costly to annotate, or a single first-frame mask [35]. MaGGIe mattes human instances from binary mask tracks, MatAnyone propagates a target-assigned al-pha through memory, MatAnyone-2 adds a learned quality evaluator and a large self-curated training set, and Video-MaMa conditions a generative prior on first-frame masks from SAM2; all reintroduce annotation or tracking at infer-ence [12, 15, 20, 36, 41]. We instead focus on auxiliary-free matting, where the model sees only the RGB input and predicts alpha with no trimap, mask, prompt, or annotation. This is the most con-venient and deployable setting, and a long line of image and video methods pursue it directly [8, 14, 16, 17, 23]. Its central difficulty is data: dense alpha labels are far more costly than segmentation masks, and public matting supervision is largely composited, synthetic, or limited in scale [12, 22, 37], which is precisely the gap a pretrained generative prior can help fill. 
+
+## 2.2. Generative priors for video matting 
+
+Large pretrained generative models have emerged as pow-erful visual priors, capturing appearance, structure, and, for video, motion and temporal continuity from large-scale syn-thesis [2, 39, 43]. Early efforts built on latent-diffusion U-Nets [28], which reach high resolution only by repeatedly downsampling into convolutional feature maps; modern dif-fusion transformers instead scale a video into a flat lattice of spatio-temporal tokens, each bound to a fixed space-time patch [2, 31]. Riding this prior, dense prediction has been recast as generation: latent-diffusion priors have been adapted to depth, normals, image matting, and segmenta-tion masks [7, 9, 13, 34, 38], and for video matting GVM [8] casts matting as flow-matching in latent space while Video-MaMa [20] synthesizes alpha-matte latents from a video diffusion backbone. Across this line, however, the alpha target is reached only through the backbone’s VAE: it is encoded into an RGB-trained latent and supervised there, so an opacity field scored in pixel space must survive an 8x-compressed space optimized for natural images, eroding the sub-pixel hair and semi-transparent boundaries matting must recover while adding a decode pass at high resolu-tion [8, 18, 20, 40]. Building on the ViT patch paradigm, pixel-space generators like JiT [18] share DiT’s [26] per-patch token view but drop the VAE to read raw pixels di-rectly, an insight our readout extends to auxiliary-free, high-resolution video matting by mapping each video DiT token to its corresponding block of alpha pixels. 
+
+# 3. Method 
+
+Recent generative video matting reaches the alpha target through the backbone’s VAE: alpha is encoded into a la-tent, supervised there, and decoded back to pixels [8, 20]. This inherits two costs from RGB synthesis. The VAE is optimized to reconstruct natural RGB, not the continuous transmittance of an alpha matte, so encoding alpha through it compresses exactly the sub-pixel hair and soft boundaries matting must recover, capping accuracy before learning be-gins; and decoding back to pixels adds a pass whose cost is most severe at the high resolutions matting demands. We avoid both by never sending alpha through the VAE: we unlock the RGB prior of a pretrained video DiT for video matting and read the alpha field directly off its tokens, in one forward pass. Following Fig. 2 from left to right, we utilize the prior (Sec. 3.1), read alpha off the token grid (Sec. 3.2), and supervise it in pixel space (Sec. 3.3). We seek the alpha sequence α ∈ RT ×1×H×W from an RGB video x ∈ RT ×3×H×W , with no trimap, mask, prompt, or first-frame annotation. 
+
+## 3.1. RGB Video Translation 
+
+Reusing the pretrained RGB interface. The RGB video enters through the backbone’s frozen VAE encoder E, pre-serving the pretrained RGB input interface. The video DiT is then fine-tuned for RGB-to-alpha prediction, while the alpha target never passes through the VAE (Sec. 3.3). 3VAE         
+
+> Encoder
+> Pre-trained T2V
+> backbone
+> Shared
+> Linear
+> Head
+> pixel-space
+> loss
+> RGB Video Translation (Sec. 3.1) Pixel Readout (Sec. 3.2) Pixel-Space Supervision (Sec. 3.3) Figure 2. Method Overview. From an RGB video, a frozen VAE encoder produces latent tokens and a pretrained T2V backbone runs one deterministic pass ( τ=τ0,ϵ= 0 ) to yield a spatio-temporal token field (Sec. 3.1). A shared linear head unfolds each token into its local block of alpha pixels (Sec. 3.2), supervised in pixel space with no alpha encoding or VAE decoding (Sec. 3.3).
+
+From generation to a single-pass translation. A video DiT Fθ is pretrained for conditional generation, mapping a noised latent at timestep τ to a velocity or noise estimate and sampling by iterative denoising. For a deterministic dense target this stochastic interface is unnecessary [34]. We collapse it into one feed-forward pass by fixing the time embedding and removing the noise, 
+
+Z = Fθ (E(x); τ = τ0, ϵ = 0) , (1) where τ0 is a fixed timestep and Z = {zijk } is the resulting token field. With the time embedding fixed and no noise injected, Fθ no longer denoises; it deterministically trans-forms the encoded RGB field into a task-adapted token field in one pass [34]. We fine-tune the backbone for this trans-lation. A DiT represents the clip as a regular grid of spatio-temporal tokens, each tied to a fixed space-time region ex-ploited by our readout. 
+
+## 3.2. Pixel Readout 
+
+A correspondence the encoder already fixed. A DiT or-ganizes its representations on a regular spatio-temporal to-ken grid, where each token zijk corresponds to a fixed out-put region Ωijk through patch-aligned indexing. A token is thus a spatio-temporal carrier; its channels, pretrained to hold an RGB latent, can instead hold the opacity of that block. Reading alpha is then not a reconstruction but an inversion of this existing correspondence, with the target swapped from RGB to alpha. 
+
+A single linear readout. After adaptation, each token is mapped to its block of alpha pixels by one shared linear projection: 
+
+ˆAijk = reshape( W z ijk + b) , ˆAijk ∈ R t×p×p×1,
+
+(2) where t×p×p is exactly the pixel block zijk encodes. Tiling all blocks over {Ωijk } yields the full-resolution alpha se-quence ˆα. The projection W is shared across all positions and contains no convolution, no learned upsampling, and no inter-token mixing. 
+
+A minimal token-local readout. We intentionally choose the simplest token-local output interface to test whether an adapted video prior can expose alpha directly in pixel space without a task-specific decoder. Empirically, this minimal readout already achieves strong matting accuracy and sub-stantially outperforms the matched latent-output interface (Sec. 4.4). Our claim is therefore not that richer local read-outs can never help, but that a high-capacity generative de-coder is not required for accurate pixel-space alpha readout. 
+
+Sequence-length-independent readout. The shared readout acts independently on each spatio-temporal token and introduces no recurrence, memory bank, or dependence on sequence length. Sequence-length handling is left to the video backbone and evaluated empirically in Sec. 4.4. 
+
+## 3.3. Pixel-Space Supervision 
+
+The readout in Eq. (2) produces alpha directly in pixel space, so the alpha target never enters the VAE. We super-vise it with a pixel-space objective only: 
+
+L = ˆα − α 1, (3) There is no alpha VAE encoding, no latent flow-matching or denoising objective, and no VAE decoding pass. This is a structural departure from the latent interface of recent generative matting, where the ground-truth alpha is encoded by the video VAE and supervised on the al-pha latent, a decoded pixel loss serving only to refine the output. That interface is constrained in two task-specific ways. (i) Target compression. The VAE is optimized for RGB reconstruction; encoding the alpha target through it compresses the sub-pixel hair, semi-transparent boundaries, and motion-blurred edges matting must recover, capping at-tainable detail before learning begins. (ii) Objective place-ment. A latent flow-matching or denoising loss is natu-rally applied in latent space, leaving pixel-space supervision through the decoder as an indirect refinement. 4Table 1. Public training data. We train only on existing public matting supervision and construct no additional dataset. ( α: con-tinuous alpha; img: image; vid: video.)                 
+
+> Dataset Type Size GT Source VideoMatte240K [22] vid (greenscreen) 479 clips αRVM, CVPR’21 P3M-10K [16] img (portrait) 9,421 imgs αP3M, MM’21 V-HIM2K5 [12] vid (multi-inst.) 2,461 clips αMaGGIe, CVPR’24
+
+This cost is acknowledged within the latent paradigm it-self: a representative generative video matting method re-ports that the VAE’s reconstruction quality upper-bounds attainable matting accuracy, and deliberately restricts the VAE’s temporal compression to avoid motion-blur artifacts when decoding alpha [8]. Our readout removes the bound at its source by never encoding alpha. Both costs vanish when alpha stays in pixel space. On the accuracy side, an oracle round-trip of ground-truth alpha through the frozen RGB-trained VAE already incurs MAD 3.50/1.22/0.54 on VideoMatte/V-HIM60/YouTubeMatte, losing fine hair structure before learning (Fig. 1). On the efficiency side, removing the high-resolution VAE decode pass makes our pixel readout 1.51 × faster than the latent interface baseline while matching or exceeding its accuracy. Thus, not encoding alpha preserves detail, while not decod-ing it reduces latency. 
+
+# 4. Experiments 
+
+## 4.1. Experimental Setup 
+
+Backbone and adaptation. We build our model on a pre-trained video DiT (Wan2.1 1.3B [31]). The VAE encoder 
+
+E remains frozen as the pretrained RGB input interface, while the full DiT backbone is fine-tuned for RGB-to-alpha prediction. The backbone runs in a single deterministic forward pass with the time embedding fixed to τ0 and no noise injected. The output interface remains deliberately lightweight: the only newly introduced spatial module is the shared linear token-to-pixel readout W .
+
+Training objective and schedule. We supervise ˆα purely in pixel space with an ℓ1 loss. The model is trained on 21-frame clips at 720 × 1280 resolution for 30K steps using AdamW with bfloat16 precision, taking approximately 12 hours on a TPU v6e-16. We use the same training config-uration across all experiments and introduce no auxiliary trimap, mask, or segmentation supervision. 
+
+Inference. At test time, we run full-sequence inference in a single forward pass, processing clips of up to 100 frames at 1080 p at once, with no windowing or inter-segment prop-agation. The effect of inference length beyond the 21-frame training context is evaluated in Sec. 4.4. 
+
+Evaluation metrics. Following RVM [23] and GVM [8], we report MAD, MSE, Grad [27], Conn (connectivity), and dtSSD [6]; all metrics are lower-is-better. 
+
+Comparison protocol. We focus on the auxiliary-free setting, where the model receives only RGB video with no trimap, mask, point prompt, or first-frame annotation at in-ference. We compare primarily against auxiliary-free meth-ods and report mask-guided methods for context. Video-MaMa [20] is included under its first-frame mask-guided protocol, where SAM2 propagates the initial mask across the video; it is therefore not directly comparable to our RGB-only setting. We follow the unified VideoMatte and YouTubeMatte evaluation protocol of MatAnyone2 [37]. 
+
+## 4.2. Datasets 
+
+Training data. Public alpha supervision remains limited in scale and diversity: existing video matting datasets are largely composited or green-screen captured and dominated by human portraits. We therefore adapt a pretrained video DiT using existing public alpha supervision rather than con-structing an additional task-specific corpus. Concretely, we use VideoMatte240K [22] as the primary video matte source, P3M-10K [16] for large-scale portrait fine-alpha supervision, and V-HIM2K5 [12] for multi-instance video matting; their statistics are summarized in Table 1. This dif-fers from recent data-scaling lines of work that construct ad-ditional task-specific resources—e.g. GVM [8] renders the synthetic SynHairMan set and pseudo-labels real video seg-mentation, VideoMaMa [20] builds the 50K-video pseudo-labeled MA-V dataset via a generative mask-to-matte la-beler, and MatAnyone 2 [37] curates the real-world VM-Real dataset ( 28 K clips, 2.4M frames) with a learned quality evaluator. TokenMatte instead uses only the public datasets listed above while leveraging pretrained video representa-tions for task adaptation. 
+
+Evaluation benchmarks. We evaluate on three standard public benchmarks, all in the auxiliary-free regime with no benchmark-specific fine-tuning. VideoMatte [22] pro-vides 50 composited test clips ( 25 motion + 25 static) of 
+
+100 frames each at 1920 × 1080 , following the RVM [23] evaluation split with continuous-α ground truth. YouTube-Matte [36] is a high-resolution ( 1920 × 1080 ) human video matting benchmark of 64 clips ( 32 motion + 32 static), 100 
+
+frames each, harmonized from raw green-screen footage. 
+
+V-HIM60 [12] is a multi-instance human matting bench-mark of 60 clips split evenly into Easy / Medium / Hard (20 each), 30 frames per clip, with manually annotated continuous-α ground truth that preserves the finest hair-level fly-aways among the three benchmarks. 5VideoMatte (1920 × 1080 ) YouTubeMatte (1920 × 1080 )Method MAD ↓ MSE ↓ Grad ↓ dtSSD ↓ MAD ↓ MSE ↓ Grad ↓ dtSSD ↓                                                                                                                                                                                       
+
+> Mask-guided methods
+> AdaM (CVPR’23) [21] 4.42 0.39 5.12 1.39 ––––FTP-VM (CVPR’23) [11] 8.00 3.24 23.75 2.37 6.49 4.58 29.78 2.41 MaGGIe (CVPR’24) [12] 4.42 0.40 4.03 1.31 2.37 0.98 7.69 1.77 MatAnyone (CVPR’25) [36] 4.24 0.33 4.00 1.19 1.99 0.71 8.91 1.65 MatAnyone2 (CVPR’26) [37] 4.10 0.28 3.45 1.15 1.61 0.50 7.14 1.53 VideoMaMa †(CVPR’26) [20] ----1.36 0.29 3.57 -
+> Auxiliary-free methods
+> MODNet (AAAI22) [14] 11.13 5.54 15.30 3.08 15.29 12.68 8.42 2.74 RVM (WACV’22) [23] 6.57 1.93 10.55 1.90 4.37 2.25 15.10 2.28 GVM (SIGGRAPH’25) [8] 6.33 2.08 8.04 1.59 2.68 1.34 8.38 1.72
+> TokenMatte (Ours) 5.11 1.10 4.34 1.37 1.21 0.25 3.46 1.42
+> Table 2. Quantitative comparison on VideoMatte and YouTubeMatte at 1920 ×1080 . Lower is better; blue marks the best auxiliary-free results. †VideoMaMa uses first-frame mask guidance with SAM2 propagation; unreported entries are denoted by –.
+> V-HIM60 (Easy) V-HIM60 (Medium) V-HIM60 (Hard)
+> Method MAD Grad Conn dtSSD MAD Grad Conn dtSSD MAD Grad Conn dtSSD RVM (WACV’22) [23] 6.40 14.27 11.74 4.10 10.28 19.82 20.66 4.56 17.96 20.63 34.52 7.03 SparseMat (CVPR’23) [30] 6.51 13.41 11.71 4.52 10.08 16.91 19.79 5.07 23.48 20.86 44.64 9.76 MaGGIe (CVPR’24) [12] 10.48 13.71 19.99 5.19 26.16 19.61 71.29 7.14 25.68 21.18 49.78 11.30 GVM (SIGGRAPH’25) [8] 6.24 10.13 10.55 3.26 10.13 15.00 13.61 3.55 11.04 13.52 13.16 4.11 VideoMaMa †(CVPR’26) [20] 1.35 2.89 ––2.31 4.69 ––2.78 4.83 ––
+> TokenMatte (Ours) 3.35 10.00 5.94 3.23 5.35 11.59 10.39 3.54 6.09 15.87 11.42 4.40
+> Table 3. Quantitative comparison on V-HIM60 across Easy ,Medium , and Hard splits. Lower is better; blue marks the best auxiliary-free results. †VideoMaMa uses first-frame mask guidance with SAM2 propagation; Conn and dtSSD are not reported.
+
+## 4.3. Main Results 
+
+Comparison with prior work. Tables 2 and 3 report re-sults on the three benchmarks. Across all of them our method sets a new auxiliary-free state of the art, and the margin widens precisely on the cases that stress real-world appearance and multi-instance structure. On the compos-ited VideoMatte benchmark we lead every auxiliary-free baseline on all four metrics—e.g. MAD 5.11 vs. 6.33 and Grad 4.34 vs. 8.04 for GVM, nearly halving the gradi-ent error—indicating substantially sharper boundaries. On YouTubeMatte the advantage is far larger: at MAD 1.21, MSE 0.25, and Grad 3.46 we not only top the auxiliary-free group but also outperform the mask-guided VideoMaMa (1.36/0.29/3.57) on all three commonly reported metrics, despite using no auxiliary input. These results are ob-tained using only the public training datasets described in Sec. 4.2, without constructing an additional task-specific matting corpus. The trend is most pronounced on V-HIM60 
+
+(Table 3), where multiple interacting human instances are the main difficulty. Among auxiliary-free methods, Token-Matte achieves the best MAD and Conn on all three splits and the best Grad and dtSSD on Easy and Medium, with especially large gains in MAD on the hardest split (6.09 vs. 11.04 for GVM). On Hard, GVM obtains lower Grad (13.52 vs. 15.87) and dtSSD (4.11 vs. 4.40), while Token-Matte retains lower MAD (6.09 vs. 11.04) and Conn (11.42 vs. 13.16). Mask-guided methods are reported only for con-text under their stronger input conditions. 
+
+## 4.4. Ablation Studies 
+
+Latent baseline. To isolate the output interface, we com-pare against a controlled Latent baseline with the same Wan2.1 backbone, training data, and configuration. Instead of the per-token pixel readout, it encodes ground-truth al-pha with the video VAE, supervises the alpha latent, and decodes predictions with a frozen VAE decoder at infer-ence, following recent generative matting [8, 20]. Thus, the comparison changes only the alpha supervision and out-6put interface. Latency is measured on a single 100 -frame 
+
+1920 × 1080 clip using one NVIDIA A100 in eager mode; Fig. 1(d) attributes the gap to the VAE decoding stage.                       
+
+> Paradigm MAD ↓MSE ↓Grad ↓dtSSD ↓Latency ↓
+> Random Init 21.5 16.0 61.0 5.46 382ms LATENT 6.00 1.36 8.22 1.89 576ms PIXEL (Ours) 5.11 1.10 4.34 1.37 382ms
+> Table 4. Paradigm ablation. The large gap from Random Init confirms the importance of the pretrained video prior, while the improvement from LATENT to PIXEL shows that direct pixel-space alpha readout preserves fine matte details and avoids VAE decoding overhead.
+
+Table 4 isolates the two design choices behind our framework: the pretrained video prior and the pixel-space readout. Removing the pretrained initialization ( Random Init ) substantially degrades performance across every met-ric (MAD 21 .5, Grad 61 .0), confirming the importance of the pretrained video prior under the same data and optimiza-tion setting. The gap between the latent and pixel interfaces is especially pronounced on Grad, which improves from 
+
+8.22 to 4.34 with the pixel-native formulation. Since Grad is particularly sensitive to fine boundary structures, this re-sult is consistent with the effect of the output interface: en-coding the alpha target through an RGB-optimized VAE compresses the sub-pixel hair and semi-transparent edges that matting must recover, whereas reading alpha directly off the token grid preserves these local details more faith-fully. The pixel interface also improves MAD, MSE, and dtSSD over its latent counterpart. Skipping VAE decoding reduces per-clip latency from 576 ms to 382 ms, yielding a 
+
+1.51 × speedup. Together, these ablations demonstrate the importance of the pretrained video prior and show that di-rect pixel-space alpha readout provides a more accurate and efficient interface than latent supervision. 
+
+Readout design. We further test whether the minimal lin-ear readout limits prediction quality by replacing it with a shallow local convolutional decoder while keeping the backbone, training data, and optimization unchanged. As shown in Table 5, the convolutional decoder changes MAD only marginally from 5.11 to 5.09 while slightly worsening Grad from 4.34 to 4.38. Thus, additional local decoding provides no consistent improvement, supporting the use of the shared linear readout as a simple and effective pixel-native output interface. 
+
+Adaptation. We further examine whether the pixel-native formulation depends on a particular backbone-adaptation regime. We compare our default backbone adaptation with a parameter-efficient LoRA variant while keeping the same         
+
+> Readout MAD ↓Grad ↓
+> Linear (Ours) 5.11 4.34
+> Local convolutional decoder 5.09 4.38 Table 5. Readout design on VideoMatte. A shallow local con-volutional decoder provides no consistent improvement over the shared linear readout.
+
+pixel-native output interface. As shown in Table 6, LoRA already transfers strongly to VideoMatte, even obtaining a slightly lower MAD, but its performance degrades substan-tially on the held-out YouTubeMatte benchmark. This sug-gests that the pretrained video prior provides a strong start-ing point, while stronger task adaptation remains important for robust cross-dataset transfer. We therefore use a single fixed backbone-adaptation configuration across all bench-marks rather than selecting the adaptation strategy sepa-rately for each test set.           
+
+> Adaptation VideoMatte ↓YouTubeMatte ↓
+> LoRA 4.11 16.4 Full (Ours) 5.11 1.21
+> Table 6. Backbone adaptation. MAD on VideoMatte and YouTubeMatte under LoRA and full adaptation. Full adaptation substantially improves cross-dataset generalization, while both use the same pixel-native output interface.
+
+Inference length. Table 7 evaluates the same checkpoint using inference contexts of 21, 61, and 100 frames, while training uses 21-frame clips. MAD, MSE, and Grad remain stable or improve as the inference context increases, with MAD decreasing from 6.04 to 5.11 and Grad from 4.63 to 4.34. Temporal consistency is also largely preserved, as dtSSD changes only marginally from 1.33 to 1.37. These results indicate that the model remains stable when eval-uated substantially beyond its training clip length, includ-ing full-sequence 100-frame inference without windowing or inter-segment propagation.                        
+
+> Inference length MAD ↓MSE ↓Grad ↓dtSSD ↓
+> 21 6.04 1.17 4.63 1.33
+> 61 5.59 1.13 4.47 1.35 100 ∗5.11 1.10 4.34 1.37 Table 7. Inference length on VideoMatte. The same 21-frame-trained checkpoint is evaluated on complete 100-frame videos with different inference lengths. Spatial metrics remain stable or improve, while dtSSD changes only marginally. ∗The full se-quence is padded to 101 frames for Wan2.1’s 4k+ 1 requirement; padding is excluded from evaluation.
+
+7Figure 3. Qualitative comparison with auxiliary-free methods. We compare TokenMatte with RVM and latent-based GVM across three video frames. The blue and orange boxes indicate regions magnified on the right. RVM produces diffuse alpha boundaries, while GVM exhibits over-smoothed predictions that blur fine structures and merge neighboring details. In contrast, TokenMatte preserves sharper boundaries and finer, more separated alpha structures without auxiliary inputs. 
+
+## 4.5. Qualitative Results 
+
+Figure 3 compares TokenMatte with RVM and GVM across three frames of a challenging curly-hair sequence. In the magnified regions, RVM produces diffuse alpha re-sponses, while GVM over-smooths curl boundaries and merges neighboring strands into broader structures; To-kenMatte preserves sharper and more separated hair de-tails across the shown frames. Figure 4 further demon-strates qualitative generalization beyond the predominantly human-centered benchmarks, where TokenMatte recovers fine whiskers, fur, and irregular boundary structures across diverse animal foregrounds. 
+
+# 5. Conclusion 
+
+We presented TokenMatte, an auxiliary-free video mat-ting framework that adapts a pretrained video DiT with a lightweight token-to-pixel output interface. A shared linear readout maps each adapted spatio-temporal token directly to its corresponding block of alpha pixels, keeping alpha supervision entirely in pixel space. This design avoids the information loss introduced by encoding continuous alpha through an RGB-trained VAE and eliminates the VAE de-coding stage at inference. Under the same backbone, train-ing data, and optimization setting, the pixel-native interface achieves better matting accuracy and 1.51 × faster inference   
+
+> Figure 4. Generalization to non-human foregrounds. Token-Matte produces detailed alpha mattes across diverse animal cate-gories, preserving fine whiskers, fur, and irregular boundary struc-tures beyond the predominantly human-centered evaluation do-main. Ground-truth mattes are shown for reference.
+
+than its matched latent counterpart. Our ablations further confirm the importance of both the pretrained video prior and the direct pixel-space output interface for accurate al-pha prediction. Using only public alpha supervision without constructing an additional matting corpus, TokenMatte es-tablishes a new auxiliary-free state of the art on VideoMatte, YouTubeMatte, and V-HIM60. These results demonstrate that pretrained video DiT representations can be effectively 8adapted for high-resolution video matting through a sim-ple pixel-native readout, enabling accurate continuous alpha prediction without a heavy task-specific decoder. 
+
+# 6. Additional Results and Details 
+
+## 6.1. Relation to Prior Generative Matting 
+
+For completeness, Table 8 contrasts TokenMatte with re-cent generative and data-scaling video matting methods at the design level. Latent approaches reach the alpha tar-get through the backbone’s VAE—encoding alpha into an RGB-trained latent, supervising there, and decoding back— and several pair this with large self-curated corpora or auxil-iary mask guidance. We instead keep alpha entirely in pixel space and use only public supervision, so our gains come from unlocking the pretrained video prior rather than from latent supervision, extra curated data, or auxiliary inputs.                       
+
+> Method Alpha Matting data Guidance VAE dec.
+> GVM latent synth.+pseudo none yes VideoMaMa latent synthetic only mask yes MatAnyone2 pixel VMReal (28K) mask –
+> Ours pixel public only none no Table 8. Design-level comparison. TokenMatte uses pixel-space alpha, no auxiliary guidance, and no VAE decoding.
+
+## 6.2. Implementation Details 
+
+We use the same fixed timestep τ0 during training and in-ference with no injected noise ( ϵ = 0 ). The VAE encoder remains frozen, while the full video DiT is fine-tuned us-ing the public training datasets described in the main pa-per. Additional optimization and inference configurations are summarized in Table 9. 
+
+## 6.3. Additional Qualitative Results 
+
+Figure 5 compares TokenMatte with auxiliary-free and mask-guided video matting methods on a challenging zero-shot sequence with fine moving hair. Figures 6–11 further demonstrate zero-shot generalization to diverse dynamic, translucent, and non-rigid foregrounds. 
+
+Configuration Value 
+
+Optimization 
+
+Optimizer AdamW ( β1=0 .9, β 2=0 .95 )Learning rate 2 × 10 −5, constant Weight decay 1 × 10 −3
+
+Gradient clipping global norm 1.0
+
+Global batch size 64 
+
+Training steps 30 KPrecision bfloat16 
+
+Forward pass 
+
+Fixed timestep τ0 (no noise, ϵ=0 )Readout head single shared linear Training loss ℓ1 in pixel space (Eq. 3) 
+
+Data / augmentation 
+
+Training clip length 21 frames Training resolution 720 × 1280 
+
+Augmentation horizontal flip Background pool RVM background composites 
+
+Inference 
+
+Mode full-sequence single pass Clip length up to 100 frames Resolution 1920 × 1080 
+
+> Table 9. Full training and inference configuration of TokenMatte.
+
+9Figure 5. Qualitative comparison with auxiliary-free and mask-guided methods. We compare TokenMatte with auxiliary-free RVM and GVM, and with mask-guided MatAnyone2 and VideoMaMa using SAM2 guidance. The SAM2 mask sequence is shown for reference, and colored boxes indicate the magnified regions on the right. While all methods recover the main foreground, RVM produces diffuse hair boundaries and the other baselines tend to smooth some thin strands. TokenMatte preserves finer and more separated hair structures without auxiliary mask guidance. 
+
+Figure 6. Translucent fabric. TokenMatte preserves thin fabric layers and spatially varying opacity across the sequence. 
+
+Figure 7. Fast water spray. TokenMatte captures rapidly changing water structures and fine spray details from RGB input alone. 
+
+10 Figure 8. Transparent soap bubbles. TokenMatte recovers transparent bubbles with clear boundaries and varying opacity over time. 
+
+Figure 9. Translucent tentacles. TokenMatte preserves thin tentacles and translucent structures across separated frames. 
+
+Figure 10. Soft emissive boundaries. TokenMatte captures the foreground together with soft, spatially varying alpha transitions around the glowing hand across frames. 
+
+Figure 11. Complex foreground interaction. TokenMatte preserves the articulated foreground together with thin structures such as hair, ropes, and the moving weapon across temporally separated frames. 
+
+11 References 
+
+[1] Nicholas Apostoloff and Andrew Fitzgibbon. Bayesian video matting using learnt image priors. In Proceedings of the 2004 IEEE Computer Society Conference on Computer Vision and Pattern Recognition, 2004. CVPR 2004. , pages I–I. IEEE, 2004. 1 [2] Andreas Blattmann, Tim Dockhorn, Sumith Kulal, Daniel Mendelevitch, Maciej Kilian, Dominik Lorenz, Yam Levi, Zion English, Vikram Voleti, Adam Letts, et al. Stable video diffusion: Scaling latent video diffusion models to large datasets. arXiv preprint arXiv:2311.15127 , 2023. 3 [3] Shaofan Cai, Xiaoshuai Zhang, Haoqiang Fan, Haibin Huang, Jiangyu Liu, Jiaming Liu, Jiaying Liu, Jue Wang, and Jian Sun. Disentangled image matting. In Proceedings of the IEEE/CVF International Conference on Computer Vi-sion , pages 8819–8828, 2019. 1 [4] Sili Chen, Hengkai Guo, Shengnan Zhu, Feihu Zhang, Zi-long Huang, Jiashi Feng, and Bingyi Kang. Video depth any-thing: Consistent depth estimation for super-long videos. In 
+
+Proceedings of the Computer Vision and Pattern Recognition Conference , pages 22831–22840, 2025. 2 [5] Yung-Yu Chuang, Aseem Agarwala, Brian Curless, David H Salesin, and Richard Szeliski. Video matting of complex scenes. In Proceedings of the 29th annual conference on Computer graphics and interactive techniques , pages 243– 248, 2002. 1 [6] Mikhail Erofeev, Yury Gitman, Dmitriy S Vatolin, Alexey Fedorov, and Jue Wang. Perceptually motivated benchmark for video matting. In BMVC , page 2, 2015. 5 [7] Xiao Fu, Wei Yin, Mu Hu, Kaixuan Wang, Yuexin Ma, Ping Tan, Shaojie Shen, Dahua Lin, and Xiaoxiao Long. Geowiz-ard: Unleashing the diffusion priors for 3d geometry esti-mation from a single image. In European Conference on Computer Vision , pages 241–258. Springer, 2024. 3 [8] Yongtao Ge, Kangyang Xie, Guangkai Xu, Li Ke, Mingyu Liu, Longtao Huang, Hui Xue, Hao Chen, and Chunhua Shen. Generative video matting. In Proceedings of the Special Interest Group on Computer Graphics and Interac-tive Techniques Conference Conference Papers , pages 1–10, 2025. 1, 2, 3, 5, 6 [9] Jing He, Haodong Li, Wei Yin, Yixun Liang, Leheng Li, Kaiqiang Zhou, Hongbo Zhang, Bingbing Liu, and Ying-Cong Chen. Lotus: Diffusion-based visual foundation model for high-quality dense prediction. In International Con-ference on Learning Representations , pages 89454–89467, 2025. 3 [10] Qiqi Hou and Feng Liu. Context-aware image matting for si-multaneous foreground and alpha estimation. In Proceedings of the IEEE/CVF International Conference on Computer Vi-sion , pages 4130–4139, 2019. 3 [11] Wei-Lun Huang and Ming-Sui Lee. End-to-end video matting with trimap propagation. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 14337–14347, 2023. 6 [12] Chuong Huynh, Seoung Wug Oh, Abhinav Shrivastava, and Joon-Young Lee. Maggie: Masked guided gradual human in-stance matting. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 3870– 3879, 2024. 1, 3, 5, 6 [13] Bingxin Ke, Anton Obukhov, Shengyu Huang, Nando Met-zger, Rodrigo Caye Daudt, and Konrad Schindler. Repurpos-ing diffusion-based image generators for monocular depth estimation. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , pages 9492–9502, 2024. 3 [14] Zhanghan Ke, Jiayu Sun, Kaican Li, Qiong Yan, and Ryn-son WH Lau. Modnet: Real-time trimap-free portrait mat-ting via objective decomposition. In Proceedings of the AAAI conference on artificial intelligence , pages 1140–1147, 2022. 1, 3, 6 [15] Alexander Kirillov, Eric Mintun, Nikhila Ravi, Hanzi Mao, Chloe Rolland, Laura Gustafson, Tete Xiao, Spencer White-head, Alexander C Berg, Wan-Yen Lo, et al. Segment any-thing. In Proceedings of the IEEE/CVF international confer-ence on computer vision , pages 4015–4026, 2023. 3 [16] Jizhizi Li, Sihan Ma, Jing Zhang, and Dacheng Tao. Privacy-preserving portrait matting. In Proceedings of the 29th ACM international conference on multimedia , pages 3501–3509, 2021. 3, 5 [17] Jizhizi Li, Jing Zhang, and Dacheng Tao. Deep automatic natural image matting. arXiv preprint arXiv:2107.07235 ,2021. 3 [18] Tianhong Li and Kaiming He. Back to basics: Let denoising generative models denoise. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition ,pages 36115–36125, 2026. 3 [19] Yaoyi Li and Hongtao Lu. Natural image matting via guided contextual attention. In Proceedings of the AAAI conference on artificial intelligence , pages 11450–11457, 2020. 3 [20] Sangbeom Lim, Seoung Wug Oh, Jiahui Huang, Heeji Yoon, Seungryong Kim, and Joon-Young Lee. Videomama: Mask-guided video matting via generative prior. arXiv preprint arXiv:2601.14255 , 2026. 1, 2, 3, 5, 6 [21] Chung-Ching Lin, Jiang Wang, Kun Luo, Kevin Lin, Linjie Li, Lijuan Wang, and Zicheng Liu. Adaptive human matting for dynamic videos. In Proceedings of the IEEE/CVF Con-ference on Computer Vision and Pattern Recognition , pages 10229–10238, 2023. 6 [22] Shanchuan Lin, Andrey Ryabtsev, Soumyadip Sengupta, Brian L Curless, Steven M Seitz, and Ira Kemelmacher-Shlizerman. Real-time high-resolution background matting. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 8762–8771, 2021. 1, 3, 5 [23] Shanchuan Lin, Linjie Yang, Imran Saleemi, and Soumyadip Sengupta. Robust high-resolution video matting with tempo-ral guidance. In Proceedings of the IEEE/CVF Winter Con-ference on Applications of Computer Vision , pages 238–247, 2022. 1, 3, 5, 6 [24] Hao Lu, Yutong Dai, Chunhua Shen, and Songcen Xu. In-dices matter: Learning to index for deep image matting. In 
+
+Proceedings of the IEEE/CVF International Conference on Computer Vision , pages 3266–3275, 2019. 3 
+
+12 [25] GyuTae Park, SungJoon Son, JaeYoung Yoo, SeHo Kim, and Nojun Kwak. Matteformer: Transformer-based image mat-ting via prior-tokens. In Proceedings of the IEEE/CVF Con-ference on Computer Vision and Pattern Recognition , pages 11696–11706, 2022. 3 [26] William Peebles and Saining Xie. Scalable diffusion models with transformers. In Proceedings of the IEEE/CVF inter-national conference on computer vision , pages 4195–4205, 2023. 3 [27] Christoph Rhemann, Carsten Rother, Jue Wang, Margrit Gelautz, Pushmeet Kohli, and Pamela Rott. A perceptu-ally motivated online benchmark for image matting. In 2009 IEEE conference on computer vision and pattern recogni-tion , pages 1826–1833. IEEE, 2009. 5 [28] Robin Rombach, Andreas Blattmann, Dominik Lorenz, Patrick Esser, and Bj¨ orn Ommer. High-resolution image synthesis with latent diffusion models. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , pages 10684–10695, 2022. 3 [29] Soumyadip Sengupta, Vivek Jayaram, Brian Curless, Steven M Seitz, and Ira Kemelmacher-Shlizerman. Back-ground matting: The world is your green screen. In Pro-ceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 2291–2300, 2020. 1 [30] Yanan Sun, Chi-Keung Tang, and Yu-Wing Tai. Ultrahigh resolution image/video matting with spatio-temporal spar-sity. In Proceedings of the IEEE/CVF Conference on Com-puter Vision and Pattern Recognition , pages 14112–14121, 2023. 6 [31] Team Wan, Ang Wang, Baole Ai, Bin Wen, Chaojie Mao, Chen-Wei Xie, Di Chen, Feiwu Yu, Haiming Zhao, Jianxiao Yang, et al. Wan: Open and advanced large-scale video gen-erative models. arXiv preprint arXiv:2503.20314 , 2025. 2, 3, 5 [32] Tiantian Wang, Sifei Liu, Yapeng Tian, Kai Li, and Ming-Hsuan Yang. Video matting via consistency-regularized graph neural networks. In Proceedings of the IEEE/CVF International Conference on Computer Vision , pages 4902– 4911, 2021. 1 [33] Zanyi Wang, Dengyang Jiang, Liuzhuozheng Li, Sizhe Dang, Chengzu Li, Harry Yang, Guang Dai, Mengmeng Wang, and Jingdong Wang. Deforming videos to masks: Flow matching for referring video segmentation. arXiv preprint arXiv:2510.06139 , 2025. 1 [34] Guangkai Xu, Mingyu Liu, Chengxiang Fan, Kangyang Xie, Zhiyue Zhao, Hao Chen, Chunhua Shen, et al. What mat-ters when repurposing diffusion models for general dense perception tasks? In International Conference on Learning Representations , pages 6786–6799, 2025. 3, 4 [35] Ning Xu, Brian Price, Scott Cohen, and Thomas Huang. Deep image matting. In Proceedings of the IEEE conference on computer vision and pattern recognition , pages 2970– 2979, 2017. 1, 3 [36] Peiqing Yang, Shangchen Zhou, Jixin Zhao, Qingyi Tao, and Chen Change Loy. Matanyone: Stable video matting with consistent memory propagation. In Proceedings of the Computer Vision and Pattern Recognition Conference , pages 7299–7308, 2025. 1, 3, 5, 6 [37] Peiqing Yang, Shangchen Zhou, Kai Hao, and Qingyi Tao. Matanyone 2: Scaling video matting via a learned qual-ity evaluator. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 37476– 37485, 2026. 1, 3, 5, 6 [38] Yuhuan Yang, Xianwei Zhuang, Yuxuan Cai, Chaofan Ma, Shuai Bai, Jiangchao Yao, Ya Zhang, Junyang Lin, and Yan-feng Wang. Genmask: Adapting dit for segmentation via direct mask generation. arXiv preprint arXiv:2603.23906 ,2026. 3 [39] Zhuoyi Yang, Jiayan Teng, Wendi Zheng, Ming Ding, Shiyu Huang, Jiazheng Xu, Yuanming Yang, Wenyi Hong, Xi-aohan Zhang, Guanyu Feng, et al. Cogvideox: Text-to-video diffusion models with an expert transformer. In In-ternational Conference on Learning Representations , pages 83048–83077, 2025. 3 [40] Jingfeng Yao, Bin Yang, and Xinggang Wang. Reconstruc-tion vs. generation: Taming optimization dilemma in latent diffusion models. In Proceedings of the Computer Vision and Pattern Recognition Conference , pages 15703–15712, 2025. 3[41] Qihang Yu, Jianming Zhang, He Zhang, Yilin Wang, Zhe Lin, Ning Xu, Yutong Bai, and Alan Yuille. Mask guided matting via progressive refinement network. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , pages 1154–1163, 2021. 3 [42] Yunke Zhang, Chi Wang, Miaomiao Cui, Peiran Ren, Xuan-song Xie, Xian-Sheng Hua, Hujun Bao, Qixing Huang, and Weiwei Xu. Attention-guided temporally coherent video ob-ject matting. In Proceedings of the 29th ACM International Conference on Multimedia , pages 5128–5137, 2021. 3 [43] Zangwei Zheng, Xiangyu Peng, Tianji Yang, Chenhui Shen, Shenggui Li, Hongxin Liu, Yukun Zhou, Tianyi Li, and Yang You. Open-sora: Democratizing efficient video production for all. arXiv preprint arXiv:2412.20404 , 2024. 3 
+
+13

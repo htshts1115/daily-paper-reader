@@ -1,0 +1,1995 @@
+FocusAnchor: Zero-Shot Metric Depth by Anchoring
+a Depth Foundation Prior to Focus Cues
+Ashkan Ganj1
+Hang Su2
+Tian Guo1
+1Worcester Polytechnic Institute
+2NVIDIA Research
+{aganj,tian}@wpi.edu, hangsu@nvidia.com
+Focus 0.82 m
+Focus 1.67 m
+Focus 3.08 m
+Focus 4.88 m
+Focus 8.10 m
+All-in-focus
+FOSSA ViT-B
+AbsRel 0.068
+DA3 Metric-L
+AbsRel 0.186
+FocusAnchor (ours)
+AbsRel 0.024
+Ground truth
+1.1 m
+2.8 m
+Metric depth
+Five-slice focal stack with known focus distances
+real camera, F/2.8
+Single image
+Focal stack only
+Spatial artifacts in
+low-texture regions
+Single image only
+Preserves structure but
+overestimates depth
+Focal stack +
+all-in-focus
+Preserves structure with
+more accurate metric depth
+Reference
+Figure 1. FocusAnchor combines focus cues and a frozen depth prior for accurate metric depth. Top: a real five-slice focal stack from
+ZEDD [34], captured at known focus distances, and an all-in-focus image. Bottom: metric depth predictions and ground truth. Numbers
+are per-image AbsRel, and all depth maps share the same color scale. In this example, FOSSA ViT-B [34] exhibits spatial artifacts,
+while Depth Anything 3 Metric-Large [15] overestimates depth. By repeatedly anchoring the foundation prior to focus cues, FocusAnchor
+improves metric accuracy while preserving scene structure.
+Abstract
+Existing depth-from-focus methods can struggle with weak
+focus cues, new cameras, or fewer focal slices. We present
+FocusAnchor, a recurrent model that uses focus-volume
+lookups to refine metric depth and repeatedly aligns a rel-
+ative depth prior from a frozen foundation model to the
+current depth estimate.
+The aligned prior guides subse-
+quent refinement in a feedback loop, carrying metric scale
+recovered from textured regions into regions where focus
+cues are weak while preserving scene structure. To sup-
+port transfer across cameras, we synthesize training stacks
+with randomized camera parameters and focus distances.
+However, stack synthesis blurs existing image noise differ-
+ently across slices, creating artificial depth cues even on
+textureless surfaces. We add independent per-slice noise to
+suppress these cues. We also introduce variable-stack train-
+ing to improve robustness with fewer focal slices and sup-
+port more practical mobile capture. Compared with FOSSA
+ViT-B, FocusAnchor reduces AbsRel by 36% on NYU Depth
+V2 and by 9% on DDFF-12 after fine-tuning.
+In zero-
+shot evaluation, FocusAnchor and its variable-stack vari-
+ant, FocusAnchor-flex, achieve the two lowest AbsRel val-
+ues on all five benchmarks. On ZEDD test, FocusAnchor
+achieves 9% lower AbsRel than the best competing method
+FOSSA ViT-B, while FocusAnchor-flex achieves lower Ab-
+sRel with 40% fewer focal slices on ZEDD validation.
+Check project page for code and weights at https://
+cake.wpi.edu/FocusAnchor-website/.
+1. Introduction
+Metric depth estimation predicts the distance from a camera
+to visible surfaces in meters. The metric depths are useful
+because they enable applications such as augmented reality
+to correctly scale and position virtual objects [7], and help
+robots judge distances for obstacle avoidance and manipu-
+lation [22]. Camera focus can provide a metric cue because
+surfaces appear sharpest when focused at their distance.
+Capturing the same scene at several known focus distances
+produces a focal stack, with each image called a focal slice.
+Depth-from-focus (DFF) models [8, 17, 27, 29, 30] estimate
+metric depth from sharpness changes across slices and their
+1
+arXiv:2611.32970v1  [cs.CV]  24 Nov 2026
+
+
+known focus distances. However, changes in sharpness are
+not equally informative across the image. Textured regions
+often provide informative focus cues, while smooth walls
+and other textureless surfaces can look similar across slices,
+making their depth difficult to determine.
+Relative-depth foundation models such as Depth Any-
+thing V2 [32] can provide complementary scene structure
+from a single image, including where focus cues are weak,
+but their predictions lack metric scale. HybridDepth [8]
+aligns a monocular depth estimate with a focus-based esti-
+mate and refines the result. FOSSA [34] adapts a pretrained
+depth model to focal stacks, demonstrating zero-shot trans-
+fer to new cameras and scenes.
+Despite these advances, three limitations remain. First,
+metric depth can remain inaccurate in regions with weak fo-
+cus cues, particularly textureless surfaces. Second, achiev-
+ing strong generalization with limited task-specific training
+data remains challenging. FOSSA, for example, is trained
+on stacks rendered from 373k synthetic images. Third, ex-
+isting methods often lose accuracy with fewer focal slices,
+limiting their use when capture time or scene motion re-
+stricts stack size. On an iPhone 18 Pro, we measure about
+0.58 s per slice and 2.9 s for five slices (Sec. 4.4).
+We introduce FocusAnchor, a recurrent DFF model built
+around a feedback loop between depth refinement and prior
+alignment (Fig. 1).
+Given a focal stack, its focus dis-
+tances, and an all-in-focus image, FocusAnchor maps a
+frozen foundation model’s relative depth prediction onto
+the focus range. A recurrent network refines this estimate
+through lookups in a focus volume, which stores learned
+scores across focal slices at each pixel. After initial scale
+adjustment, each refinement step fits the frozen prediction
+to the current estimate using a confidence-weighted local
+scale and shift. The aligned prior and focus evidence guide
+the next update, carrying metric scale recovered from tex-
+tured regions into regions where focus cues are weak.
+To support cross-camera transfer, we train the refinement
+network under varied acquisition conditions using NYU
+Depth V2 images. Following FOSSA, we synthesize fo-
+cal stacks with randomized camera parameters and focus
+distances. However, during the synthesis process, blurring
+a captured RGB image also smooths the sensor noise al-
+ready present. At each pixel, this noise is smoothed least
+in the slice focused at the surface’s depth, creating an ar-
+tificial depth cue even on textureless surfaces.
+A model
+can therefore learn to locate the in-focus slice from residual
+noise rather than scene detail. This shortcut does not reflect
+real capture, where sensor noise is introduced separately in
+each exposure rather than blurred with the scene. We there-
+fore add independent random noise to each rendered slice
+to suppress this shortcut. To support different capture bud-
+gets, we also train a variant with two to five focal slices,
+FocusAnchor-flex.
+FocusAnchor achieves strong accuracy on held-out
+NYU Depth V2 images and on DDFF-12 after fine-
+tuning.
+Without target-dataset fine-tuning, FocusAnchor
+and FocusAnchor-flex achieve the two lowest AbsRel val-
+ues across five benchmarks, including real captured fo-
+cal stacks in ZEDD, where FocusAnchor reduces AbsRel
+by about 9% relative to FOSSA ViT-B on the public test
+set. With variable-stack training, FocusAnchor-flex main-
+tains strong performance across stack sizes.
+On ZEDD
+validation, FocusAnchor-flex achieves 73% lower AbsRel
+than FOSSA ViT-B when both use two slices and achieves
+lower AbsRel with three slices than FOSSA ViT-B with
+five. These results suggest potential for mobile capture with
+fewer exposures.
+Our main contributions are:
+• A recurrent DFF architecture that updates depth in units
+of focus planes and repeatedly aligns a frozen depth prior
+to the current estimate to guide refinement.
+• A training recipe combining randomized camera param-
+eters and independent per-slice noise to suppress artifi-
+cial depth cues from synthetic stack rendering and sup-
+port transfer to real captured stacks.
+• Robustness across focal-stack sizes through variable-
+stack training that enables FocusAnchor-flex to support
+two to five slices and outperforms competing methods
+with two or three slices on ZEDD.
+• State-of-the-art zero-shot AbsRel on ZEDD, Infinigen
+Defocus, iBims, HAMMER, and ARKitScenes.
+2. Related Work
+Depth from focus. Early DFF methods estimate depth
+using handcrafted sharpness measures across focal set-
+tings [25]. DDFF [9] introduced end-to-end DFF and the
+DDFF-12 light-field benchmark, while DefocusNet [17]
+narrowed the synthetic-to-real gap with a defocus-aware ar-
+chitecture and the FoD500 dataset. DFV [30] uses a dif-
+ferential focus volume from neighboring-slice feature dif-
+ferences and estimates a distribution over focus distances,
+while DualFocus [29] adds spatial and focal variational con-
+straints to distinguish depth boundaries from texture arti-
+facts and to encourage physically consistent training. We
+adapt DFV’s focus volume for recurrent depth refinement.
+Single-image depth estimation. Relative depth models
+predict depth only up to an unknown scale and shift. Mi-
+DaS [21] and Depth Anything [31] generalize across do-
+mains through diverse training data, and Depth Anything
+V2 [32] adds robustness and fine detail. Marigold [13] re-
+purposes a pretrained diffusion model for zero-shot depth.
+Metric depth models predict depth in meters from learned
+scene priors, often with known or estimated intrinsics.
+ZoeDepth [4] adds metric heads to relative-depth training.
+Metric3D, Metric3D v2 and DA3 Metric [10, 15, 33] pre-
+2
+
+
+dict depth in a canonical camera space and rescale predic-
+tions using the input focal length. UniDepth and UniDepth
+V2 [18, 19] predict camera geometry alongside depth, and
+Depth Pro [5] estimates the focal length, enabling metric
+prediction without supplied intrinsics. However, the single-
+image models we evaluated still incur large metric errors on
+ZEDD (Tab. 3). We instead anchor a relative depth prior
+using focus observations at known distances.
+Fusing focus with single-image priors. HybridDepth [8]
+aligns a relative single-image depth map to a DFF estimate
+with a global scale and shift, then applies learned pixel-
+wise scale corrections. FOSSA [34] integrates focus cues
+into a pretrained metric depth transformer through attention
+across slices and an embedding of each focus distance. In
+stereo, MonSter [6] aligns a monocular prior inside a re-
+current loop through learned per-pixel shift updates. We
+instead align the prior in closed form with a local scale and
+shift before every step, and combine it with focus-volume
+lookups in units of focus planes.
+Recurrent refinement with depth priors. RAFT [26] and
+RAFT-Stereo [16] iteratively refine optical flow and dispar-
+ity, respectively, using ConvGRUs guided by features re-
+trieved from correlation volumes. DEFOM-Stereo [11] ini-
+tializes disparity from Depth Anything V2 and applies scale
+updates before additive refinement.Stereo Anywhere [2]
+combines correlation volumes derived from stereo image
+features and monocular depth predictions.
+We extend
+DEFOM-Stereo’s recurrent backbone with focus-volume
+lookups and depth updates relative to known focus planes.
+3. Method
+Given a focal stack {Ii}N
+i=1 with known focus distances
+d1 < · · · < dN in meters and an all-in-focus image Iaif,
+we estimate a metric depth map D. Figure 2 shows the
+architecture of FocusAnchor, where a CNN encodes the fo-
+cal stack into a focus volume that scores the sharpness of
+each pixel in each slice, and a frozen Depth Anything V2
+predicts the relative inverse depth from the all-in-focus im-
+age. We map this prediction onto the focus range and recur-
+rently correct its scale before refining it in focus-plane co-
+ordinates. During the latter stage, each iteration aligns the
+prior to the current estimate and uses the aligned prior to-
+gether with focus-volume lookups to guide the next update.
+Building on DEFOM-Stereo’s recurrent backbone [11], we
+introduce focus-plane lookups and updates (Sec. 3.3), re-
+peated prior alignment (Sec. 3.4), and per-slice noise and
+variable-stack training (Sec. 3.6).
+3.1. Primer
+Focus volume. For a thin lens, a point at depth D appears
+as a blur disk whose diameter grows with |1/D −1/di|.
+The point is thus sharpest in the slice focused nearest to it
+Focal stack
+CNN encoder
+Fi
+[Fi, Fi −Fi+1]
+3D conv
+volume C
+All-in-focus
+DAv2 ViT-L
+relative inverse depth z
+Context encoder
+h0, context
+Recurrent
+refinement
+t=1…T
+proposed
+frozen
+x0
+AbsRel 0.219
+x4
+AbsRel 0.032̂
+D
+AbsRel 0.024
+C
+C(gρ(σxt−1))
+Lt
+Lt =C(gρ(xt−1)±r)
+h0
+hidden state ht
+ConvGRU
+t=1…4
+x←sx
+ConvGRU
+t=5…T
+u←gρ(x)+Δu
+xT
+upsample
+Prior alignment̃
+xt =âz +b
+weights ct−1̃
+xt̂
+z
+Confidence
+ct(ht−1, Lt,̃ xt)
+ct̃
+x5
+c5
+Figure 2. FocusAnchor. Top: a CNN encoder and 3D convolu-
+tions turn the focal stack into the focus volume C, and a frozen
+Depth Anything V2 gives the relative inverse depth z of the AiF
+image. The recurrent refinement turns these into xT , which is up-
+sampled to the metric depth ˆD = d1/xT . Bottom: the refinement
+detail. The scale stage (t ≤4) rescales the estimate. The step
+stage (t > 4) reads the focus volume around the estimate (Lt) and
+moves it along the plane index u. Before each step, ˆz is aligned to
+the estimate with weights ct−1, which gives the aligned prior ˜xt.
+Confidence ct (white: high confidence) weights the next prior fit.
+in inverse depth, so we estimate inverse depth throughout.
+We take the focus volume from DFV [30] (Sec. 3.2). The
+focus distances are known in meters, so the volume carries
+metric depth. Textureless surfaces can have flat scores.
+Depth prior. Depth Anything V2 [32] covers these sur-
+faces. From one image, it predicts a relative inverse depth z
+that captures the structure of the scene but matches the true
+inverse depth only up to an unknown scale and shift.
+RAFT-based update loop. We combine the volume with
+the prior through the update loop of RAFT-Stereo [16, 26],
+which refines an estimate at 1/4 resolution over several iter-
+ations. In each iteration, a lookup reads the volume around
+the current estimate. A ConvGRU takes the lookup, the es-
+timate and fixed context features, and predicts a correction.
+GRU weights are shared within each stage, and a learned
+convex upsampling gives the full-resolution output. From
+DEFOM-Stereo [11] we keep two ideas: the loop starts
+from the single-image prior, and its first iterations rescale
+the estimate before the rest add corrections.
+3.2. Encoders
+A shared CNN maps each slice Ii to 32-channel features Fi
+at 1/4 resolution. As in DFV, we pair each feature with its
+difference to the next slice, [Fi, Fi −Fi+1] with FN+1 = 0,
+and apply three 3D convolutions along the stack, which
+3
+
+
+gives the focus volume C(i, p) over slices i and pixels p
+for any N. Unlike DEFOM-Stereo, we add no Depth Any-
+thing features, so the focus volume stays independent of the
+prior. A softmax over slices gives the volume-only depth
+Dvol =
+  P
+i softmaxi(C)/di
+−1, which we supervise as
+an auxiliary output. The prior z comes from a frozen Depth
+Anything V2 Large (ViT-L) applied to Iaif, which can be
+fused from the slices. A trained copy of the first layers of
+its DPT head gives multi-scale features, and a context en-
+coder maps them and Iaif to the initial hidden state h0 and
+the context features read by every iteration.
+3.3. Recurrent Refinement
+FocusAnchor uses focus-volume lookups and a three-level
+ConvGRU at 1/4, 1/8 and 1/16 resolution (Fig. 2, bot-
+tom).
+The scale stage corrects large initial scale errors
+through multiplicative updates, while the step stage then re-
+fines each pixel with bounded updates in focus-plane coor-
+dinates. Each stage has its own GRU weights, shared by its
+iterations, and the hidden state carries over.
+Plane index u. The focus planes sit at ρi = d1/di, from
+ρ1 = 1 down to ρN. We estimate the normalized inverse
+depth x = d1/D, so the nearest focus plane is at x = 1
+and the metric depth is D = d1/x. We also express x as
+a plane index u = gρ(x), which counts focus planes from
+the nearest one. A pixel on the second plane has u = 2,
+and a pixel halfway between the second and third planes in
+inverse depth has u = 2.5. The map gρ is piecewise linear
+with gρ(ρi) = i and extends linearly beyond the end planes.
+Stereo measures steps in pixels of disparity. We measure
+them in planes, so a step of 1 moves the estimate to the next
+focus plane for every camera and focus schedule.
+Initialization x0. The first estimate takes its shape from the
+prior and its scale from the focus planes. We min-max nor-
+malize z to ˆz ∈[0, 1] and initialize x0 = ρN + (1 −ρN) ˆz.
+The nearest predicted surface thus lands on the nearest fo-
+cus plane, and the farthest on the farthest plane. Our focus
+distances are in meters, so x0 starts at a metric scale. This
+scale is only approximate, because a scene rarely spans ex-
+actly the focus range.
+Scale stage (t ≤4). At each of the first four iterations, a
+scale lookup reads C at gρ(σxt−1) for nine scale factors
+σ ∈[0.5, 2], with five taps around each. It thus shows how
+well each rescaling of the current estimate agrees with the
+focus evidence. From this lookup, the GRU predicts a per-
+pixel scale st, and the estimate becomes xt = st xt−1.
+Step stage (t > 4). In the remaining iterations, the lookup
+Lt reads C at ut−1 +k δ for k ∈{−4, . . . , 4}, interpolating
+linearly between slices. It thus covers r = 4δ planes on
+each side of the estimate, written C(gρ(xt−1)±r) in Fig. 2.
+Stereo pools its volume into coarser levels, which is not an
+option with five or fewer slices. We instead read the same
+volume at two step sizes, δ = 0.5 and 1. The lookup reads
+raw scores rather than a softmax, and samples outside the
+stack read zero. From Lt and the aligned prior (Sec. 3.4),
+the GRU predicts a step along the plane index,
+xt = g−1
+ρ
+ ut−1 + clip(∆ut, −4, 4)
+
+,
+(1)
+where the clip matches the span the lookup sees at δ = 1.
+Like RAFT-Stereo, we train with fewer iterations, T = 4 +
+8, than we test with, T = 4 + 12.
+3.4. Prior Alignment
+In the loop described so far, the prior enters only through
+x0 and the context. Where the volume is flat, as on a blank
+wall, the GRU can thus drift away from the prior’s structure.
+We therefore align ˆz to the estimate before every step-stage
+iteration, and weight each pixel by how much the estimate
+can be trusted (Fig. 2, bottom). The scale stage needs no
+alignment, since x0 is itself an affine map of ˆz.
+Local fit. Since ˆz is inverse depth up to scale and shift, we
+fit it to xt−1 with a scale ap and a shift bp per pixel p. We
+solve least squares over a 33 × 33 window W(p) at 1/4
+resolution, about 130 full-resolution pixels wide, weighted
+by the previous confidence ct−1 (with c4 = 1). Let Ep
+be the weighted mean over W(p), pulled slightly toward
+the image-wide mean so that a window with no confident
+pixel falls back to the global fit (Sec. 6 of the supplementary
+material). This gives:
+ap = max
+
+0,
+Covp[ˆz, xt−1]
+max(Varp[ˆz], ϵ)
+
+,
+bp = Ep[xt−1]−ap Ep[ˆz].
+(2)
+with Covp and Varp formed from Ep and ϵ = 10−6.
+The aligned prior ˜xt(p) = ap ˆz(p) + bp is clamped to
+[ 1
+2 min xt−1, 2 max xt−1], so it cannot run to near-zero in-
+verse depth. No gradient flows through the fit.
+Confidence. A small head ψ predicts the probability ct
+that xt−1 lies within about 5% of the ground truth, from
+the finest hidden state ht−1, the lookup Lt and log xt−1 −
+log ˜xt. Since ct depends on ˜xt, it weights the next fit. We
+detach ct before the GRU, so ψ learns only from Lc.
+Fusion. The step-stage GRU receives [xt−1, ˜xt, ct] in place
+of xt−1 alone. It can follow the aligned prior where the
+volume is flat and follow the volume where it is peaked.
+3.5. Training Loss
+Convex upsampling brings each estimate to full resolution,
+giving the metric depths D1, . . . , DT and the output ˆD =
+DT . We supervise all T estimates, the volume-only depth
+and the confidence,
+L =
+T
+X
+t=1
+γT −t log Dt −log D∗
+1
++ λv
+ log Dvol −log D∗
+1 + λcLc,
+(3)
+4
+
+
+where ∥· ∥1 averages over valid pixels, γ = 0.915/(T −1) as
+in RAFT-Stereo, λv = 1 and λc = 0.1. The log makes the
+loss the same for depth and for inverse depth. Lc is a binary
+cross-entropy averaged over the step-stage iterations. We
+supervise ct with 1[ | log Dt−1 −log D∗| < 0.05 ].
+3.6. Training
+We train FocusAnchor on NYU Depth V2 [24], rendering
+focal stacks with FOSSA’s render [34]. Camera parameters
+and focus distances vary per image to support cross-camera
+transfer (Suppl. Sec. 7). FocusAnchor-flex is the same ar-
+chitecture trained with variable stacks (Sec. 4.4). We ad-
+dress the following two sources of artificial depth cues.
+Focus planes. Prior focal-stack methods [8, 29] place the
+nearest and farthest planes at each image’s minimum and
+maximum ground-truth depth, so the network only places
+pixels between two known depths (Suppl. Fig. 4). Follow-
+ing FOSSA, 80% of our stacks instead use random focus
+distances, with the nearest plane at 0.6 to 1 m and the far-
+thest 7 to 15 times farther.
+Per-slice noise. The renderer blurs one sharp photo once per
+focus distance, so the photo’s sensor noise stays sharpest in
+the slice that is in focus. On a textureless surface, such as a
+white wall, this noise is the only detail, so its sharpest slice
+hints at the depth. A real camera exposes every slice sepa-
+rately, with new noise each time, so we add fresh Gaussian
+noise to every rendered slice. If textureless pixels carried
+no depth hint, their sharpest slice would be the one focused
+nearest the true depth 20% of the time, one in five. In our
+renders this happens 62% of the time, and the added noise
+lowers it to 27% (Suppl. Sec. 7).
+4. Experiments
+We evaluate three aspects of FocusAnchor: (i) generaliza-
+tion across scene and camera domains, (ii) sensitivity to
+focal-stack size, and (iii) the contributions of prior align-
+ment and iterative refinement. Trained only on NYU Depth
+V2, FocusAnchor and FocusAnchor-flex achieve the two
+lowest AbsRel values on all five zero-shot benchmarks
+(Tab. 3). FocusAnchor-flex remains accurate with as few
+as two slices, which suggests practical utility when a long
+focal stack cannot be captured.
+4.1. Experimental Setup
+Datasets. Our evaluation covers captured,
+light-field-
+refocused, and synthetic focal stacks.
+• NYU Depth V2 [24] contains indoor RGB-D images,
+with 24,231 training and 654 test images in our split. We
+evaluate on the test images following prior work [8, 29],
+with focus planes spanning each image’s ground-truth
+depth range.
+• DDFF-12 [9] provides focal stacks refocused from light-
+field images of 12 indoor scenes. We use five-slice inputs
+and follow prior protocols [9, 30] for comparison.
+• ZEDD [34] provides focal stacks captured with a full-
+frame camera and a 50 mm lens, with dense LiDAR
+ground-truth. We evaluate its validation and test splits,
+each containing 50 scenes. We follow FOSSA evaluation
+and test protocols. Inputs are resized and center-cropped
+to 480 × 640, with valid ground-truth depths restricted to
+[0.01, 1000] m.
+• Infinigen Defocus [34] is a synthetic benchmark con-
+taining 200 indoor scenes generated with Infinigen In-
+doors [20] and rendered with defocus in Blender Cy-
+cles. Following FOSSA, we use five images per scene
+at F/1.4, with focus distances of 0.8, 1.7, 3.0, 4.7, and
+8.0 m, retaining ground-truth depths in [0.01, 1000] m.
+For FocusAnchor, RGB images and depth maps are re-
+sized to 480 × 640 using Lanczos and nearest-neighbor
+interpolation, respectively.
+• iBims, HAMMER, and ARKitScenes provide RGB-D
+images without focal stacks. For zero-shot evaluation,
+we synthesize focal stacks from their RGB images and
+ground-truth depth maps using the rendering procedure
+from FOSSA’s evaluation [34]. For ARKitScenes, we use
+5,594 validation images downsampled to 480 × 640.
+Metrics. Following prior work [8, 29, 34], we report the
+AbsRel, SqRel, RMSE, logRMSE and threshold accuracy
+δt, the fraction of pixels with max( ˆdp/dp, dp/ ˆdp) < t. δ1,
+δ2 and δ3 denote t = 1.25, 1.252 and 1.253. For DDFF-12,
+the metrics are computed on disparity, and we also report
+MSE. For the ZEDD test split, we use the official evaluation
+server.
+Implementation details. We train FocusAnchor on the data
+of Sec. 3.6 for 60k steps on 384×512 crops with five slices,
+using AdamW with a learning rate of 2 × 10−4, a one-
+cycle schedule, and a batch of 8 on two RTX 4090 GPUs.
+FocusAnchor-flex is trained likewise with 2–5 slices per
+batch, then for 20k more steps at a learning rate of 5×10−5.
+Following FOSSA [34], we use the ZEDD validation split
+during development: FocusAnchor uses its final 60k-step
+checkpoint, while FocusAnchor-flex uses a checkpoint se-
+lected on this split. Each model is evaluated using a sin-
+gle fixed checkpoint across all zero-shot benchmarks. For
+comparison with HybridDepth and DualFocus on NYU, we
+separately train FocusAnchor using their rendering proto-
+col: the NYU camera, focus planes spanning each image’s
+ground-truth depth range (Suppl. Fig. 4, top), and no per-
+slice noise augmentation. For DDFF-12, we fine-tune on its
+training split. FocusAnchor has 24.6M trainable parameters
+plus the frozen Depth Anything V2 Large model. Five-slice
+480 × 640 inference takes 92 ms on an RTX 4090.
+5
+
+
+Table 1.
+Metric depth estimation results on NYU Depth V2.
+FocusAnchor achieves the lowest AbsRel and RMSE within each
+training group.
+Method
+RMSE↓logRMSE↓AbsRel↓SqRel↓
+δ1 ↑
+δ2 ↑
+δ3 ↑
+NYU rendering protocol
+HybridDepth† [8]
+0.128
+–
+0.026
+–
+0.995 1.000 1.000
+DualFocus† [29]
+0.075
+0.020
+0.013
+0.0021 0.999 1.000 1.000
+FocusAnchor
+0.0564
+0.0157
+0.0077
+0.0012 0.999 1.000 1.000
+Default training protocols
+UniDepth V2 [19]
+0.297
+0.101
+0.080
+0.041
+0.950 0.991 0.995
+DA3 Metric-L [15]
+0.309
+0.104
+0.075
+0.036
+0.961 0.989 0.995
+Metric3D v2 [10]
+0.317
+0.207
+0.072
+0.038
+0.965 0.989 0.993
+FOSSA ViT-S [34]
+0.458
+0.240
+0.094
+0.080
+0.884 0.945 0.965
+FOSSA ViT-B [34]
+0.403
+0.209
+0.080
+0.061
+0.906 0.958 0.975
+FocusAnchor
+0.1874
+0.0713
+0.0513
+0.0172 0.962 0.999 1.000
+NYU rendering protocol: training uses the NYU camera and focus planes spanning
+each image’s ground-truth depth range. Default training: each method uses its own
+training settings and FocusAnchor follows Sec. 3.6. Results are from our evaluations
+using released checkpoints for prior methods, except † taken from the original papers.
+Best and second-best results within each group are bold and underlined.
+Table 2. Depth estimation results on DDFF-12. FocusAnchor
+achieves the lowest AbsRel and RMSE.
+Method
+MSE↓RMSE↓AbsRel↓SqRel↓δ1 ↑
+δ2 ↑
+δ3 ↑
+DFV [30]
+5.7e-4 0.0213
+0.17
+0.0063 0.767 0.942 0.981
+HybridDepth [8]
+5.1e-4 0.0200
+0.17
+0.0060 0.789 0.947 0.981
+DualFocus [29]
+4.7e-4 0.0194
+0.16
+0.0056 0.800 0.954 0.982
+FOSSA ViT-S [34] 4.2e-4 0.0183
+0.11
+0.0045 0.936 0.983 0.991
+FOSSA ViT-B [34] 2.8e-4 0.0148
+0.11
+0.0025 0.932 0.987 0.994
+FocusAnchor
+3.0e-4 0.01472
+0.10
+0.0035 0.932 0.980 0.990
+FocusAnchor is fine-tuned on the DDFF-12 training split using five-slice stacks and
+evaluated at the final checkpoint. Metrics are computed on disparity. Best and second-
+best results are bold and underlined, respectively.
+4.2. Performance on NYU Depth V2 and DDFF-12
+NYU Depth V2. HybridDepth and DualFocus train with the
+same render as the NYU test stacks: the NYU camera and
+focus planes fixed to each image’s ground-truth depth range.
+As this makes a direct comparison unfair, we also train an
+in-domain version of FocusAnchor with their render, with-
+out per-slice noise, and compare it with them. In Tab. 1, our
+default model reduces AbsRel by 29% compared with the
+best single-image model and 36% compared with FOSSA
+ViT-B. The in-domain version lowers the AbsRel of Dual-
+Focus by 41% and its RMSE by 25%.
+DDFF-12. Against the earlier focus methods, fine-tuned
+FocusAnchor lowers AbsRel by 38% and RMSE by 24%
+relative to DualFocus (Tab. 2). Against FOSSA, the gap
+closes. Our AbsRel is 9% below that of FOSSA ViT-B,
+and the RMSE is tied (0.5%, below the precision FOSSA
+reports). FOSSA ViT-B keeps the lead on MSE, SqRel, δ2
+and δ3, and FOSSA ViT-S on δ1. A likely reason is that fine-
+tuning gives every model the target camera, which removes
+the camera transfer where our design gains most.
+4.3. Zero-Shot Generalization Performance
+We show that FocusAnchor and FocusAnchor-flex, trained
+only on NYU Depth V2, achieve the two lowest AbsRel
+values on all five benchmarks, which differ in scenes and
+cameras (Tab. 3). Qualitative results are shown in Fig. 3.
+ZEDD.
+On
+real
+captured
+stacks,
+FocusAnchor
+and
+FocusAnchor-flex rank first and second on test AbsRel and
+δ1.05 (Tab. 3). Compared with FOSSA ViT-B, the strongest
+competing method on this split, FocusAnchor reduces Ab-
+sRel by 9% and raises δ1.05 from 0.505 to 0.580. FOSSA
+ViT-B retains the highest test δ1.25 (0.918 versus 0.903), so
+our advantage is clearest at the stricter threshold. On val-
+idation, both variants rank in the top two across all three
+metrics, with 24% lower AbsRel than FOSSA ViT-B. Both
+variants preserve scene structure with lower per-image Ab-
+sRel than the baselines in all ZEDD and ARKitScenes ex-
+amples in Fig. 3.
+Infinigen Defocus. Both variants occupy the top two posi-
+tions on all reported metrics (Tab. 3), extending the gains to
+rendered scenes. Relative to FOSSA ViT-S, FocusAnchor-
+flex lowers AbsRel by 16%, while FocusAnchor raises δ1.05
+by 23%. FocusAnchor-flex also lowers AbsRel by 94% rel-
+ative to HybridDepth and 88% relative to DFV.
+iBims and HAMMER. On iBims,
+under FOSSA’s
+synthetic-stack protocol (Tab. 3), FocusAnchor reduces Ab-
+sRel by 50% compared to FOSSA ViT-B (0.070 to 0.035)
+and increases δ1.25 from 0.963 to 0.986. On HAMMER,
+FocusAnchor further reduces AbsRel by 41% relative to
+FOSSA ViT-B (0.017 to 0.010).
+ARKitScenes. Both variants rank in the top two on all three
+metrics (Tab. 3). FocusAnchor lowers AbsRel by 27% rela-
+tive to FOSSA ViT-B and places 4% more pixels within 5%
+of the ground truth. Both methods exceed 0.99 in δ1.25. In
+the ARKitScenes examples in Fig. 3, we recover more accu-
+rate metric scale on close-up walls and ceilings. We achieve
+these gains using only NYU Depth V2 for training, whereas
+FOSSA uses the larger Hypersim and TartanAir datasets.
+4.4. Robustness Across Focal-Stack Sizes
+We evaluate zero-shot robustness to focal-stack size on the
+50 ZEDD validation scenes (Tab. 4). For each scene, we
+use slices {1, 9}, {1, 5, 9}, {1, 4, 6, 9} or {1, 3, 5, 7, 9} of
+its nine focus settings, and fuse Iaif from these slices only
+(Suppl. Sec. 11). All methods in Tab. 4 were trained with
+five slices, except FocusAnchor-flex, which was trained
+with stack sizes sampled from two to five (Sec. 4.1).
+Robustness with variable-stack training. FocusAnchor-
+flex is less sensitive to reductions in input stack size while
+retaining comparable five-slice accuracy.
+Reducing the
+stack from five to two slices increases its AbsRel by only
+1.6X, compared with 4.3X/4.5X/2.4X for FocusAnchor,
+FOSSA ViT-B, and HybridDepth, respectively. It achieves
+6
+
+
+Table 3. Zero-shot metric depth estimation across five benchmarks. FocusAnchor and FocusAnchor-flex outperform all evaluated
+single-image and depth-from-focus baselines on AbsRel, achieving the top two positions on every benchmark.
+ZEDD (Test / Val)
+Infinigen Defocus
+iBims [14]
+HAMMER [12]
+ARKitScenes [3]
+Method
+δ1.05 ↑
+δ1.25 ↑
+AbsRel↓
+δ1.05 ↑δ1.25 ↑AbsRel↓δ1.05 ↑δ1.25 ↑AbsRel↓δ1.05 ↑δ1.25 ↑AbsRel↓δ1.05 ↑δ1.25 ↑AbsRel↓
+Single image
+DAv2 [32]
+0.037 / 0.044 0.261 / 0.253 0.337 / 0.338
+0.026
+0.133
+0.429
+0.268
+0.885
+0.127
+0.043
+0.322
+0.541
+0.088
+0.440
+0.394
+Depth Pro [5]
+0.182 / 0.148 0.665 / 0.615 0.201 / 0.219
+0.174
+0.692
+0.176
+0.308
+0.878
+0.120
+0.200
+0.720
+0.271
+0.019
+0.093
+1490.2
+UniDepth V2 [19]
+0.106 / 0.146 0.605 / 0.589 0.253 / 0.348
+0.103
+0.464
+0.370
+0.510
+0.942
+0.078
+0.068
+0.482
+0.371
+0.296
+0.832
+0.133
+MoGe-2 [28]
+0.149 / 0.137 0.580 / 0.520 0.278 / 0.309
+0.175
+0.621
+0.233
+0.394
+0.890
+0.106
+0.300
+0.751
+0.269
+0.422
+0.879
+0.096
+Metric3D v2∗[10]
+0.007 / 0.043 0.120 / 0.326 0.558 / 0.428
+0.074
+0.374
+0.401
+0.188
+0.761
+0.184
+0.039
+0.463
+0.346
+0.239
+0.749
+0.160
+DA3 Metric-L∗[15] 0.202 / 0.135 0.617 / 0.684 0.230 / 0.217
+0.204
+0.707
+0.186
+0.471
+0.954
+0.076
+0.168
+0.716
+0.218
+0.351
+0.890
+0.101
+Depth from focus
+FV [30]
+0.153 / 0.219 0.576 / 0.759 0.369 / 0.235
+0.045
+0.172
+0.629
+0.231
+0.759
+0.141
+0.560
+0.912
+0.106
+0.361
+0.935
+0.103
+DFV [30]
+0.152 / 0.227 0.546 / 0.809 0.573 / 0.148
+0.053
+0.205
+0.568
+0.229
+0.756
+0.144
+0.529
+0.927
+0.076
+0.365
+0.946
+0.086
+DEReD [23]
+0.128 / 0.125 0.505 / 0.442 0.347 / 0.389
+0.108
+0.446
+0.355
+0.064
+0.275
+0.689
+0.000
+0.000
+5.313
+0.013
+0.062
+2.640
+HybridDepth [8]
+0.075 / 0.270 0.347 / 0.771 0.754 / 0.153
+0.037
+0.157
+1.232
+0.222
+0.795
+0.146
+0.450
+0.908
+0.085
+0.398
+0.952
+0.082
+FOSSA ViT-S [34]
+0.451 / 0.445 0.884 / 0.886 0.098 / 0.0985 0.520
+0.940
+0.0847
+0.519
+0.954
+0.075
+0.601
+0.999
+0.044
+0.780
+0.995
+0.034
+FOSSA ViT-B [34]
+0.505 / 0.432 0.918 / 0.919 0.089 / 0.0957 0.420
+0.936
+0.0908
+0.555
+0.963
+0.070
+0.938
+0.999
+0.017
+0.904
+0.997
+0.022
+FocusAnchor
+0.580 / 0.548 0.903 / 0.927 0.081 / 0.0731 0.639
+0.941
+0.0717
+0.799
+0.986
+0.035
+0.967
+0.999
+0.010
+0.943
+0.998
+0.016
+FocusAnchor-flex
+0.550 / 0.570 0.896 / 0.920 0.086 / 0.0732 0.611
+0.948
+0.0708
+0.764
+0.983
+0.039
+0.970
+0.999
+0.012
+0.922
+0.998
+0.020
+ZEDD entries report test/validation results, ranked separately for each split. ZEDD test and Infinigen results are from FOSSA [34], except for ∗methods and our models, which
+we evaluate ourselves. All ZEDD validation and ARKitScenes results are from our evaluations. Best and second-best results are bold and underlined, respectively.
+0.033
+0.034
+0.109
+0.213
+0.098
+0.080
+0.060
+0.192
+0.285
+0.171
+0.052
+0.036
+0.247
+0.285
+0.243
+0.048
+0.021
+0.292
+0.238
+0.184
+All-in-focus
+Ground truth
+FocusAnchor
+FocusAnchor-flex
+FOSSA ViT-B
+DA3 Metric-L
+HybridDepth
+ZEDD
+ARKitScenes
+Figure 3. Zero-shot qualitative results on ZEDD (top) and ARKitScenes (bottom). Numbers are per-image AbsRel, with the lowest in
+each row in bold. Per-pixel error maps and more visual results are in the suppl. Fig. 6 and Sec. 10.
+the best results among the compared methods on all three
+metrics with two to four slices. With two slices, its AbsRel
+is 73% lower than FOSSA ViT-B and 68% lower than Hy-
+bridDepth. At five slices, it nearly matches FocusAnchor’s
+AbsRel with small tradeoffs in RMSE and δ1.25.
+Practical capture and inference implications. Acquiring
+a focal stack requires repeated focus adjustments and photo
+captures. On iOS, processing to improve photo quality can
+further delay image delivery [1]. Longer acquisition win-
+dows also make it harder to maintain a consistent view-
+point and scene during handheld capture. We quantify this
+cost using an iOS app on an iPhone 18 Pro that locks the
+lens at five evenly spaced focus positions and captures each
+photo once the lens has settled. Across 10 trials, a five-slice
+stack takes 2.89 s on average, and photo capture is 85% of
+the 579 ms per slice (supplementary Tab. 7). Reducing the
+stack to two slices thus shortens acquisition by 60%, about
+1.7 s, under this protocol. Together with its stronger ac-
+curacy than the compared methods at two slices (Tab. 4),
+FocusAnchor-flex offers a practical tradeoff between depth
+7
+
+
+Table 4. Zero-shot robustness to stack size on ZEDD validation
+(50 scenes). FocusAnchor-flex leads on all metrics with two to
+four slices and retains comparable five-slice accuracy.
+2 slices
+3 slices
+AbsRel↓RMSE↓δ1.25 ↑AbsRel↓RMSE↓δ1.25 ↑
+HybridDepth [8]
+0.374
+2.011
+0.306
+0.267
+1.550
+0.518
+FOSSA ViT-B [34]
+0.434
+1.916
+0.421
+0.206
+0.949
+0.680
+FocusAnchor
+0.313
+1.685
+0.308
+0.244
+1.293
+0.547
+FocusAnchor-flex
+0.119
+0.774
+0.855
+0.090
+0.643
+0.899
+4 slices
+5 slices
+AbsRel↓RMSE↓δ1.25 ↑AbsRel↓RMSE↓δ1.25 ↑
+HybridDepth [8]
+0.231
+1.249
+0.607
+0.153
+1.021
+0.771
+FOSSA ViT-B [34]
+0.134
+0.756
+0.857
+0.096
+0.722
+0.919
+FocusAnchor
+0.158
+1.015
+0.755
+0.073
+0.588
+0.927
+FocusAnchor-flex
+0.112
+0.726
+0.876
+0.073
+0.603
+0.920
+All models use five-slice training while FocusAnchor-flex additionally uses two to
+five slices. Bold/underlined are best/second-best per slice count and metric.
+Table 5. Test-time ablations of FocusAnchor (AbsRel ↓). The
+full model outperforms either single-cue estimate on all three
+datasets. Removing focus lookups causes the largest degradation
+on NYU and ARKitScenes, while removing the scale stage has the
+largest effect on ZEDD.
+ZEDD
+NYU
+ARKitScenes
+FocusAnchor (full)
+0.0731
+0.0513
+0.0163
+Single-cue estimates
+Prior only (x0)
+0.485
+0.0962
+0.0883
+Focus volume only (Dvol)
+0.141
+0.0576
+0.0326
+Test-time modifications
+w/o focus lookup (step stage)
+0.113
+0.107
+0.0900
+w/o scale stage
+0.115
+0.0598
+0.0386
+w/o fitted-prior input
+0.0857
+0.0602
+0.0202
+Single prior fit (t = 5)
+0.0797
+0.0566
+0.0170
+Global prior fit
+0.0752
+0.0513
+0.0173
+Uniform confidence (c = 1)
+0.0731
+0.0516
+0.0164
+All variants use the same 60k-step checkpoint without retraining and the ZEDD val-
+idation split. Bold denotes the lowest AbsRel, while darker and lighter gray mark
+the largest and second-largest increases in AbsRel relative to the full model among
+test-time modifications, respectively, within each dataset. The prior-only estimate x0
+is mapped to the focus range.
+accuracy and acquisition time, allowing fewer focal slices
+at inference when capture time is limited.
+4.5. Ablations
+We ablate FocusAnchor on ZEDD validation, NYU Depth
+V2, and ARKitScenes through test-time modifications
+(Tab. 5) and variants retrained under a common 10k-step
+schedule (Tab. 6). The results support combining focus cues
+with repeated prior alignment and highlight the importance
+of training-stack synthesis for cross-camera transfer.
+Complementary cues (Tab. 5). The full model outperforms
+either single-cue estimate on all three datasets.
+Among
+component removals, disabling focus lookups causes the
+largest degradation on NYU and ARKitScenes, while re-
+moving the scale stage has the largest effect on ZEDD. Re-
+Table 6. Retrained ablations of FocusAnchor (AbsRel ↓). Cam-
+era randomization is important for generalization, as the fixed-
+camera variants incur the largest errors on ZEDD and ARK-
+itScenes. Removing prior alignment or the scale stage also de-
+grades accuracy on all three datasets.
+ZEDD
+NYU
+ARKitScenes
+FocusAnchor (full)
+0.0813
+0.0447
+0.0233
+Architecture
+w/o prior alignment
+0.0876
+0.0553
+0.0264
+w/o scale stage
+0.0914
+0.0520
+0.0254
+Training configuration
+w/o per-slice noise
+0.0914
+0.0558
+0.0236
+Fixed camera∗
+0.1622
+0.0153
+0.0411
+Fixed camera, no noise∗
+0.2474
+0.0134
+0.0417
+All variants are only trained for 10k steps. Bold denotes the lowest AbsRel, while
+darker and lighter gray mark the largest and second-largest increases in AbsRel rel-
+ative to the full model, respectively, within each dataset.
+∗The training camera
+matches the NYU evaluation renderer, making these NYU results in-domain.
+moving the fitted-prior input increases AbsRel by 17-24%,
+confirming its consistent contribution.
+Prior alignment. Tab. 5 shows that fitting the prior only
+once after the scale stage, while retaining it as a GRU in-
+put, increases AbsRel by approximately 4-10% relative to
+the full model. This suggests that updating the prior’s align-
+ment as the depth estimate changes provides better guidance
+than keeping the initial fit fixed. Local fitting and learned
+confidence have small effects overall. In the retrained abla-
+tions (Tab. 6), removing prior alignment or the scale stage
+also increases AbsRel on all three datasets.
+Training-stack synthesis (Tab. 6). Training with the NYU
+evaluation camera configuration improves NYU accuracy
+but reduces transfer to other cameras:
+ZEDD AbsRel
+roughly doubles, and ARKitScenes AbsRel increases by
+76%. Removing per-slice noise worsens ZEDD accuracy
+with both randomized and fixed cameras. On NYU, noise
+removal improves accuracy with the fixed camera but wors-
+ens it with randomized cameras.
+Refinement iterations. With five slices, the four scale it-
+erations provide most of the accuracy gain.
+Reducing
+subsequent step iterations from twelve to eight keeps Ab-
+sRel within 1.3% of the default for both models across all
+three datasets and reduces inference time by 10%. Two-
+slice FocusAnchor-flex benefits from longer refinement on
+ZEDD, suggesting the accuracy-runtime tradeoff depends
+on stack size. Detailed results are in Sec. 8 of the supple-
+mentary material.
+5. Conclusion
+FocusAnchor uses an aligned foundation-model depth prior
+to carry metric scale recovered from textured regions into
+regions where focus cues are weak.
+FocusAnchor and
+FocusAnchor-flex achieve competitive zero-shot perfor-
+mance, and ablations demonstrate the benefits of repeat-
+8
+
+
+edly aligning the prior with focus-derived depth estimates
+throughout refinement. Our variable-stack training supports
+shorter focal stacks, but does not explicitly account for cam-
+era or scene motion during acquisition. Future work could
+incorporate these effects into model design and training to
+improve robustness in handheld capture.
+LLM Usage Statement
+We used large language models (LLMs) to refine the writing
+of this paper, mainly to improve the clarity, grammar, and
+phrasing of text drafted by the authors. The research ideas,
+method design, choice of datasets, implementation, and
+experiments are the authors’ own work, and LLMs were not
+used to generate research content. The authors reviewed all
+text and take full responsibility for the content of the paper.
+References
+[1] Apple Inc.
+AVFoundation:
+Capture setup.
+https:
+/ / developer . apple . com / documentation /
+avfoundation
+/
+avcapturephotosettings
+/
+photoqualityprioritization. 7
+[2] Luca Bartolomei, Fabio Tosi, Matteo Poggi, and Stefano
+Mattoccia.
+Stereo Anywhere:
+Robust Zero-Shot Deep
+Stereo Matching Even Where Either Stereo or Mono Fail.
+In IEEE/CVF Conference on Computer Vision and Pattern
+Recognition (CVPR), 2025. arXiv:2412.04472. 3
+[3] Gilad Baruch, Zhuoyuan Chen, Afshin Dehghan, Tal Dimry,
+Yuri Feigin, Peter Fu, Thomas Gebauer, Brandon Joffe,
+Daniel Kurz, Arik Schwartz, and Elad Shulman.
+ARK-
+itScenes:
+A Diverse Real-World Dataset For 3D Indoor
+Scene Understanding Using Mobile RGB-D Data. In Neural
+Information Processing Systems Datasets and Benchmarks
+Track, 2021. arXiv:2111.08897. 7
+[4] Shariq Farooq Bhat, Reiner Birkl, Diana Wofk, Peter Wonka,
+and Matthias M¨uller.
+ZoeDepth: Zero-shot Transfer by
+Combining Relative and Metric Depth.
+arXiv preprint
+arXiv:2302.12288, 2023. 2
+[5] Aleksei Bochkovskii, Ama¨el Delaunoy, Hugo Germain,
+Marcel Santos, Yichao Zhou, Stephan R. Richter, and
+Vladlen Koltun. Depth Pro: Sharp Monocular Metric Depth
+in Less Than a Second.
+In International Conference on
+Learning Representations (ICLR), 2025. arXiv:2410.02073.
+3, 7
+[6] Junda Cheng, Longliang Liu, Gangwei Xu, Xianqi Wang,
+Zhaoxing Zhang, Yong Deng, Jinliang Zang, Yurui Chen,
+Zhipeng Cai, and Xin Yang. MonSter: Marry Monodepth
+to Stereo Unleashes Power.
+In IEEE/CVF Conference on
+Computer Vision and Pattern Recognition (CVPR), 2025.
+arXiv:2501.08643. 3
+[7] Ashkan Ganj, Yiqin Zhao, Hang Su, and Tian Guo. Mobile ar
+depth estimation: Challenges & prospects. In Proceedings of
+the 25th International Workshop on Mobile Computing Sys-
+tems and Applications, page 21–26, New York, NY, USA,
+2024. Association for Computing Machinery. 1
+[8] Ashkan Ganj, Hang Su, and Tian Guo. HybridDepth: Ro-
+bust Metric Depth Fusion by Leveraging Depth from Fo-
+cus and Single-Image Priors.
+In IEEE/CVF Winter Con-
+ference on Applications of Computer Vision (WACV), 2025.
+arXiv:2407.18443. 1, 2, 3, 5, 6, 7, 8
+[9] Caner Hazirbas, Sebastian Georg Soyer, Maximilian Chris-
+tian Staab, Laura Leal-Taix´e, and Daniel Cremers.
+Deep
+Depth From Focus. In Asian Conference on Computer Vi-
+sion (ACCV), 2018. arXiv:1704.01085. 2, 5
+[10] Mu Hu, Wei Yin, Chi Zhang, Zhipeng Cai, Xiaoxiao Long,
+Kaixuan Wang, Hao Chen, Gang Yu, Chunhua Shen, and
+Shaojie Shen. Metric3Dv2: A Versatile Monocular Geomet-
+ric Foundation Model for Zero-shot Metric Depth and Sur-
+face Normal Estimation. IEEE Transactions on Pattern Anal-
+ysis and Machine Intelligence, 2024. arXiv:2404.15506. 2,
+6, 7
+[11] Hualie Jiang, Zhiqiang Lou, Laiyan Ding, Rui Xu, Minglang
+Tan, Wenjie Jiang, and Rui Huang. DEFOM-Stereo: Depth
+Foundation Model Based Stereo Matching. In IEEE/CVF
+Conference on Computer Vision and Pattern Recognition
+(CVPR), 2025. arXiv:2501.09466. 3
+[12] HyunJun Jung, Patrick Ruhkamp, Guangyao Zhai, Niko-
+las Brasch, Yitong Li, Yannick Verdie, Jifei Song, Yiren
+Zhou, Anil Armagan, Slobodan Ilic, et al.
+Is my depth
+ground-truth good enough? hammer–highly accurate multi-
+modal dataset for dense 3d scene regression. arXiv preprint
+arXiv:2205.04565, 2022. 7
+[13] Bingxin Ke, Anton Obukhov, Shengyu Huang, Nando Met-
+zger, Rodrigo Caye Daudt, and Konrad Schindler. Repurpos-
+ing diffusion-based image generators for monocular depth
+estimation. In Proceedings of the IEEE/CVF Conference on
+Computer Vision and Pattern Recognition (CVPR), 2024. 2
+[14] Tobias Koch, Lukas Liebel, Friedrich Fraundorfer, and
+Marco K¨orner. Evaluation of cnn-based single-image depth
+estimation methods, 2018. 7
+[15] Haotong Lin, Sili Chen, Junhao Liew, Donny Y. Chen,
+Zhenyu Li, Guang Shi, Jiashi Feng, and Bingyi Kang. Depth
+Anything 3: Recovering the Visual Space from Any Views.
+arXiv preprint arXiv:2511.10647, 2025. 1, 2, 6, 7
+[16] Lahav Lipson, Zachary Teed, and Jia Deng. RAFT-Stereo:
+Multilevel Recurrent Field Transforms for Stereo Match-
+ing. In International Conference on 3D Vision (3DV), 2021.
+arXiv:2109.07547. 3
+[17] Maxim Maximov, Kevin Galim, and Laura Leal-Taix´e. Fo-
+cus on defocus:
+bridging the synthetic to real domain
+gap for depth estimation.
+In IEEE/CVF Conference on
+Computer Vision and Pattern Recognition (CVPR), 2020.
+arXiv:2005.09623. 1, 2
+[18] Luigi Piccinelli, Yung-Hsu Yang, Christos Sakaridis, Mat-
+tia Segu, Siyuan Li, Luc Van Gool, and Fisher Yu.
+UniDepth: Universal Monocular Metric Depth Estimation.
+In IEEE/CVF Conference on Computer Vision and Pattern
+Recognition (CVPR), 2024. arXiv:2403.18913. 3
+[19] Luigi Piccinelli, Christos Sakaridis, Yung-Hsu Yang, Mat-
+tia Segu, Siyuan Li, Wim Abbeloos, and Luc Van Gool.
+UniDepthV2: Universal Monocular Metric Depth Estima-
+tion Made Simpler. arXiv preprint arXiv:2502.20110, 2025.
+3, 6, 7
+9
+
+
+[20] Alexander Raistrick, Lingjie Mei, Karhan Kayan, David
+Yan, Yiming Zuo, Beining Han, Hongyu Wen, Meenal
+Parakh, Stamatis Alexandropoulos, Lahav Lipson, Zeyu Ma,
+and Jia Deng. Infinigen indoors: Photorealistic indoor scenes
+using procedural generation. In 2024 IEEE/CVF Conference
+on Computer Vision and Pattern Recognition (CVPR), pages
+21783–21794, 2024. 5
+[21] Ren´e Ranftl,
+Katrin Lasinger,
+David Hafner,
+Konrad
+Schindler, and Vladlen Koltun. Towards robust monocular
+depth estimation: Mixing datasets for zero-shot cross-dataset
+transfer, 2020. 2
+[22] Shreeyak Sajjan, Matthew Moore, Mike Pan, Ganesh Na-
+garaja, Johnny Lee, Andy Zeng, and Shuran Song. Clear
+grasp: 3d shape estimation of transparent objects for manip-
+ulation. In 2020 IEEE International Conference on Robotics
+and Automation (ICRA), pages 3634–3642, 2020. 1
+[23] Haozhe Si, Bin Zhao, Dong Wang, Yunpeng Gao, Mulin
+Chen, Zhigang Wang, and Xuelong Li. Fully self-supervised
+depth estimation from defocus clue.
+In 2023 IEEE/CVF
+Conference on Computer Vision and Pattern Recognition
+(CVPR), pages 9140–9149. IEEE, 2023. 7
+[24] Nathan Silberman, Derek Hoiem, Pushmeet Kohli, and Rob
+Fergus. Indoor Segmentation and Support Inference from
+RGBD Images. In European Conference on Computer Vision
+(ECCV), 2012. 5
+[25] Supasorn Suwajanakorn, Carlos Hernandez, and Steven M.
+Seitz.
+Depth from Focus with Your Mobile Phone.
+In
+IEEE Conference on Computer Vision and Pattern Recog-
+nition (CVPR), 2015. 2
+[26] Zachary Teed and Jia Deng. RAFT: Recurrent All-Pairs Field
+Transforms for Optical Flow. In European Conference on
+Computer Vision (ECCV), 2020. arXiv:2003.12039. 3
+[27] Ning-Hsu Wang, Ren Wang, Yu-Lun Liu, Yu-Hao Huang,
+Yu-Lin Chang, Chia-Ping Chen, and Kevin Jou. Bridging
+Unsupervised and Supervised Depth from Focus via All-in-
+Focus Supervision. In IEEE/CVF International Conference
+on Computer Vision (ICCV), 2021. arXiv:2108.10843. 1
+[28] Ruicheng Wang, Sicheng Xu, Yue Dong, Yu Deng, Jianfeng
+Xiang, Zelong Lv, Guangzhong Sun, Xin Tong, and Jiaolong
+Yang. Moge-2: Accurate monocular geometry with metric
+scale and sharp details, 2025. 7
+[29] Sungmin Woo and Sangyoun Lee. DualFocus: Depth from
+Focus with Spatio-Focal Dual Variational Constraints. In Ad-
+vances in Neural Information Processing Systems (NeurIPS),
+2025. arXiv:2509.21992. 1, 2, 5, 6
+[30] Fengting Yang, Xiaolei Huang, and Zihan Zhou. Deep Depth
+from Focus with Differential Focus Volume. In IEEE/CVF
+Conference on Computer Vision and Pattern Recognition
+(CVPR), 2022. arXiv:2112.01712. 1, 2, 3, 5, 6, 7
+[31] Lihe Yang, Bingyi Kang, Zilong Huang, Xiaogang Xu, Jiashi
+Feng, and Hengshuang Zhao. Depth Anything: Unleashing
+the Power of Large-Scale Unlabeled Data.
+In IEEE/CVF
+Conference on Computer Vision and Pattern Recognition
+(CVPR), 2024. arXiv:2401.10891. 2
+[32] Lihe Yang, Bingyi Kang, Zilong Huang, Zhen Zhao, Xiao-
+gang Xu, Jiashi Feng, and Hengshuang Zhao. Depth Any-
+thing V2.
+In Advances in Neural Information Processing
+Systems (NeurIPS), 2024. arXiv:2406.09414. 2, 3, 7
+[33] Wei Yin, Chi Zhang, Hao Chen, Zhipeng Cai, Gang Yu,
+Kaixuan Wang, Xiaozhi Chen, and Chunhua Shen.
+Met-
+ric3D: Towards Zero-shot Metric 3D Prediction from A Sin-
+gle Image. In IEEE/CVF International Conference on Com-
+puter Vision (ICCV), 2023. arXiv:2307.10984. 2
+[34] Yiming Zuo, Hongyu Wen, Venkat Subramanian, Patrick
+Chen, Karhan Kayan, Mario Bijelic, Felix Heide, and Jia
+Deng. Zero-Shot Depth from Defocus. In European Confer-
+ence on Computer Vision (ECCV), 2026. arXiv:2603.26658.
+1, 2, 3, 5, 6, 7, 8
+10
+
+
+FocusAnchor: Zero-Shot Metric Depth by Anchoring
+a Depth Foundation Prior to Focus Cues
+Supplementary Material
+6. Prior Alignment Details
+For the local fit in Sec. 3.4, we compute confidence-
+weighted averages in each window W(p) using the confi-
+dence map c = ct−1. Let µp[·] denote the mean over W(p)
+and ⟨·⟩the mean over the full image. At image borders,
+W(p) includes only pixels inside the image.
+For each m ∈{ˆz, xt−1, ˆz2, ˆzxt−1}, we use a pseudo-
+count κ = 0.05 to pull the local average toward the image-
+wide confidence-weighted average. The resulting average
+is
+Ep[m] = µp[c m] + κ ⟨c m⟩/⟨c⟩
+µp[c] + κ
+.
+(4)
+If all pixels in W(p) have zero confidence, each average
+equals its image-wide value, so the window uses the global
+fit.
+We use these averages to compute the local variance and
+covariance:
+Varp[ˆz] = Ep[ˆz2] −Ep[ˆz]2,
+Covp[ˆz, xt−1] = Ep[ˆz xt−1] −Ep[ˆz] Ep[xt−1].
+7. Rendering Training Focal Stacks
+We use FOSSA’s thin-lens renderer [34] to generate 384 ×
+512 focal stacks from NYU Depth V2 with a 36 mm sen-
+sor.
+For each image, we scale the focal length by a
+zoom factor drawn from [1, 1.5] and select an f-number
+from {1.0, 1.4, 2.0, 2.8, 4.0}.
+We use a 15 × 15 power-
+exponential blur kernel with exponent 2u, where u ∼
+U(1, 5).
+The kernel is Gaussian at exponent 2 and ap-
+proaches a disk as the exponent increases to 32.
+Focus planes. For 80% of training images, we sample the
+nearest focus distance d1 ∼U(0.6, 1) m and set the farthest
+distance to dN = rd1, where r ∼U(7, 15). We draw β
+uniformly from (0, 1] and set the N focus distances to
+di =
+
+(1−τi) d−β
+1
++τi d−β
+N
+−1/β
+,
+τi = i −1
+N −1. (5)
+When β = 1, the planes are evenly spaced in inverse depth.
+As β →0, their spacing becomes uniform in log depth. For
+the remaining 20% of images, we space the planes evenly in
+inverse depth between the 5th and 95th percentiles of each
+image’s inverse depth (Fig. 4).
+FOSSA samples the f-number, blur kernel, and focus
+planes once per batch. We use the same sampling scheme
+and draw a new set of parameters for each image at every
+training step.
+0.5
+2
+4
+6
+8
+Depth (m)
+Planes span the GT range
+Random planes
+scene depth range
+Figure 4. Focus planes during training. Gray bars show the
+ground-truth depth range of each image. Prior work [8, 29] spaces
+the planes across this range. Following FOSSA [34], we sample
+focus distances independently of the image’s depth range for 80%
+of training images.
+Per-slice noise. Every rendered slice gets its own Gaussian
+noise, drawn independently of the other slices. Its standard
+deviation is drawn per image from U(0, 0.01), for intensi-
+ties in [0, 1].
+Noise test. A pixel is textureless when the Sobel gradient
+magnitude of the gray all-in-focus image, averaged over a
+7 × 7 window, is below 0.0265 for intensities in [0, 1]. This
+covers 21% of the valid pixels of the training render. The
+sharpest slice of a pixel is the one with the largest absolute
+Laplacian, averaged over 3 × 3. The test passes when this
+slice is the one focused nearest to the ground truth in in-
+verse depth. We average the pass rate per image over 300
+NYU training images. Without per-slice noise, textureless
+pixels pass 62% of the time, against 20% by chance with
+five slices. With the noise, they pass 27%. This likely stays
+above chance because some of these pixels hold faint real
+texture, which is a true focus cue. Textureless pixels in real
+ZEDD stacks pass the same test 41% of the time.
+8. Number of Refinement Iterations
+Figure 5 shows AbsRel after each iteration of a single run of
+up to 32 iterations. Since each update depends only on ear-
+lier states, the state at iteration T is also the output we would
+obtain by stopping at T. The first four iterations correct
+scale errors in the initialization, which maps the prior’s min-
+imum and maximum values to the ends of the focus range.
+On ZEDD with five slices, the first scale iteration reduces
+AbsRel for FocusAnchor from 0.485 at x0 to 0.110. Af-
+ter all four scale iterations, AbsRel reaches 0.089, an 82%
+reduction from x0. The step stage reduces AbsRel by a fur-
+1
+
+
+.07
+.1
+.15
+.2
+.3
+.5
+AbsRel ↓
+ZEDD val
+.05
+.07
+.1
+NYU Depth v2
+0
+4
+8
+12 16
+24
+32
+Refinement iterations T
+.015
+.02
+.03
+.05
+.07
+AbsRel ↓
+ARKitScenes
+0
+4
+8
+12 16
+24
+32
+Refinement iterations T
+50
+75
+100
+125
+ms
+scale
+default
+Forward time, RTX 4090
+FocusAnchor
+FocusAnchor-flex
+5 slices
+2 slices
+Figure 5. Accuracy and speed against the number of refine-
+ment iterations. AbsRel↓after T iterations, where T = 0 is the
+start x0, and the forward time for T iterations. The shaded band
+marks the four scale iterations. The dotted line and the dots mark
+the default T = 16 (4 + 12) used in all tables. FocusAnchor and
+FocusAnchor-flex share one architecture, so their times coincide
+with five slices. Times are medians of 100 passes on ZEDD val
+at 480 × 640, batch 1, bfloat16, on one RTX 4090. On NYU the
+focus planes span the ground-truth depth range (Sec. 4.1), so with
+two slices the start already has the true range.
+ther 18% to 0.073, with little change after about eight step
+iterations. Figure 7 shows how the depth and error maps
+change during refinement for three ZEDD scenes.
+With five slices, stopping after four scale iterations and
+eight step iterations (4 + 8, as in training) saves 10% of
+the forward-pass time. AbsRel stays within 1.3% of the
+16-iteration default for both models on all three datasets.
+Stopping at 4 + 4 saves 21% of the time and increases Ab-
+sRel by up to 6%. Beyond 16 iterations, the effect varies
+by dataset. On NYU, AbsRel improves by at most 1%. On
+ZEDD and ARKitScenes, it rises by 1–3% at 32 iterations.
+One possible reason is that the GRU was trained for only 12
+iterations.
+Each iteration takes 2.36 ms. With five slices, the default
+16 iterations account for 41% of the 92 ms forward pass.
+The frozen DAv2 ViT-L backbone, the slice encoder, and
+the focus volume account for the remaining 54 ms. This
+explains why halving the iteration count saves about one
+fifth of the total time.
+With two slices, FocusAnchor-flex converges more
+slowly on ZEDD. At 4+8, its AbsRel is 2.3% above the de-
+fault and continues to fall slightly through iteration 32. On
+NYU, refinement increases two-slice AbsRel by 19% rela-
+tive to x0. The initialization already uses the ground-truth
+depth range, and the two focus planes lie at its endpoints.
+Table 7. Focal-stack capture time on a phone. iPhone 18 Pro,
+standard photo API, 10 five-slice stacks (50 slices). Every photo
+was exposed after the lens had settled.
+Step
+Mean ± std
+Range
+Lens move until settled
+87 ± 11 ms
+71–106 ms
+Photo capture
+491 ± 8 ms
+478–510 ms
+One slice
+579 ± 13 ms
+555–609 ms
+Five-slice stack
+2.89 ± 0.03 s
+2.85–2.96 s
+These planes may provide too little focus information to im-
+prove the initial estimate.
+9. Focal-Stack Capture Time on a Phone
+Table 7 breaks down the time to capture a focal stack on a
+phone. Our iOS app moves the lens to five evenly spaced
+positions across its focus range. At each position, it waits
+until the lens has settled and then requests a photo. Photo
+capture takes 85% of each slice, and the lens move takes the
+remaining 15%. Within capture, the shutter fires about 0.1 s
+after the request, and the photo is delivered about 0.39 s
+later. Because every slice costs about the same, stack time
+grows linearly with the number of slices. Each five-slice
+stack equals the sum of its slices to within 2 ms. We did not
+time two-slice stacks directly. Summing the nearest and far-
+thest slices of each run gives an estimate of 1.16 ± 0.02 s,
+60% less than a five-slice stack.
+10. Additional Qualitative Results
+Figures 8 and 10 show three scenes from each zero-shot
+benchmark of Tab. 3, and Figs. 9 and 11 show the relative
+error of the same predictions. The scenes in Fig. 3 were
+picked by hand. Here, for each benchmark, we take the im-
+ages at the 25th, 50th and 75th percentile of the per-image
+AbsRel of FocusAnchor, with at most one image per scene
+or video. The rows therefore show typical cases, not the best
+ones. Every method gets the same inputs as in Tab. 3. Fig-
+ure 6 shows the per-pixel error for the hand-picked scenes
+of Fig. 3.
+FocusAnchor or FocusAnchor-flex has the lowest Ab-
+sRel on 12 of the 15 rows. The focus planes give both of
+our models the metric scale. On every row, the median ra-
+tio of our depth to the ground truth lies within 7% of one.
+DA3 Metric-L has to infer the scale from the image alone,
+and its maps often have the right shape at the wrong scale.
+One scale factor per image removes most of its error on 8
+of the 15 rows. On HAMMER and ARKitScenes, the same
+rescaling changes the error of HybridDepth by at most 11%,
+so its error there lies in the shape of the scene rather than in
+its scale. Part of our remaining error lies beyond the farthest
+focus plane, where blur hardly changes with depth. In the
+2
+
+
+0.033
+0.034
+0.109
+0.213
+0.098
+0.080
+0.060
+0.192
+0.285
+0.171
+0.052
+0.036
+0.247
+0.285
+0.243
+0.048
+0.021
+0.292
+0.238
+0.184
+0.0
+0.1
+0.2
+0.3
+Relative error
+All-in-focus
+FocusAnchor
+FocusAnchor-flex
+FOSSA ViT-B
+DA3 Metric-L
+HybridDepth
+ZEDD
+ARKitScenes
+Figure 6. Per-pixel relative error for the scenes of Fig. 3, clipped at 0.3. Gray marks pixels without ground truth. Numbers are per-image
+AbsRel, with the lowest in each row in bold. FOSSA and Depth Anything 3 err almost evenly across each scene, because they misjudge
+its metric scale. The errors of FocusAnchor and FocusAnchor-flex sit mainly at depth edges.
+third ZEDD row, the 17% of pixels beyond the 8.1 m plane
+carry 39% of the error of FocusAnchor.
+11. Slice Choice in the Stack-Size Study
+ZEDD provides nine focus settings per scene. Table 4 uses
+settings {1, 9}, {1, 5, 9}, {1, 4, 6, 9} and {1, 3, 5, 7, 9} for
+two to five slices, so every stack spans 0.82 to 8.10 m. The
+all-in-focus image is fused from the selected slices only.
+FOSSA [34] reports a stack-size study on the same split
+without stating which settings it uses. Its δ1.25 with five and
+four slices (0.919 and 0.865, read from its Fig. 5c) agrees
+with our runs of its released ViT-B model (0.919 and 0.857).
+Its values with two and three slices (0.702 and 0.888) are
+higher than ours (0.421 and 0.680), so the difference likely
+lies in the slice choice. FocusAnchor-flex (0.855, 0.899,
+0.876 and 0.920 for two to five slices) is above FOSSA’s
+reported values at every size. Four slices are the only case
+that cannot be evenly spaced among the nine settings, and
+both FocusAnchor-flex and FOSSA’s own study dip there.
+3
+
+
+0.485
+0.066
+0.038
+0.037
+Ground truth
+0.485
+0.066
+0.038
+0.037
+0.495
+0.079
+0.061
+0.059
+Ground truth
+0.495
+0.079
+0.061
+0.059
+0.285
+0.106
+0.092
+0.106
+Ground truth
+0.285
+0.106
+0.092
+0.106
+0.0
+0.1
+0.2
+0.3
+Relative error
+Input / GT
+Start, T = 0
+T = 4 (scale stage done)
+T = 8
+T = 16 (default)
+Figure 7. Depth and error during refinement. For each ZEDD scene of Fig. 8, the top row shows the depth of FocusAnchor after T
+iterations and the bottom row its relative error. The first column holds the all-in-focus image and the ground truth. Numbers are per-image
+AbsRel.
+4
+
+
+0.037
+0.065
+0.056
+0.077
+0.066
+0.059
+0.037
+0.085
+0.472
+0.130
+0.106
+0.090
+0.127
+0.222
+0.403
+0.035
+0.030
+0.098
+0.194
+0.158
+0.054
+0.062
+0.052
+0.197
+0.226
+0.083
+0.088
+0.145
+1.010
+0.344
+All-in-focus
+Ground truth
+FocusAnchor
+FocusAnchor-flex
+FOSSA ViT-B
+DA3 Metric-L
+HybridDepth
+ZEDD
+Infinigen Defocus
+Figure 8. Typical zero-shot results on ZEDD and Infinigen Defocus. Rows are the images at the 25th, 50th and 75th percentile of the
+per-image AbsRel of FocusAnchor. Each row has one color range, from the 2nd to the 98th percentile of the ground truth, with blue for near
+and red for far. A prediction whose metric scale lies beyond this range fills the map with a single color. FocusAnchor and FocusAnchor-flex
+stay close to the ground-truth colors. Gray marks pixels without ground truth. Numbers are per-image AbsRel, with the best in bold. On
+Infinigen Defocus, Tab. 3 takes the FOSSA and HybridDepth numbers from [34], while the maps here are our runs of the released models.
+5
+
+
+0.037
+0.065
+0.056
+0.077
+0.066
+0.059
+0.037
+0.085
+0.472
+0.130
+0.106
+0.090
+0.127
+0.222
+0.403
+0.035
+0.030
+0.098
+0.194
+0.158
+0.054
+0.062
+0.052
+0.197
+0.226
+0.083
+0.088
+0.145
+1.010
+0.344
+0.0
+0.1
+0.2
+0.3
+Relative error
+All-in-focus
+FocusAnchor
+FocusAnchor-flex
+FOSSA ViT-B
+DA3 Metric-L
+HybridDepth
+ZEDD
+Infinigen Defocus
+Figure 9. Relative error on ZEDD and Infinigen Defocus for the predictions of Fig. 8. Each pixel shows | ˆd −d|/d for predicted depth
+ˆd and ground truth d, from black (0) to light yellow (0.3 or more). Gray marks pixels without ground truth, and each number is the mean
+error over the remaining pixels (per-image AbsRel). The error of FocusAnchor and FocusAnchor-flex sits in thin lines at depth edges and
+in a few small regions. The error of the other methods often covers whole surfaces, which is the pattern of a wrong scale.
+6
+
+
+0.022
+0.017
+0.355
+0.184
+0.046
+0.032
+0.030
+0.078
+0.044
+0.069
+0.043
+0.046
+0.035
+0.031
+0.111
+0.007
+0.012
+0.017
+0.101
+0.041
+0.010
+0.011
+0.015
+0.102
+0.129
+0.013
+0.013
+0.015
+0.127
+0.149
+0.011
+0.015
+0.013
+0.040
+0.058
+0.014
+0.020
+0.018
+0.061
+0.047
+0.019
+0.028
+0.016
+0.073
+0.093
+All-in-focus
+Ground truth
+FocusAnchor
+FocusAnchor-flex
+FOSSA ViT-B
+DA3 Metric-L
+HybridDepth
+iBims-1
+HAMMER
+ARKitScenes
+Figure 10. Typical zero-shot results on iBims, HAMMER and ARKitScenes. Focal stacks are rendered as in Tab. 3. Rows, color ranges,
+gray pixels and numbers are as in Fig. 8. In the first iBims row, FOSSA ViT-B and DA3 Metric-L place the shelf beyond the far end of
+the color range, so their maps show a single color. On HAMMER, DA3 Metric-L keeps the layout of the scene at a shifted scale, and
+HybridDepth blurs object shapes. FocusAnchor and FocusAnchor-flex keep both the scale and the shapes.
+7
+
+
+0.022
+0.017
+0.355
+0.184
+0.046
+0.032
+0.030
+0.078
+0.044
+0.069
+0.043
+0.046
+0.035
+0.031
+0.111
+0.007
+0.012
+0.017
+0.101
+0.041
+0.010
+0.011
+0.015
+0.102
+0.129
+0.013
+0.013
+0.015
+0.127
+0.149
+0.011
+0.015
+0.013
+0.040
+0.058
+0.014
+0.020
+0.018
+0.061
+0.047
+0.019
+0.028
+0.016
+0.073
+0.093
+0.0
+0.1
+0.2
+0.3
+Relative error
+All-in-focus
+FocusAnchor
+FocusAnchor-flex
+FOSSA ViT-B
+DA3 Metric-L
+HybridDepth
+iBims-1
+HAMMER
+ARKitScenes
+Figure 11. Relative error on iBims, HAMMER and ARKitScenes for the predictions of Fig. 10. Pixels, colors, gray and numbers are as
+in Fig. 9. The error of FocusAnchor and FocusAnchor-flex lies mostly at depth edges and thin structures. On HAMMER, the error of DA3
+Metric-L covers whole surfaces, as expected from a shifted scale, and the error of HybridDepth forms large uneven patches.
+8

@@ -48,17 +48,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-11-25</span>
+      <span class="dpr-home-dashboard-kicker">2026-11-26</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 3 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 6 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>0</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>3</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>3</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-11-25 03:04:28 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-11-26 02:38:54 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -69,7 +69,7 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日速读3篇论文，聚焦第一人称操作度量深度基准、视觉示范上下文分割与MVS与单目深度的双向融合。最值得关注的是《EgoDepth-Bench》提出的第一人称操作度量深度评测（7.0分），其次是跨任务深度与分割的融合思路。普通读者可先浏览该基准的评测维度，再按需跟进分割与深度融合两篇。</p>
+<p>今日共筛出6篇论文，精读3篇，重点聚焦视频抠像与单目深度估计。最值得关注的是 TokenMatte 借助 T2V 扩散先验实现像素级原生视频抠像，以及 FocusAnchor 利用对焦线索将深度基础先验锚定至零样本度量深度，二者均获 9.0 分。普通读者可以先从这两篇精读入手，再根据兴趣浏览 PINE 等速读论文，了解一步扩散模型如何同时完成点、实例与法向估计。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -78,12 +78,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">0 篇</strong>
+    <strong class="dpr-home-dashboard-count">3 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p class="dpr-home-dashboard-empty">今日暂无推荐。</p>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="TokenMatte: Unlocking T2V Diffusion Priors for Pixel-Native Video Matting">TokenMatte: Unlocking T2V Diffusion Priors for Pixel-Native Video Matting</span></li><li><span class="dpr-home-dashboard-paper-title" title="FocusAnchor: Zero-Shot Metric Depth by Anchoring a Depth Foundation Prior to Focus Cues">FocusAnchor: Zero-Shot Metric Depth by Anchoring a Depth Foundation Prior to Focus Cues</span></li><li><span class="dpr-home-dashboard-paper-title" title="Seeing to Drive on a Single Board: Attention-Free Depth for Onboard Robot Navigation">Seeing to Drive on a Single Board: Attention-Free Depth for Onboard Robot Navigation</span></li></ul>
   </div>
-
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">mono-depth <strong>2</strong></span><span class="dpr-home-dashboard-tag">matting <strong>1</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -94,9 +94,9 @@
     <strong class="dpr-home-dashboard-count">3 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="EgoDepth-Bench: Benchmarking Metric Depth for Egocentric Manipulation">EgoDepth-Bench: Benchmarking Metric Depth for Egocentric Manipulation</span></li><li><span class="dpr-home-dashboard-paper-title" title="Segment Anything In-Context via Visual Demonstrations">Segment Anything In-Context via Visual Demonstrations</span></li><li><span class="dpr-home-dashboard-paper-title" title="BridgeMVS: Bridging Multi-View Stereo and Monodepth via Bidirectional Dynamic Fusion">BridgeMVS: Bridging Multi-View Stereo and Monodepth via Bidirectional Dynamic Fusion</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="PINE: Point, Instance and Normal Estimation in One-Step Diffusion Model">PINE: Point, Instance and Normal Estimation in One-Step Diffusion Model</span></li><li><span class="dpr-home-dashboard-paper-title" title="HS-OVSeg: Multi-Granularity Open-Vocabulary Semantic Segmentation in Remote Sensing via Heterogeneous Supervision">HS-OVSeg: Multi-Granularity Open-Vocabulary Semantic Segmentation in Remote Sensing via Heterogeneous Supervision</span></li><li><span class="dpr-home-dashboard-paper-title" title="MIR-Depth: Multi-Range Refinement for Single-View RGB-D Depth Completion of Transparent Objects">MIR-Depth: Multi-Range Refinement for Single-View RGB-D Depth Completion of Transparent Objects</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">mono-depth <strong>2</strong></span><span class="dpr-home-dashboard-tag">seg <strong>1</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">seg <strong>2</strong></span><span class="dpr-home-dashboard-tag">mono-depth <strong>1</strong></span></div>
 </section>
 </div>
 

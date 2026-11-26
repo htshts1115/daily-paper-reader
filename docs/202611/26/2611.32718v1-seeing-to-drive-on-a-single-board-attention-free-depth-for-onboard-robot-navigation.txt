@@ -1,0 +1,270 @@
+Title: Seeing to Drive on a Single Board: Attention-Free Depth for Onboard Robot Navigation
+
+URL Source: https://arxiv.org/pdf/2611.32718v1
+
+Published Time: Wed, 25 Nov 2026 03:31:52 GMT
+
+Number of Pages: 13
+
+Markdown Content:
+# Seeing to Drive on a Single Board: Attention-Free Depth for Onboard Robot Navigation 
+
+Itai Mizlish and Boaz Ben-Moshe 
+
+Department of Computer Science, Ariel University, Ariel, Israel itai.mizlish@msmail.ariel.ac.il, benmo@g.ariel.ac.il 
+
+Abstract —A small ground robot can carry one camera and a few watts of compute, but the depth foundation models that could turn that camera into a range sensor are vision transformers sized for GPUs. We bring one to a Raspberry Pi 5 with the Hailo-8L, an accelerator that runs every layer in integer arithmetic, attention included. Quantised for it, Depth Anything V2 loses large parts of the scene, and we measure why: at 449 tokens, 91 % of softmax weights fall below one int8 step while carrying 17–33 % of the attention mass. Our answer is to distil, not quantise. An attention-free ResNet-34 U-Net student of Depth Anything V2-Large (24.5 M parameters) runs at 27.1 FPS on the chip, its int8 output matches its float twin (Pearson 0.99993), and on held-out scenes of its simulated yard it is the most accurate depth network on the chip (AbsRel 0.269 against 0.354–0.530). On 1,000 stereo-verified points of a real outdoor drive it is not resolvably different from the vendor’s Depth Anything V2-Small build, while running faster (27.1 vs 21.6 FPS). Ranging obstacles by where they meet the floor needs only the camera height, so mapping, hybrid-A ∗
+
+planning and SLAM run on the Pi’s own CPU. In real-time hardware-in-the-loop tests in a Gaussian-splat reconstruction of a real yard, the stack reaches the goal without contact in 7.9 ±1.1 of 10 scenes, against 9.2 ±0.4 with exact obstacles, and in 7.7 ±0.7 on its own pose with simulated wheel odometry (ten seeds each; 8.2 ±0.4 with the real Pi and Hailo-8L in the loop, five seeds). The source code, pre-trained models and data are available at https://github.com/itaim18/DANIEL. 
+
+I. I NTRODUCTION 
+
+A rover that drives through a yard of chairs, cones, crates and people must know where things are. Range sensors answer that at a cost in money, power, mass and blind spots: a planar LiDAR misses a table top and a low curb, and a stereo camera adds a baseline, power and cost (ours carries one only as a reference, Figure 2). A single RGB camera sees all of these, costs little and emits nothing, but gives no distance directly. Monocular depth has changed character in the last three years. Networks trained on tens of millions of images, from MiDaS [1] to Depth Anything [2], Depth Anything V2 [3], Depth Pro [4] and Depth Anything 3 [5], now predict relative depth sharp and stable enough to drive with. They are vision transformers sized for data-centre GPUs: Depth Anything V2-Large has 335 M parameters and takes 175 ms per frame even on the RTX 5090 laptop GPU used in this work. A small robot has a few watts, and none of these models targets an integer-only accelerator. We ask how much of that capability survives on the cheapest serious edge platform available today, a Raspberry Pi 5 with the 13-TOPS Hailo-8L of the Raspberry Pi AI Kit [6], and what a rover can do with it. The answer is not a compilation exercise. The accelerator executes every layer in integer arith-metic, attention included, and both our int8 build of Depth Anything V2-Small and the vendor’s lose large parts of the scene. Even a faithful depth map is only relative, so it cannot by itself tell a planner that a chair is 1.2 m away. And a car needs a map, a planner, a controller and an estimate of its own position within the same board and control period. 
+
+Contributions. 
+
+1) A measured mechanism for why transformer depth fails on the Hailo-8L (int8 cannot represent diffuse attention at a few hundred tokens), and an attention-free student distilled from Depth Anything V2-Large whose int8 output equals its float output on the chip (Sections III and IV). 2) A head-to-head benchmark of every depth network we could run on the Hailo-8L, on 400 simulated frames from held-out scenes with metric ground truth and 100 real robot frames: on the simulated frames the student is the most accurate on the chip, and it is faster than both Depth Anything V2-Small builds (Section V). On 1,000 stereo-verified points of a real outdoor drive it is not resolvably different from the vendor’s Depth Anything V2-Small (Section IX). 3) Scale-free metric ranging from relative depth by ground-contact geometry, and a complete onboard stack on the Pi (map, hybrid A ∗, pure pursuit, ground-plane SLAM with wheel odometry and a slip guard) with its measured real-time budget (Sections VI and VII). 4) A real-time hardware-in-the-loop evaluation with the real board, an explicit error budget from oracle to camera-only odometry, and the negative results reported with the same rigour as the positive ones (Section VIII). Figure 1 shows what the car sees on an outdoor drive, Figure 2 the robot, and Figure 3 the complete onboard system and where each part runs. II. R ELATED WORK 
+
+Monocular depth. MiDaS [1] introduced the scale- and shift-invariant loss that makes relative depth transfer zero-shot, DPT [7] moved it to a vision transformer, and Depth Anything [2] scaled pseudo-labelling to 62 M images. Depth Anything V2 [3] trains a large teacher on synthetic ground truth and distils it into 25–335 M-parameter students. Metric models condition on or estimate the camera [8], [9], [4]; Depth arXiv:2611.32718v1 [cs.RO] 24 Nov 2026 Fig. 1. What the car sees: one moment of an exterior drive on the real robot (hand-driven, November 2026). Top left, the robot’s RGB camera (people blurred); top right, relative depth from our attention-free student, computed onboard on the Hailo-8L; bottom left, RealSense D435 stereo depth, recorded only as a reference; bottom right, the D435 left infrared image. Warm colours are near. The header gives the session clock, the steering and throttle sent to the car, and the driving mode. The pole and the pine trunks ahead of the car show up in all four views. 
+
+Anything 3 [5] predicts consistent geometry from any number of views; Distill Any Depth [10] shows that distillation choices alone strengthen a student. All are transformers, and none targets an integer-only accelerator. 
+
+Depth on small computers. FastDepth [11] runs a pruned MobileNet encoder-decoder on a Jetson; Lite-Mono [12] and SC-DepthV3 [13] learn from video without labels. FastDepth and SC-DepthV3 are the two depth models Hailo ships for the Hailo-8L, and both appear in our benchmark. AsyncMDE [14] amortises a foundation model over time on a Jetson AGX Orin. Vision transformers are hard to quantise because post-softmax activations are long-tailed; FQ-ViT [15], PTQ4ViT [16] and RepQ-ViT [17] need quantiser support that a fixed NPU toolchain may not offer. 
+
+Navigating with predicted depth. MonoNav [18] fuses transformer depth into a reconstruction to fly a Crazyflie, with depth computed off-board. MonoMPC [19] uses depth as context for a learned collision model. Finke et al. [20] fine-tune Depth Anything V2 for four cameras and run an RL policy on a Jetson AGX Orin at 10 Hz. Learned policies [21], [22] and imperative planners [23], [24] map images to paths. We keep planning classical (hybrid A ∗ [25], pure pursuit [26]) so that every failure can be attributed to perception, planning or localisation, and run all of it on a board an order of magnitude cheaper than an AGX Orin. III. W HY TRANSFORMER DEPTH BREAKS ON THE 
+
+HAILO -8L The Hailo-8L runs every layer with 8-bit weights and activations, including the matrix products and softmax of attention. We exported Depth Anything V2-Small at 224 ×392 (a 16 ×28 grid of 14-pixel patches plus a class token: 449 tokens), calibrated it on domain images and compiled it. On real robot video the result looked right (median Pearson 0.99 to the float model). On the yard renders it erased obstacles on a third of held-out frames, dissolving a crate or a person into the floor. A softmax weight lies in [0 , 1] , and a uniform 8-bit quantiser divides that interval into steps of ∆ = 1 /255 . A head that spreads its attention evenly over all N = 449 tokens gives each token a weight of 1/N , which is below one step: 
+
+1
+
+N = 1449 ≈ 2.2 × 10 −3 < ∆ = 1255 ≈ 3.9 × 10 −3. (1) Such weights round to zero or to one step. Measured in float Depth Anything V2-Small at the chip’s input on 26 held-out frames (Figure 4), 91 % of all softmax weights are below one int8 step, and they carry 17–33 % (median 23 %) of each query’s attention mass, most of it in the last block, which feeds the depth head. The available remedies did not close the gap: re-calibration plus the compiler’s quantisation fine-tuning moved the share of frames with Pearson below 0.8 Intel RealSense D435    
+
+> camera; colour image only
+> PCA9685 PWM driver
+> steering servo (ch. 0) and ESC (ch. 3)
+> Raspberry Pi 5 + Hailo-8L AI HAT
+> runs everything in Figure 3
+> Electronic speed controller (ESC)
+> drives the motor
+> Fig. 2. The robot: a Traxxas rock crawler with a 0.56 ×0.29 m footprint. The onboard system uses only the colour image of the front camera; the camera’s stereo depth serves as a reference in Section IX. The Raspberry Pi 5 with the Hailo-8L AI HAT runs the whole system of Figure 3 and commands the steering servo and the electronic speed controller (ESC) through the PCA9685 PWM driver.
+> Hailo-8L NPU Raspberry Pi 5 CPU (4 cores): 47 ms per frame (median), in parallel with the NPU
+> RGB camera
+> Depth network
+> attention-free student, int8, 288 ×512 input 35 ms per frame
+> Obstacle scan
+> ground-contact ranging, one hit per image column
+> Map
+> 5 cm grid of obstacle hits
+> Planner
+> hybrid A ∗, own process, 110 ms median
+> Control
+> pure pursuit, ESC reverse gate Steering and throttle (PWM)
+> SLAM
+> floor visual odometry + wheel odometry Wheel encoder and gyro (simulated)
+> image pose
+> Fig. 3. The onboard system. Red: runs on the Hailo-8L NPU; blue: runs on the Raspberry Pi 5’s CPU; grey: sensors and actuators; dashed: simulated in the evaluation. The NPU computes depth for the next frame while the CPU processes the current one (Figure 11), and the planner runs in its own process, so a slow search never stalls the frame loop. Metric range comes from the camera height, not from the depth network (Section VI).
+
+only from 48 % to 37 %, sensor-noise calibration models left 30–39 % broken, and Hailo’s own Model Zoo build shows the same blockiness and object loss. Every int8 transformer build we tested fails this way, and the attention-free student of Section IV does not. IV. A N ATTENTION -F REE STUDENT 
+
+We distil Depth Anything V2-Large into a network with no attention, no LayerNorm and no softmax: a ResNet-34 encoder [27] with ImageNet initialisation and a U-Net de-coder [28] of convolution, batch normalisation, ReLU, bilinear 
+
+2× upsampling and skip concatenation. It has 24.5 M param-eters, almost exactly Depth Anything V2-Small’s 24.8 M, so the comparison isolates architecture from capacity. It maps 288 ×512 RGB, the robot camera’s aspect, to relative disparity at full resolution. 
+
+Training. The loss is the scale- and shift-invariant L1 of MiDaS plus four-scale gradient matching, so only the shape of depth is supervised. v1 is distilled from teacher labels on 7,230 simulated point-of-view frames and 720 real frames, with three scenes (crates, people, barrels) and the real robot video held out. v3 fine-tunes v1 for eight epochs on rendered ground-truth disparity for simulated frames (13,902 simulated + 2,024 real), which reduces the teacher-inherited range bias on simulated props from about −30 % to −7 %. v5, the deployed student, weights the loss four times higher on rows below the horizon, where obstacles meet the floor; it cuts spurious near-floor hits from 13.7 % to 10.2 %. 
+
+On the chip. The student compiles with normalisation folded into the HEF. Replayed on the real chip against its own float weights on 500 frames, v3 reaches Pearson 0.99995 at the median (5th percentile 0.99897) and v5 0.99993 (0.99569). The compiler’s emulator had reported a correlation of −0.41 
+
+for this graph, a false alarm: an NPU build should be judged by replay on the chip. The student takes 35.1 ms on the NPU and 37.0 ms per frame end to end, 27.1 FPS at batch 1 (59 FPS 1 2 3 4 5 6 7 8 9 10 11 12 transformer block 020 40 60 80 100 % of a tt en ti on weights < 1/255 91% of all weights are smaller than one int8 step 1 2 3 4 5 6 7 8 9 10 11 12 transformer block 0510 15 20 25 30 % of each query's a tt en ti on mass 
+
+…and they carry 23% of the a tt en ti on mass (median block) Fig. 4. Why attention breaks in int8, measured in float Depth Anything V2-Small at the Hailo-8L’s 449-token input on 26 held-out frames. Left: for each of the 12 transformer blocks, the percentage of softmax weights smaller than one int8 step ( 1/255 ); on average 91 % are. Right: the share of each query’s attention mass that these small weights carry (median 23 %), which int8 rounds away. The last block, which feeds the depth head, loses the most.            
+
+> 1/2 1/4 1/8 1/16 1/32 1/16 1/8 1/4 1/2 1/1
+> Encoder : ResNet-34 Decoder : conv-BN-ReLU, bilinear ×2
+> no attention, LayerNorm or softmax; 24.5 M parameters; 35.1 ms on the Hailo-8L
+
+Fig. 5. The attention-free student: a U-Net from 288 ×512 RGB to disparity at full resolution (grey: skip connections). 
+
+at batch 8), against 455 ms on the Pi’s four CPU cores. V. O N-C HIP BENCHMARK 
+
+Protocol. 400 simulated frames from 36 episodes of the three held-out scenes, with the renderer’s metric depth, and 100 held-out real robot frames without ground truth. Every Hailo-8L model runs on the chip with its outputs read back. Each model sees a centre crop at its own aspect; predictions are aligned to ground-truth disparity by per-frame least-squares scale and shift [1]. We report AbsRel and δ1 on all valid pixels and on obstacle pixels: pixels within 3 m that, back-projected with the true pose, lie on a prop’s collider. The obstacle region removes the renderer’s floor speckle and measures what the planner reads. On real video the metric is Pearson correlation to the teacher. 
+
+Results (Table I and Figure 6). On the chip the student is in a different class: overall AbsRel 0.269 against 0.354 for 
+
+TABLE I DEPTH ON HELD -OUT FRAMES (400 SIM FRAMES WITH METRIC GT; r: 
+
+> MEDIAN
+
+PEARSON TO DEPTH ANYTHING V2-L ARGE ON 100 REAL FRAMES ). B OLD : BEST ON THE CHIP .Model AbsRel ↓ δ1 ↑ r ↑ Speed all obst. all real 
+
+On the Hailo-8L (int8), FPS on the Pi 
+
+Ours, student v5 0.269 0.197 0.669 0.996 27.1 Ours, student v3 0.269 0.204 0.674 0.995 27.1 DAv2-S, Hailo zoo 0.354 0.334 0.593 0.979 21.6 DAv2-S, our int8 0.477 0.330 0.423 0.982 16.6 SC-DepthV3, zoo 0.414 0.352 0.506 0.950 53.6 FastDepth, zoo 0.530 0.767 0.344 0.709 121.3 
+
+Float on the RTX 5090 GPU, ms per frame 
+
+DAv2-L (teacher) 0.284 0.144 0.643 1.000 175 ms DAv2-S 0.283 0.150 0.651 0.999 39 ms DA3-Small 0.315 0.172 0.611 0.988 42 ms DA3-Base 0.304 0.188 0.616 0.985 40 ms AbsRel: mean absolute relative error (lower is better); δ1: share of pixels within 25 % of the true depth (higher is better); all: every valid pixel; obst.: pixels on obstacles within 3 m; real r: Pearson correlation with the teacher on real video; Speed: frames per second on the Pi (chip rows) or milliseconds per frame on the GPU (float rows). 
+
+Hailo’s Depth Anything V2-Small, 0.414 for SC-DepthV3, 0.477 for our Depth Anything V2-Small build and 0.530 for FastDepth, and 0.197 against 0.330–0.767 on obstacle pixels. On real video (Figure 7) it tracks its teacher at r = 0 .996 ,where the vendor’s Depth Anything V2-Small reaches 0.979 and FastDepth 0.709. Speed is not traded for this: at 27.1 FPS it is faster than both Depth Anything V2-Small builds (21.6 and 16.6 FPS) while processing 2.9 × and 1.7 × more pixels. Against float foundation models the student gives up a few points on obstacles (the teacher reaches 0.144) but is better 15 20 30 50 100 150 Hailo-8L throughput (FPS, batch 1) 0.2 0.3 0.4 0.5 0.6 0.7 
+
+> AbsRel on obstacle pixels, held-out sim (lower is be tt er)
+
+15 20 30 50 100 150 Hailo-8L throughput (FPS, batch 1) 0.70 0.75 0.80 0.85 0.90 0.95 1.00     
+
+> Agreement with DAv2-L, real robot video (Pearson)
+> Ours: dis ti lled student, 288×512 DAv2-S 224×392, our int8 build DAv2-S 224×224, Hailo Model Zoo SC-DepthV3 256×320, Hailo Model Zoo FastDepth 224×224, Hailo Model Zoo DAv2-L teacher, fl oat GPU (335 M) DAv2-S, fl oat GPU (25 M) DA3-Small, fl oat GPU (34 M) Fig. 6. Accuracy against measured on-chip throughput on the Raspberry Pi 5 + Hailo-8L (batch 1, logarithmic axis). Left: AbsRel on obstacle pixels of the 400 held-out simulated frames (lower is better). Right: Pearson agreement with Depth Anything V2-Large on 100 real robot frames (higher is better). Markers: models running on the chip (red star: ours). Horizontal lines: float GPU models, which cannot run on the Pi at these rates. The student is both the most accurate and faster than both Depth Anything V2-Small builds.
+
+overall, because it was fine-tuned on rendered ground truth of this domain; Depth Anything 3 is not better than Depth Anything V2 here. The simulated frames come from one reconstructed yard; the real frames show that the fine-tuning did not damage real-world behaviour, but agreement with a teacher is not accuracy. VI. F ROM RELATIVE DEPTH TO A METRIC SCAN 
+
+The student’s disparity is d = a/Z + b with unknown, drifting a and b. Instead of learning metric depth we take metre scale from the camera height h. For a level camera with focal length fy and principal row cy , a floor point at image row 
+
+v > c y lies at 
+
+Zfloor (v) = fy hv − cy
+
+. (2) An obstacle meeting the floor at row vc is at Zfloor (vc),whatever the network’s scale. The network only has to say where in each column the floor ends, a question about the shape of the depth map. The image columns become a 69 ◦,4-metre “laser scan”. 
+
+The scan. Per row, the 25th percentile of disparity over the central 80 % of columns models the floor f (v), made monotone from the horizon down. For a pixel, (d−b)/(f (v)−
+
+b) = Zfloor /Z is scale-free; a pixel at least Hmin = 5 cm above the floor at its range exceeds 1/(1 − Hmin /h ), and the first run of five such rows in a column is the obstacle’s contact. A second, profile-free detector flags vertical faces, where the normalised disparity slope ∂v d (v − cy )/(d − b)
+
+drops from ≈ 1 (floor) to ≈ 0 (face). Following the contact upward gives an obstacle’s height; only hits at least 6 cm tall are mapped, which cut phantom hits from 2,376 to 75 on six recorded episodes. Two fixes came from failure analysis: anchoring the floor profile at the horizon (a chair seat above the camera had become “floor”, making a tube at 0.68 m read 1.16 m), and a detector for floating overhangs such as seats and table tops (Figure 9). The same profile is a ruler for every pixel, Z = Zfloor (v)( f (v) − b)/(d − b), which gives a metric point cloud from one frame without metric training (Figure 8); pixels at depth discontinuities are dropped. Per pixel it is less robust than the contact scan (median error −2 to +8 % on obstacle pixels, but a long tail at object edges), so we use it for overhangs and visualisation, not for ranging. 
+
+Map and limit. Hits accumulate in a 5 cm world grid; a Fig. 7. Depth computed on the Hailo-8L for four real robot frames (rows). Columns, left to right: the robot’s camera image; the float Depth Anything V2-Large teacher on a GPU (the reference); our attention-free student (int8, on the chip, 27 FPS); Hailo’s Model Zoo build of Depth Anything V2-Small; and the two self-supervised models Hailo ships, SC-DepthV3 and FastDepth. Colour encodes relative depth (red near, blue far); dark bands lie outside a model’s input crop. The student keeps the teacher’s structure; the int8 transformer is blocky and loses fine structure (the chairs in the first row); the small zoo models are coarse. 
+
+Fig. 8. One real camera frame lifted to metric 3D on the Pi. Top left: the robot camera image. Bottom left: relative depth computed on the Hailo-8L (int8, 35 ms). Right: the resulting point cloud of about 80,000 points, seen from behind the robot (grid: 0.5 m). Metric scale comes from the floor profile and the camera height, with no metric training; pixels at depth discontinuities are removed. 
+
+cell becomes an obstacle after three hits and if it holds at least 30 % of the hits of the densest cell within 0.2 m. The remaining perception error is low structure: at the deployed 5 cm threshold the scan sees prop sides 5.5 cm (ground-truth depth) and 5.1 cm (student) inside the true footprint. Lowering the threshold to 2 cm closes the gap for ground-truth depth (−0.5 cm) but not for the student (+2.5 cm), whose floor-to-base boundary is blurred. VII. O NBOARD AUTONOMY 
+
+Planning. A hybrid A ∗ [25] over rear-axle poses (0.1 m cells, 72 headings, ten 0.25 m primitives forward and backward) checks a three-circle footprint against the sensed map and a prior drivability map of the yard. Its heuristic is the larger of an obstacle-aware 2D geodesic distance and a precomputed table of the obstacle-free non-holonomic cost of the lattice; without the table, a goal behind the car flooded 40,000 expansions. Primitives are planned at 75 % of steering lock (1.17 m radius), because the car turns wider than its bicycle model and plans −2 0 2lateral (m, right +) 0123forward (m)  
+
+> scan hits (one per image column) Fig. 9. The obstacle scan on a held-out simulated frame, computed from Hailo-8L depth. Left: the robot’s view with the ground-contact point found in each image column (red), where a person’s foot and a cone meet the floor. Right: the same hits in bird’s-eye view (metres, robot at the origin, dashed lines: field of view) against the true footprints of the props (grey discs). The hits land on the footprints although the depth network has no metric scale.
+
+at full lock saturated the follower. A cascade relaxes the clearance margin from 0.10 to 0.06 m when a search fails and widens it to 0.20 m when that costs at most 1.6 × the length. Cells the car already overlaps are passable only within 0.3 m of the start, so it can back out of a contact without planning through a touched crate face. Searches run in a worker process: 110 ms at the median and 547 ms at the 90th percentile on the Pi. 
+
+Control and safety. Pure pursuit tracks one direction segment at a time. The car re-plans when the path is blocked, when it leaves the path, or when it is wedged (throttle without progress for 1.5 s, which also places a “bump” obstacle at the bumper). Every reverse passes the Traxxas ESC’s brake-then-neutral gate, which the simulator models. 
+
+SLAM. About 400 floor features within 1.5 m are tracked with forward–backward Lucas–Kanade [29], lifted to metric floor points with the same camera-height geometry, and fit by a RANSAC 2D rigid transform. Wheel odometry (encoder and gyro) enters directly. A slip guard declares the car still when the rotation-compensated floor flow is below 2 px while the encoder claims at least 2 cm per frame. Offline on 50 recorded episodes (Table II) an IMU alone barely helps; the wheel encoder is what makes own-pose navigation work. In the closed loop, with encoder and gyro, the onboard estimate stays within 0.13 m of the truth at the median and 0.99 m at the 90th percentile over ten seeds (Figure 10). 
+
+Real-time budget. With the deployed code on the real board the NPU takes 35.0 ms per frame and the CPU stages (scan, map, SLAM, navigation) 46.7 ms at the median (64.1 ms at p90), overlapped (Figure 11). On real 1280 ×720 video the standalone runner reaches 16.5 Hz with SLAM and 27 Hz without it, limited by the NPU. Over 1000 episodes and 28 h the NPU time did not drift (p99 35.9 ms) and the firmware’s throttle register stayed clear. The Hailo-8L is rated at about 1.5 W [6]; the module exposes no power sensor, so we report                   
+
+> TABLE II SELF -LOCALISATION ALTERNATIVES ,OFFLINE ON 50 RECORDED 35-SEPISODES (ABSOLUTE TRAJECTORY ERROR ,M). Odometry source median p90 Ground-plane VO (camera only) 0.42 1.32 VO translation + gyro heading 0.36 1.04 Encoder + VO heading 0.22 1.18 Encoder + Ackermann heading from steering 0.25 0.61
+> Encoder + gyro 0.08 0.19
+> Median and 90th-percentile absolute trajectory error over the 50 episodes, in metres (lower is better). VO: visual odometry from the floor; encoder: wheel encoder; gyro: yaw rate.
+
+no measured power. VIII. H ARDWARE -IN -THE -L OOP EVALUATION 
+
+Set-up. Isaac Sim with Isaac Lab [30] renders a Gaussian-splat reconstruction [31], [32] of a real yard with a height-field collider. A model of the project’s Traxxas drives with 
+
+±0.349 rad steering and up to 0.72 m/s; its level camera is 504 ×280 with a 69.4 ◦ field of view, 0.13 m above the ground. Eleven prop types (chairs, a cone, a box, a barrel, a bin, a sign, a crate, two people) carry colliders sized to what the car can hit. Ten frozen scenes put 3–6 m between start and goal; three were never seen by the depth network. Every frame is sent to the robot computer, and each returned command is applied only when it arrives. An episode is clean if the goal is reached (within 0.45 m, in 35 s) and no point of the car’s real 0.557 ×0.294 m footprint ever touched a collider. Every arm runs at least five seeds, each jittering the start. 
+
+The board in the loop. The first arms ran on the real Pi and Hailo-8L. To run arms in parallel, the identical Pi code also runs on the laptop with replies padded to the Pi’s measured round trip and plans slowed to the Pi’s speed. The deployed configuration was then re-run on the real board: 8.2 ± 0.4 clean against 7.6 for the laptop twin on the same seeds, with −8 −7 −6 −5 −4 −3yard x (m) 01234yard y (m)   
+
+> ground truth (simulator) onboard SLAM es ti mate goal hybrid-A* plans made on the Pi (28, early →late)
+
+0 5 10 15 20 
+
+ti me (s) 010 20 30 40 posi ti on error of the onboard es ti mate (cm) Fig. 10. Onboard SLAM and global planning on the robot’s own pose, in one cone-slalom episode. Left: top view of the yard (metres), with cones (dark discs), ground the prior map marks as non-drivable (grey), the true path (black), the onboard SLAM estimate (dashed), the goal (star) and every hybrid-A ∗                                                 
+
+> plan the Pi made (thin lines, early to late). Right: the distance between the SLAM estimate and the true position over time. The car reached the goal despite 0.47 m peak drift. TABLE III CLEAN GOALS OF 10 ( MEAN ±SD OVER nSEEDS )AND GOALS REACHED .Configuration nClean Reached Oracle: exact props, lockstep 59.8 ±0.4 10.0 Real time, exact obstacles 59.2 ±0.4 9.8 Student v3, GT pose 10 7.9 ±1.0 9.0
+> Student v5, GT pose 10 7.9 ±1.1 9.0 Student v3, own pose 10 7.1 ±0.9 7.4
+> Student v5, own pose 10 7.7 ±0.7 8.1
+> v5, own pose, real Pi + Hailo 58.2 ±0.4 8.4 Camera-only VO (v1, earlier planner) 52.6 ±0.9 3.6 Clean: goals reached with no contact between the car’s footprint and any obstacle, out of 10 scenes. Reached: goals reached with or without contact.
+> n: number of seeds. GT pose: the simulator supplies the car’s position; own pose: the car estimates it with its onboard SLAM. Bold: the deployed configuration.
+
+a median round trip of 85 ms (p99 113 ms) over 9,371 replies against the twin’s 84 ms. 
+
+The error budget (Table III and Figure 13). An oracle that knows every prop and plans in lockstep reaches 9.8: a perfect score is feasible. The same real-time stack fed exact obstacles reaches 9.2, so latency, the follower and the ESC gate cost about 0.6. With depth from the Hailo-8L, the deployed stack reaches 7.9 ± 1.1 (9.0 reached): perception costs about 1.3. On its own pose with simulated encoder and gyro it reaches 7.7 ± 0.7; self-localisation costs 0.2 clean goals, within seed noise, but 0.9 goals reached. Camera-only odometry reaches 2.6, so a wheel encoder is not optional for this car. With simulator pose most misses reach the goal after a graze (11 of 21); on own pose most are timeouts (18 of 23). 
+
+v3 or v5. The floor-weighted v5 replaced v3 on modest evidence, which we state exactly: with simulator pose the two are not resolved (7.9 vs 7.9 at ten seeds), with per-scene differences in both directions; on own pose v5 leads, 7.7 against 7.1, not significantly (permutation test p ≈ 0.17 ). It costs nothing on the chip and has the lower obstacle AbsRel. 
+
+What remains, and what did not help. The remaining contacts are almost all the car’s front corner grazing the side of a cone, a person or a crate that the scan places 5–15 cm too far out: the low-base limit of Section VI. In one scene the goal starts 63 ◦ off axis and a crate lies outside the ±34 ◦ view, so first plans run through unseen space; this is an exploration problem. More than a dozen interventions moved contacts within the seed noise and are reported as such (Table IV). One comparison is worth stating plainly: the student drives better than the simulator’s own depth buffer (6.8 vs 5.2), whose splat floaters and floor speckle corrupt ground-contact ranging, 0 50 100 150 
+
+ti me (ms) Pi 5 CPU (Cortex-A76) Hailo-8L NPU depth f0 35 ms scan 26 ms SLAM 18 ms depth f1 35 ms scan 26 ms SLAM 18 ms depth f2 35 ms scan 26 ms SLAM 18 ms 
+
+10 ms 100 ms 1 s 10 s plan ti me 020 40 60 80 100 plans Fig. 11. The real-time budget on the Raspberry Pi 5 + Hailo-8L, measured on the robot computer. Left: median duration of each per-frame stage over three consecutive frames; the NPU computes depth for frame k + 1 (top lane) while the CPU runs the decoding, scan and map, SLAM and navigation for frame 
+
+k (bottom lane). Right: histogram of hybrid-A ∗ search times on the Pi (logarithmic axis; red line: median, 110 ms). Planning runs in a separate process and does not block the frame loop. 
+
+Fig. 12. The deployed stack driving with the real Pi + Hailo-8L in the loop, on its own SLAM pose. Left: cone slalom. Right: backing away from a cone seen at close range. In each image: top left, a chase camera; top right, the robot’s camera; bottom left, depth computed on the chip with the commanded steering arc (red); bottom right, a bird’s-eye map with the obstacles (orange), the goal (green circle), its SLAM path (white), its current plan (magenta) and the car (yellow). TABLE IV INTERVENTIONS THAT DID NOT IMPROVE CLEAN SUCCESS (≥5 SEEDS ;
+
+> AGAINST THE BASELINE OF THE TIME ON THE SAME SEEDS
+
+). Intervention Outcome Clean +6 cm skirt on small obstacles slalom closes 7.2 vs 7.6 Orange-mask cone contacts slalom timeouts 7.8 vs 7.6 Look-first arc, off-axis goal neutral, own pose 6.8 vs 7.1 Third planning pass contacts move 7.8 vs 8.0 Faster follower drift p90 ×1.6 7.4 vs 7.6 Uniform blocked-path margin re-plans stall 6.6 vs 7.4 2× camera pixels no change 2.6 vs 2.6 Renderer depth for the student floaters, speckle 5.2 vs 6.8 Clean: goals reached with no contact, out of 10, with the intervention vs without it on the same seeds. None improved clean success. 
+
+even though the renderer’s arm ran without latency. IX. A R EAL DRIVE : D EPTH AND SLAM AGAINST THE 
+
+REAL SENSE 
+
+The car was driven by hand through a sunlit park while it recorded every D435 stream (colour, on-chip stereo depth, both infrared images) and the student’s Hailo-8L output for every frame: 219 s recorded (SLAM window 216 s). Three recorder defects (a header byte shift, stereo timestamps drifting 
+
+≈8 %, a power cut at the end) were worked around before any comparison (49 of 388 evaluation frames excluded). 
+
+Which depth is better. The drive has no lidar, so the reference is agreement between three different match-ers on the same infrared pair (D435 ASIC, SGBM, Fast-FoundationStereo; within 2 % + 1 % /m, 0.3–3 m). Fast-FoundationStereo’s backbone includes Depth Anything V2 features, but as one voter it can only veto points. Points are registered into the colour view with the D435’s factory calibration, read after the drive: the nominal values misplaced every point by a median 14.5 px; on the same points the factory 0 2 4 6 8 10 Goals reached with NO contact, of 10 scenes (car's real footprint); | = goals reached                    
+
+> Own pose from the camera alone (ground VO) Deployed, OWN pose, on the REAL Pi + Hailo Deployed, OWN pose (SLAM: encoder + gyro + VO) Deployed: Hailo depth + global planning, GT pose Real-ti me stack fed EXACT obstacles Oracle: exact props + ideal planning (lockstep) 9.8 ± 0.4 clean ·10.0 reached (n=5) 9.2 ± 0.4 clean ·9.8 reached (n=5) 7.9 ± 1.1 clean ·9.0 reached (n=10) 7.7 ± 0.7 clean ·8.1 reached (n=10) 8.2 ± 0.4 clean ·8.4 reached (n=5) 2.6 ± 0.9 clean ·3.6 reached (n=5)
+
+Fig. 13. The error budget: goals reached with no contact, out of 10 scenes, from an oracle down to camera-only odometry. Bars: mean over seeds; dots: individual seeds; error bars: one standard deviation; vertical ticks: mean goals reached with or without contact. The drops between the first four bars give the cost of each component: execution (0.6), perception (1.3) and self-localisation (0.2 clean, within seed noise; 0.9 reached). 
+
+values cut 17 of 19 networks’ AbsRel by 10–47 % (stereo unchanged) and align depth with colour edges better on all 20 scorable frames. 1,000 points are frozen once and every monocular method is scored on them, relative models aligned per frame on held-out points (Table V); CIs are frame-cluster bootstraps, re-checked with 10 s blocks as units. The student, live on the chip, reaches AbsRel 0.262 and is not resolvably different from the Hailo model-zoo Depth Anything V2-S (paired difference +0 .017 , 95 % CI [−0.060 , +0 .118] , p =0.70 ; | log(ˆ z/z )| +0 .009 , CI [−0.012 , +0 .032] ): on these mostly-ground points the interval bounds any advantage of ours at 0.060 (0.040 with blocks), against the simulator’s 0.084 (CI 0.060–0.113 over 104 runs; a different metric), so the block bound lies below that interval; in relative terms, 
+
+−8 % (CI −30 to +23 %) against the simulator’s 18–30 %, one drive cannot decide; on the two-matcher set below neither bound holds. On an obstacle stratum (points ≥0.15 m above the floor plane; 319 points, 87 frames; added after the main null), | log(ˆ z/z )| leans the simulator’s way, ours against the zoo model −0.165 , but with blocks exact p = 0 .046 (Holm 0.046–0.14 by family; exploratory) and −0.123 , p = 0 .055 ,on the two-matcher set; the median barely differs (0.232 vs 0.240; 0.369 vs 0.346 two-matcher), and with one scale per drive ours is worse there ( +0 .334 , p = 0 .040 , Holm 0.058). Depth Anything V2-L (not on the two-matcher set) and DA3-L are better on obstacles by 0.153 and 0.184. Without Fast-FoundationStereo (a new 1,000-point set on 321 frames) the mean leans our way ( −0.061 , block CI [−0.130 , +0 .007] ,
+
+p = 0.078 ), carried by the zoo model’s blow-ups ( | log |:
+
+−0.006 ). Live, the student is worse than its own chip replay by 
+
++0 .004 (CI [0 .001 , 0.006] ; not on the two-matcher set). It beats the other three edge builds (block p ≤ 0.014 ; SC-DepthV3 and FastDepth get a median scale only) and trails its teacher Depth Anything V2-L by 0.085 per frame (CI [0 .047 , 0.141] ). GPU metric models score 0.20–0.22 aligned (not resolvably better than ours) and overestimate distance from 16 cm by ×1.7–
+
+3.5 raw. With one scale per drive MoGe-3/2 lead (0.26) and the relative networks span 0.36–0.44 (ours 0.410): their scale moves from frame to frame, so the robot takes a per-frame scale from camera height (unscored). 
+
+Same poses, swap the depth. As a pseudo-lidar at the same poses, where the onboard rule flags an obstacle base beyond 1 m the two depths differ by a median 25 % (931 frames; 26 % with the factory principal point), but 85 % of the stereo’s flags sit within 5 cm of its fitted floor (the grass surface): the gap compares where the rule fires. Free of the rule, the network’s floor-fit metric depth at the measured horizon reads raised structure nearer beyond 1.5 m (CIs 0.66–0.92, 0.57– 0.79), unresolved at 0.6–1.5 m, weakly farther at 0.3–0.6 m; depth and scale are not separable here. Replayed open loop with the measured mount, the planner stops on 37 % (block CI 23–50 %) of frames with the network’s depth and 83 % (75–90 %) with the stereo’s; ground flags are implicated in at most 84–87 % of those stops. No stricter rule variant (11 tried) keeps the simulator’s props in view: each loses at least 22 percentage points of recall. A stricter vertical-face test cuts the held-out half’s stops from 47 % to 17 % but keeps only 78 % of the raised flags (bar: 80 %), so it fails too. 
+
+SLAM. The reference is RTAB-Map on the D435 infrared image and stereo depth: one graph over 97 % of the drive, four loop closures, 47 odometry resets. Skill ( 1 − RMS /RMS 
+
+of standing still) measures agreement with this reference, not accuracy: one drive; one run per method except ORB-SLAM3 stereo, DROID and VGGT (three runs each). The reference’s re-runs differ from it by 0.64–0.79 m RMS and from each other by 0.33–0.49 m; against any of four reference runs no skill moves by more than 0.06 and no full-coverage ranking changes. Sim(2) skill cannot fall below 0, SE(2) skill can; under Sim(2) ours scores +0 .10 and the commands +0 .08 :a 0.02 gap from one run, not evidence of a lead. VGGT-SLAM 2.0 reaches +0 .80 (three bit-identical runs; 117 s in keyframe gaps, +0 .79 at keyframes only); DROID-SLAM chair center box o ff set cone slalom gate chair cluster person on path mixed clu tt er crate wall gap person and cones barrel center                                                                          
+
+> Oracle Exact obstacles v3, before fi xes v3, GT pose Deployed (v5), GT pose Deployed, own pose Deployed, own pose, real Pi Camera-only VO
+> 100% 100% 100% 80% 100% 100% 100% 100% 100% 100% 100% 100% 100% 60% 80% 100% 100% 80% 100% 100% 100% 100% 60% 80% 0% 100% 100% 60% 40% 100% 100% 100% 40% 80% 70% 100% 100% 40% 60% 100% 100% 100% 70% 80% 80% 100% 100% 20% 40% 100% 100% 100% 50% 90% 70% 100% 100% 10% 60% 90% 100% 100% 80% 80% 60% 100% 100% 0% 100% 100% 100% 0% 20% 0% 0% 40% 80% 20% 0% 0%
+
+0.0 0.2 0.4 0.6 0.8 1.0 Fig. 14. Clean success per scene: for each configuration (rows) and each of the ten scenes (columns), the percentage of seeds that reached the goal with no contact (green high, red low). Failures concentrate on the cone slalom, the gate, the chair cluster, the crate wall and the person-and-cones scene; camera-only odometry fails in most scenes. 
+
++0 .27 ± 0.19 (three runs; it does not rank against DPV-SLAM’s +0 .39 ); CoreSLAM on a RealSense scan +0 .02 rigid (+0 .06 Sim(2)); the commands alone, without vision, −0.31 .ORB-SLAM3 stereo reaches +0 .879 ± 0.013 over three runs on the 13–19 % it tracks, but skill on a partial overlap does not rank against skill over the whole drive, and it shares the reference’s infrared images. Our onboard SLAM scores −0.11 
+
+as deployed: its ground odometry’s speed gate was set from the 
+
+simulated car and rejected the fast 23 % of frames, so its path is 0.43 × the reference’s. With a physical gate the path is 1.08 ×
+
+(the only check of the reference’s scale that shares none of its inputs) but the skill falls to −0.38 to −0.62 , worse than the commands alone (also under Sim(2)). The uncorrected mount (3.8 ◦ down, roll −1.4◦) is the prime suspect, not isolated. As deployed, depth barely enters the trajectory: with either gate, switching the scan match off changes neither arm by more than 0.015, so their gap is the odometry on different frame sets (5,612 vs 5,882), and this drive cannot rank the depths. 
+
+Which depth is better inside SLAM? The real drive cannot say; the HITL simulator can, with ground truth. We added a D435-geometry infrared pair (SGBM), a planar lidar ring and exact depth, drove one loop twice under three lighting presets and ran every source through our SLAM (ATE after a rigid fit, mean ± sd over the three sessions). One trajectory: the spread is lighting and render noise. The student is in-distribution here: it was fine-tuned on exact disparity rendered in this same yard. The simulated car executes its commands without slip, so the commands alone reach 0.107 m (noon). Every arm therefore measures how much a depth source corrupts a near-exact prior, and every camera arm except true-scale exact depth is worse than no vision. The deployed front end ignores depth (its tight visual-odometry prior: 0.60 m whatever the source). With scan matching as the odometry, the deployed floor-contact pseudo-scan from exact depth reaches only 0.84 ±0.03 m (ours 
+
+0.65 ±0.33 ). Read off the depth image’s horizontal plane, exact depth reaches 0.50 ± 0.07 m with the per-frame floor-fit scale. Smoothing that scale does not recover the loss ( 0.42 ± 0.13 ), while the true metric scale cuts the error 6.8 × (6.3–7.4 × per session), to 0.074 ± 0.003 m; on seven of ten further start seeds (three excluded by pre-stated checks), 6.5 × (CI 5.5– 7.7), and 6.3 × (5.7–6.9) on the same loop driven the other way. Under the same floor-fit scale our network’s error over exact depth’s is 0.75 × at noon (CI 0.49–1.14, at most 14 % worse) and, on those drives re-rendered, 0.66 × at evening (0.57–0.78, lower) and 0.97 × at dusk (0.70–1.36, at most 36 % worse). Even with a per-frame affine scale fitted to exact depth, at noon it stays 3.2 × exact depth’s true-scale error (CI 2.4– 4.2), and 5.3 × (4.1–6.7) fitted on the scan’s rows: none of the three affine scales tried (floor fit, image-wide or scan-row fit) closes the gap. On exact depth the floor-fit scale error at 1–2 m drifts slowly (sd 0.32 across frames, 0.04 frame to frame), so smoothing cannot remove it. The lidar ring ( 0.083 ± 0.013 m) samples the same noise-free depth: a consistency check, not a lidar result. The floor fit suits avoidance, not mapping. Of the possible scale sources only stereo was tested (true-scale SGBM 0.195 ± 0.048 m; an IMU and a metric model TABLE V REAL DRIVE , 1,000 STEREO -VERIFIED POINTS (PARK , SUN ; ONE RUN ; D435 FACTORY CALIBRATION ). A BS REL WITH THE SCALE FITTED PER FRAME AND ONCE PER DRIVE ; ∆ = OURS (LIVE ) − METHOD IN PER -FRAME ABS REL , FRAME -CLUSTER BOOTSTRAP 95 % CI. † EACH MATCHER AGAINST THE OTHER TWO ON ITS OWN POINTS : AGREEMENT , NOT COMPARABLE WITH THE MONOCULAR ROWS . ‡ MEDIAN SCALE ONLY (THE OTHERS : SCALE AND SHIFT ). Method AbsRel per drive δ1 ∆ [95 % CI] D435 / SGBM / FFS stereo † 0.009–0.040 – 0.97–1.00 –DA3 S–L (GPU) 0.101–0.115 0.390–0.418 0.86–0.90 +0 .129 to +0 .143                                         
+
+> DAv2 S/B/L (GPU) 0.160–0.181 0.422–0.427 0.82–0.84 +0 .076 to +0 .092
+> Hailo zoo DAv2-S (chip) 0.234 0.432 0.74 +0 .017 [−0.060 ,+0 .118 ]Ours, chip replay 0.258 0.413 0.74 +0 .004 [+0 .001 ,+0 .006 ]Ours, live on the chip 0.262 0.410 0.73 –SC-DepthV3 (chip) ‡0.392 0.435 0.22 −0.159 [−0.242 ,−0.038 ]FastDepth (chip) ‡0.394 0.415 0.23 −0.160 [−0.243 ,−0.041 ]DAv2-S, our int8 (chip) 0.443 0.439 0.58 −0.178 [−0.229 ,−0.128 ]
+
+untested). The same network’s int8 output from the real Hailo-8L, replayed offline over the session frames, agrees with the float twin at a median r = 0 .9999 per frame (dusk 0.9988; 2,652 frames), but its floor-fit scale differs by −8 to +5 %(dusk, 5–95th pct), which plausibly moves per-session ATE by a median 0.13 m (up to 0.48 m, 12 pairs): this SLAM amplifies tiny depth differences, so only large effects are resolved, and smoothing’s effect on the network flips sign between the two builds. X. D ISCUSSION 
+
+Distillation, not better quantisation. The common as-sumption is that a foundation model reaches a small NPU through better quantisation. On the Hailo-8L it does not: int8 attention is structurally lossy at a few hundred tokens, for our build and the vendor’s. Distilling into a purely convolutional student turns a quantisation problem into a training problem, and quantisation cost then disappears from the error budget (int8 = float at r = 0.99993). The plain recipe (ResNet-34, U-Net decoder, scale-invariant loss, rendered-truth fine-tune) transfers to any integer-only accelerator. 
+
+Metric navigation without metric depth. Ground-contact ranging asks the network only where each column’s floor ends; the camera height does the rest. It is immune to relative depth’s frame-to-frame scale drift, and its failure modes are geometric and nameable (overhangs, low bases, row-filling surfaces). 
+
+Applications. One passive camera and a few-watt accelerator suit small unmanned ground vehicles where cost, power and size are limited, notably in the defence industry, where a camera also has the advantage of emitting nothing, unlike LiDAR or active depth sensors, that could reveal the vehicle. 
+
+An evaluation that explains itself. Oracle, exact-obstacle, simulator-pose and own-pose arms decompose the gap to a perfect score into execution (0.6), perception (1.3) and localisation (0.2 clean, within seed noise; 0.9 reached), so Table IV’s interventions were not tuned blindly. XI. L IMITATIONS 
+
+The suite is one reconstructed yard with static obstacles; the wheel encoder and gyro the own-pose results rely on are simulated, and on the real drive the onboard SLAM, tuned in simulation, beats dead reckoning from the commands ( −0.11 
+
+vs −0.31 ) but not the vision SLAM baselines; the student’s metric range on real ground is not calibrated and the camera pitch is measured (3.8 ◦) but not applied onboard; and the Pi’s camera path, power draw and an autonomous drive of the real car remain to be measured (Section IX is a manual drive). The real results come from one drive, one route and one lighting condition, without ground truth. Obstacle bases below 5 cm are invisible to the scan, and the planner commits to routes through space the camera has not seen. Absolute HITL scores are specific to the simulator build (a restored build scores the released code 1.4 goals per seed lower); all comparisons were within one build. XII. C ONCLUSION 
+
+A foundation-quality monocular depth network can run on a Raspberry Pi 5 with a Hailo-8L, but not as a transformer. Distilled into an attention-free student it runs at 27 FPS, its int8 output equals its float output, and on held-out scenes of its simulated yard it is the most accurate depth network on the chip; on stereo-verified real outdoor points it is not resolvably different from the vendor’s Depth Anything V2-Small. Ranged by ground-contact geometry, its relative depth becomes a metric scan without metric training, and the Pi itself maps, plans, follows and localises on it. In a real-time hardware-in-the-loop run through a reconstructed yard, the system reaches the goal without contact in 7.9 ±1.1 of 10 scenes with simulator pose, 7.7 ±0.7 on its own pose and 8.2 ±0.4 with the real board in the loop (five seeds), where the same stack with perfect obstacles reaches 9.2 ±0.4. The measured gap points at two concrete next steps: perception of low structure and exploration that looks before it commits. ACKNOWLEDGMENT 
+
+We thank the Department of Computer Science at Ariel University for its support. REFERENCES [1] R. Ranftl, K. Lasinger, D. Hafner, K. Schindler, and V. Koltun, “Towards robust monocular depth estimation: Mixing datasets for zero-shot cross-dataset transfer,” IEEE Transactions on Pattern Analysis and Machine Intelligence , vol. 44, no. 3, pp. 1623–1637, 2022. [2] L. Yang, B. Kang, Z. Huang, X. Xu, J. Feng, and H. Zhao, “Depth anything: Unleashing the power of large-scale unlabeled data,” in 
+
+IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , 2024. [3] L. Yang, B. Kang, Z. Huang, Z. Zhao, X. Xu, J. Feng, and H. Zhao, “Depth anything v2,” in Advances in Neural Information Processing Systems (NeurIPS) , 2024. [4] A. Bochkovskiy, A. Delaunoy, H. Germain, M. Santos, Y. Zhou, S. R. Richter, and V. Koltun, “Depth pro: Sharp monocular metric depth in less than a second,” in International Conference on Learning Representations (ICLR) , 2025. [5] H. Lin, S. Chen, J. H. Liew et al. , “Depth anything 3: Recovering the visual space from any views,” arXiv preprint arXiv:2511.10647 , 2025. [6] Raspberry Pi Ltd, “Raspberry pi ai kit: product brief,” https:// datasheets.raspberrypi.com/ai-kit/raspberry-pi-ai-kit-product-brief.pdf, 2024, hailo-8L M.2 module, 13 TOPS, published June 2024. [7] R. Ranftl, A. Bochkovskiy, and V. Koltun, “Vision transformers for dense prediction,” in IEEE/CVF International Conference on Computer Vision (ICCV) , 2021. [8] M. Hu, W. Yin et al. , “Metric3d v2: A versatile monocular geometric foundation model for zero-shot metric depth and surface normal estima-tion,” IEEE Transactions on Pattern Analysis and Machine Intelligence ,2024. [9] L. Piccinelli, Y.-H. Yang, C. Sakaridis, M. Segu, S. Li, L. Van Gool, and F. Yu, “Unidepth: Universal monocular metric depth estimation,” in IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , 2024. [10] X. He, D. Guo, H. Li, R. Li, Y. Cui, and C. Zhang, “Distill any depth: Distillation creates a stronger monocular depth estimator,” arXiv preprint arXiv:2502.19204 , 2025. [11] D. Wofk, F. Ma, T.-J. Yang, S. Karaman, and V. Sze, “Fastdepth: Fast monocular depth estimation on embedded systems,” in IEEE International Conference on Robotics and Automation (ICRA) , 2019. [12] N. Zhang, F. Nex, G. Vosselman, and N. Kerle, “Lite-mono: Alightweight cnn and transformer architecture for self-supervised monoc-ular depth estimation,” in IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , 2023. [13] L. Sun, J.-W. Bian et al. , “Sc-depthv3: Robust self-supervised monocular depth estimation for dynamic scenes,” IEEE Transactions on Pattern Analysis and Machine Intelligence , vol. 46, no. 1, pp. 497–508, 2024. [14] L. Ma, Y. Li, B. Jiang, Z. Zhong, H. Ding, and L. Zhu, “Asyncmde: Real-time monocular depth estimation via asynchronous spatial memory,” 
+
+arXiv preprint arXiv:2603.10438 , 2026. [15] Y. Lin, T. Zhang, P. Sun, Z. Li, and S. Zhou, “Fq-vit: Post-training quantization for fully quantized vision transformer,” in International Joint Conference on Artificial Intelligence (IJCAI) , 2022. [16] Z. Yuan, C. Xue, Y. Chen, Q. Wu, and G. Sun, “Ptq4vit: Post-training quantization for vision transformers with twin uniform quantization,” in 
+
+European Conference on Computer Vision (ECCV) , 2022. [17] Z. Li, J. Xiao, L. Yang, and Q. Gu, “Repq-vit: Scale reparameterization for post-training quantization of vision transformers,” in IEEE/CVF International Conference on Computer Vision (ICCV) , 2023. [18] N. Simon and A. Majumdar, “Mononav: Mav navigation via monocular depth estimation and reconstruction,” in International Symposium on Experimental Robotics (ISER) , 2023. [19] B. Sharma, P. Jadhav, P. Paul, K. M. Krishna, and A. K. Singh, “Monompc: Monocular vision based navigation with learned collision model and risk-aware model predictive control,” IEEE Robotics and Automation Letters (arXiv:2508.07387) , 2026. [20] J. Finke, W. P. Martis, A. Schmelter, L. Erbach, C. Jestel, and M. Wiede-mann, “Learning vision-based omnidirectional navigation: A teacher-student approach using monocular depth estimation,” arXiv preprint arXiv:2603.01999 , 2026. [21] D. Shah, A. Sridhar, N. Dashora, K. Stachowicz, K. Black, N. Hirose, and S. Levine, “Vint: A foundation model for visual navigation,” in 
+
+Conference on Robot Learning (CoRL) , 2023. [22] A. Sridhar, D. Shah, C. Glossop, and S. Levine, “Nomad: Goal masked diffusion policies for navigation and exploration,” in IEEE International Conference on Robotics and Automation (ICRA) , 2024. [23] F. Yang, C. Wang, C. Cadena, and M. Hutter, “iplanner: Imperative path planning,” in Robotics: Science and Systems (RSS) , 2023. [24] P. Roth, J. Nubert, F. Yang, M. Mittal, and M. Hutter, “Viplanner: Visual semantic imperative learning for local navigation,” in IEEE International Conference on Robotics and Automation (ICRA) , 2024. [25] D. Dolgov, S. Thrun, M. Montemerlo, and J. Diebel, “Path planning for autonomous vehicles in unknown semi-structured environments,” The International Journal of Robotics Research , vol. 29, no. 5, pp. 485– 501, 2010. [26] R. C. Coulter, “Implementation of the pure pursuit path tracking al-gorithm,” Carnegie Mellon University, Robotics Institute, Tech. Rep. CMU-RI-TR-92-01, 1992. [27] K. He, X. Zhang, S. Ren, and J. Sun, “Deep residual learning for image recognition,” in IEEE Conference on Computer Vision and Pattern Recognition (CVPR) , 2016. [28] O. Ronneberger, P. Fischer, and T. Brox, “U-net: Convolutional networks for biomedical image segmentation,” in Medical Image Computing and Computer-Assisted Intervention (MICCAI) , 2015. [29] B. D. Lucas and T. Kanade, “An iterative image registration technique with an application to stereo vision,” in International Joint Conference on Artificial Intelligence (IJCAI) , 1981. [30] NVIDIA et al. , “Isaac lab: A gpu-accelerated simulation framework for multi-modal robot learning,” arXiv preprint arXiv:2511.04831 , 2025. [31] B. Kerbl, G. Kopanas, T. Leimk¨ uhler, and G. Drettakis, “3d gaussian splatting for real-time radiance field rendering,” ACM Transactions on Graphics , vol. 42, no. 4, 2023. [32] Q. Wu, J. Martinez Esturo, A. Mirzaei, N. Moenne-Loccoz, and Z. Go-jcic, “3dgut: Enabling distorted cameras and secondary rays in gaussian splatting,” in IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , 2025.
