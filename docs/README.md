@@ -48,17 +48,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-11-26</span>
+      <span class="dpr-home-dashboard-kicker">2026-11-27</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
     <strong class="dpr-home-dashboard-count">共 6 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>3</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>3</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>2</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>4</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-11-26 02:38:54 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-11-27 02:25:17 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -69,7 +69,7 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日共筛出6篇论文，精读3篇，重点聚焦视频抠像与单目深度估计。最值得关注的是 TokenMatte 借助 T2V 扩散先验实现像素级原生视频抠像，以及 FocusAnchor 利用对焦线索将深度基础先验锚定至零样本度量深度，二者均获 9.0 分。普通读者可以先从这两篇精读入手，再根据兴趣浏览 PINE 等速读论文，了解一步扩散模型如何同时完成点、实例与法向估计。</p>
+<p>2026-11-27 日报共筛选 6 篇，精读 2 篇、速读 4 篇，重点聚焦图像抠图与分割前沿。最值得看的是高分论文《High-Fidelity Image Matting with Pixel-Space Diffusion Transformers》（9.0/10）和《X-Matte》（8.0/10），两者都在探索像素空间扩散与流匹配以提升抠图精度与效率。普通读者可先读这两篇精读，把握“像素空间生成式抠图”这一主线，再按需浏览分割与几何模型评估类速读。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -78,12 +78,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">3 篇</strong>
+    <strong class="dpr-home-dashboard-count">2 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="TokenMatte: Unlocking T2V Diffusion Priors for Pixel-Native Video Matting">TokenMatte: Unlocking T2V Diffusion Priors for Pixel-Native Video Matting</span></li><li><span class="dpr-home-dashboard-paper-title" title="FocusAnchor: Zero-Shot Metric Depth by Anchoring a Depth Foundation Prior to Focus Cues">FocusAnchor: Zero-Shot Metric Depth by Anchoring a Depth Foundation Prior to Focus Cues</span></li><li><span class="dpr-home-dashboard-paper-title" title="Seeing to Drive on a Single Board: Attention-Free Depth for Onboard Robot Navigation">Seeing to Drive on a Single Board: Attention-Free Depth for Onboard Robot Navigation</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="High-Fidelity Image Matting with Pixel-Space Diffusion Transformers">High-Fidelity Image Matting with Pixel-Space Diffusion Transformers</span></li><li><span class="dpr-home-dashboard-paper-title" title="X-Matte: VAE-Free Pixel-Space Flow Matching for Single-Step Image Matting">X-Matte: VAE-Free Pixel-Space Flow Matching for Single-Step Image Matting</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">mono-depth <strong>2</strong></span><span class="dpr-home-dashboard-tag">matting <strong>1</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">matting <strong>2</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -91,12 +91,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">3 篇</strong>
+    <strong class="dpr-home-dashboard-count">4 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="PINE: Point, Instance and Normal Estimation in One-Step Diffusion Model">PINE: Point, Instance and Normal Estimation in One-Step Diffusion Model</span></li><li><span class="dpr-home-dashboard-paper-title" title="HS-OVSeg: Multi-Granularity Open-Vocabulary Semantic Segmentation in Remote Sensing via Heterogeneous Supervision">HS-OVSeg: Multi-Granularity Open-Vocabulary Semantic Segmentation in Remote Sensing via Heterogeneous Supervision</span></li><li><span class="dpr-home-dashboard-paper-title" title="MIR-Depth: Multi-Range Refinement for Single-View RGB-D Depth Completion of Transparent Objects">MIR-Depth: Multi-Range Refinement for Single-View RGB-D Depth Completion of Transparent Objects</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="CIRKDV2: Cross-Image Relational Knowledge Distillation with Contextual Modeling for Efficient Semantic Segmentation">CIRKDV2: Cross-Image Relational Knowledge Distillation with Contextual Modeling for Efficient Semantic Segmentation</span></li><li><span class="dpr-home-dashboard-paper-title" title="ReSA: Preserving Reference-Specified Foreground in In-Context Segmentation">ReSA: Preserving Reference-Specified Foreground in In-Context Segmentation</span></li><li><span class="dpr-home-dashboard-paper-title" title="SpatialArena: Where Do Geometric Foundation Models Stand?">SpatialArena: Where Do Geometric Foundation Models Stand?</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">seg <strong>2</strong></span><span class="dpr-home-dashboard-tag">mono-depth <strong>1</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">seg <strong>3</strong></span><span class="dpr-home-dashboard-tag">mono-depth <strong>1</strong></span></div>
 </section>
 </div>
 

@@ -1,0 +1,2847 @@
+SPiXSeg: Rethinking MLLM-based Image Segmentation as Superpixel
+Classification
+Piyush Tiwary1
+Sohini Dutta2
+Prathosh A.P.2
+1Dolby Laboratories, Bengaluru
+2Indian Institute of Science, Bengaluru
+piyush.tiwary@dolby.com
+{sohinidutta, prathosh}@iisc.ac.in
+Abstract
+Multimodal large language models (MLLMs) are widely
+used for image segmentation. However, existing methods
+either use a decoder or use patch-based approach which
+trades boundary precision against the number of decisions
+as coarse grid cells mix foreground and background pix-
+els, while finer grids require many more predictions, and
+autoregressive mask generation adds sequential decoding
+overhead. We propose SPiXSeg, which shifts the output
+from per-patch to per-superpixel label assignment, using
+superpixel tokens formed by aggregating patch-level visual
+features. An off-the-shelf model partitions each image into
+task-agnostic superpixels, so the partition is computed once
+and reused across tasks.
+A Spix-to-Mask (S2M) module
+scores each superpixel token in a single MLLM forward
+pass by directly comparing the MLLM’s hidden representa-
+tions, without autoregressive generation or a separate scor-
+ing network, and the selected superpixels are mapped di-
+rectly to pixels without refinement. Without any trainable
+decoder head or post-hoc refinement, SPiXSeg achieves an
+average cIoU of 80.5 with LLaVA-1.5-7B and 81.9 with
+InternVL2.5-8B on RefCOCO, RefCOCO+ and RefCOCOg
+and, when trained only on COCO-Stuff, extends to open-
+vocabulary semantic segmentation with mIoU of 29.0, 59.5
+and 95.4 on ADE20K, PASCAL Context and PASCAL VOC,
+outperforming several SoTA MLLM baselines. Our results
+suggest that a fixed, query-agnostic superpixel partition is
+enough for accurate language-guided segmentation.
+1. Introduction
+Multimodal Large Language Models (MLLMs) have sig-
+nificantly advanced computer vision by unifying vision
+and language tasks under a single autoregressive frame-
+work [3, 11, 12, 25, 46], enabling progress across im-
+age classification, detection, and visual question answering
+without task-specific architectural modifications. Extend-
+ing MLLMs to segmentation requires the mask to be ex-
+“Segment the child”
+“Segment the right horse”
+Referring Segmentation
+“Segment the parents”
+“Segment the three front horses”
+Generalized RES
+person
+tree
+car
+fence
+“Segment all the classes”
+horse
+sky
+tree
+“Segment all the classes”
+Semantic Segmentation
+“Bounding box: man in overalls”
+“Bounding box: left horse”
+Bounding Box
+Image
+Superpixels
+superpixel extraction
+Image
+Superpixels
+superpixel extraction
+One Vocabulary
+for all Tasks
+Figure 1. We propose superpixels as the primary unit of segmen-
+tation. Superpixels are computed once per image, independent of
+the query, and the same superpixels serve different tasks.
+pressed in a form that the model can generate. We refer the
+unit in which a mask is expressed as the vocabulary; essen-
+tially it determines the cost of segmentation in terms of the
+number of decisions, the mask precision, quality, and the
+modules required before/after the MLLM.
+Existing vocabularies and methods can be broadly
+grouped into four types. First, methods requiring a decoder
+after the MLLM, where a special token (e.g., <seg>) is
+generated, and its hidden state is converted into a mask by
+a separate decoder [21, 32–34, 39]. This adds additional
+decoder overhead for every query. Second, methods with
+learned mask tokens, where masks are compressed into dis-
+crete tokens by a trained tokenizer [37, 55]. These meth-
+1
+arXiv:2611.33842v1  [cs.CV]  25 Nov 2026
+
+
+ods usually require multi-stage training where a tokenizer
+is first trained using VQ-VAE [36], then the tokenizer is
+aligned with the MLLM and then the whole pipeline is
+trained end-to-end. Third, methods making patch-level pre-
+dictions, where a label is assigned for every patch of a reg-
+ular grid [22, 26, 35]. Here, the patch size sets a trade-off
+between mask quality and sequence length. Large patches
+produce coarse masks that straddle object boundaries and
+mix foreground with background, while small patches re-
+cover finer detail but require substantially more decisions.
+Lastly, methods relying on object proposals, where one
+or more proposals from a detector are selected [6, 52].
+Proposal-based methods can only output whole detected
+objects, so they cannot support sub-object segmentation.
+Moreover, the actual segmentation is done by the detector,
+and the MLLM only assigns a label, a task that a simple
+CLIP-style model [31] could handle.
+From the above discussion, we emphasize on four prop-
+erties that are desired from a vocabulary: (i) it should re-
+quire fewer decisions/predictions per mask/query, (ii) en-
+ables precise and accurate masks/boundaries, (iii) should
+be able to recover mask directly from MLLM, without a
+decoder, and (iv) manifests a form that can be natively in-
+tegrated into MLLM and can be reused across queries and
+various tasks. In this work, we observe that superpixels [2],
+which partition an image into non-overlapping regions, sat-
+isfy these properties. Our core idea is to use off-the-shelf
+models to obtain high-quality superpixels for an image and
+to represent any mask as a union of superpixels. The prob-
+lem then reduces to integrating superpixels into an MLLM
+and classifying each superpixel as inside or outside the
+mask. Since each superpixel groups several pixels into one,
+the MLLM makes one prediction per superpixel instead of
+one per pixel. This reduces the number of decisions while
+retaining accuracy. No additional decoder is needed as the
+superpixel classifications directly select the relevant super-
+pixels, which are assembled into the final mask. Because
+superpixels are task-agnostic, they can serve as a general
+vocabulary for various segmentation tasks, as illustrated in
+Fig. 1. Current literature uses superpixels as input tokens,
+but are limited to perception tasks like VQA [8] or fail to na-
+tively integrate them for dense tasks like segmentation [44].
+In this work, we integrate superpixels natively into MLLM
+for general-purpose dense segmentation tasks.
+Based on this, we propose SPiXSeg. Here, we first ex-
+tract superpixels from an off-the-shelf model.
+Next, we
+compute a token for each superpixel by pooling the patch-
+level embeddings of the MLLM vision tower over the super-
+pixel region. The superpixel tokens, together with the text
+and vision tokens, are processed by the transformer back-
+bone of the MLLM in a single forward pass. Then, a Spix-
+to-Mask (S2M) module classifies each superpixel as inside
+or outside the mask. S2M does this by comparing the hid-
+den state of the superpixel token with the hidden states of
+the visual tokens inside that superpixel. This is done with-
+out any additional layer on top of the MLLM. Lastly, the
+mask is obtained as the union of the superpixels classified
+as inside. An overview of our method is presented in Fig. 2.
+We evaluate SPiXSeg on dense tasks like referring seg-
+mentation (RefCOCO/+/g) and open-vocabulary semantic
+segmentation. With LLaVA-1.5-7B as the backbone, our
+method achieves a mean cIoU of 80.5 on referring segmen-
+tation, which is 3.5 to 5.6 points above the state-of-the-art
+(SoTA) baselines. Our method also beats baselines with
+multi-stage training and those that use heavier models like
+RAS [6] by significant margin. Further, on semantic seg-
+mentation evals, SPiXSeg obtains mIoU of 95.4 and 59.5 on
+PASCAL VOC-20 and PASCAL Context-59 respectively.
+In summary, the main contributions are:
+• We propose SPiXSeg which uses superpixels as the vo-
+cabulary for segmentation. Particularly, we recast MLLM
+segmentation as classification of superpixels. The intu-
+ition being that any mask can be represented as union of
+superpixels, hence segmentation can be boiled down to
+classification of superpixels as inside or outside the mask.
+This way, our method is decoder free, precise, and doesn’t
+require any multi-stage training.
+• Our method first tokenizes each superpixel by aggregat-
+ing MLLM’s own patch-embeddings (Section 3.2), the
+transformer backbone then processes the text, vision and
+superpixel tokens in a single forward pass. A Spix-to-
+Mask (S2M) module is introduced, which classifies su-
+perpixels by comparing hidden states of the MLLM, with
+no additional layer added on top (Section 3.3).
+• We obtain SoTA results on RefCOCO/+/g with a mean
+cIoU of 80.5 with LLaVA-1.5-7B which is an im-
+provement over existing baselines of about 3.5 to 5.6
+points. We also show competitive performance on open-
+vocabulary semantic segmentation and generalized refer-
+ring segmentation.
+2. Related Works
+MLLM-based segmentation. MLLMs typically consist of
+a visual encoder and an LLM backbone [3, 11, 12, 18, 25],
+these are tied together through a small projector which
+matches the dimension of visual encoder with LLM back-
+bone. While such architectures have shown great success in
+perception tasks like VQA [11, 51], its extension to dense
+tasks like segmentation remains challenging. Several meth-
+ods have recently tried to extend MLLMs for segmentation,
+these can be broadly classified into four types: (i) Decoder-
+based methods, LISA [21], GSVA [39], PixelLM [33],
+GLaMM [32], OMG-LLaVA [51], NExT-Chat [50] and
+PaDT [34], use special tokens whose hidden states are
+turned into a mask by a separate decoder that is run for ev-
+2
+
+
+Overview
+Spix-to-Mask
+Final Mask ˆG
+· · ·
+· · ·
+hv
+hs
+Multimodal Large Language Model
+LoRA
+· · ·
+· · ·
+Text Encoder
+Image Encoder
+Superpixel
+Tokenization
+“What is right
+man light
+brown coat in
+this image?”
+Input Image
+Superpixels
+Superpixel
+Extraction
+Attention
+Q
+Q
+I
+I
+S
+S
+Both Ways
+Causal
+Masked
+Trainable
+Frozen
+Superpixel Tokenization
+Patch Embeddings
+F
+Superpixels Si
+Mask Pooling
+espix
+Pos. Emb.
+Centroid ci
+Spix Token zi
+zi = Pool(Si)
++ PosEmb(ci)
++ espix
+Spix-to-Mask
+hv + Superpixels
+Mask Pooling
+¯hv
+i
+hs
+i
+Scale + Shift
+σ(·)
+si
+pi
+Lfocal + LDice
+Training
+Inference
+.96
+✓
+.02
+×
+.93
+✓
+.01
+×
+.88
+✓
+.03
+×
+· · ·
+Final Mask ˆG
+Figure 2. Overview of SPiXSeg. The image is partitioned once into superpixels, independent of the query, and each superpixel token is
+pooled from the MLLM’s patch features. S2M scores every superpixel token by comparing hidden states, and the mask is the union of the
+selected superpixels, with no mask decoder or refinement.
+ery query. (ii) Learned mask tokens, as in HiMTok [37]
+and SAMTok [55], compress a mask into discrete tokens
+with a learnt tokenizer and de-tokenizer. This usually leads
+to multi-stage training for tokenizer, alignment and joint-
+training. (iii) Patch-based predictions where the methods
+make prediction for each patch of a patchified mask. These
+predictions can be in form of text as in Text4Seg [22] or in
+form of special tokens as in STAMP [26, 27] and UFO [35].
+Here the patch size trades mask quality against the number
+of decisions. A large patch size leads to coarse mask but re-
+quires fewer predictions, whereas a smaller patch size leads
+to accurate mask but requires more predictions.
+Hence,
+these methods rely on refiners like SAM or CRF [19, 20]
+to convert coarse masks into finegrained outputs. Finally,
+(iv) object proposals, as in Groundhog [52] and RAS [6],
+are produced by a detector and the MLLM selects the rel-
+evant mask among them. This limits the output to whole
+objects, and the overlapping proposals cannot be composed
+into new masks. Set-of-Mark [43] and ChatRex [15] sim-
+ilarly give the MLLM region IDs, but only to refer to re-
+gions. In contrast, SPiXSeg expresses the mask in a disjoint,
+query-agnostic partition of the image, so the MLLM output
+decodes exactly to a mask without a decoder, tokenizer or
+refiner.
+Superpixels and region tokens. Superpixels [2] group
+pixels into compact regions that follow image bound-
+aries and partition a given image.
+Recent off-the-shelf
+segmenters can produce such partitions at the sub-object
+level [7, 8, 19]. Superpixel-like tokens have been used as
+inputs in several works. E.g., SPiT [1] replaces the patch
+grid of vision transformers with superpixels, EPOC [8] to-
+kenizes images at the sub-object level for perception tasks
+such as VQA, and SVP [44] repurposes SAM segments as
+visual projectors for referring segmentation. These works
+either target perception or still obtain the mask from a sepa-
+rate decoder. In contrast, our method uses superpixels as the
+primary vocabulary of the MLLM for segmentation. This
+allows us to re-cast segmentation as a binary classification
+over superpixels as ‘inside’ or ‘outside’ the mask.
+3. Methodology
+3.1. Preliminaries and Notation
+Let I ∈RH×W ×3 denote an input image with spatial res-
+olution H × W, and let Ω= {1, . . . , H} × {1, . . . , W}
+represent its discrete spatial domain. Task. Given I and a
+text query, the goal is to predict a segmentation mask of I.
+For referring segmentation, the query is a referring expres-
+sion, and the output is the mask of the referred region. For
+semantic segmentation, the query is the class vocabulary
+C = {c1, . . . , cK} of K classes, and the output is a class
+label for each pixel. Superpixel Partitioning. We define
+a superpixel partition as a set of N disjoint, contiguous re-
+gions S = {S1, . . . , SN} that completely cover the image
+3
+
+
+domain:
+N
+[
+i=1
+Si = Ω,
+Si ∩Sj = ∅
+∀i̸ = j,
+(1)
+where, Si ⊂Ωdenotes the set of pixel coordinates compris-
+ing the i-th superpixel. The spatial extent of each region Si
+is represented by a binary mask mi ∈{0, 1}H×W , where
+(mi)h,w = 1 if (h, w) ∈Si, and 0 otherwise. The superpix-
+els are computed once per image by existing off-the-shelf
+models [7, 8, 19]. Visual Encoding. The MLLM’s visual
+encoder processes I by decomposing it into a regular grid
+of P = ⌊H/p⌋× ⌊W/p⌋non-overlapping patches of size
+p × p. This yields a sequence of patch-level embeddings
+F = {f1, . . . , fP } ∈RP ×dv, where dv is the visual feature
+dimension. We denote P(Si) ⊆{1, . . . , P} as the subset of
+patch indices whose receptive fields geometrically intersect
+with superpixel Si. A projector (usually an MLP) projects
+the patch-level embeddings to MLLM’s input dimension, d.
+3.2. Superpixel Tokenization
+Once we have the superpixel partitions S and patch-level
+embeddings F, we compute the superpixel (spix) tokens by
+aggregating the patch-level embeddings. Particularly, we
+first upsample the patch embeddings, F by a factor of p to
+match the spatial dimension of S. Then, for i-th superpixel
+Si, we pool the patch embeddings falling inside Si by taking
+a weighted average where the weights are the fraction of the
+patches lying inside the superpixel:
+Pool(Si) =
+X
+j∈P(Si)
+wijfj, wij = Area(fj ∩Si)
+Area(Si)
+(2)
+Hence, patches lying inside the superpixel contribute more
+to the embedding compared to ones lying partially inside.
+Next, to include the positional information to the embed-
+ding, we compute the centroid (ci) of Si and pass the
+Fourier positional encodings of ci through an MLP to get
+the positional embedding. Lastly, we add a learnable em-
+bedding espix to differentiate the spix tokens from other to-
+kens. Overall, the spix token zi for superpixel Si is given
+by-
+zi = Pool(Si) + MLP(PosEmb(ci)) + espix
+(3)
+We note that there is no additional encoding used for spix
+tokenization, instead we re-use the existing visual patch em-
+beddings to aggregate and re-purpose them for superpixels.
+This is in contrast with methods like HiMTok [37], SAM-
+Tok [55], SVP [44] which require separate encoding mod-
+ules, which even leads to multi-stage pipeline requiring a
+separate training and aligning of the encoding module.
+3.3. Spix-to-Mask (S2M)
+Once the spix tokens Z = {z1, · · · , zN} are obtained,
+they are appended to the visual and text tokens, and the
+entire sequence is processed by the transformer blocks of
+the MLLM in a single forward pass. The attention mask
+is designed such that each visual tokens attend each other
+and the text tokens, whereas each spix tokens attend each
+other and the visual and text tokens as shown in Fig. 2. Let
+hv
+j ∈Rd denote the output hidden state of the j-th visual
+token, and hs
+i ∈Rd denote the output hidden state of the
+i-th spix token.
+Since the spix token zi attends to both
+text and visual tokens, hs
+i is conditioned on both. Next,
+we want to classify the spix tokens into the ones ‘inside the
+mask’ and ‘outside the mask’. Particularly, for a ground-
+truth mask G ⊂Ω, the label of the i-th spix token is de-
+fined as yi = 1
+h
+|Si∩G|
+|Si|
+> 0.5
+i
+, hence, yi = 1 if more than
+half of Si lies inside G, and yi = 0 otherwise. A standard
+choice for such a classification is a linear layer applied on
+hs
+i. However, such a layer is tied to a fixed set of outputs,
+and has to decode the content of Si from a single vector.
+Instead, we compare hs
+i against the visual content of Si, as
+seen by the MLLM through hv
+j. To do this, the hidden states
+of the visual tokens are pooled using the same weights wij
+as in Eq. 2- ¯hv
+i = P
+j∈P(Si) wijhv
+j. Hence, ¯hv
+i represents
+what is encoded inside the superpixel location of the image,
+and hs
+i represents what is inferred about the i-th superpixel
+given the text prompt. A superpixel is expected to be inside
+the mask when these two representations/quantities agree.
+Therefore, we use a simple similarity-based approach for
+classification. Particularly, the agreement between hs
+i and
+¯hv
+i is measured by a scaled dot-product, followed by a sig-
+moid activation:
+si = α · ⟨hs
+i, ¯hv
+i ⟩
+√
+d
++ β,
+pi = σ(si)
+(4)
+where, α and β are learnable scalars, and pi ∈[0, 1] is
+the predicted probability of the spix token being inside the
+mask. Overall, the classification is performed by comparing
+two hidden states already produced by the MLLM, and no
+additional layer is added on top of it. This is in contrast with
+methods requiring a separate decoder where the final mask
+is obtained by per-pixel prediction or text-encoding based
+method which requires auto-regressive decoding and suffer
+through accuracy-latency tradeoff.
+Training. With the labels yi described above, and the area
+of each superpixel defined as its number of pixels, ai = |Si|,
+the classification is trained with the sum of area-weighted
+4
+
+
+smooth-Dice loss and Focal loss:
+LDICE = 1 −
+2 PN
+i=1 ai pi yi + 1
+PN
+i=1 ai pi + PN
+i=1 ai yi + 1
+(5)
+LFOCAL = −1
+N
+N
+X
+i=1
+αt · (1 −pt)γ · log pt
+(6)
+where, αt is the balancing parameter which equals to 0.25
+if yi = 1 and 0.75 otherwise, γ = 2 is the focusing pa-
+rameter. Since the superpixels partition Ω, Eq. 5 is identical
+to the pixel-level Dice between the two maps obtained by
+assigning pi and yi to all pixels in Si. Hence, the loss is
+computed over N regions, without upsampling the predic-
+tions to the image resolution.
+Inference. During inference, the i-th superpixel is classi-
+fied as inside the mask if pi > 0.5, for the corresponding
+token, and the predicted mask is given by the union of such
+superpixels, ˆG = S
+i: pi>0.5 Si. As the superpixels are dis-
+joint and cover Ω, any classification of the spix tokens is
+converted into a mask exactly without any refinement.
+Semantic Segmentation. For semantic segmentation, the
+classification is extended from two outcomes (inside and
+outside) to the K classes of C. Let hc ∈Rd denote the
+hidden state of the name of class c in the text tokens. If
+there are multiple tokens corresponding to the class name,
+we take the average. The score of class c for Si is computed
+by comparing hc to both hs
+i and ¯hv
+i :
+si,c = τ ·
+ cos(hc, hs
+i) + cos(hc, ¯hv
+i )
+
+(7)
+where τ is a learnable scalar. As a superpixel may contain
+several classes, its label yi,c = |Si ∩Gc|/|Si| is the fraction
+of Si belonging to class c, with Gc ⊂Ωthe ground-truth
+region of c. With pi,c = softmaxc∈C(si,c), the loss is a soft
+cross-entropy plus the Dice loss of Eq. 5 applied per class:
+LSEM = −1
+N
+N
+X
+i=1
+X
+c∈C
+yi,c log pi,c + 1
+K
+X
+c∈C
+Lc
+DICE,
+(8)
+where Lc
+DICE is Eq. 5 with pi,c and yi,c in place of pi and
+yi. Then, the predicted label of Si is ˆyi = arg maxc∈C si,c,
+which is assigned to all pixels in Si. Hence, referring and
+semantic segmentation share the same mechanism, and dif-
+fer only in what the hidden states are compared against.
+4. Results and Experiments
+In this section, we present the performance of our pro-
+posed method across tasks such as referring segmentation
+(RES), referring comprehension (REC), and semantic seg-
+mentation.
+We follow same benchmarking protocols as
+Text4Seg [22] for each task, and compare against both spe-
+cialized segmentation models and generalist segmentation
+models with comparable parameter counts.
+Our method
+demonstrates competitive performance across all bench-
+marks, validating the effectiveness of our approach. We
+use LLaVA-1.5-7B as the main MLLM with Vicuna-7B
+as the transformer backbone and CLIP vision tower for
+fair comparisons; however we also show results with with
+InternVL2.5-8B (InternLM2.5-7B [5]). Further, we use off-
+the-shelf SAM3.1 [7] to obtain superpixels. More details
+regarding superpixel extraction, training and additional ex-
+periments are provided in Supplementary material.
+Baselines. We compare our method against a range of
+baselines, categorised into two groups: (i) specialised seg-
+mentation models, which are designed explicitly for seg-
+mentation tasks and often rely on task-specific architectures
+or training recipes; and (ii) generalist segmentation models,
+which are built on top of LLMs and aim to perform segmen-
+tation through in-context learning, dedicated decoder heads,
+or other architectural adaptations. For semantic segmenta-
+tion, we include CLIP-based specialists [10, 16, 23, 40, 41,
+49] and the MLLM-based LaSagnA [38], HiMTok [37] and
+Text4Seg [22].
+For fair comparison, we mainly include generalist mod-
+els with 8B parameters or fewer. The exception is RAS,
+which we also report with its 13B model, since its 7B model
+reports only the average cIoU.
+Datasets. For semantic segmentation, we evaluate on three
+datasets:
+ADE20K [53, 54] (150 classes), Pascal Con-
+text [30] (59 classes) and Pascal VOC [13] (20 classes). For
+RES, we evaluate on the three standard benchmarks: Re-
+fCOCO, RefCOCO+, and RefCOCOg [48], which contain
+80 object categories and varying numbers of referring ex-
+pressions per image.
+4.1. Referring Expression Segmentation
+Referring Expression Segmentation (RES) requires the
+model to segment an object based on the given image and
+a natural language description. We evaluate RES perfor-
+mance using class-aware Intersection-over-Union (cIoU)
+across the three standard benchmarks: RefCOCO, Ref-
+COCO+, and RefCOCOg. Our results are presented in Ta-
+ble 1.
+With InternVL2.5, SPiXSeg reaches 81.9, and with
+LLaVA-1.5 80.5, both above the best baselines SAMTok
+(79.9) and UFO (78.3). Our method gives the best scores
+on seven out of eight subsets while SAMTok leads on the
+remaining one. This illustrates the efficacy of our method
+which is able to perform at-par with multi-stage training
+and refinement-based methods. Further, we also observe
+that SPiXSeg performs better than methods with a decoder
+head such as PaDT and GLaMM, and than patch-based
+methods such as UFO and STAMP, even when they are
+fine-tuned separately for RES, e.g., UFO (RES ft). We at-
+tribute this to the simplicity of per-spix classification as op-
+5
+
+
+RefCOCO
+RefCOCO+
+RefCOCOg
+Method
+LLM
+Mask from
+val
+testA
+testB
+val
+testA
+testB
+val
+test
+Avg.
+Decoder after the MLLM
+NExT-Chat [50]
+Vicuna-7B
+SAM
+74.7
+78.9
+69.5
+65.1
+71.9
+56.7
+67.0
+67.0
+68.9
+PixelLM [33]
+Vicuna-7B
+decoder
+73.0
+76.5
+68.2
+66.3
+71.7
+58.3
+69.3
+70.5
+69.2
+LISA [21]
+Vicuna-7B
+SAM-H
+74.9
+79.1
+72.3
+65.1
+70.8
+58.1
+67.9
+70.6
+69.9
+LaSagnA [38]
+Vicuna-7B
+SAM-H
+76.8
+78.7
+73.8
+66.4
+70.6
+60.1
+70.6
+71.9
+71.1
+GSVA [39]
+Vicuna-7B
+SAM-H
+77.2
+78.9
+73.5
+65.9
+69.6
+59.8
+72.7
+73.3
+71.4
+AnyRef [14]
+LLaMA2-7B
+SAM-H
+76.9
+79.9
+74.2
+70.3
+73.5
+61.8
+70.0
+70.7
+72.2
+SVP [44]
+Vicuna-7B
+SAM-H
+80.2
+82.9
+77.0
+71.6
+76.6
+65.9
+73.7
+74.6
+75.3
+GLaMM [32]
+Vicuna-7B
+SAM-H
+79.5
+83.2
+76.9
+72.6
+78.7
+64.6
+74.2
+74.9
+75.6
+PaDT [34]
+Qwen2.5-7B
+decoder
+78.5
+79.8
+77.3
+75.0
+77.7
+71.3
+73.0
+73.9
+75.8
+Learned mask tokens
+HiMTok [37]
+InternLM2.5-7B
+32 tokens
+81.1
+81.2
+79.2
+77.1
+78.8
+71.5
+75.8
+76.7
+77.7
+SAMTok [55]
+Qwen2.5-3B
+SAM2
+82.4
+83.9
+79.9
+78.4
+81.8
+74.8
+79.0
+79.1
+79.9
+Grid cells
+Text4Seg [22]
+Vicuna-7B‡
+16×16 grid
+70.5
+72.3
+69.3
+64.4
+68.7
+60.6
+65.1
+66.5
+67.2
+Text4Seg [22]
+Vicuna-7B‡
+grid + CRF
+73.2
+75.7
+71.4
+67.0
+71.9
+62.4
+67.3
+68.9
+69.7
+Text4Seg [22]
+Vicuna-7B‡
+grid + SAM-H
+79.3
+81.9
+76.2
+72.1
+77.6
+66.1
+72.1
+73.9
+74.9
+STAMP [26]
+Vicuna-7B‡
+patches + SAM-H
+80.5
+83.0
+77.3
+74.8
+79.2
+68.6
+75.7
+76.8
+77.0
+UFO [35]
+Vicuna-7B‡
+per-pixel
+77.2
+80.1
+76.4
+71.8
+77.9
+70.2
+74.1
+73.5
+75.2
+UFO (RES ft) [35]
+Vicuna-7B‡
+per-pixel
+77.9
+81.1
+77.0
+72.5
+78.5
+71.4
+75.6
+74.1
+76.0
+UFO (RES ft) [35]
+InternLM2.5-7B
+per-pixel
+81.0
+82.6
+78.6
+77.1
+80.4
+72.6
+76.7
+77.3
+78.3
+Object proposals
+RAS [6]
+Vicuna-7B‡
+Co-DETR
+–
+–
+–
+–
+–
+–
+–
+–
+73.7
+Groundhog [52]
+LLaMA2-7B
+Mask2Former+
+78.5
+79.9
+75.7
+70.5
+75.0
+64.9
+74.1
+74.6
+74.2
+RAS [6]
+Vicuna-13B‡
+Co-DETR
+79.4
+82.6
+75.9
+72.2
+77.3
+64.7
+73.2
+74.5
+75.0
+RAS (RES ft) [6]
+Vicuna-13B‡
+Co-DETR
+81.0
+83.5
+79.0
+75.1
+80.0
+70.3
+76.0
+77.5
+77.8
+Superpixels
+SPiXSeg (ours)
+Vicuna-7B‡
+superpixels
+84.1
+86.9
+79.7
+78.2
+83.7
+71.0
+79.5
+80.8
+80.5
+SPiXSeg (ours)
+InternLM2.5-7B
+superpixels
+84.5
+87.1
+81.3
+80.5
+84.9
+74.2
+80.6
+81.9
+81.9
+Table 1. Referring expression segmentation (cIoU), grouped by the
+unit in which the mask is expressed. SPiXSeg uses no mask decoder
+or refiner. Bold / underline: best / second best. ‡LLaVA-1.5. ft: fine-
+tuned per dataset. RAS-7B reports only the average.
+RefCOCO
+RefCOCO+
+RefCOCOg
+Method
+LLM
+Box from
+val
+testA
+testB
+val
+testA
+testB
+val
+test
+Avg.
+Specialist models
+MDETR [17]
+–
+box head
+86.8
+89.6
+81.4
+79.5
+84.1
+70.6
+81.6
+80.9
+81.8
+Grounding DINO-L [28]
+–
+box head
+90.6
+93.2
+88.2
+82.8
+89.0
+75.9
+86.1
+87.0
+86.6
+UNINEXT-L [42]
+–
+box head
+91.4
+93.7
+88.9
+83.1
+87.9
+76.2
+86.9
+87.5
+87.0
+MLLMs, box output
+Shikra [9]
+Vicuna-7B
+text
+87.0
+90.6
+80.2
+81.6
+87.4
+72.1
+82.3
+82.2
+82.9
+Ferret [47]
+Vicuna-7B
+text
+87.5
+91.4
+82.5
+80.8
+87.4
+73.1
+83.9
+84.8
+83.9
+Qwen-VL-Chat [4]
+Qwen-7B
+text
+88.6
+92.3
+84.5
+82.8
+88.6
+76.8
+86.0
+86.3
+85.7
+UFO [35]
+Vicuna-7B‡
+text
+90.2
+93.5
+87.3
+84.4
+90.3
+78.7
+86.4
+86.8
+87.2
+UFO (ft) [35]
+Vicuna-7B‡
+text
+91.1
+93.7
+88.6
+85.5
+90.5
+79.9
+87.3
+87.2
+88.0
+Decoder after the MLLM
+LISA [21]
+Vicuna-7B
+SAM-H
+85.4
+88.8
+82.6
+74.2
+79.5
+68.4
+79.3
+80.4
+79.8
+GSVA [39]
+Vicuna-7B
+SAM-H
+86.3
+89.2
+83.8
+72.8
+78.8
+68.0
+81.6
+81.8
+80.3
+PixelLM [33]
+Vicuna-7B
+Decoder
+89.8
+92.2
+86.4
+83.2
+87.0
+78.9
+84.6
+86.0
+86.0
+PaDT [34]
+Qwen2.5-7B
+Decoder
+93.1
+97.2
+90.4
+88.8
+92.8
+83.2
+88.2
+88.8
+90.1
+Learned mask tokens
+HiMTok [37]
+InternLM2.5-7B
+text after mask tokens
+92.9
+94.7
+89.3
+87.6
+91.5
+81.5
+88.5
+89.0
+89.4
+SAMTok [55]
+Qwen2.5-3B
+SAM2
+92.7
+94.6
+89.7
+88.2
+92.2
+84.4
+89.9
+89.6
+90.2
+Grid cells
+Text4Seg [22]
+Vicuna-7B‡
+grid mask
+89.2
+92.0
+86.4
+83.4
+88.6
+78.0
+81.7
+82.4
+85.2
+Text4Seg [22]
+Vicuna-7B‡
+grid + SAM-H
+90.8
+93.7
+87.6
+84.7
+90.2
+79.0
+84.8
+85.0
+87.0
+Object proposals
+Groma [29]
+Vicuna-7B
+Proposals
+89.5
+92.1
+86.3
+83.9
+88.9
+78.1
+86.4
+87.0
+86.5
+ChatRex [15]
+Qwen2.5-7B
+Proposals
+91.0
+94.1
+87.0
+89.8
+91.9
+79.3
+89.8
+90.0
+89.1
+Superpixels
+SPiXSeg (ours)
+Vicuna-7B‡
+Superpixels
+94.6
+98.2
+89.1
+89.7
+94.2
+82.3
+89.0
+90.1
+90.9
+SPiXSeg (ours)
+InternLM2.5-7B
+Superpixels
+94.8
+98.1
+90.7
+91.0
+95.7
+85.2
+90.9
+91.4
+92.2
+Table 2. Referring expression comprehension (Acc@0.5). Segmen-
+tation models are scored with the box of their predicted mask (PaDT:
+decoder box; HiMTok: box written as text; Groma, ChatRex: se-
+lected proposal); SPiXSeg uses the RES model. Bold / underline:
+best / second best. ‡LLaVA-1.5. ft: fine-tuned.
+“woman next to
+one with cornrows”
+“1 red double
+decker and one
+blue parked”
+“third carrot
+from front”
+“the slice of pizza
+close to the left edge”
+“the jelly filled lightest
+donut in center”
+“from right second
+giraffe counting half
+cut off on on right”
+GT
+Text4Seg
+RAS
+UFO
+PaDT
+SPiXSeg (ours)
+(a) RES. Ground-truth masks (GT) and predictions from representative base-
+lines and SPiXSeg on RefCOCO.
+“first two
+banana slices”
+“front most toilet”
+“broc at 5 oclock”
+“the frontmost
+red bear”
+“second pot
+from front”
+“wine bottle at
+the bottom left”
+GT
+Text4Seg
+RAS
+UFO
+PaDT
+SPiXSeg (ours)
+(b) REC. Boxes are tight around each method’s predicted mask (ground truth:
+around the ground-truth mask), as in Table 2; colours vary per image for
+visibility only.
+Figure 3. Qualitative comparison with representative baselines on RefCOCO.
+posed to per-pixel classification and native alignment within
+MLLM which is lost due to mask-specific decoder heads.
+We present qualitative results in Fig. 3a. It can be seen
+that methods like Text4Seg and PaDT which make predic-
+tions at patch level lead to coarse masks by construction.
+While object-proposal based methods like RAS give accu-
+rate and precise masks primarily because of the detection
+model, they fail to reason and often choose incorrect mask
+as the output. However, we observe that SPiXSeg is able
+to not only give good quality fine-grained masks but is also
+able to reason over the superpixels given the text query and
+recover the correct mask.
+4.2. Referring Expression Comprehension
+In referring expression comprehension (REC), the model
+localizes the referred object with a bounding box, evalu-
+ated by Acc@0.5 on the same benchmarks as RES in Ta-
+ble 2. For SPiXSeg, the box is obtained from the predicted
+6
+
+
+Method
+LLM / CLIP
+A-150 PC-59 PAS-20 Avg.
+CLIP-based specialist models (no LLM)
+OVSeg [23]
+ViT-B/16
+24.8
+53.3
+92.6
+56.9
+OVSeg [23]
+ViT-L/14
+29.6
+55.7
+94.5
+59.9
+SAN [41]
+ViT-B/16
+27.5
+53.8
+94.0
+58.4
+SAN [41]
+ViT-L/14
+32.1
+57.7
+94.6
+61.5
+SED [40]
+ConvNeXt-B
+31.6
+57.3
+94.4
+61.1
+SED [40]
+ConvNeXt-L
+35.2
+60.6
+96.1
+64.0
+FC-CLIP† [49]
+ConvNeXt-L
+34.1
+58.4
+95.4
+62.6
+MAFT+ [16]
+ConvNeXt-L
+36.1
+59.4
+96.5
+64.0
+CAT-Seg [10]
+ViT-B/16
+31.8
+57.5
+94.6
+61.3
+CAT-Seg [10]
+ViT-L/14
+37.9
+63.3
+97.0
+66.1
+Decoder after the MLLM
+LaSagnA [38]
+Vicuna-7B
+14.3
+46.1
+69.8
+43.4
+Learned mask tokens
+HiMTok∗[37]
+InternLM2.5-7B
+25.0
+43.9
+82.0
+50.3
+Grid cells
+Text4Seg [22]
+Vicuna-7B‡
+16.5
+52.5
+76.5
+48.5
+Superpixels
+SPiXSeg (ours) Vicuna-7B‡
+29.0
+59.5
+95.4
+61.3
+Table 3.
+Open-vocabulary semantic segmentation (mIoU).
+MLLMs are trained on COCO-Stuff and evaluated zero-shot un-
+less marked. Bold / underline: best / second-best MLLM. ∗Trained
+with ADE20K and PASCAL Context. †Trained on COCO Panop-
+tic. ‡LLaVA-1.5.
+mask of the RES model, with no additional training. We
+observe that SPiXSeg gives the highest average accuracy of
+92.2, followed by SAMTok (90.2) and PaDT (90.1), and
+the best score on all subsets. SPiXSeg also performs better
+than the box-as-text MLLMs, including UFO fine-tuned on
+each dataset (88.0), and the methods that select a detector
+proposal, e.g., ChatRex (89.1). This suggests that the su-
+perpixel classification that is trained for segmentation also
+localizes the object well, without a box being written out.
+4.3. Semantic Segmentation
+In semantic segmentation, the model is tasked with assign-
+ing a class label to each pixel in the image.
+We eval-
+uate this by using mean Intersection-over-Union (mIoU)
+across all classes on three benchmarks of varying difficulty-
+ADE20K (150 classes), Pascal Context (59 classes), and
+Pascal VOC (20 classes). These results are presented in
+Table 3. All MLLM-based methods except HiMTok are
+trained on COCO-Stuff only and evaluated zero-shot on the
+three benchmarks, which makes the comparison a test of
+how well the output vocabulary transfers to unseen label
+spaces and image distributions.
+We observe that SPiXSeg gives the highest mIoU among
+MLLM-based methods on all three benchmarks, with an
+average of 61.3 against 50.3 for HiMTok and 48.5 for
+Text4Seg. The gain over Text4Seg, which is the closest
+comparison since both methods are trained on the same data
+and use no mask decoder, is +18.9 on Pascal VOC, +12.5
+on ADE20K and +7.0 on Pascal Context. Both methods
+building
+sky
+wall
+trade name
+floor
+wall
+person
+chandelier
+ceiling
+wall
+floor
+ceiling
+painting
+wall
+bed
+ceiling
+windowpane
+mirror
+table
+wall
+bed
+table
+painting
+wall
+floor
+ceiling
+swivel chair
+table
+crt screen
+GT
+UFO†
+Text4Seg‡
+LaSagnA†
+HiMTok
+SPiXSeg (ours)
+Figure 4. Open-vocabulary semantic segmentation on ADE-
+150. Classes covering at least 3% of the ground truth are listed
+under each column. † UFO†, LaSagnA† and HiMTok use released
+checkpoints trained with ADE20K, so they are not zero-shot on
+ADE-150 (unlike Table 3). ‡With SAM-H refinement.
+are given the same number of classes per query, so the dif-
+ference comes from the unit in which the mask is obtained.
+In the patch-based format, a class label is predicted for ev-
+ery patch of the grid, and patches lying on object bound-
+aries mix pixels of different classes. A patch is assigned
+to only one of them, which affects the mIoU of every class
+that is adjacent to another one. Superpixels follow the im-
+age boundaries, so the same decision is made over regions
+that are mono-semantic and likely of a single class. Meth-
+ods that use a decoder after the MLLM, e.g., LaSagnA, do
+not benefit from this, as the semantic prediction has to be
+translated into a mask by a separate module, and we ob-
+serve that it also performs below the other methods. HiM-
+Tok improves over these on A-150 and PAS-20, but it has
+been trained with ADE20K and Pascal Context, and hence
+the comparison on these two benchmarks is not zero-shot.
+Even so, SPiXSeg is ahead of it on all three benchmarks.
+Compared to the CLIP-based specialists, SPiXSeg is at-
+par with the similar-sized variants like CAT-Seg ViT-B/16,
+while the larger specialists like CAT-Seg ViT-L/14 lead with
+average of 66.1. The gap is the largest on ADE20K, which
+has the largest class labels.
+We hypothesize that this is
+due to the training label space and not the output format,
+since ADE20K classes without a counterpart in COCO-
+Stuff must be classified by the MLLM’s text understanding
+alone.
+We present qualitative results in Fig. 4. It can be seen that
+Text4Seg often merges different classes into one because
+of the coarse mask generated. SPiXSeg gives masks that
+follow the object contours, as each superpixel is assigned
+entirely to one class.
+7
+
+
+Superpixels
+Method
+val
+testA
+testB
+Avg.
+SAM 3.1
+Ceiling
+89.0
+89.8
+88.3
+89.0
+SPiXSeg
+84.1
+86.9
+79.7
+83.6
+Share (%)
+94.5
+96.8
+90.2
+93.8
+EPOC
+Ceiling
+81.1
+83.4
+75.5
+80.0
+SPiXSeg
+75.0
+79.7
+67.3
+74.0
+Share (%)
+92.4
+95.6
+89.3
+92.4
+Table 4. Superpixel extractors. cIoU on RefCOCO with up to
+64 superpixels per image. Share: SPiXSeg’s cIoU as a percentage
+of the ceiling.
+“the man wearing the
+black leather jacket . . . ”
+“tux on the left with
+the white flower”
+“child on right”
+Superpixels
+IoU 97 · max 97
+IoU 96 · max 96
+IoU 84 · max 93
+Selected
+Superpixels
+IoU 97 · max 97
+IoU 97 · max 97
+IoU 83 · max 91
+Selected
+EPOC
+SAM 3.1
+Figure 5. Superpixel extractors. The superpixels from EPOC
+and SAM 3.1, and those selected by SPiXSeg for each expression
+(RefCOCOg and RefCOCO val). max: the best IoU these super-
+pixels allow.
+4.4. Additional Results
+In this section, we study how the choice of superpixels
+affects SPiXSeg, compare its inference, time with other
+paradigms, and present qualitative results on out-of-domain
+images.
+Choice of Superpixels. Since SPiXSeg segments by se-
+lecting superpixels, its accuracy is bounded by how well
+the superpixels follow the object boundaries. We call the
+best cIoU reachable by selecting superpixels the ‘ceiling’.
+Replacing SAM 3.1 with EPOC superpixels [8] lowers the
+ceiling by about 9 points as shown in Table 4, yet SPiXSeg
+reaches a similar share of it (92.4 vs. 93.8%) and selects
+nearly the same superpixels as the ceiling with either set as
+shown in Fig. 5.
+Efficiency Comparison. Fig. 6 (a) plots accuracy against
+the time for one expression on a new image.
+SPiXSeg
+achieves the highest cIoU (80.5) at 0.95 s, most of which
+is the one-time superpixel extraction; the model itself takes
+0.12 s. PaDT and UFO are faster on a single new image
+but 4.5–4.7 points lower in cIoU. In practice, an image is
+usually queried with several expressions, and SPiXSeg ex-
+(a) Accuracy vs. latency
+(b) Whole-workload time
+Figure 6. Efficiency. (a) RES cIoU (mean of the 8 splits) against
+time per expression on a new image (one GPU, batch 1); up and
+left is better. (b) Total time for all expressions of 50 random Re-
+fCOCO val images, with the ratio to SPiXSeg.
+†With SAM-H
+refinement; without it, 67.2 cIoU at 3.9 s.
+“the front leg of
+the chameleon”
+“the legs of
+the crab”
+“the antennae of
+the grasshopper”
+“the claws of
+the lobster”
+“the legs of
+the horse”
+“the man in
+the blue robe”
+“the diver
+on the right”
+Input
+Text4Seg
+RAS
+UFO
+PaDT
+SPiXSeg (ours)
+Figure 7. OOD qualitative comparison of representative base-
+lines and SPiXSeg. Images from Wikimedia Commons; credits in
+the supplementary material.
+tracts its superpixels only once per image. On a workload
+of 385 expressions over 50 random RefCOCO val images,
+as shown in Fig. 6 (b), SPiXSeg is the fastest method, fin-
+ishing in 1.4 min, 1.7× faster than RAS, 2.1× than PaDT,
+3.0× than UFO and 18× than Text4Seg.
+Out-of-domain inputs. Fig. 7 shows images far from
+COCO, including paintings, sculptures, underwater scenes
+and close-ups of animals, with expressions that refer to ob-
+ject parts such as legs, claws and antennae. SPiXSeg seg-
+ments these parts accurately, while the baselines often re-
+turn the whole object or miss the part.
+5. Conclusion
+In this work, we revisited the vocabulary in which MLLMs
+express masks for segmentation. Existing vocabularies each
+have a limitation. Decoder-based methods add per-query
+overhead, learned mask tokens require multi-stage train-
+ing, grid-based methods trade boundary precision against
+the number of decisions, and proposal-based methods only
+8
+
+
+output whole objects. We showed that superpixels satisfy
+the four properties desired from a vocabulary and proposed
+SPiXSeg, which recasts MLLM segmentation as superpixel
+classification. Superpixels are computed once per image
+and classified by S2M in a single forward pass, without
+any decoder or refinement. SPiXSeg achieves state-of-the-
+art results among LLaVA-1.5-7B methods, with a mean
+cIoU of 80.5 on RefCOCO/+/g, and extends naturally to
+open-vocabulary semantic segmentation. One limitation is
+that every mask is a union of superpixels, so accuracy is
+bounded by the superpixel extraction model and boundaries
+it misses cannot be recovered. Since SPiXSeg reaches a
+similar share of this bound with different extractors, we ex-
+pect better extraction models to act as drop-in replacements
+that improve masks without architectural changes.
+LLM Usage Statement
+We used LLMs, particularly through the coding agents, in
+three parts of this work. Coding: we used it to write and
+debug parts of the training, evaluation and analysis code.
+Paraphrasing: we used it to rephrase and edit text that we
+wrote, for clarity and grammar. TikZ diagrams: we used
+it to write the TikZ code for the method and overview di-
+agrams, following layouts that we designed. All research
+ideas, experimental design, results and conclusions are our
+own. We reviewed, ran and checked all code; every num-
+ber in the paper comes from our own experiments; and ev-
+ery qualitative result is an actual output of our model or of
+a baseline, shown on benchmark images or on openly li-
+censed photographs and artworks. No image or mask was
+generated or edited with generative AI. We take full respon-
+sibility for the content of the paper. The multimodal LLMs
+we study (LLaVA-1.5 and InternVL2.5) are the subject of
+the research, not writing or coding tools, and are described
+in the main text.
+References
+[1] Marius Aasan, Odd Kolbjørnsen, Anne Schistad Solberg,
+and Ad´ın Ramirez Rivera. A spitting image: Modular su-
+perpixel tokenization in vision transformers. In European
+Conference on Computer Vision, pages 124–142. Springer,
+2024. 3
+[2] Radhakrishna Achanta, Appu Shaji, Kevin Smith, Aurelien
+Lucchi, Pascal Fua, and Sabine S¨usstrunk. Slic superpix-
+els compared to state-of-the-art superpixel methods. IEEE
+Transactions on Pattern Analysis and Machine Intelligence,
+34(11):2274–2282, 2012. 2, 3
+[3] Jean-Baptiste Alayrac, Jeff Donahue, Pauline Luc, Antoine
+Miech, Iain Barr, Yana Hasson, Karel Lenc, Arthur Men-
+sch, Katherine Millican, Malcolm Reynolds, et al. Flamingo:
+a visual language model for few-shot learning.
+Advances
+in neural information processing systems, 35:23716–23736,
+2022. 1, 2
+[4] Jinze Bai, Shuai Bai, Shusheng Yang, Shijie Wang, Sinan
+Tan, Peng Wang, Junyang Lin, Chang Zhou, and Jingren
+Zhou. Qwen-VL: A versatile vision-language model for un-
+derstanding, localization, text reading, and beyond. arXiv
+preprint arXiv:2308.12966, 2023. 6
+[5] Zheng Cai, Maosong Cao, Haojiong Chen, Kai Chen, Keyu
+Chen, Xin Chen, Xun Chen, Zehui Chen, Zhi Chen, Pei
+Chu, Xiaoyi Dong, Haodong Duan, Qi Fan, Zhaoye Fei,
+Yang Gao, Jiaye Ge, Chenya Gu, Yuzhe Gu, Tao Gui, Aijia
+Guo, Qipeng Guo, Conghui He, Yingfan Hu, Ting Huang,
+Tao Jiang, Penglong Jiao, Zhenjiang Jin, Zhikai Lei, Jiax-
+ing Li, Jingwen Li, Linyang Li, Shuaibin Li, Wei Li, Yin-
+ing Li, Hongwei Liu, Jiangning Liu, Jiawei Hong, Kaiwen
+Liu, Kuikun Liu, Xiaoran Liu, Chengqi Lv, Haijun Lv, Kai
+Lv, Li Ma, Runyuan Ma, Zerun Ma, Wenchang Ning, Linke
+Ouyang, Jiantao Qiu, Yuan Qu, Fukai Shang, Yunfan Shao,
+Demin Song, Zifan Song, Zhihao Sui, Peng Sun, Yu Sun,
+Huanze Tang, Bin Wang, Guoteng Wang, Jiaqi Wang, Jiayu
+Wang, Rui Wang, Yudong Wang, Ziyi Wang, Xingjian Wei,
+Qizhen Weng, Fan Wu, Yingtong Xiong, Chao Xu, Ruil-
+iang Xu, Hang Yan, Yirong Yan, Xiaogui Yang, Haochen
+Ye, Huaiyuan Ying, Jia Yu, Jing Yu, Yuhang Zang, Chuyu
+Zhang, Li Zhang, Pan Zhang, Peng Zhang, Ruijie Zhang,
+Shuo Zhang, Songyang Zhang, Wenjian Zhang, Wenwei
+Zhang, Xingcheng Zhang, Xinyue Zhang, Hui Zhao, Qian
+Zhao, Xiaomeng Zhao, Fengzhe Zhou, Zaida Zhou, Jing-
+ming Zhuo, Yicheng Zou, Xipeng Qiu, Yu Qiao, and Dahua
+Lin. Internlm2 technical report, 2024. 5
+[6] Shengcao Cao, Zijun Wei, Jason Kuen, Kangning Liu,
+Lingzhi Zhang, Jiuxiang Gu, HyunJoon Jung, Liang-Yan
+Gui, and Yu-Xiong Wang. Refer to any segmentation mask
+group with vision-language prompts. In 2025 IEEE/CVF In-
+ternational Conference on Computer Vision (ICCV), pages
+21853–21863. IEEE, 2025. 2, 3, 6, 7, 8
+[7] Nicolas Carion, Laura Gustafson, Yuan-Ting Hu, Shoubhik
+Debnath, Ronghang Hu, Didac Suris Coll-Vinent, Chaitanya
+Ryali, Kalyan Vasudev Alwala, Haitham Khedr, Andrew
+Huang, et al. Sam 3: Segment anything with concepts. In
+International conference on learning representations, pages
+138846–138923, 2026. 3, 4, 5, 1
+[8] Delong Chen, Samuel Cahyawijaya, Jianfeng Liu, Baoyuan
+Wang, and Pascale Fung. Subobject-level image tokeniza-
+tion. In Forty-second International Conference on Machine
+Learning, 2025. 2, 3, 4, 8, 1
+[9] Keqin Chen, Zhao Zhang, Weili Zeng, Richong Zhang,
+Feng Zhu, and Rui Zhao.
+Shikra:
+Unleashing multi-
+modal LLM’s referential dialogue magic.
+arXiv preprint
+arXiv:2306.15195, 2023. 6
+[10] Seokju Cho, Heeseong Shin, Sunghwan Hong, Anurag
+Arnab, Paul Hongsuck Seo, and Seungryong Kim.
+CAT-
+Seg: Cost aggregation for open-vocabulary semantic seg-
+mentation. In Proceedings of the IEEE/CVF Conference on
+Computer Vision and Pattern Recognition (CVPR), 2024. 5,
+7
+[11] Federico Cocchi, Nicholas Moratelli, Davide Caffagni, Sara
+Sarto, Lorenzo Baraldi, Marcella Cornia, and Rita Cuc-
+chiara. Llava-more: A comparative study of llms and vi-
+sual backbones for enhanced visual instruction tuning. In
+9
+
+
+2025 IEEE/CVF International Conference on Computer Vi-
+sion Workshops (ICCVW), pages 4337–4347. IEEE, 2025. 1,
+2
+[12] Wenliang Dai, Junnan Li, Dongxu Li, Anthony Tiong, Junqi
+Zhao, Weisheng Wang, Boyang Li, Pascale N Fung, and
+Steven Hoi. Instructblip: Towards general-purpose vision-
+language models with instruction tuning. Advances in neural
+information processing systems, 36:49250–49267, 2023. 1,
+2
+[13] Mark Everingham, Luc Van Gool, Christopher KI Williams,
+John Winn, and Andrew Zisserman. The pascal visual object
+classes (voc) challenge. International journal of computer
+vision, 88(2):303–338, 2010. 5
+[14] Junwen He, Yifan Wang, Lijun Wang, Huchuan Lu, Jun-Yan
+He, Jin-Peng Lan, Bin Luo, and Xuansong Xie. Multi-modal
+instruction tuned llms with fine-grained visual perception. In
+Proceedings of the ieee/cvf conference on computer vision
+and pattern recognition, pages 13980–13990, 2024. 6
+[15] Qing Jiang, Gen Luo, Yuqin Yang, Yuda Xiong, Zhaoyang
+Zeng, Yihao Chen, Tianhe Ren, and Lei Zhang. Chatrex:
+Taming multimodal llm for joint perception and understand-
+ing. IEEE Transactions on Multimedia, 2026. 3, 6
+[16] Siyu Jiao, Hongguang Zhu, Jiannan Huang, Yao Zhao, Yun-
+chao Wei, and Humphrey Shi. Collaborative vision-text rep-
+resentation optimizing for open-vocabulary segmentation. In
+European Conference on Computer Vision (ECCV), 2024. 5,
+7
+[17] Aishwarya Kamath, Mannat Singh, Yann LeCun, Gabriel
+Synnaeve, Ishan Misra, and Nicolas Carion.
+Mdetr-
+modulated detection for end-to-end multi-modal understand-
+ing. In 2021 IEEE/CVF international conference on com-
+puter vision (ICCV), pages 1760–1770. IEEE, 2021. 6
+[18] Aishwarya Kamath, Johan Ferret, Shreya Pathak, Nino Vieil-
+lard, Ramona Merhej, Sarah Perrin, Tatiana Matejovicova,
+Alexandre Ram´e, Morgane Rivi`ere, Louis Rouillard, et al.
+Gemma 3 technical report. arXiv preprint arXiv:2503.19786,
+4, 2025. 2
+[19] Alexander Kirillov, Eric Mintun, Nikhila Ravi, Hanzi Mao,
+Chloe Rolland, Laura Gustafson, Tete Xiao, Spencer White-
+head, Alexander C Berg, Wan-Yen Lo, et al. Segment any-
+thing. In Proceedings of the IEEE/CVF international confer-
+ence on computer vision, pages 4015–4026, 2023. 3, 4
+[20] Philipp Kr¨ahenb¨uhl and Vladlen Koltun. Efficient inference
+in fully connected crfs with gaussian edge potentials. Ad-
+vances in neural information processing systems, 24, 2011.
+3
+[21] Xin Lai, Zhuotao Tian, Yukang Chen, Yanwei Li, Yuhui
+Yuan, Shu Liu, and Jiaya Jia. Lisa: Reasoning segmentation
+via large language model. In Proceedings of the IEEE/CVF
+conference on computer vision and pattern recognition,
+pages 9579–9589, 2024. 1, 2, 6, 4, 5
+[22] Mengcheng Lan, Chaofeng Chen, Yue Zhou, Jiaxing Xu,
+Yiping Ke, Xinjiang Wang, Litong Feng, and Wayne Zhang.
+Text4seg: Reimagining image segmentation as text genera-
+tion. In The Thirteenth International Conference on Learn-
+ing Representations, 2025. 2, 3, 5, 6, 7, 1, 8, 9
+[23] Feng Liang, Bichen Wu, Xiaoliang Dai, Kunpeng Li, Yinan
+Zhao, Hang Zhang, Peizhao Zhang, Peter Vajda, and Diana
+Marculescu. Open-vocabulary semantic segmentation with
+mask-adapted clip. In Proceedings of the IEEE/CVF Con-
+ference on Computer Vision and Pattern Recognition, pages
+7061–7070, 2023. 5, 7
+[24] Chang Liu, Henghui Ding, and Xudong Jiang. GRES: Gen-
+eralized referring expression segmentation. In IEEE Conf.
+Comput. Vis. Pattern Recog., 2023. 1, 2
+[25] Haotian Liu, Chunyuan Li, Qingyang Wu, and Yong Jae Lee.
+Visual instruction tuning. Advances in neural information
+processing systems, 36:34892–34916, 2023. 1, 2
+[26] Jiazhen Liu, Mingkuan Feng, and Long Chen.
+Better,
+stronger, faster: Tackling the trilemma in mllm-based seg-
+mentation with simultaneous textual mask prediction.
+In
+Proceedings of the IEEE/CVF Conference on Computer Vi-
+sion and Pattern Recognition, pages 33121–33130, 2026. 2,
+3, 6
+[27] Jiazhen Liu, Mingkuan Feng, and Long Chen.
+Bet-
+ter, stronger, faster, and broader:
+Structured all-mask
+prediction for mllm-based segmentation.
+arXiv preprint
+arXiv:2608.02791, 2026. 3
+[28] Shilong Liu, Zhaoyang Zeng, Tianhe Ren, Feng Li, Hao
+Zhang, Jie Yang, Qing Jiang, Chunyuan Li, Jianwei Yang,
+Hang Su, Jun Zhu, and Lei Zhang. Grounding DINO: Mar-
+rying DINO with grounded pre-training for open-set object
+detection.
+In European Conference on Computer Vision
+(ECCV), 2024. 6
+[29] Chuofan Ma, Yi Jiang, Jiannan Wu, Zehuan Yuan, and Xiao-
+juan Qi. Groma: Localized visual tokenization for grounding
+multimodal large language models. In European Conference
+on Computer Vision, pages 417–435. Springer, 2024. 6
+[30] Roozbeh Mottaghi, Xianjie Chen, Xiaobai Liu, Nam-Gyu
+Cho, Seong-Whan Lee, Sanja Fidler, Raquel Urtasun, and
+Alan Yuille.
+The role of context for object detection and
+semantic segmentation in the wild. In IEEE Conference on
+Computer Vision and Pattern Recognition (CVPR), 2014. 5
+[31] Alec Radford, Jong Wook Kim, Chris Hallacy, Aditya
+Ramesh, Gabriel Goh, Sandhini Agarwal, Girish Sastry,
+Amanda Askell, Pamela Mishkin, Jack Clark, et al. Learning
+transferable visual models from natural language supervi-
+sion. In International conference on machine learning, pages
+8748–8763. PmLR, 2021. 2
+[32] Hanoona Rasheed, Muhammad Maaz, Sahal Shaji, Abdel-
+rahman Shaker, Salman Khan, Hisham Cholakkal, Rao M
+Anwer, Eric Xing, Ming-Hsuan Yang, and Fahad S Khan.
+Glamm: Pixel grounding large multimodal model. In Pro-
+ceedings of the IEEE/CVF Conference on Computer Vision
+and Pattern Recognition, pages 13009–13018, 2024. 1, 2, 6
+[33] Zhongwei Ren, Zhicheng Huang, Yunchao Wei, Yao Zhao,
+Dongmei Fu, Jiashi Feng, and Xiaojie Jin. Pixellm: Pixel
+reasoning with large multimodal model. In Proceedings of
+the IEEE/CVF Conference on Computer Vision and Pattern
+Recognition, pages 26374–26383, 2024. 2, 6
+[34] Yongyi Su, Haojie Zhang, Shijie Li, Nanqing Liu, Jingyi
+Liao, Junyi Pan, Yuan Liu, Xiaofen Xing, Chong Sun, Chen
+Li, Nancy F. Chen, Shuicheng Yan, Xulei Yang, and Xun
+Xu. Patch-as-decodable-token: Towards unified multi-modal
+vision tasks in MLLMs. arXiv preprint arXiv:2510.01954,
+2025. 1, 2, 6, 4, 5, 7, 8
+10
+
+
+[35] Hao Tang, Chen-Wei Xie, Haiyang Wang, Xiaoyi Bao,
+Tingyu Weng, Pandeng Li, Yun Zheng, and Liwei Wang.
+Ufo: A unified approach to fine-grained visual perception
+via open-ended language interface. Advances in Neural In-
+formation Processing Systems, 38:83761–83791, 2026. 2, 3,
+6, 7, 8, 9
+[36] Aaron Van Den Oord, Oriol Vinyals, et al. Neural discrete
+representation learning. Advances in neural information pro-
+cessing systems, 30, 2017. 2
+[37] Tao Wang, Changxu Cheng, Lingfeng Wang, Senda Chen,
+and Wuyue Zhao. Himtok: Learning hierarchical mask to-
+kens for image segmentation with large multimodal model.
+In Proceedings of the IEEE/CVF International Conference
+on Computer Vision, pages 23267–23278, 2025. 1, 3, 4, 5, 6,
+7, 2, 9
+[38] Cong Wei, Haoxian Tan, Yujie Zhong, Yujiu Yang, and Lin
+Ma. Lasagna: Language-based segmentation assistant for
+complex queries. arXiv preprint arXiv:2404.08506, 2024. 5,
+6, 7, 2, 9
+[39] Zhuofan Xia, Dongchen Han, Yizeng Han, Xuran Pan, Shiji
+Song, and Gao Huang.
+Gsva: Generalized segmentation
+via multimodal large language models. In Proceedings of
+the IEEE/CVF Conference on Computer Vision and Pattern
+Recognition (CVPR), pages 3858–3869, 2024. 1, 2, 6
+[40] Bin Xie, Jiale Cao, Jin Xie, Fahad Shahbaz Khan, and
+Yanwei Pang.
+SED: A simple encoder-decoder for open-
+vocabulary semantic segmentation.
+In Proceedings of the
+IEEE/CVF Conference on Computer Vision and Pattern
+Recognition (CVPR), 2024. 5, 7
+[41] Mengde Xu, Zheng Zhang, Fangyun Wei, Han Hu, and Xi-
+ang Bai. Side adapter network for open-vocabulary semantic
+segmentation. In Proceedings of the IEEE/CVF conference
+on computer vision and pattern recognition, pages 2945–
+2954, 2023. 5, 7
+[42] Bin Yan, Yi Jiang, Jiannan Wu, Dong Wang, Ping Luo, Ze-
+huan Yuan, and Huchuan Lu.
+Universal instance percep-
+tion as object discovery and retrieval.
+In Proceedings of
+the IEEE/CVF Conference on Computer Vision and Pattern
+Recognition (CVPR), 2023. 6
+[43] Jianwei Yang, Hao Zhang, Feng Li, Xueyan Zou, Chunyuan
+Li, and Jianfeng Gao.
+Set-of-mark prompting unleashes
+extraordinary visual grounding in gpt-4v.
+arXiv preprint
+arXiv:2310.11441, 2023. 3
+[44] Xiaobo Yang and Xiaojin Gong.
+Re-purposing sam into
+efficient visual projectors for mllm-based referring image
+segmentation. ACM Trans. Multimedia Comput. Commun.
+Appl., 22(2), 2026. 2, 3, 4, 6
+[45] Zhao Yang, Jiaqi Wang, Xubing Ye, Yansong Tang, Kai
+Chen, Hengshuang Zhao, and Philip HS Torr. Language-
+aware vision transformer for referring segmentation. IEEE
+Transactions on Pattern Analysis and Machine Intelligence,
+47(7):5238–5255, 2024. 2
+[46] Shukang Yin, Chaoyou Fu, Sirui Zhao, Ke Li, Xing Sun,
+Tong Xu, and Enhong Chen. A survey on multimodal large
+language models. National Science Review, 11(12), 2024. 1
+[47] Haoxuan You, Haotian Zhang, Zhe Gan, Xianzhi Du, Bowen
+Zhang, Zirui Wang, Liangliang Cao, Shih-Fu Chang, and
+Yinfei Yang. Ferret: Refer and ground anything anywhere
+at any granularity. In International Conference on Learning
+Representations, pages 57153–57180, 2024. 6
+[48] Licheng Yu, Patrick Poirson, Shan Yang, Alexander C Berg,
+and Tamara L Berg. Modeling context in referring expres-
+sions. In European conference on computer vision, pages
+69–85. Springer, 2016. 5
+[49] Qihang Yu, Ju He, Xueqing Deng, Xiaohui Shen, and Liang-
+Chieh Chen. Convolutions die hard: Open-vocabulary seg-
+mentation with single frozen convolutional CLIP.
+In Ad-
+vances in Neural Information Processing Systems (NeurIPS),
+2023. 5, 7
+[50] Ao Zhang, Yuan Yao, Wei Ji, Zhiyuan Liu, and Tat-Seng
+Chua. Next-chat: an lmm for chat, detection and segmenta-
+tion. In Proceedings of the 41st International Conference on
+Machine Learning, pages 60116–60133, 2024. 2, 6
+[51] Tao Zhang, Xiangtai Li, Hao Fei, Haobo Yuan, Shengqiong
+Wu, Shunping Ji, Chen Change Loy, and Shuicheng Yan.
+Omg-llava: Bridging image-level, object-level, pixel-level
+reasoning and understanding. ArXiv, abs/2406.19389, 2024.
+2
+[52] Yichi Zhang, Ziqiao Ma, Xiaofeng Gao, Suhaila Shakiah,
+Qiaozi Gao, and Joyce Chai. Groundhog: Grounding large
+language models to holistic segmentation. In Conference on
+Computer Vision and Pattern Recognition 2024, 2024. 2, 3,
+6
+[53] Bolei Zhou, Hang Zhao, Xavier Puig, Sanja Fidler, Adela
+Barriuso, and Antonio Torralba.
+Scene parsing through
+ade20k dataset. In Proceedings of the IEEE conference on
+computer vision and pattern recognition, pages 633–641,
+2017. 5
+[54] Bolei Zhou, Hang Zhao, Xavier Puig, Tete Xiao, Sanja Fi-
+dler, Adela Barriuso, and Antonio Torralba. Semantic under-
+standing of scenes through the ade20k dataset. International
+journal of computer vision, 127(3):302–321, 2019. 5
+[55] Yikang Zhou, Tao Zhang, Dengxian Gong, Yuanzheng Wu,
+Ye Tian, Haochen Wang, Haobo Yuan, Jiacong Wang, Lu
+Qi, Hao Fei, et al. Samtok: Representing any mask with
+two words.
+In Proceedings of the IEEE/CVF Conference
+on Computer Vision and Pattern Recognition, pages 37852–
+37863, 2026. 1, 3, 4, 6, 2, 5
+11
+
+
+SPiXSeg: Rethinking MLLM-based Image Segmentation as Superpixel
+Classification
+Supplementary Material
+6. Implementation details
+In this section, we provide the settings and implementation
+details of the proposed method as described in Sec. 3 of the
+main paper.
+Superpixel Extraction. As described in the main text,
+SPiXSeg method relies on superpixels and treats it as the
+fundamental unit for segmentation. However, SPiXSeg is
+not tied to a specific superpixel extractor. In our experi-
+ments, we use SAM 3.1 [7] by default and EPOC [8] as
+an alternative.
+With SAM 3.1, we resize the image to
+1024×1024 and prompt the model with a regular (uncondi-
+tional) 32×32 grid of points. However, in such regular grid
+points, neighboring points often produce the same mask,
+so we remove the near-duplicates with non-maximum sup-
+pression at a box IoU of 0.7, and the top 64 masks with the
+highest predicted IoU are retained. Since SAM masks are
+nested, for example, a face lies inside a person; we assign
+each pixel to exactly one mask going through the masks
+from the largest to the smallest, so that each part remains a
+separate superpixel and the larger mask containing it covers
+only the remaining area. Small uncovered areas and super-
+pixels below 1024 pixels are merged into a neighboring su-
+perpixel. This gives at most N=64 superpixels per image,
+on RefCOCO we observe the average number of superpix-
+els per image to be 50. For EPOC, the superpixels are deter-
+mined by the threshold on its predicted boundary map, we
+choose this threshold to be 0.1.
+Model. For LLaVA-1.5-7B, we take visual features from
+the penultimate CLIP layer at a resolution of 3362. For
+InternVL2.5-8B, the input is 8962, split into four tiles of
+4482. In both cases, the vision encoder and the projector
+are frozen, and the LLM is fine-tuned with LoRA of rank
+64. The positional MLP and espix in Eq. (3) and the scalars
+α and β in Eq. (4) are trained from scratch.
+Training. We train the pipeline using losses mentioned in
+Eq. (5) and Eq. (6). One of the edge cases while train-
+ing is when none of the superpixels have more than half
+of its area inside the ground truth, in that case, we use the
+one with the largest overlap as the positive. The losses of
+Eq. (5) and Eq. (6) have equal weight of 1.0. We train with
+AdamW at a learning rate of 10−4 without weight decay,
+an effective batch of 64, linear warm-up over the first 3%
+of steps and cosine decay after it, gradient clipping at 0.3
+and bf16. Since many expressions refer to spatial loca-
+tions as ‘left’ and ‘right’, the images are resized to a square
+without flips or crops. For RES, we train on the RefCLEF
+and RefCOCO/+/g train splits (430K expressions similar to
+Text4Seg [22]) for 10 epochs with LLaVA-1.5-7B and for 5
+epochs with InternVL2.5-8B. During inference, if none of
+the superpixel reaches pi > 0.5, we keep the one with the
+highest score.
+Other tasks. For Generalized RES (gRES), we train from
+the base MLLM for 5 epochs on gRefCOCO and add a bi-
+nary cross-entropy term on maxi si, which tells whether the
+expression has a target at all. Unlike in RES, an empty
+selection is kept and read as ‘no target’. For ReasonSeg,
+we start from the RES-finetuned model model and fine-tune
+it for 2,000 steps on batches drawn from data-mix of RES
+(35%), VQA on the COCO images of LLaVA-665K (25%,
+one 4482 tile, text loss), LISA++ (25%) and the ReasonSeg
+train split (15%). For semantic segmentation, we train the
+model for 5 epochs with up to 63 class names per prompt.
+7. Additional experiments
+7.1. Generalized Referring Segmentation
+Generalized referring segmentation (gRES) refers to task
+where the expression points to multiple or none of the sub-
+jects present in the image. gRefCOCO [24] contains such
+expressions that refer to several objects or to none. We train
+SPiXSeg on its train split for 5 epochs, with LLaVA-1.5-7B
+and InternVL2.5-8B. An extra loss on the highest super-
+pixel score teaches the model whether the target exists; if
+no superpixel is selected, the predicted mask is empty. Ta-
+ble 5 presents our results. With InternVL2.5-8B, SPiXSeg
+performs the best in every split, and with LLaVA-1.5 our
+method is second best. We present and compare qualitative
+examples in Fig. 8. It can be seen that our method is able to
+segment out precise objects and is able to avoid segmenta-
+tion where the referred object is not present in challenging
+scenarios.
+7.2. Reasoning Segmentation
+Reasoning Segmentation (ReasonSeg) [21] refers to the task
+where the referred object is not directly mentioned and the
+model has to reason out the relevant object for segmenta-
+tion. For ReasonSeg, we fine-tune our RES model on a mix
+of RES, VQA (the COCO part of LLaVA-665K), LISA++
+and the ReasonSeg train split. We present and compare our
+performance in Table 6. It can be seen that SPiXSeg per-
+forms best on val gIoU and on short queries, and is second
+best on test gIoU after UFO, which is trained as a generalist
+with extra reasoning data. We present the qualitative results
+1
+
+
+val
+testA
+testB
+Method
+LLM
+gIoU
+cIoU
+N-acc
+gIoU
+cIoU
+N-acc
+gIoU
+cIoU
+N-acc
+Avg. cIoU
+Specialist models
+LAVT [45]
+–
+58.4
+57.6
+49.3
+65.9
+65.3
+49.3
+55.8
+55.0
+48.5
+59.3
+ReLA [24]
+–
+63.6
+62.4
+56.4
+70.0
+69.3
+59.0
+61.0
+59.9
+58.4
+63.9
+Decoder after the MLLM
+LISA (gRES ft) [21]
+Vicuna-7B
+61.6
+61.8
+54.7
+66.3
+68.5
+50.0
+58.8
+60.6
+51.9
+63.6
+GSVA (gRES ft) [39]
+Vicuna-7B
+66.5
+63.3
+62.4
+71.1
+69.9
+65.3
+62.2
+60.5
+60.6
+64.6
+Learned mask tokens
+HiMTok§ [37]
+InternLM2.5-7B⋆
+72.1
+70.4
+–
+73.5
+74.9
+–
+71.7
+72.0
+–
+72.4
+SAMTok [55]
+Qwen2.5-3B
+70.5
+68.2
+60.5
+73.8
+73.0
+58.8
+65.9
+65.4
+55.3
+68.9
+Grid cells
+Text4Seg (grid + CRF) [22]
+Vicuna-7B‡
+69.1
+64.7
+–
+69.9
+70.8
+–
+62.1
+62.3
+–
+65.9
+Text4Seg (grid + SAM-H) [22]
+Vicuna-7B‡
+73.6
+67.9
+–
+74.1
+72.8
+–
+66.1
+64.8
+–
+68.5
+Text4Seg (grid + CRF) [22]
+InternLM2.5-7B⋄
+70.0
+66.1
+–
+69.4
+70.9
+–
+63.1
+64.1
+–
+67.0
+Text4Seg (grid + SAM-H) [22]
+InternLM2.5-7B⋄
+74.4
+69.1
+–
+75.1
+73.8
+–
+67.3
+66.6
+–
+69.8
+Object proposals
+RAS [6]
+Vicuna-13B‡
+68.9
+64.4
+57.2
+74.8
+74.4
+54.9
+66.7
+64.5
+54.1
+67.8
+RAS (gRES ft) [6]
+Vicuna-13B‡
+74.6
+70.5
+69.1
+77.5
+77.0
+64.6
+69.4
+67.9
+62.9
+71.8
+Superpixels
+SPiXSeg (ours)
+Vicuna-7B‡
+77.7
+71.6
+70.5
+78.9
+78.4
+66.0
+71.3
+70.2
+63.0
+73.4
+SPiXSeg (ours)
+InternLM2.5-7B⋆
+81.4
+74.5
+75.3
+81.2
+80.2
+70.6
+73.6
+72.3
+65.6
+75.6
+Table 5. Generalized referring expression segmentation on gRefCOCO [24], grouped by vocabulary as in Table 1. N-acc: accuracy
+on expressions with no target (a dash where the paper does not report it). Avg.: mean cIoU over the three splits. gRES ft: fine-tuned
+on gRefCOCO. Bold: best per column; underline: second best.
+§Numbers as reported by SAMTok.
+‡LLaVA-1.5.
+⋆InternVL2.5-8B.
+⋄InternVL2-8B.
+val
+test
+short
+long
+Method
+LLM
+gIoU cIoU gIoU cIoU gIoU gIoU
+Decoder after the MLLM
+LISA (ft) [21]
+Vicuna-7B
+52.9
+54.0
+47.3
+48.4
+40.6
+49.4
+LISA (ft) [21]
+Vicuna-7B‡
+61.3
+62.9
+55.6
+56.9
+48.3
+57.9
+LaSagnA [38]
+Vicuna-7B
+–
+47.2
+–
+–
+–
+–
+UFO [35]
+Vicuna-7B‡
+–
+–
+58.8
+–
+46.5
+62.7
+UFO [35]
+InternLM2.5-7B⋆
+–
+–
+67.0
+–
+56.2
+70.4
+Learned mask tokens
+HiMTok [37]
+InternLM2.5-7B⋆
+60.7
+67.0
+60.8
+66.2
+–
+–
+Object proposals
+Groundhog [52] LLaMA2-7B
+56.2
+–
+–
+–
+–
+–
+Superpixels
+SPiXSeg (ours) InternLM2.5-7B⋆
+64.4
+51.2
+65.5
+64.7
+61.9
+65.8
+Table 6. Reasoning segmentation on ReasonSeg [21], grouped by
+vocabulary. Short / long: test queries split as in LISA. ft: fine-
+tuned on the ReasonSeg train split. Bold: best per column; under-
+line: second best. ‡LLaVA-1.5. ⋆InternVL2.5-8B.
+in Fig. 9. It can be seen that SPiXSeg is able to reason the
+referred object and segment it out precisely.
+8. Error Analysis
+We present an error analysis of our method in Table 7 to
+illustrate where does our method lose the maximum achiev-
+able accuracy. Table 7 splits the cIoU that SPiXSeg (with
+InternVL2.5-8B) loses on RefCOCO/+/g into errors of the
+model and the limit set by the superpixels (ceiling). The
+ceiling is the cIoU of the training targets i.e., the highest
+achievable cIoU. The ceiling cIoU is 88.9 on average, so
+11.1 cIoU is lost to the superpixel segmentation inaccuracy
+irrespective of our method. It can be seen that on top of that,
+our method loses 7.0 points, of which 3.9 comes from pick-
+ing the wrong object or missing it, and 2.2 from picking the
+right object with missing or extra pieces. It can be seen that
+picking wrong objects costs the most on RefCOCO+ testB
+(10.8 cIoU), where expressions do not use location words.
+We provide visualization of each of these errors in Fig. 10.
+9. Additional Qualitative Results
+9.1. Referring Expression Segmentation
+Table 1 in the main paper compares SPiXSeg with prior
+methods on RefCOCO/+/g. Here, we present more quali-
+tative examples with InternVL2.5-8B backbone in Fig. 11.
+2
+
+
+RefCOCO
+RefCOCO+
+RefCOCOg
+val
+testA
+testB
+val
+testA
+testB
+val
+test
+Avg.
+(a) Where the remaining cIoU goes (adds up to 100)
+• SPiXSeg cIoU
+84.5
+87.1
+81.3
+80.5
+85.0
+74.2
+80.6
+81.9
+81.9
+• + wrong or missed object
+2.5
+0.9
+3.4
+5.8
+2.0
+10.8
+4.3
+3.6
+3.9
+• + right object, wrong pieces
+1.1
+0.8
+2.9
+1.9
+1.8
+2.6
+2.7
+2.2
+2.2
++ other (near the ceiling)
+0.9
+1.0
+0.8
+0.9
+1.0
+0.8
+0.6
+0.7
+0.8
+• + partition limit (100 −ceiling)
+11.0
+10.2
+11.7
+10.9
+10.3
+11.6
+11.8
+11.6
+11.1
+Piece ceiling
+89.0
+89.8
+88.3
+89.1
+89.7
+88.4
+88.2
+88.4
+88.9
+(b) Error types (% of expressions)
+• wrong object
+2.9
+2.0
+3.5
+6.1
+3.7
+8.2
+4.4
+4.1
+4.4
+• two objects
+2.5
+1.5
+3.5
+3.1
+1.6
+4.6
+2.9
+2.9
+2.8
+• mix of objects
+0.8
+0.6
+1.8
+0.9
+0.7
+1.7
+1.0
+1.0
+1.0
+• missed
+1.3
+0.8
+2.3
+1.6
+0.8
+3.0
+2.1
+1.7
+1.7
+• missing pieces
+5.7
+5.2
+7.1
+5.2
+5.2
+6.8
+6.2
+5.6
+5.9
+• extra pieces
+2.4
+2.9
+3.2
+2.4
+2.8
+2.8
+3.7
+3.4
+3.0
+• near the ceiling (correct)
+84.5
+87.0
+78.6
+80.8
+85.2
+73.0
+79.7
+81.4
+81.3
+Table 7. Where the errors of SPiXSeg (InternVL2.5-8B) come from; colours match Fig. 10. (a) The rows add up to 100 on every split.
+Piece ceiling: cIoU of the training targets, i.e. the superpixels more than half inside the ground truth (the top one if none is); the partition
+limit is what is lost even with this selection. The model errors are measured by replacing each group of predictions with the training targets,
+in the order listed. (b) Share of expressions per error type: wrong object, two objects, mix and missed make up “wrong or missed object”
+in (a); missing and extra pieces make up “right object, wrong pieces”.
+9.2. Out-Of-Domain Expressions
+Fig. 7 of the main paper presented expressions on OOD
+images that are far from COCO training data.
+We pro-
+vide more such examples in Fig. 12. These images have no
+ground truth, and we show expressions on which the base-
+lines struggle.
+9.3. Open-Vocabulary Semantic Segmentation
+We presented zero-shot qualitative results after training on
+COCO-Stuff in Table 3. We provide more qualitative results
+in Fig. 13 for ADE20K-150.
+9.4. Region Budget
+SPiXSeg is trained with at most K=64 superpixels per im-
+age, but K can be changed at test time by running the super-
+pixel extraction with a smaller limit, without retraining the
+model. Fig. 14 shows the predictions for K = 16, 32, 48
+and 64, together with the ceiling, i.e. the best performance
+that any selection of the superpixels can reach. With few
+superpixels, the target is merged with its surroundings, re-
+sulting in coarser superpixels, so even the best selection is
+poor; at K=16 the ceiling is at most 10 IoU in all four ex-
+amples. As K grows, the target is covered by its own super-
+pixels and the ceiling rises. From K=32 on, our prediction
+reaches the ceiling in every example, so the remaining er-
+rors at small K come from the superpixels and not from
+their classification.
+10. Image credits
+Image
+Author
+Licence
+Fig. 7
+Chameleon
+Charles J. Sharp
+CC BY-SA 4.0
+Crab
+Bj¨orn K¨onig
+CC BY-SA 3.0
+Grasshopper
+Biggins Dean, U.S. Fish and
+Wildlife Service
+Public domain
+Lobster
+Federicofuentes
+CC BY-SA 3.0
+Horse sculpture
+Gary Todd
+CC0
+Painting (Vermeer) Johannes Vermeer
+Public domain
+Divers
+NOAA Fisheries/Hannah
+Barkley
+Public domain
+Fig. 12
+Clownfish
+Nick Hobgood
+CC BY-SA 3.0
+Macaw
+Michael G¨abler
+CC BY 3.0
+Heron
+Basile Morin
+CC BY-SA 4.0
+Dragonfly
+Charles J. Sharp
+CC BY-SA 4.0
+Violinist
+Wilfredor
+CC0
+Stingray
+Charles J. Sharp
+CC BY-SA 4.0
+Cathedral
+Diego Delso
+CC BY-SA 3.0
+Longhorn beetle
+Jeevan Jose, Kerala, India
+CC BY-SA 4.0
+The out-of-domain images in Fig. 7 and Fig. 12 are from
+Wikimedia Commons; we resize them and draw the pre-
+dicted masks on them. Each image name links to its Com-
+mons page.
+3
+
+
+GT
+LISA
+HiMTok
+SAMTok
+PaDT
+SPiXSeg
+“the tongs and
+very left plate”
+“the nine
+fire hydrants
+closest to us”
+“bottles of wine
+situated next
+to the table”
+“inside the green
+box positioned on
+the right there are
+apple segments”
+“the black guy on
+the left holding a
+bread and a table”
+“silver saturn”
+“a train”
+“front bottom middle
+bird laying on side
+cant see his legs”
+Figure 8. Generalized referring segmentation on gRefCOCO with the InternVL2.5-8B backbone. Top five rows: expressions with several
+targets; then one with a single target; bottom two: expressions with no target in the image, where the correct answer is an empty mask.
+Columns: ground truth, LISA-7B [21], HiMTok [37], SAMTok [55], PaDT [34], and SPiXSeg (ours)
+4
+
+
+GT
+LISA
+SAMTok
+PaDT
+SPiXSeg
+“the unopened flowers”
+“In what specific way do the
+characteristics of the plant in the picture
+enable it to survive arid conditions?”
+“What part of the fish and chips
+meal is often used to add flavor
+and squeezed onto the fish?”
+“What piece of accessory
+among the small, colorful bead
+decorations in the image can
+be worn as a wrist ornament?”
+“In modern cuisine, dishes are
+often decorated to create a distinct
+and aesthetically pleasing dining
+experience. Based on the picture,
+what food item is most likely to be
+utilized for decoration purposes?”
+“In a game of darts, what part
+of the dartboard should you aim
+for to maximize your points?”
+“the food with high vitamin”
+“Which part of the dog’s body in the
+picture seems to be alert and attentive?”
+Figure 9. Reasoning segmentation on the ReasonSeg test split with the InternVL2.5-8B backbone (fine-tuned from our RES checkpoint
+on RES, VQA and ReasonSeg). Columns: ground truth, LISA-7B [21], SAMTok [55], PaDT [34], and SPiXSeg (ours).
+5
+
+
+ground truth
+ceiling pieces (training targets)
+ours
+left: superpixels
+right: our selection
+Wrong object
+wrong or missed object
+IoU 0
+ceiling 98
+“upright suitcase to the right of dog”
+Two objects
+wrong or missed object
+IoU 26
+ceiling 97
+“middle bowl on right”
+Mix of objects
+wrong or missed object
+IoU 22
+ceiling 90
+“snowboard horizontal”
+Missed
+wrong or missed object
+IoU 0
+ceiling 97
+“an imac computer beside a computer monitor”
+Missing pieces
+right object, wrong pieces
+IoU 31
+ceiling 93
+“front gif”
+Extra pieces
+right object, wrong pieces
+IoU 30
+ceiling 97
+“inside sink”
+Partition limit
+partition limit
+IoU 37
+ceiling 38
+“a four light decorative lamp”
+Correct
+near the ceiling
+IoU 98
+ceiling 98
+“avocado chunks and several carrots”
+Figure 10. One example per error type of Table 7 (InternVL2.5-8B). Left of each pair: our superpixels with the ceiling pieces (blue), the
+training targets, i.e. the superpixels more than half inside the ground truth; right: our selection (red). Yellow: ground-truth outline. Wrong
+object, two objects and mix of objects involve a look-alike of the same category; missed: the target is barely covered and the selection is
+not on a look-alike. The partition limit is the loss no selection can avoid: the thin lamp arms fall inside no superpixel.
+6
+
+
+GT
+Text4Seg
+RAS
+UFO
+PaDT
+SPiXSeg
+“standing
+hands together”
+“third from
+left nana”
+“the orange directly
+below the biggest
+furthest orange”
+“little oranges on
+left in middle”
+“right banana”
+“carrot
+background”
+“banana right
+above free”
+“peeled orange
+middle”
+Figure 11.
+Referring expression segmentation on RefCOCO/+/g with the InternVL2.5-8B backbone.
+Columns:
+ground truth,
+Text4Seg [22], RAS [6], UFO [35], PaDT [34], and SPiXSeg (ours).
+7
+
+
+Input
+Text4Seg
+RAS
+UFO
+PaDT
+SPiXSeg
+“the sea anemone”
+“the yellow chest”
+“the legs of the heron”
+“the long striped
+abdomen of
+the dragonfly”
+“the strap on
+his shoulder”
+“the tail of the stingray”
+“the street lamp
+on the right”
+“the flower spike”
+Figure 12. More out-of-domain expressions compared across methods, on images not shown in Fig. 7: Text4Seg [22], RAS [6], UFO [35],
+PaDT [34] and SPiXSeg. Text4Seg, UFO and SPiXSeg use LLaVA-1.5-7B, RAS LLaVA-1.5-13B and PaDT Qwen2.5-VL-7B.
+8
+
+
+GT
+UFO†
+Text4Seg‡
+LaSagnA†
+HiMTok
+SPiXSeg (ours)
+ceiling
+bed
+curtain
+wall
+chest of drawers
+floor
+wall
+armchair
+floor
+bag
+basket
+wall
+bed
+windowpane
+painting
+curtain
+pillow
+wall
+door
+ceiling
+floor
+fireplace
+wall
+floor
+animal
+cabinet
+armchair
+ceiling
+plant
+computer
+desk
+wall
+floor
+curtain
+wall
+windowpane
+floor
+wall
+bed
+wardrobe
+ceiling
+pillow
+floor
+Figure 13. Open-vocabulary semantic segmentation on ADE20K-150, more examples. Columns: ground truth, UFO [35], Text4Seg [22],
+LaSagnA [38], HiMTok [37], and SPiXSeg (ours); the classes covering at least 3% of the ground truth are listed under each row. †Trained
+with ADE20K, so not zero-shot on it. ‡LLaVA-1.5.
+9
+
+
+Image / GT
+K = 16
+K = 32
+K = 48
+K = 64
+IoU 0 · max 10 · 16 regions
+IoU 12 · max 12 · 28 regions
+IoU 31 · max 31 · 38 regions
+IoU 96 · max 96 · 53 regions
+“full size bed
+with two pillows”
+IoU 0 · max 8 · 14 regions
+IoU 63 · max 63 · 25 regions
+IoU 97 · max 97 · 41 regions
+IoU 97 · max 97 · 61 regions
+“dog with an attached
+bag standing before
+three people carrying
+camping equipment”
+IoU 0 · max 5 · 12 regions
+IoU 84 · max 84 · 26 regions
+IoU 84 · max 84 · 45 regions
+IoU 94 · max 94 · 57 regions
+“first boat”
+IoU 0 · max 10 · 13 regions
+IoU 98 · max 98 · 16 regions
+IoU 98 · max 98 · 26 regions
+IoU 98 · max 98 · 46 regions
+“very bottom far left donut”
+IoU 4 · max 4 · 16 regions
+IoU 76 · max 76 · 32 regions
+IoU 97 · max 97 · 44 regions
+IoU 96 · max 96 · 58 regions
+“a love seat with light
+brown seats and
+dark brown sides”
+IoU 0 · max 21 · 16 regions
+IoU 29 · max 29 · 26 regions
+IoU 92 · max 92 · 37 regions
+IoU 92 · max 92 · 42 regions
+“bowl of food in
+the back left”
+IoU 0 · max 12 · 10 regions
+IoU 0 · max 19 · 20 regions
+IoU 94 · max 94 · 27 regions
+IoU 94 · max 94 · 36 regions
+“the plate that only
+has roast beef on it”
+IoU 1 · max 5 · 10 regions
+IoU 1 · max 5 · 14 regions
+IoU 96 · max 96 · 35 regions
+IoU 96 · max 96 · 50 regions
+“white cup behind glass”
+Figure 14. SPiXSeg (LLaVA-1.5-7B, trained at K=64) with K = 16, 32, 48, 64 regions at test time. Left: image with the ground truth
+(yellow); then, per K, the superpixel boundaries (white) and our selection (blue); IoU of the selection, the ceiling (max) and the realised
+number of regions below. Coarse maps merge the target with its surroundings; from K=48 on the target can be formed and our selection
+follows it.
+10

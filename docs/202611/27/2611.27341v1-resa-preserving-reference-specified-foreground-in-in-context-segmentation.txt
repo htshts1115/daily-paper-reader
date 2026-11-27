@@ -1,0 +1,5419 @@
+ReSA: Preserving Reference-Specified Foreground in In-Context Segmentation
+Dezhao Su1*, Bingxu Hou2, Jingdi Lei3, Lin Qian4, Likai Wang5, Yunyun Wan6
+1Fudan University
+2Zhejiang University
+3Nanyang Technological University
+4University of Manchester
+5Tsinghua University
+6Beijing University of Posts and Telecommunications
+Inputs
+Extra foreground
+Missed foreground
+ReSA
+Reference
+Query
+(GT mask)
+Target (GT)
+Prediction
+Foreground error rates in LVIS-92i
+1-shot /
+5-shot (%)
+Miss ↓
+10
+20
+30
+21.9
+30.3
+18.7
+30.8
+25.9
+32.4
+14.3
+23.5
+FSSAM
+RSRM
+INSID3
+ReSA
+Extra ↓
+40
+50
+60
+70
+46.2
+56.2
+56.2
+64.8
+44.7
+48.7
+42.0
+48.4
+FSSAM
+RSRM
+INSID3
+ReSA
+FSSAM
+RSRM
+50
+55
+60
+65
+70
+75
+5-shot mIoU (%)
+45
+50
+55
+60
+65
+1-shot mIoU (%)
+Better
+RPG-SAM
+MICCAI’26
+COSINE
+ICCV’25
+Matcher
+ICLR’24
+HERA
+CVPR’26
+GF-SAM
+NeurIPS’24
+RSRM
+ECCV’26
+INSID3
+CVPR’26
+FSSAM
+ICML’25
+ReSA
+This paper
+Ten-dataset averages
+66,981 episodes per shot setting
+PR-MaGIC
+CVPR’26
+Figure 1. Foreground coverage and segmentation performance. Left: a matched 5-shot example shows extra and missed foreground;
+one of five references is shown. Below: foreground miss FN/(TP+FN) and extra FP/(TP+FP) rates (%) on LVIS-92i, a natural-object
+segmentation benchmark with 23,000 test episodes per shot setting. Rates are averaged over classes and then folds; filled/open markers
+denote 1-shot/5-shot. Right: mean 1-shot versus 5-shot mIoU (%) across ten benchmarks (Tables 1–2); the upper right is better.
+Abstract
+In-context segmentation uses annotated references to spec-
+ify the target and its extent in a query image.
+Accu-
+rately transferring this reference-specified foreground re-
+quires recovering target regions while suppressing irrel-
+evant predictions. We propose ReSA, a reference-guided
+framework that unifies query adaptation and mask selection
+through a shared reference kernel. ReSA leverages fore-
+ground and background reference prototypes to constrain
+prediction changes during adaptation and guide foreground
+selection through reference-weighted reconstruction. This
+shared guidance promotes consistent use of reference infor-
+mation across prediction refinement and mask formation.
+ReSA further selects among adapted predictions and aligns
+boundary refinement with the selected foreground thresh-
+old. We establish a theoretical bound connecting reference-
+response changes during adaptation and soft reconstruc-
+tion. With a frozen visual encoder and lightweight test-time
+adaptation, ReSA requires no offline task training. Ablation
+*Corresponding author.
+studies demonstrate improved foreground retention and ef-
+fective suppression of false-positive regions, while qualita-
+tive results show more complete masks with fewer isolated
+artifacts. Across ten object, part, and cross-domain seg-
+mentation benchmarks, ReSA achieves the highest average
+mIoU among the evaluated methods, reaching 62.6% in 1-
+shot and 71.8% in 5-shot.
+1. Introduction
+In-context segmentation uses a few annotated reference im-
+ages to specify the target in a query image.
+The refer-
+ence masks define both target identity and foreground ex-
+tent, supporting object, part, and cross-domain segmenta-
+tion [5, 6, 8, 11, 13, 16, 22, 23, 38, 51]. Reference fore-
+ground and background provide examples of target and non-
+target content. Segmentation must recover the specified ex-
+tent while excluding surrounding distractors.
+Existing approaches use learned decoders [25, 32, 47]
+1
+arXiv:2611.27341v1  [cs.CV]  20 Nov 2026
+
+
+or pretrained mask generators [26, 52, 53].
+Decoder-
+based methods learn reference-conditioned segmentation
+from annotated training data. This requires task-specific su-
+pervision; cross-domain research reports declining target-
+domain performance with continued source-domain train-
+ing [28]. SAM-based approaches combine semantic corre-
+spondence with a mask generator, requiring prompt selec-
+tion and alignment with the reference-specified mask gran-
+ularity [52]. These dependencies have motivated segmenta-
+tion directly from dense self-supervised features.
+On frozen features, reference matching and feature
+affinities guide query-region selection and aggregation [10,
+44]. The conversion from correspondence to foreground re-
+gions determines mask quality. Confident predictions can
+include distractors and omit target regions. Figure 1 illus-
+trates two remaining errors: incomplete target coverage and
+extra foreground from unrelated regions. Part segmentation
+further requires selecting the annotated portion of an object
+(Fig. 4). These errors motivate using reference foreground
+and background throughout mask inference.
+We study foreground recovery through two connected
+decisions: query adaptation and mask selection. Adapta-
+tion updates foreground probabilities; selection determines
+which regions enter the mask. Both affect coverage and
+background inclusion. Our central idea is to use the same
+reference-to-query similarities to guide both decisions. The
+annotated context thus informs both the adaptation objec-
+tive and the selection criterion.
+We propose ReSA, a unified framework for reference-
+guided adaptation and mask selection (Fig. 3). A shared
+reference kernel represents similarities between query fea-
+tures and foreground/background reference prototypes.
+Response-constrained adaptation (RCA) uses this kernel to
+regularize weighted foreground responses during entropy
+minimization. Reference-weighted mask selection (RMS)
+reuses the kernel to fit candidate-specific thresholds through
+weighted probability reconstruction and selects a candidate
+by relative reconstruction gain. Threshold-aligned refine-
+ment (TAR) uses the selected threshold to align the CRF
+unary scores before refining the mask boundaries.
+The
+framework keeps the encoder frozen and adapts lightweight
+classifiers separately for each episode.
+Our contributions are:
+• We propose ReSA, an in-context segmentation frame-
+work that uses foreground and background reference cues
+to guide query adaptation and mask selection, improving
+target coverage and suppressing false positives.
+• We connect response regularization and reconstruction-
+based threshold fitting through a shared reference kernel,
+and select candidates by relative reconstruction gain. We
+derive a bound linking adaptation and soft reconstruction,
+and align boundary refinement with the selected thresh-
+old.
+Query
+DINOv3
+Probability 0
+1
+Prediction
+Ground truth
+Initial
+adapt
+RCA
+adapt
+Final
+prediction
+Figure 2. From reference fitting to query adaptation. Columns
+show the query with its ground-truth target, DINOv3 feature clus-
+ters, initial probabilities p0, probabilities after RCA, and the final
+mask. Probability maps share a [0, 1] scale. Cyan/magenta denote
+ground truth/predictions. Loss ablations are in Fig. 6(a).
+• Across ten benchmarks, ReSA achieves the highest aver-
+age mIoU among the evaluated methods: 62.6% in 1-shot
+and 71.8% in 5-shot. Ablations quantify the contribu-
+tions of reference guidance, threshold fitting, and candi-
+date selection; qualitative comparisons show more com-
+plete masks with fewer isolated false-positive regions.
+2. Related Work
+Reference-guided segmentation.
+SegGPT, SegIC, and
+SINE learn reference-conditioned segmentation through
+in-context prediction, correspondence-derived instructions,
+and task-aware decoding [25, 32, 47].
+DiffewS adapts
+latent-diffusion features [40, 55]; FSSAM and SANSA
+adapt SAM 2 [39] for few-shot segmentation [9, 50];
+LoEC emphasizes low-level features for cross-domain
+transfer [28].
+Matcher, PerSAM, and GF-SAM use ref-
+erence cues to guide pretrained mask generators [18, 26,
+52, 53]; GSM improves semantic mining [49].
+RE-
+BASE projects reference and query features away from a
+reference-background subspace to improve matching and
+prompt localization [12].
+Constructing masks from frozen features.
+DINO rep-
+resentations support segmentation through feature group-
+ing and reference matching [34, 43].
+INSID3 selects
+a reference-related seed cluster and expands it through
+query-cluster aggregation [10].
+RSRM improves match-
+ing through feature fusion, query-guided support-feature
+enhancement, and global, regional, and pixel-level proto-
+2
+
+
+Reference + mask
+Target: cake
+Query + GT
+DINOv3
+Initial adapt
+Without response constraint
+Lost
+foreground
+Response-Constrained
+Adaptation
+Linear adapt
+Constrain response drift
+Reference-Weighted
+Mask Selection
+W Weighted threshold fitting
+Probability pλ Two-level qλ Selected
+Threshold Relative gain
+1
+0.447
+0.972
+3
+0.342
+0.942
+Select max
+gain
+Gain = 1 −
+Two-level error
+Constant error
+Threshold-Aligned
+Refinement
+1. Use T* as the FG/BG cutoff
+2. Refine only near the contour
+Coarse
+Refined
+Final mask
+IoU 96.93
+Query RGB
+Boundary band
+From frozen DINOv3 features
+Reference features
+Query features
+Reference
+FG / BG
+prototypes
+Cosine
+similarity
+Query-Reference kernel K
+FG mean
+BG mean
+Reference
+weight map W
+W
+0
+1
+Probability p
+Adapted per episode
+Frozen encoder
+Zoomed region
+Figure 3. Reference guidance from predictions to masks. A recorded 1-shot example; query ground truth is shown for visualization.
+Frozen DINOv3 features form the reference kernel K. Reference fitting produces p0; RCA adapts two copies of the head with entropy
+weights λ ∈{1, 3} while penalizing changes from Kp0 to Kpλ. RMS uses the reference weight map W (entries wi) to fit thresholds and
+select (p∗, T ∗) by relative reconstruction gain. TAR shifts the CRF unary scores to use T ∗and refines the coarse mask using query RGB
+and spatial cues. The inset shows the matched λ = 1 control without the response constraint. Probability maps, thresholds, gains, and
+masks are recorded outputs.
+types [44]. FROST estimates foreground and background
+feature densities from the references and applies a Bayes
+decision rule with equal class priors [35].
+Test-time adaptation and foreground inference.
+Trans-
+ductive methods use unlabeled query data to adapt pre-
+dictions within a few-shot episode [4].
+HERA com-
+bines feature-layer selection, attention regularization, and
+pixel-logit calibration for cross-domain segmentation [31].
+Threshold selection converts query probabilities into a fore-
+ground mask. RPG-SAM selects thresholds through geo-
+metric agreement among candidate masks [24]. Bregman
+quantization groups continuous values by minimizing re-
+construction error [3]. Dense CRFs refine boundaries using
+prediction scores, pixel positions, and appearance [19, 20].
+ReSA uses the same reference kernel to regularize query
+adaptation and fit mask thresholds, then uses the selected
+threshold in CRF refinement.
+3. Method
+Given S annotated references R = {(Ir
+s, M r
+s )}S
+s=1 and an
+unlabeled query Iq, ReSA predicts the foreground at the
+semantic granularity specified by the reference masks. Fig-
+ure 3 summarizes the inference pipeline.
+A frozen encoder maps each image to a spatial grid
+of N tokens with D-dimensional features. Following IN-
+SID3 [10], we remove the positional subspace:
+eF = Norm
+ F(ID −BB⊤)
+
+,
+(1)
+where B is an orthonormal basis derived from a constant
+input and Norm normalizes each row. We use the resulting
+features for reference–query matching and foreground pre-
+diction. Before classifier fitting, a reference–query match-
+ing check identifies episodes with no foreground candi-
+dates, which receive an empty mask.
+3.1. Reference kernel and responses
+For each reference image, we use masked average pooling
+on the token grid to compute foreground and background
+prototypes. Let cr, r = 1, . . . , 2S, denote the normalized
+prototypes. Applying a softmax to their cosine similarities
+with normalized query features f q
+i gives the reference ker-
+nel:
+Kri =
+exp(c⊤
+r f q
+i /τ)
+P
+j exp(c⊤
+r f q
+j /τ),
+τ = 0.05.
+(2)
+Each row of K ∈R2S×N contains nonnegative weights
+that sum to one. For a query foreground probability map
+p ∈[0, 1]N, the reference response (Kp)r = P
+i Kripi is a
+weighted average that emphasizes query features similar to
+prototype r. Foreground and background prototypes apply
+different weights to the same foreground probability map.
+3
+
+
+With 4,096 query tokens, Kp contains two responses in 1-
+shot and ten in 5-shot. We keep K fixed and use it to com-
+pute RCA’s responses and RMS’s reconstruction weights.
+3.2. Response-constrained adaptation (RCA)
+RCA regularizes query foreground responses against their
+values after reference fitting during entropy minimiza-
+tion.
+We use a linear foreground classifier p(f)
+=
+sigmoid(v⊤f + b) with D + 1 parameters and initialize v
+and b to zero for each episode. We first fit it to the refer-
+ence annotations by minimizing binary cross-entropy Lref,
+weighted equally across foreground/background classes
+and references.
+The fitted classifier produces the ini-
+tial query probabilities p0 and initializes two branches,
+which are adapted independently.
+Writing d(u, v)
+=
+DKL(Ber(u)∥Ber(v)), we penalize deviations from the ini-
+tial responses Kp0:
+Lcond(p) = 1
+2S
+2S
+X
+r=1
+d(Krp, Krp0).
+(3)
+Each branch minimizes
+Lλ = Lref + 1
+S
+
+Lcond(p) + λH(p)
+
+,
+(4)
+where H(p) = N −1 P
+i H(pi) is mean Bernoulli entropy.
+The factor 1/S reduces the weight of the query losses rel-
+ative to reference supervision as the number of references
+increases; 1/(2S) averages the prototype-wise KL terms.
+The branches use entropy weights λ = 1 and 3, with the
+same initialization and number of optimization steps. RMS
+takes the resulting probability maps p1 and p3 as input.
+3.3. Reference-weighted mask selection (RMS)
+Threshold fitting. RMS fits a separate threshold to each
+adapted probability map to account for differences in confi-
+dence scale, then selects a candidate mask. For a threshold
+t, it approximates the probabilities using two fitted values:
+qλ,i(t, a, b) = a + (b −a)1[pλ,i > t],
+(5)
+with 0 < a ≤b < 1. Tokens with pλ,i ≤t receive the
+fitted value a, and those with pλ,i > t receive b. The thresh-
+old partition defines the binary mask. We average the rows
+of K to obtain the reference weight map W, with entries
+wi = (2S)−1 P
+r Kri and P
+i wi = 1, and minimize the
+weighted Bernoulli KL divergence:
+Dλ(t, a, b) =
+X
+i
+wid(pλ,i, qλ,i).
+(6)
+The reference weights emphasize reconstruction accuracy
+at query locations similar to the annotated foreground or
+background. Threshold fitting thus uses the same reference-
+to-query similarities as RCA. For each nonempty split with
+positive group weights, the optimal values a and b are the
+weighted mean probabilities within the two groups. Sorting
+the probabilities and evaluating prefix sums finds the best
+split in O(N log N) time. This gives the minimum error D∗
+λ
+and a threshold Tλ midway between the adjacent distinct
+probabilities at that split.
+Candidate selection. We score each candidate by the
+fraction of its best constant-reconstruction error removed by
+the two-level fit. For Dλ,const > 0, we define
+sλ = 1 −
+D∗
+λ
+Dλ,const
+,
+λ∗= arg max
+λ∈{1,3}
+sλ.
+(7)
+Here Dλ,const is the minimum error in Eq. 6 for a constant
+map q = c1, attained at c = P
+i wipλ,i. Ties select λ = 3.
+The selected probability map p∗= pλ∗and threshold T =
+Tλ∗define the coarse mask
+bmi = 1[p⋆
+i > T].
+(8)
+TAR receives (p∗, T).
+3.4. Threshold-aligned refinement (TAR)
+TAR aligns the foreground/background preference of the
+CRF with the threshold selected by RMS. We subtract
+logit(T) from the query logits:
+zi = logit(p⋆
+i ) −logit(T).
+(9)
+On the token grid, zi > 0
+⇐⇒
+p⋆
+i > T, so the unary
+scores agree with the coarse foreground/background labels.
+For example, pi = 0.4 favors foreground when T = 0.3.
+We bilinearly upsample and binarize bm on the CRF grid,
+then use dilation and erosion to define a boundary band B.
+Interpolating z to this grid gives the foreground/background
+scores
+ℓfg
+x = ηezx/2,
+ℓbg
+x = −ηezx/2,
+x ∈B,
+(10)
+with η = 8.
+Within the band, these scores define the
+unary terms. The spatial pairwise term uses pixel positions,
+and the bilateral term uses both positions and RGB values.
+We use the regularized Frank–Wolfe solver adopted by IN-
+SID3 [10, 19, 20] and retain the coarse mask’s foreground
+core and exterior background in the final mask.
+3.5. Reference-response consistency
+We analyze a fixed, row-stochastic K for episodes with both
+reference classes present and a valid threshold fit. The re-
+sponse penalty is zero whenever K(p −p0) = 0. For initial
+responses strictly between zero and one, its local quadratic
+form in probability space has rank at most 2S. For RMS,
+joint convexity of KL gives
+1
+2S
+X
+r
+d(Krpλ, Krqλ) ≤Dλ.
+(11)
+4
+
+
+Table 1. Natural-object segmentation. Foreground mIoU (%); Avg (4) weights these four datasets equally. Params: total model parame-
+ters (M), including frozen encoders. Gray marks task-training overlap (possible for COSINE); affected entries and averages are unranked.
+Best/second best: bold/underlined, including ties. †: local evaluation (whole row when attached to a method); –: unavailable.
+Method
+Venue
+Backbone
+Params
+LVIS-92i
+COCO-20i
+FSS-1000
+PASCAL-5i
+Avg (4)
+1-shot
+5-shot
+1-shot
+5-shot
+1-shot
+5-shot
+1-shot
+5-shot
+1-shot
+5-shot
+Task-specific fine-tuning: Semantic + mask supervision
+SegGPT[47]
+ICCV’23
+ViT-L
+354M
+18.6
+25.4
+56.1
+67.9
+85.6
+89.3
+83.2
+89.8
+60.9
+68.1
+SegIC[32]
+ECCV’24
+DINOv2-L
+310M
+44.6
+46.8†
+76.1
+74.4†
+86.8
+87.3†
+85.6
+88.4†
+73.3
+74.2
+SINE[25]
+NeurIPS’24 DINOv2-L
+373M
+31.2
+35.5
+64.5
+66.1
+84.3†
+85.0†
+85.4
+86.2
+66.3
+68.2
+DiffewS[55]
+NeurIPS’24 SD 2.1
+890M
+31.4
+35.4
+71.3
+72.2
+87.8
+88.0
+88.3
+87.8
+69.7
+70.9
+LDIS-1†[46]
+AAAI’25
+SD1.5+AlphaCLIP
+1248M
+15.9
+20.4
+57.7
+63.8
+67.5
+69.3
+84.5
+86.0
+56.4
+59.9
+FSSAM†[50]
+ICML’25
+DINOv2+SAM2
+132M
+37.2
+47.7
+62.3
+71.0
+88.7
+89.6
+79.5
+86.3
+66.9
+73.7
+COSINE†[27]
+ICCV’25
+DINOv2-L+CLIP
+691M
+35.3
+40.8
+68.0
+71.5
+87.2
+87.1
+86.2
+88.3
+69.1
+71.9
+No offline task training: Mask-supervised pre-training
+PerSAM†[53]
+ICLR’24
+DINOv2-L+SAM-H
+945M
+20.1
+24.3
+34.3
+39.1
+72.1
+72.8
+50.6
+56.0
+44.3
+48.0
+Matcher[26]
+ICLR’24
+DINOv2-L+SAM-H
+945M
+33.0
+40.0
+52.7
+60.7
+87.0
+89.6
+68.1
+74.0
+60.2
+66.1
+GF-SAM[52]
+NeurIPS’24 DINOv2-L+SAM-H
+945M
+35.2
+44.2
+58.7
+66.8
+88.0
+88.9
+72.1
+82.6
+63.5
+70.6
+GSM+Matcher[49] AAAI’26
+DINOv2-L+SAM-H
+945M
+34.3
+41.9
+55.9
+62.7
+87.3
+89.6
+71.3
+75.7
+62.2
+67.5
+RNS†[2]
+CVPR’26
+DINOv3+SAM2.1
+528M
+27.1
+34.4
+45.1
+58.8
+81.6
+87.0
+62.8
+81.6
+54.1
+65.5
+PR-MaGIC†[21]
+CVPR’26
+DINOv2-L+SAM-H
+945M
+23.8
+24.5
+44.5
+48.2
+86.6
+88.6
+63.8
+69.8
+54.7
+57.8
+RPG-SAM†[24]
+MICCAI’26 DINOv2-L+SAM2-L
+529M
+28.4
+39.7
+47.7
+53.1
+75.6
+77.9
+55.5
+64.0
+51.8
+58.7
+No offline task training: Self-supervised pre-training
+INSID3[10]
+CVPR’26
+DINOv3-L
+303M
+41.8
+47.2
+57.6
+65.1
+85.8†
+87.4†
+67.3†
+80.1†
+63.1
+70.0
+HERA†[31]
+CVPR’26
+DINOv3-L
+312M
+26.0
+33.2
+45.3
+54.0
+80.2
+82.5
+61.6
+74.7
+53.3
+61.1
+RSRM†[44]
+ECCV’26
+DINOv3-L
+303M
+31.3
+39.9
+51.6
+61.8
+80.6
+82.8
+68.8
+79.4
+58.1
+66.0
+FROST[35]
+arXiv’26
+DINOv3-L
+303M
+32.8
+47.1
+48.4
+60.5
+82.6†
+86.0†
+70.1
+82.5
+58.5
+69.0
+ReSA (ours)
+This paper
+DINOv3-L
+303M
+44.9
+53.0
+58.8
+68.4
+86.4
+89.5
+73.8
+88.9
+66.0
+74.9
+Thus, the reconstruction error upper-bounds the average KL
+divergence between the original and reconstructed refer-
+ence responses. Define their root-mean-square difference
+as E(u, v) = ∥K(u −v)∥2/
+√
+2S. With natural logarithms,
+Pinsker’s inequality and the triangle inequality give
+E(qλ, p0) ≤
+p
+Lcond(pλ)/2 +
+p
+Dλ/2.
+(12)
+The bound combines adaptation and reconstruction errors
+to control the drift from the initial responses Kp0 to the
+reconstructed responses Kqλ.
+Let X ∼w be a sampled token index and Y | X = i ∼
+Ber(pλ,i) a model-generated label. Define Z∗= 1[pλ,X >
+Tλ] as the threshold group of the sampled token. At the
+optimal fitted levels and for Dλ,const > 0,
+sλ = I(Y ; Z∗)
+I(Y ; X) .
+(13)
+Thus, sλ measures the fraction of token–label mutual infor-
+mation retained by the threshold partition.
+4. Experiments
+4.1. Evaluation setting
+Benchmarks and metric.
+We evaluate 1-shot and 5-shot
+segmentation on ten datasets: LVIS-92i, COCO-20i, FSS,
+and PASCAL-5i for natural objects; PASCAL-Part and
+PACO-Part for parts; and ISIC, SUIM, iSAID, and X-Ray
+for specialized imaging domains [5, 6, 8, 11, 13, 16, 22,
+23, 38, 51].
+The eight original benchmarks follow IN-
+SID3’s class and fold protocols. FSS uses Matcher’s 240
+test classes and 2,400 episodes per shot setting. PASCAL-
+5i [41] uses VOC2012/SBD annotations and FSSAM’s
+sampling pools, with 1,000 fixed episodes per fold and shot
+setting [14]. The evaluation covers 133,962 episodes in to-
+tal. We pool intersections and unions across episodes within
+each class to compute foreground IoU, then average over
+classes and folds. Cross-dataset averages weight all datasets
+equally.
+Implementation.
+We use a frozen DINOv3 ViT-L/16 en-
+coder with 1024 × 1024 inputs, producing 64 × 64 tokens.
+Positional debiasing uses a rank-500 basis, and each clas-
+sifier has 1,025 parameters.
+Reference fitting and query
+adaptation use separate AdamW [30] optimizer states, with
+a learning rate of 0.004 and betas (0.9, 0.999). We use the
+same inference configuration across datasets and shot set-
+tings. TAR runs five iterations on a 640 × 640 grid with
+η = 8 and a five-pixel band radius. Full implementation,
+optimization, sampling, and evaluation details are provided
+in Supplementary Sections A and C.
+Comparisons.
+We group methods by offline task training
+and pretraining supervision: task-trained methods, methods
+using mask-supervised pretraining without task training,
+5
+
+
+Table 2. Object-part and cross-domain segmentation. Foreground mIoU (%) in 1-shot and 5-shot. Avg (6) weights these six datasets
+equally. Backbones and notation follow Table 1. Extended comparisons and ten-dataset averages are in Supplementary Tables S3–S4.
+Method
+Venue
+object parts
+dermoscopy
+underwater
+aerial
+chest X-ray
+Avg (6)
+PASCAL-Part
+PACO-Part
+ISIC
+SUIM
+iSAID
+X-Ray
+1-shot
+5-shot
+1-shot
+5-shot
+1-shot
+5-shot
+1-shot
+5-shot
+1-shot
+5-shot
+1-shot
+5-shot
+1-shot
+5-shot
+Task-specific fine-tuning: Semantic + mask supervision
+SegGPT[47]
+ICCV’23
+35.8
+42.8
+13.5
+14.1
+37.5
+45.2
+34.9
+33.7
+30.9
+35.9
+87.5
+89.1
+40.0
+43.5
+SegIC[32]
+ECCV’24
+39.9
+38.9†
+25.9
+30.5†
+25.3
+29.1†
+52.5
+64.5†
+46.1
+51.0†
+34.5
+29.6†
+37.4
+40.6
+SINE[25]
+NeurIPS’24
+36.2
+36.4
+23.3
+25.4
+25.8
+28.6
+50.7
+54.8
+38.3
+40.5
+39.8
+40.6
+35.7
+37.7
+DiffewS[55]
+NeurIPS’24
+34.0
+39.7
+22.8
+26.1
+27.8
+32.7
+48.9
+49.8
+47.5
+48.0
+41.6
+45.1
+37.1
+40.2
+LDIS-1†[46]
+AAAI’25
+33.2
+32.9
+18.1
+20.7
+24.2
+24.5
+25.1
+26.8
+20.4
+21.8
+35.1
+34.7
+26.0
+26.9
+FSSAM†[50]
+ICML’25
+43.8
+52.7
+33.0
+38.3
+53.9
+65.1
+56.7
+61.9
+50.0
+53.5
+80.5
+70.0
+53.0
+56.9
+COSINE†[27]
+ICCV’25
+36.2
+36.0
+27.7
+28.9
+28.1
+29.0
+58.7
+61.9
+36.4
+36.9
+30.3
+30.0
+36.2
+37.1
+No offline task training: Mask-supervised pre-training
+PerSAM†[53]
+ICLR’24
+31.6
+32.5
+25.0
+28.5
+35.5
+38.9
+26.0
+28.8
+29.1
+31.1
+32.4
+31.3
+29.9
+31.8
+Matcher[26]
+ICLR’24
+42.9
+45.8
+34.7
+33.6
+38.6
+35.0
+44.1
+50.6
+33.3
+34.3
+70.8
+71.2
+44.1
+45.1
+GF-SAM[52]
+NeurIPS’24
+44.5
+51.2
+36.3
+41.9
+48.7
+55.2
+53.1
+58.1
+47.1
+52.4
+51.0
+52.9
+46.8
+52.0
+RNS†[2]
+CVPR’26
+28.6
+37.0
+21.7
+28.7
+39.3
+43.6
+51.4
+61.1
+42.3
+52.0
+29.2
+29.8
+35.4
+42.0
+PR-MaGIC†[21] CVPR’26
+40.2
+41.4
+32.6
+32.4
+42.4
+41.5
+40.3
+43.8
+33.3
+34.3
+75.3
+74.3
+44.0
+44.6
+RPG-SAM†[24] MICCAI’26
+41.6
+48.3
+36.8
+42.5
+58.8
+63.7
+39.7
+44.0
+41.3
+47.4
+50.4
+49.6
+44.8
+49.2
+No offline task training: Self-supervised pre-training
+INSID3[10]
+CVPR’26
+50.5
+57.1
+38.7
+46.8
+54.4
+63.9
+54.9
+61.7
+52.1
+56.9
+78.8
+80.1
+54.9
+61.1
+HERA†[31]
+CVPR’26
+45.9
+59.4
+32.4
+45.5
+52.9
+61.9
+48.5
+58.0
+44.5
+52.8
+74.0
+86.8
+49.7
+60.7
+RSRM†[44]
+ECCV’26
+51.1
+60.2
+38.0
+48.5
+57.0
+63.9
+52.4
+62.2
+48.9
+57.1
+87.8
+89.0
+55.9
+63.5
+FROST[35]
+arXiv’26
+53.1†
+64.9†
+39.1
+52.1
+52.6
+66.3
+58.0
+68.8
+50.5†
+61.0†
+84.7†
+85.5†
+56.3
+66.4
+ReSA (ours)
+This paper
+56.0
+66.3
+45.5
+57.3
+58.8
+68.2
+58.8
+69.0
+53.2
+66.2
+89.7
+90.7
+60.3
+69.6
+and methods using self-supervised features without task
+training. INSID3, RSRM, HERA, FROST, and ReSA all
+use DINOv3-L/16. Other backbones include CLIP [37] and
+Alpha-CLIP [45]. Supplementary Sections D.2–D.4 docu-
+ment each method’s inference configuration, result sources,
+and evaluation conventions.
+4.2. Main results
+ReSA achieves average mIoU scores of 62.6% in 1-shot and
+71.8% in 5-shot across ten datasets (Tables 1–2). These
+scores exceed INSID3 by 4.4/7.2 points and FROST by
+5.4/4.3 points. In 5-shot, ReSA ranks first on three of the
+four natural-object datasets among methods without offline
+task training (Table 1).
+On PASCAL-Part and PACO-Part,
+ReSA averages
+50.7/61.8 mIoU in 1-shot/5-shot, outperforming INSID3 by
+6.1/9.8 points (Table 2). The 5-shot gains over INSID3 on
+ISIC, SUIM, iSAID, and X-Ray are 4.3, 7.3, 9.3, and 10.6
+points, respectively, using the same inference configuration.
+Foreground coverage and background rejection.
+Com-
+pared with INSID3 in 1-shot, ReSA reduces both fore-
+ground miss and extra-foreground rates on PASCAL-Part
+and X-Ray (Supplementary Fig. S1). On PASCAL-Part,
+the miss rate falls from 32.6% to 26.8% and the extra-
+foreground rate from 32.3% to 29.2%; the corresponding
+changes on X-Ray are 8.9% to 7.4% and 14.4% to 3.3%. On
+COCO-20i, the miss rate decreases from 27.0% to 21.0%,
+Table 3. Module combinations. Ten-dataset mean mIoU (%).
+Base is p0; ∆subtracts its displayed score. Bold marks the best
+per shot.
+RCA
+RMS
+TAR
+1-shot
+∆
+5-shot
+∆
+Base
+57.3
+–
+67.9
+–
+✓
+–
+–
+60.0
++2.7
+70.3
++2.4
+✓
+✓
+–
+61.9
++4.6
+70.7
++2.8
+✓
+–
+✓
+60.6
++3.3
+71.3
++3.4
+✓
+✓
+✓
+62.6
++5.3
+71.8
++3.9
+while the extra-foreground rate increases from 27.3% to
+30.9%.
+Figure 4 illustrates how ReSA follows the target extent
+specified by the references: it separates the bird from its
+reflection and segments the annotated cow torso and laptop
+screen. Supplementary Fig. S4 shows the progression from
+the initial prediction to more complete target masks with
+fewer isolated false-positive regions.
+4.3. Ablation and mechanism analysis
+The full method outperforms the reference-fitted baseline
+(Base) by 5.3/3.9 mIoU points (Table 3). All ablations use
+the same evaluation episodes.
+Foreground
+retention
+and
+background
+rejection.
+Combining reference supervision (R), the response KL
+6
+
+
+Reference
+RSRM
+ECCV’26
+GT
+Reference
+RSRM
+ECCV’26
+GT
+INSID3
+CVPR’26
+FSSAM
+ICML’25
+INSID3
+CVPR’26
+FSSAM
+ICML’25
+ReSA
+ours
+ReSA
+ours
+IoU 17.8
+IoU 27.9
+IoU 50.8
+IoU 94.3
+LVIS-92i
+IoU 48.7
+IoU 64.9
+IoU 65.8
+IoU 96.6
+FSS-1000
+SUIM
+IoU 14.6
+IoU 22.6
+IoU 30.3
+IoU 92.3
+iSAID
+IoU 49.8
+IoU 96.0
+IoU 48.6
+IoU 46.7
+PASCAL-5i
+IoU 38.4
+IoU 10.9
+IoU 22.2
+IoU 80.7
+COCO-20i
+IoU 56.1
+IoU 58.5
+IoU 53.6
+IoU 84.3
+ISIC
+PACO-Part
+IoU 54.2
+IoU 73.4
+IoU 82.1
+IoU 91.0
+X-Ray
+IoU 64.7
+IoU 69.4
+IoU 60.4
+IoU 95.6
+PASCAL-Part
+IoU 21.4
+IoU 0.0
+IoU 2.5
+IoU 86.4
+IoU 27.9
+IoU 47.7
+IoU 73.9
+IoU 97.8
+Figure 4. Five-shot qualitative comparisons across ten benchmarks. FSSAM (ICML’25), INSID3 (CVPR’26), RSRM (ECCV’26), and
+ReSA use the same five annotated references per query (one shown). Cyan: reference masks and ground truth; magenta: predictions.
+Table 4. RCA loss combinations. Reference supervision is re-
+tained; ten-dataset mean mIoU (%). ∆subtracts the displayed
+full-objective score; bold marks the best per shot.
+Loss combination
+1-shot
+∆
+5-shot
+∆
+R
+56.8
+−3.2
+68.3
+−2.0
+R + C
+55.2
+−4.8
+67.5
+−2.8
+R + H
+53.9
+−6.1
+69.7
+−0.6
+R + C + H
+60.0
+–
+70.3
+–
+penalty (C), and query entropy (H) gives the highest
+average mIoU in both shot settings (Table 4). All variants
+share p0, the optimization budget, λ = 1, and T = 0.5,
+with RMS and TAR disabled. The retained query losses
+use the same 1/S scaling. In 1-shot, adding C to R + H
+reduces the foreground miss rate from 37.1% to 26.5%.
+Adding H to R + C reduces the background false-positive
+rate from 7.8% to 5.7%.
+RCA outperforms continued reference supervision alone
+(R-only) by 3.7/2.1 mIoU points with one candidate and the
+same threshold-fitting rule (Supplementary Table S7).
+Reference-weighted mask selection.
+Reference weight-
+ing improves average mIoU over uniform weighting by 0.3
+points in 1-shot and 1.1 points in 5-shot under the same
+RCA objective, without TAR (Supplementary Table S10).
+RMS threshold fitting improves 1-shot mIoU by 1.6 points
+over T = 0.5, reaching 61.9; both thresholds give 70.7 in
+5-shot after rounding (Fig. 5).
+Relative-gain selection outperforms either fixed branch
+0.3
+0.5
+0.7
+58
+59
+60
+61
+62
+RMS 61.9
+61.0
+60.3
+58.6
+1-shot
+0.3
+0.5
+0.7
+67
+68
+69
+70
+71
+RMS 70.7
+70.1
+70.7
+70.3
+5-shot
+Mean mIoU (%)
+Fixed threshold T
+Fixed threshold
+RMS threshold
+Figure 5. Threshold fitting. Ten-dataset mean mIoU (%) with
+RMS-selected probabilities fixed, without TAR.
+and random selection (Table 5).
+It improves mIoU by
+0.9/0.2 points over selecting the branch with the lowest re-
+construction error.
+Boundary recovery and threshold alignment.
+TAR im-
+proves mIoU by 0.7/1.1 points over the coarse mask when
+the input probabilities and coarse masks are held fixed.
+Threshold alignment adds 0.4 points over unaligned unary
+scores in 1-shot; both variants round to 71.8 mIoU in 5-
+shot (Table 6). TAR also outperforms the No continuous
+evidence control by 0.2/0.3 points.
+Threshold alignment gives its largest Boundary IoU [7]
+gain of 2.4 points when |T−0.5| ≥0.2 (Fig. 7). The aligned
+and unaligned variants retain the same foreground core and
+exterior background, so the comparison isolates the thresh-
+7
+
+
+Table 5. Branch-selection controls. Ten-dataset mean mIoU (%),
+without TAR, using fixed candidate probabilities and fitted thresh-
+olds. Min D selects the branch with the lowest weighted recon-
+struction error; random selection averages 20 seeds. Bold marks
+the best per shot, including ties.
+Selection rule
+1-shot
+5-shot
+Single branch: λ = 1
+61.5
+70.2
+Single branch: λ = 3
+61.0
+70.6
+Min D: λ ∈{1, 3}
+61.0
+70.5
+Random λ ∈{1, 3}
+61.2
+70.4
+RMS: λ ∈{1, 3}
+61.9
+70.7
+RMS: λ ∈{1, 2, 3}
+61.8
+70.7
+w/o H
+GT
+Probability
+0
+1
+(a) Prediction constraints
+w/o cond
+Coarse mask
+Unaligned CRF
+TAR
+GT
+Prediction
+Ground truth
+(c) Boundary alignment
+Full RCA
+IoU 88.4
+IoU 81.2
+IoU 97.2
+GT
+Base
+IoU 29.6
++RCA
+IoU 33.9
++RMS
+IoU 87.0
++TAR (ReSA)
+IoU 95.5
+(b) Mask formation
+IoU 0.8
+IoU 21.3
+IoU 95.6
+Figure 6. Changes in predictions, masks, and boundaries. (a)
+RCA probabilities with reference supervision retained: remov-
+ing the response constraint, removing entropy, and using both.
+(b) Masks after reference fitting (Base), then cumulative RCA,
+RMS, and TAR. (c) The coarse mask, CRF without threshold
+alignment, and TAR. Each row uses a common display region.
+Numbers are full-query IoUs (%); cyan/magenta denote annota-
+tions/predictions.
+old shift within the boundary band.
+The 95% benchmark-bootstrap intervals for threshold-
+fitting and alignment gains are above zero in 1-shot, while
+both include zero in 5-shot (Supplementary Table S18).
+4.4. Encoder controls and inference cost
+ReSA improves on Base across DINOv3-S/B/L and
+DINOv2-L in both shot settings (Table 7).
+On an H100, two-branch inference takes 0.205/0.420
+seconds per episode in 1-shot/5-shot, averaged over 100
+episodes each. Branches share feature extraction and ref-
+erence fitting; TAR refines the selected prediction. A third
+I
+II
+III
+IV
+0
+1
+2
+3
+Boundary IoU gain (pp)
+-0.1
+-0.4
++0.1
++2.4
+Alignment: TAR − unaligned
+I
+II
+III
+IV
++3.0
++3.2
++2.8
++1.7
+Refinement: TAR − coarse
+I: 21.0%
+II: 22.3%
+III: 27.8%
+IV: 28.9%
+Threshold deviation d=|T−0.5|
+Episode distribution (%)
+[0, 0.05)
+[0.05, 0.10)
+[0.10, 0.20)
+≥0.20
+Figure 7. Boundary recovery and threshold alignment. Bound-
+ary IoU [7] changes across four d = |T −0.5| groups: TAR–
+unaligned isolates alignment; TAR–coarse measures total refine-
+ment. The lower strip shows the distribution of 133,690 valid-
+threshold episodes. Shots are pooled within each dataset before
+averaging datasets.
+Table 6. Matched refinement controls. Ten-dataset mean mIoU
+(%) with probabilities and coarse masks fixed. Refiners share the
+band, RGB/spatial terms, η = 8, and five iterations. Parentheses
+subtract Full TAR; bold marks the best, including ties.
+Configuration
+1-shot
+5-shot
+No TAR (RCA+RMS)
+61.9 (−0.7)
+70.7 (−1.1)
+Unaligned evidence
+62.2 (−0.4)
+71.8 (+0.0)
+No continuous evidence
+62.4 (−0.2)
+71.5 (−0.3)
+Full TAR
+62.6
+71.8
+Table 7. Matched backbone controls. Ten-dataset mean mIoU
+(%), 1-shot/5-shot. Base is first-stage p0; Full uses the same en-
+coder and episodes. Gains subtract displayed Base scores.
+Backbone
+Base
+Full method
+Gain
+DINOv2-L/14
+50.5/60.8
+57.0/67.5
++6.5/+6.7
+DINOv3-S/16
+50.5/61.0
+55.4/64.2
++4.9/+3.2
+DINOv3-B/16
+53.8/64.8
+59.6/68.9
++5.8/+4.1
+DINOv3-L/16
+57.3/67.9
+62.6/71.8
++5.3/+3.9
+candidate takes 0.210/0.450 seconds and gives 62.6/71.7
+mIoU (Supplementary Section G).
+5. Conclusion
+We presented ReSA, a framework connecting query adapta-
+tion and mask selection through a shared reference kernel.
+Foreground and background reference cues regularize query
+responses and weight probability reconstruction for thresh-
+old fitting. Relative reconstruction gain selects a candidate
+whose threshold aligns CRF unary scores for boundary re-
+finement. Our analysis links adaptation and soft reconstruc-
+tion through a bound on reference-response drift. With a
+frozen encoder and lightweight adaptation, ReSA leads the
+8
+
+
+evaluated methods across ten benchmarks at 62.6%/71.8%
+mean mIoU in 1-shot/5-shot. Ablations quantify adapta-
+tion and selection gains; visualizations show more complete
+masks and fewer isolated false positives.
+LLM Usage Statement
+We used OpenAI Codex to assist with methodological dis-
+cussions, code development and debugging, experimental
+and statistical analysis, figure and table preparation, and
+drafting, editing, and translating the main paper and sup-
+plement. GPT-6 Pro provided pre-submission manuscript
+feedback. The authors take responsibility for the methodol-
+ogy, results, and final content.
+References
+[1] Radhakrishna Achanta, Appu Shaji, Kevin Smith, Aurélien
+Lucchi, Pascal Fua, and Sabine Süsstrunk. SLIC Superpix-
+els Compared to State-of-the-Art Superpixel Methods. IEEE
+Transactions on Pattern Analysis and Machine Intelligence,
+34(11):2274–2282, 2012. 17
+[2] Tilemachos Aravanis, Vladan Stojnic, Bill Psomas, Nikos
+Komodakis, and Giorgos Tolias.
+Retrieve and Segment:
+Are a Few Examples Enough to Bridge the Supervision
+Gap in Open-Vocabulary Segmentation? In Proceedings of
+the IEEE/CVF Conference on Computer Vision and Pattern
+Recognition, pages 27621–27632, 2026. 5, 6, 16, 17, 18
+[3] Arindam Banerjee, Srujana Merugu, Inderjit S. Dhillon, and
+Joydeep Ghosh.
+Clustering with Bregman Divergences.
+Journal of Machine Learning Research, 6(58):1705–1749,
+2005. 3, 14
+[4] Malik Boudiaf, Hoel Kervadec, Imtiaz Masud Ziko, Pablo
+Piantanida, Ismail Ben Ayed, and Jose Dolz. Few-Shot Seg-
+mentation Without Meta-Learning: A Good Transductive In-
+ference Is All You Need?
+In CVPR, pages 13979–13988,
+2021. 3
+[5] Sema Candemir, Stefan Jaeger, Kannappan Palaniappan,
+Jonathan P. Musco, Rahul K. Singh, Zhiyun Xue, Alexan-
+dros Karargyris, Sameer K. Antani, George R. Thoma, and
+Clement J. McDonald. Lung Segmentation in Chest Radio-
+graphs Using Anatomical Atlases With Nonrigid Registra-
+tion. IEEE Transactions on Medical Imaging, 33(2):577–
+590, 2014. 1, 5
+[6] Xianjie Chen, Roozbeh Mottaghi, Xiaobai Liu, Sanja Fidler,
+Raquel Urtasun, and Alan L. Yuille. Detect What You Can:
+Detecting and Representing Objects Using Holistic Models
+and Body Parts. In CVPR, pages 1979–1986, 2014. 1, 5
+[7] Bowen Cheng, Ross B. Girshick, Piotr Dollár, Alexander C.
+Berg, and Alexander Kirillov.
+Boundary IoU: Improving
+Object-Centric Image Segmentation Evaluation. In CVPR,
+pages 15334–15342, 2021. 7, 8, 23
+[8] Noel C. F. Codella, Veronica Rotemberg, Philipp Tschandl,
+M. Emre Celebi, Stephen W. Dusza, David A. Gutman, Brian
+Helba, Aadi Kalloo, Konstantinos Liopyris, Michael A.
+Marchetti, Harald Kittler, and Allan Halpern.
+Skin Le-
+sion Analysis Toward Melanoma Detection 2018: A Chal-
+lenge Hosted by the International Skin Imaging Collabora-
+tion (ISIC). arXiv preprint arXiv:1902.03368, 2019. 1, 5
+[9] Claudia Cuttano, Gabriele Trivigno, Giuseppe Averta, and
+Carlo Masone. SANSA: Unleashing the Hidden Semantics
+in SAM2 for Few-Shot Segmentation. In NeurIPS, 2025. 2,
+15, 16, 17, 18
+[10] Claudia Cuttano, Gabriele Trivigno, Christoph Reich, Daniel
+Cremers, Carlo Masone, and Stefan Roth.
+INSID3:
+Training-Free In-Context Segmentation with DINOv3.
+In
+CVPR, pages 21638–21648, 2026. 2, 3, 4, 5, 6, 13, 15, 16,
+17, 18, 21
+[11] Mark Everingham,
+Luc Van Gool,
+Christopher K. I.
+Williams, John M. Winn, and Andrew Zisserman. The Pas-
+cal Visual Object Classes (VOC) Challenge. International
+Journal of Computer Vision, 88(2):303–338, 2010. 1, 5, 15
+[12] Mantha Sai Gopal, Jaison Saji Chacko, Harsh Nand-
+wana, Sandesh Hegde, Debarshi Banerjee, and Uma Ma-
+hesh.
+REBASE: Reference-Background Subspace Elimi-
+nation for Training-Free In-Context Segmentation. CoRR,
+abs/2607.09082, 2026.
+Accepted for oral presentation at
+ACCV 2026. 2
+[13] Agrim Gupta, Piotr Dollár, and Ross B. Girshick.
+LVIS:
+A Dataset for Large Vocabulary Instance Segmentation. In
+CVPR, pages 5356–5364, 2019. 1, 5
+[14] Bharath Hariharan, Pablo Arbeláez, Lubomir D. Bourdev,
+Subhransu Maji, and Jitendra Malik. Semantic contours from
+inverse detectors. In Proceedings of the IEEE International
+Conference on Computer Vision, pages 991–998, 2011. 5, 15
+[15] Gabriel Ilharco, Mitchell Wortsman, Ross Wightman, Cade
+Gordon,
+Nicholas Carlini,
+Rohan Taori,
+Achal Dave,
+Vaishaal Shankar, Hongseok Namkoong, John Miller, Han-
+naneh Hajishirzi, Ali Farhadi, and Ludwig Schmidt. Open-
+CLIP.
+https://github.com/mlfoundations/
+open_clip, 2021. 16
+[16] Md Jahidul Islam, Chelsey Edge, Yuyang Xiao, Peigen Luo,
+Muntaqim Mehtaz, Christopher Morse, Sadman Sakib Enan,
+and Junaed Sattar. Semantic Segmentation of Underwater
+Imagery: Dataset and Benchmark. In IROS, pages 1769–
+1776, 2020. 1, 5
+[17] Diederik P. Kingma and Jimmy Ba. Adam: A Method for
+Stochastic Optimization. In ICLR, 2015. 18
+[18] Alexander Kirillov, Eric Mintun, Nikhila Ravi, Hanzi Mao,
+Chloé Rolland, Laura Gustafson, Tete Xiao, Spencer White-
+head, Alexander C. Berg, Wan-Yen Lo, Piotr Dollár, and
+Ross B. Girshick. Segment Anything. In ICCV, pages 3992–
+4003, 2023. 2, 16
+[19] Philipp Krähenbühl and Vladlen Koltun. Efficient Inference
+in Fully Connected CRFs with Gaussian Edge Potentials. In
+Advances in Neural Information Processing Systems, pages
+109–117, 2011. 3, 4, 13
+[20] D. Khuê Lê-Huu and Karteek Alahari. Regularized Frank-
+Wolfe for Dense CRFs: Generalizing Mean Field and Be-
+yond. In NeurIPS, pages 1453–1467, 2021. 3, 4, 13
+[21] Minjae Lee, Sungwoo Hur, Soojin Hwang, and Won Hwa
+Kim. PR-MaGIC: Prompt Refinement Via Mask Decoder
+Gradient Flow For In-Context Segmentation. In Proceed-
+ings of the IEEE/CVF Conference on Computer Vision and
+9
+
+
+Pattern Recognition, pages 21659–21668, 2026. 5, 6, 16, 17,
+18
+[22] Xiang Li, Tianhan Wei, Yau Pun Chen, Yu-Wing Tai, and
+Chi-Keung Tang. FSS-1000: A 1000-Class Dataset for Few-
+Shot Segmentation. In CVPR, pages 2866–2875, 2020. 1, 5,
+15
+[23] Tsung-Yi Lin, Michael Maire, Serge J. Belongie, James
+Hays, Pietro Perona, Deva Ramanan, Piotr Dollár, and
+C. Lawrence Zitnick. Microsoft COCO: Common Objects
+in Context. In ECCV, pages 740–755, 2014. 1, 5
+[24] Weikun Lin, Yunhao Bai, and Yan Wang.
+RPG-SAM:
+Reliability-Weighted Prototypes and Geometric Adaptive
+Threshold Selection for Training-Free One-Shot Polyp Seg-
+mentation. In Medical Image Computing and Computer As-
+sisted Intervention, pages 490–500, 2026. 3, 5, 6, 16, 17,
+18
+[25] Yang Liu, Chenchen Jing, Hengtao Li, Muzhi Zhu, Hao
+Chen, Xinlong Wang, and Chunhua Shen.
+A Simple Im-
+age Segmentation Framework via In-Context Examples. In
+NeurIPS, 2024. 1, 2, 5, 6, 16, 17, 18
+[26] Yang Liu, Muzhi Zhu, Hengtao Li, Hao Chen, Xinlong
+Wang, and Chunhua Shen. Matcher: Segment Anything with
+One Shot Using All-Purpose Feature Matching. In ICLR,
+2024. 2, 5, 6, 15, 16, 17, 18
+[27] Yang Liu, Yufei Yin, Chenchen Jing, Muzhi Zhu, Hao Chen,
+Yuling Xi, Bo Feng, Hao Wang, Shiyu Li, and Chunhua
+Shen. Unified Open-World Segmentation with Multi-Modal
+Prompts. In ICCV, pages 21557–21567, 2025. 5, 6, 16, 17,
+18
+[28] Yuhan Liu, Yixiong Zou, Yuhua Li, and Ruixuan Li. The
+Devil is in Low-Level Features for Cross-Domain Few-Shot
+Segmentation. In Proceedings of the IEEE/CVF Conference
+on Computer Vision and Pattern Recognition, pages 4618–
+4627, 2025. 2
+[29] Zhuang Liu, Hanzi Mao, Chao-Yuan Wu, Christoph Feicht-
+enhofer, Trevor Darrell, and Saining Xie. A ConvNet for the
+2020s. In CVPR, pages 11966–11976, 2022. 15, 16
+[30] Ilya Loshchilov and Frank Hutter. Decoupled Weight Decay
+Regularization. In ICLR, 2019. 5, 12
+[31] Junyuan Ma, Xunzhi Xiang, Wenbin Li, Qi Fan, and Yang
+Gao.
+Selective, Regularized, and Calibrated: Harnessing
+Vision Foundation Models for Cross-Domain Few-Shot Se-
+mantic Segmentation. In Proceedings of the IEEE/CVF Con-
+ference on Computer Vision and Pattern Recognition, pages
+12385–12395, 2026. 3, 5, 6, 16, 17, 18
+[32] Lingchen Meng, Shiyi Lan, Hengduo Li, José M. Álvarez,
+Zuxuan Wu, and Yu-Gang Jiang.
+SegIC: Unleashing the
+Emergent Correspondence for In-Context Segmentation. In
+ECCV, pages 203–220, 2024. 1, 2, 5, 6, 16, 17, 18
+[33] Jiaxu Miao, Yunchao Wei, Yu Wu, Chen Liang, Guangrui Li,
+and Yi Yang. VSPW: A Large-scale Dataset for Video Scene
+Parsing in the Wild. In CVPR, pages 4133–4143, 2021. 15
+[34] Maxime Oquab, Timothée Darcet, Théo Moutakanni, Huy V.
+Vo, Marc Szafraniec, Vasil Khalidov, Pierre Fernandez,
+Daniel Haziza, Francisco Massa, Alaaeldin El-Nouby, Mido
+Assran, Nicolas Ballas, Wojciech Galuba, Russell Howes,
+Po-Yao Huang, Shang-Wen Li, Ishan Misra, Michael Rab-
+bat, Vasu Sharma, Gabriel Synnaeve, Hu Xu, Hervé Jégou,
+Julien Mairal, Patrick Labatut, Armand Joulin, and Piotr Bo-
+janowski. DINOv2: Learning Robust Visual Features with-
+out Supervision.
+Transactions on Machine Learning Re-
+search, 2024. 2
+[35] Junghwan Park. FROST: Training-Free Few-Shot Segmen-
+tation with Frozen Features and Nonparametric Statistics.
+arXiv preprint arXiv:2606.31136, 2026. 3, 5, 6, 16, 17, 18
+[36] Federico Perazzi, Jordi Pont-Tuset, Brian McWilliams, Luc
+Van Gool, Markus H. Gross, and Alexander Sorkine-
+Hornung.
+A Benchmark Dataset and Evaluation Method-
+ology for Video Object Segmentation. In CVPR, pages 724–
+732, 2016. 15
+[37] Alec Radford, Jong Wook Kim, Chris Hallacy, Aditya
+Ramesh, Gabriel Goh, Sandhini Agarwal, Girish Sastry,
+Amanda Askell, Pamela Mishkin, Jack Clark, Gretchen
+Krueger, and Ilya Sutskever. Learning Transferable Visual
+Models From Natural Language Supervision. In Proceedings
+of the 38th International Conference on Machine Learning,
+pages 8748–8763, 2021. 6, 15, 16
+[38] Vignesh Ramanathan, Anmol Kalia, Vladan Petrovic, Yi
+Wen, Baixue Zheng, Baishan Guo, Rui Wang, Aaron Mar-
+quez, Rama Kovvuri, Abhishek Kadian, Amir Mousavi, Yi-
+wen Song, Abhimanyu Dubey, and Dhruv Mahajan. PACO:
+Parts and Attributes of Common Objects. In CVPR, pages
+7141–7151, 2023. 1, 5
+[39] Nikhila Ravi, Valentin Gabeur, Yuan-Ting Hu, Ronghang
+Hu, Chaitanya Ryali, Tengyu Ma, Haitham Khedr, Roman
+Rädle, Chloé Rolland, Laura Gustafson, Eric Mintun, Junt-
+ing Pan, Kalyan Vasudev Alwala, Nicolas Carion, Chao-
+Yuan Wu, Ross B. Girshick, Piotr Dollár, and Christoph
+Feichtenhofer. SAM 2: Segment Anything in Images and
+Videos. In ICLR, 2025. 2, 15
+[40] Robin Rombach, Andreas Blattmann, Dominik Lorenz,
+Patrick Esser, and Björn Ommer.
+High-Resolution Image
+Synthesis with Latent Diffusion Models. In CVPR, pages
+10674–10685, 2022. 2, 15
+[41] Amirreza Shaban, Shray Bansal, Zhen Liu, Irfan Essa, and
+Byron Boots. One-Shot Learning for Semantic Segmenta-
+tion. In BMVC, 2017. 5, 15
+[42] Shuai Shao, Zeming Li, Tianyuan Zhang, Chao Peng, Gang
+Yu, Xiangyu Zhang, Jing Li, and Jian Sun. Objects365: A
+Large-Scale, High-Quality Dataset for Object Detection. In
+ICCV, pages 8429–8438, 2019. 16
+[43] Oriane Siméoni, Huy V. Vo, Maximilian Seitzer, Federico
+Baldassarre, Maxime Oquab, Cijo Jose, Vasil Khalidov,
+Marc Szafraniec, Seung Eun Yi, Michaël Ramamonjisoa,
+Francisco Massa, Daniel Haziza, Luca Wehrstedt, Jianyuan
+Wang, Timothée Darcet, Théo Moutakanni, Leonel Sentana,
+Claire Roberts, Andrea Vedaldi, Jamie Tolan, John Brandt,
+Camille Couprie, Julien Mairal, Hervé Jégou, Patrick La-
+batut, and Piotr Bojanowski. DINOv3. Transactions on Ma-
+chine Learning Research, 2026. 2
+[44] Sujun Sun, Mingwu Ren, and Haofeng Zhang. Training-Free
+Cross-Domain Few-Shot Segmentation via Robust Seman-
+tic Representation and Matching. In ECCV, pages 370–388,
+2026. 2, 3, 5, 6, 16, 17, 18
+[45] Zeyi Sun, Ye Fang, Tong Wu, Pan Zhang, Yuhang Zang, Shu
+Kong, Yuanjun Xiong, Dahua Lin, and Jiaqi Wang. Alpha-
+10
+
+
+CLIP: A CLIP Model Focusing on Wherever you Want. In
+CVPR, pages 13019–13029, 2024. 6, 15
+[46] Chaoyang Wang, Xiangtai Li, Henghui Ding, Lu Qi, Jiangn-
+ing Zhang, Yunhai Tong, Chen Change Loy, and Shuicheng
+Yan. Explore In-Context Segmentation via Latent Diffusion
+Models. In AAAI, pages 7545–7553, 2025. 5, 6, 15, 16, 17,
+18
+[47] Xinlong Wang, Xiaosong Zhang, Yue Cao, Wen Wang,
+Chunhua Shen, and Tiejun Huang. SegGPT: Towards Seg-
+menting Everything In Context. In ICCV, pages 1130–1140,
+2023. 1, 2, 5, 6, 16, 17, 18
+[48] Ross Wightman. OpenCLIP ConvNeXt-Large: LAION-2B
+320-pixel model soup. https://huggingface.co/
+laion/CLIP-convnext_large_d_320.laion2B-
+s29B-b131K-ft-soup.
+Model card and pretrained
+weights; accessed November 17, 2026. 16
+[49] Kangyu Xiao, Zilei Wang, Yixin Zhang, and Junjie Li.
+Training-free Boosting for Few-shot Segmentation via Gen-
+eralizing Semantic Mining. In AAAI, pages 10987–10995,
+2026. 2, 5, 16, 17, 18
+[50] Qianxiong Xu, Lanyun Zhu, Xuanyi Liu, Guosheng Lin,
+Cheng Long, Ziyue Li, and Rui Zhao. Unlocking the Power
+of SAM 2 for Few-Shot Segmentation. In Proceedings of the
+42nd International Conference on Machine Learning, pages
+69950–69966, 2025. 2, 5, 6, 15, 16, 17, 18
+[51] Syed Waqas Zamir, Aditya Arora, Akshita Gupta, Salman H.
+Khan, Guolei Sun, Fahad Shahbaz Khan, Fan Zhu, Ling
+Shao, Gui-Song Xia, and Xiang Bai.
+iSAID: A Large-
+scale Dataset for Instance Segmentation in Aerial Images.
+In CVPR Workshops, pages 28–37, 2019. 1, 5
+[52] Anqi Zhang, Guangyu Gao, Jianbo Jiao, Chi Harold Liu,
+and Yunchao Wei. Bridge the Points: Graph-based Few-shot
+Segment Anything Semantically. In NeurIPS, 2024. 2, 5, 6,
+16, 17, 18
+[53] Renrui Zhang, Zhengkai Jiang, Ziyu Guo, Shilin Yan, Junt-
+ing Pan, Hao Dong, Yu Qiao, Peng Gao, and Hongsheng
+Li. Personalize Segment Anything Model with One Shot.
+In ICLR, 2024. 2, 5, 6, 16, 17, 18
+[54] Bolei Zhou, Hang Zhao, Xavier Puig, Sanja Fidler, Adela
+Barriuso, and Antonio Torralba.
+Scene Parsing through
+ADE20K Dataset. In CVPR, pages 5122–5130, 2017. 16
+[55] Muzhi Zhu, Yang Liu, Zekai Luo, Chenchen Jing, Hao Chen,
+Guangkai Xu, Xinlong Wang, and Chunhua Shen. Unleash-
+ing the Potential of the Diffusion Model in Few-shot Seman-
+tic Segmentation. In NeurIPS, 2024. 2, 5, 6, 16, 17, 18
+11
+
+
+Supplementary Material
+Table S1. Evaluation episodes per shot. Counts are identical in
+the 1-shot and 5-shot settings. FSS uses a single test-class pool.
+Dataset
+Folds/pools
+Episodes
+LVIS-92i
+10
+23,000
+COCO-20i
+4
+4,000
+PASCAL-Part
+4
+8,459
+PACO-Part
+4
+10,000
+ISIC
+1
+600
+SUIM
+1
+3,859
+iSAID
+3
+10,063
+X-Ray
+1
+600
+FSS
+1
+2,400
+PASCAL-5i
+4
+4,000
+Total
+33
+66,981
+Table S2. Main inference parameters. Shared across all ten
+datasets and both shot settings.
+Parameter
+Value
+Frozen encoder
+DINOv3 ViT-L/16
+Input resolution
+1024 × 1024
+Positional basis rank
+500
+Optimizer
+AdamW [30]
+Learning rate
+0.004
+AdamW (β1, β2)
+(0.9, 0.999)
+Weight decay
+5 × 10−4
+Reference-fitting steps
+400
+RCA adaptation steps (per branch)
+100
+Kernel temperature τ
+0.05
+Entropy weights λ
+{1, 3}
+TAR grid resolution
+640 × 640
+Aligned-evidence strength η
+8
+Boundary-band radius
+5 CRF-grid pixels
+TAR iterations
+5
+A. Inference details and fixed configurations
+ReSA carries reference guidance through adaptation and
+mask selection using the same kernel: RCA constrains
+reference responses, and RMS uses the kernel to weight
+threshold fitting and candidate selection. TAR uses the se-
+lected threshold for boundary refinement. Tables S1 and S2
+give the evaluation episodes and fixed inference settings.
+A.1. Response-constrained adaptation
+Balanced reference supervision.
+Sampling each refer-
+ence mask on the feature grid gives foreground/background
+sets R+
+s and R−
+s . The reference loss assigns equal weight to
+foreground and background classes within each reference:
+Lref = 1
+2S
+S
+X
+s=1
+ CE(R+
+s ) + CE(R−
+s )
+
+,
+(S1)
+where CE(R+
+s ) = −|R+
+s |−1 P
+j∈R+
+s log psj and the back-
+ground term averages −log(1 −psj).
+Loss reductions and shot scaling.
+Using the main-paper
+definitions of the fixed kernel K, initial prediction p0, and
+Bernoulli KL d, the query part of the RCA objective ex-
+pands to
+Lcond + λH
+S
+=
+1
+2S2
+2S
+X
+r=1
+d(Krp, Krp0) +
+λ
+SN
+N
+X
+i=1
+H(pi).
+(S2)
+The inner 1/(2S) gives each reference equal weight, split
+between foreground and background independently of mask
+area; entropy averages the N query tokens. The outer 1/S
+scales the mean query losses relative to reference supervi-
+sion. Both branches and all objective ablations retain these
+reductions.
+A.2. Reference-weighted mask selection
+For
+the
+main-paper
+RMS
+objective,
+let
+wi
+=
+(2S)−1 P
+r Kri and qλ,i = a + (b −a)1[pλ,i > t]:
+Dλ(t, a, b) =
+X
+i
+wid(pλ,i, qλ,i).
+(S3)
+Closed-form levels and threshold search.
+For a fixed
+nonempty split with positive group weights, let G0 = {i :
+pλ,i ≤t} and G1 = {i : pλ,i > t}, and define
+Wg =
+X
+i∈Gg
+wi,
+µg =
+P
+i∈Gg wipλ,i
+Wg
+.
+(S4)
+The derivative of a group’s loss with respect to its level c
+is Wg(c −µg)/(c(1 −c)). Convexity of Bernoulli KL in
+its second argument therefore gives a∗= µ0 and b∗= µ1;
+sorting ensures their order. At these levels, writing H(u) =
+−u log u −(1 −u) log(1 −u), the distortion is
+Dλ(t) =
+1
+X
+g=0
+WgH(µg) −
+X
+i
+wiH(pλ,i).
+(S5)
+A stable sort followed by prefix sums evaluates ev-
+ery nonempty split between distinct probabilities in
+O(N log N) time and O(N) auxiliary space. The minimum
+supplies D∗
+λ and a threshold Tλ at the midpoint between the
+two adjacent distinct probabilities.
+12
+
+
+Relative gain and the constant baseline.
+For the con-
+stant family q = c1, the optimum is µλ = P
+i wipλ,i, giv-
+ing
+Dλ,const = H(µλ) −
+X
+i
+wiH(pλ,i).
+(S6)
+The relative-gain score is sλ = 1 −D∗
+λ/Dλ,const. The fit-
+ted levels determine reconstruction error, while the selected
+pair (pλ∗, Tλ∗) defines the coarse mask and supplies TAR’s
+aligned evidence. Ties select λ = 3.
+A.3. Episode-local optimization
+Each episode initializes a zero-weight, zero-bias head and
+fits the reference annotations once. Both query branches
+copy the fitted head and reset their AdamW states. They
+share detached features, a fixed reference kernel, and fixed
+initial responses.
+A.4. Reference-mask sampling
+Reference masks are bilinearly resized to the token grid
+and thresholded at 0.5, following INSID3 [10]. Candidate
+matching, dense evidence, and head supervision use this
+same sampling.
+A.5. Numerical implementation and boundary re-
+finement
+For AdamW, ϵ = 10−8 and the exact weight decay is
+(1 −(1 −0.002 · 0.0005)2)/0.004; the other settings are
+in Table S2. Initial responses Kp0 are clipped to [10−4, 1−
+10−4]; conditional responses and entropy probabilities are
+clipped to [10−6, 1 −10−6].
+Threshold search uses float64 arithmetic, clips logarithm
+arguments and fitted levels to [10−8, 1−10−8], and clips nu-
+merical gain to [0, 1]. A valid threshold fit requires at least
+two probabilities, maxi pi −mini pi ≥10−12, Dλ,const >
+10−12, and a split with both group weights above 10−12.
+Equal minimum distortions select the first split in ascend-
+ing probability order. If the gain-selected fit is invalid, the
+implementation uses an unweighted between-class variance
+threshold for each branch and selects the larger foreground–
+background mean probability difference.
+Constant maps
+use T = 0.5; an empty threshold group gives contrast zero,
+and ties select λ = 3.
+Threshold-aligned boundary evidence.
+On the CRF
+grid specified in Table S2, the spatial scales are α = 15 and
+γ = 5 pixels, the color scale is β = 0.03, and spatial and
+bilateral weights are 3 and 20, respectively. Potts compat-
+ibility, Frank–Wolfe step size, and ℓ2 regularization weight
+are all 1 [19, 20]. Circular erosion/dilation defines the band.
+Foreground priors are 0.95 in the eroded core, 0.05 out-
+side the dilation, and 0.5 in the band. Channel 0 denotes
+background and channel 1 foreground; the corresponding
+input scores are the negative and positive logit of the prior.
+TAR retains these scores outside the band and sets its band
+scores to (ℓbg
+x , ℓfg
+x ) = (−ηezx/2, +ηezx/2), where ez is the
+interpolated aligned logit. The solver subtracts these scores
+in its unary energy, so positive ezx favors foreground. The
+final band label is foreground when the channel-1 output
+exceeds channel 0. The probability and selected threshold
+are clipped to [10−6, 1 −10−6] before taking logits. After
+optimization, the core foreground and exterior background
+are explicitly restored.
+A.6. Reference-based foreground check
+Reference–query correspondence identifies candidate fore-
+ground tokens before probability fitting. For a query to-
+ken, the foreground and background matching scores are
+log-mean-exp similarities to the respective reference token
+sets, with inverse temperature β = 8. A reference votes
+foreground when its foreground score is larger. Majority
+voting across references is intersected with positive similar-
+ity to the equally weighted reference foreground prototype.
+If no query token has positive similarity, the prototype gate
+instead retains similarities above their 90th percentile. A
+reference containing only one class on the token grid votes
+for that class.
+If the candidate set is empty, the coarse mask is empty.
+If candidates exist but any reference lacks foreground or
+background tokens, reference-conditioned region aggrega-
+tion produces the coarse mask. These cases bypass head
+adaptation and threshold fitting and use neutral-evidence
+CRF refinement with a five-pixel band radius and ten itera-
+tions. Their predictions are included in the full evaluation.
+A.7. Execution and computational cost
+The two RCA branches share feature extraction and ref-
+erence fitting; each branch adds query adaptation and
+O(N log N) threshold search. TAR runs once on the se-
+lected output. All-pairs correspondence scales quadratically
+with token count; Section G reports measured runtimes.
+B. Mathematical analysis
+Throughout,
+K
+is fixed and row-stochastic,
+wi
+=
+(2S)−1 P
+r Kri, and logarithms are natural. The deriva-
+tions assume foreground and background reference tokens
+and exact probability arithmetic; numerical clipping is spec-
+ified in Section A.5.
+B.1. Adaptation: constrain reference responses, al-
+low local changes
+Complementary gradients of entropy and conditional
+KL.
+For the fixed reference kernel K, writing ℓ= logit,
+13
+
+
+the probability-space gradients for interior probabilities are
+∇pH = −1
+N ℓ(p),
+∇pLcond = 1
+2S K⊤[ℓ(Kp) −ℓ(Kp0)] .
+(S7)
+Entropy sharpens individual probabilities; conditional KL
+responds to drift in their reference-weighted averages. The
+shared classifier couples token updates. Section E.2 tests
+their complementary effects on foreground retention and
+background rejection.
+Local geometry of the adaptation constraint.
+Let ∆p =
+p −p0 and z0 = Kp0, with all z0,r ∈(0, 1). If K∆p =
+0, the conditional penalty is exactly zero, even when token
+probabilities change. For small reference-response changes,
+a Taylor expansion in the first argument of Bernoulli KL
+gives
+Lcond(p) = 1
+4S ∆p⊤K⊤M0K∆p + o(∥K∆p∥2
+2),
+M0 = diag
+
+1
+z0,r(1 −z0,r)
+
+.
+(S8)
+The positive semidefinite matrix K⊤M0K has rank at most
+min(2S, N) and shares the null space of K. Within the up-
+dates realizable by the classifier, RCA penalizes reference-
+response drift and permits local changes that preserve those
+responses.
+B.2. Mask selection:
+control reference-response
+changes
+Bernoulli KL is the Bregman divergence generated by
+ϕ(p) = p log p + (1 −p) log(1 −p); RMS is a reference-
+weighted, two-group instance of Bregman quantization [3].
+Reference-weighted reconstruction and response er-
+ror.
+For any row-stochastic K, Bernoulli mixtures satisfy
+P
+i Kri Ber(pi) = Ber(Krp). Joint convexity of KL im-
+plies, for each reference prototype,
+d(Krp, Krq) ≤
+X
+i
+Krid(pi, qi).
+(S9)
+Averaging over the 2S prototypes yields
+1
+2S
+X
+r
+d(Krp, Krq) ≤
+X
+i
+wid(pi, qi).
+(S10)
+The RMS objective bounds changes in the same reference
+responses constrained by RCA, connecting adaptation to
+threshold fitting through K.
+Combining adaptation and reconstruction errors.
+De-
+fine the root-mean-square reference-response difference
+E(u, v) =
+"
+1
+2S
+X
+r
+(Kru −Krv)2
+#1/2
+.
+(S11)
+Bernoulli Pinsker gives d(x, y) ≥2(x −y)2. Applying this
+inequality to the RCA penalty and the preceding reconstruc-
+tion bound yields
+E(pλ, p0) ≤
+p
+Lcond(pλ)/2,
+E(qλ, pλ) ≤
+p
+Dλ/2.
+(S12)
+The Euclidean triangle inequality after applying K then
+gives
+E(qλ, p0) ≤
+p
+Lcond(pλ)/2 +
+p
+Dλ/2.
+(S13)
+Equation (S13) bounds reference-response drift across
+adaptation and two-level reconstruction. The RCA penalty
+bounds the change from Kp0 to Kpλ, and the RMS recon-
+struction error bounds the change from Kpλ to Kqλ, both
+through the same reference kernel.
+B.3. Branch comparison: relative information re-
+tention
+Information interpretation of relative gain.
+For one
+fixed branch, define a random token X ∼w, a model-
+generated label Y | X = i ∼Ber(pλ,i), and the thresh-
+old group Z = 1[pλ,X > t]. At the optimal group levels,
+qλ,i = Pr(Y = 1 | Z = Z(i)). The expected cross-entropy
+with these levels is H(Y | Z), whereas the original ex-
+pected Bernoulli entropy is H(Y | X); hence
+Dλ(t) = H(Y | Z) −H(Y | X),
+Dλ,const = H(Y ) −H(Y | X) = I(Y ; X).
+(S14)
+For the minimizing partition Z∗and positive constant dis-
+tortion,
+sλ = Dλ,const −D∗
+λ
+Dλ,const
+= I(Y ; Z∗)
+I(Y ; X) .
+(S15)
+Thus, sλ measures the fraction of each branch’s model-
+generated label information retained by its threshold par-
+tition. Normalization compares each partition against its
+branch-specific constant baseline. Since Z∗is a function of
+X, sλ ∈[0, 1].
+C. Evaluation protocol
+C.1. Datasets, folds, and aggregation
+The eight INSID3-protocol datasets contribute 60,581
+episodes per shot across 28 folds; FSS and PASCAL-5i
+complete the counts in Table S1.
+14
+
+
+For a fold f with classes Cf, let Ie and Ue be foreground
+intersection and union for episode e after excluding ignored
+pixels. The reported metric is
+mIoUf = 100
+|Cf|
+X
+c∈Cf
+P
+e∈Ef,c Ie
+max(P
+e∈Ef,c Ue, 1).
+(S16)
+Dataset scores average predefined folds equally.
+Avg in
+each main benchmark table equally weights its displayed
+datasets (four natural-object datasets or six part/cross-
+domain datasets). The supplementary benchmark tables and
+ablation means equally weight all ten datasets. The sup-
+plementary group-wise table separately averages the four
+natural-object, two part, and four imaging-domain datasets.
+Task-training-overlap scores remain included in the relevant
+means.
+The original eight datasets retain their frozen INSID3-
+based sampling and 1024 × 1024 scoring. FSS scores at
+518 × 518. PASCAL-5i restores the prediction to the origi-
+nal annotation resolution and ignores label 255. Encoder in-
+puts and the CRF grid follow Table S2; the DINOv2 control
+uses the matched token grid specified in Section E. Compar-
+ison methods retain their native input conventions below.
+C.2. FSS
+FSS follows the public Matcher test split and sampling con-
+vention [22, 26]. There are 240 test classes with ten query
+images each.
+Support sampling uses seed zero and ex-
+cludes the query image. The five-reference sampler per-
+mits repeated support images, as in the adopted public code.
+The ReSA and official-code INSID3 evaluations use the
+same frozen episode lists. Ground-truth masks use nearest-
+neighbor resizing; binary predictions are bilinearly resized
+to the scoring grid and thresholded at 0.5.
+C.3. PASCAL-5i
+PASCAL-5i [41] uses the four-fold validation pools from
+the official FSSAM implementation, VOC2012 images, and
+augmented SBD masks [11, 14, 50]. The 20 classes are par-
+titioned into five classes per fold. A single-process sampler
+freezes 1,000 tasks per fold and shot using seed 321, ex-
+cluding the query from its support set, removing duplicate
+support images, and preserving the adopted support-input
+reversal.
+D. Comparison methods and model size
+Benchmark conventions.
+Benchmark tables combine
+published results with marked local evaluations. Local runs
+use the shared episode and scoring protocol with method-
+specific preprocessing and adaptation settings; published
+entries retain their source protocols. A method-level dagger
+marks a locally evaluated row; a cell-level dagger marks
+that measurement. Rankings use displayed scores and in-
+clude ties. Gray overlap cells contribute to averages but are
+excluded from ranking, as are averages containing them.
+D.1. Model parameter counts
+Table 1 in the main paper reports total model parameters,
+including frozen backbones and auxiliary networks. Totals
+come from checkpoints, instantiated modules, or published
+model counts [9, 10, 50]; registered buffers are excluded
+from local counts. Values are rounded to the nearest million.
+The DINOv3-L backbone has 303.23M parameters. The
+two episode-local heads in ReSA have 1,025 parameters
+each (2,050 adapted coefficients in total) and share this
+frozen backbone. HERA’s 312M total includes its 8.40M
+fusion head, and RNS includes SAM2.1-L [39] with its
+text branch disabled. FSSAM uses DINOv2-B and SAM2-
+S; SANSA uses SAM2-L. GSM+Matcher uses DINOv2-
+L and SAM-H; semantic mining adds no learned net-
+work. PerSAM uses DINOv2-L localization with SAM-
+H in both shot settings (945M parameters).
+LDIS-1 in-
+cludes the SD1.5 U-Net and VAE [40] plus the AlphaCLIP-
+L/14 visual encoder [45] (1,248.13M in total); the un-
+used text tower is excluded. COSINE includes DINOv2-
+L/14, CLIP ConvNeXt-L [29, 37], and its learned seg-
+mentation modules (690.94M); shared module aliases are
+counted once. FROST uses only DINOv3-L. RPG-SAM
+combines DINOv2-L (304.37M) and the original SAM2
+Hiera-L (224.43M), totaling 528.80M parameters.
+D.2. Task-trained methods
+FSSAM.
+All twenty FSSAM scores are local official-
+code evaluations [50].
+COCO-20i uses the correspond-
+ing fold-trained checkpoint; other datasets use the COCO
+fold-0 checkpoint. COCO-20i and PASCAL-5i are marked
+for task-training overlap; PASCAL shares target categories
+with the COCO training split.
+LDIS-1.
+All twenty LDIS-1 scores are local evaluations
+of the released one-step model [46]. We use the released
+LDIS-1 U-Net and the Stable Diffusion v1.5 VAE [40]1
+with AlphaCLIP visual conditioning [45], preserving the
+native 1-shot path. Our 5-shot extension concatenates the
+five references’ conditioning tokens before a single query
+prediction.
+Offline task training uses PASCAL, COCO,
+DAVIS16 [36], and VSPW [33], so the COCO-20i and
+PASCAL-5i cells and overall averages are gray and ex-
+cluded from ranking.
+COSINE.
+All
+twenty
+scores
+are
+local
+evaluations
+of
+the
+public
+multi-scale
+FSS
+49-epoch
+check-
+1Stable Diffusion v1.5 model card: https://huggingface.co/
+stable-diffusion-v1-5/stable-diffusion-v1-5.
+15
+
+
+Table S3. 1-shot comparison across all ten datasets. Foreground mIoU (%). GF-SAM v2/v3 use DINOv2/v3 backbones. Avg weights
+all ten datasets equally; – denotes unavailable scores or an incomplete average. Gray cells indicate task-training overlap (possible overlap
+for COSINE); they and averages containing them are excluded from ranking. Best/second best are bold/underlined, including displayed
+ties. †: local evaluations (the whole row when attached to a method). Gain is the Avg margin over the best eligible competitor.
+Method
+Venue
+Natural objects
+Object parts
+Cross-domain
+Avg
+LVIS-
+COCO-
+FSS-
+PASCAL- PASCAL- PACO-
+ISIC
+SUIM
+iSAID
+X-Ray
+92i
+20i
+1000
+5i
+Part
+Part
+Task-specific fine-tuning: Semantic + mask supervision
+SegGPT[47]
+ICCV’23
+18.6
+56.1
+85.6
+83.2
+35.8
+13.5
+37.5
+34.9
+30.9
+87.5
+48.4
+SegIC[32]
+ECCV’24
+44.6
+76.1
+86.8
+85.6
+39.9
+25.9
+25.3
+52.5
+46.1
+34.5
+51.7
+SINE[25]
+NeurIPS’24
+31.2
+64.5
+84.3†
+85.4
+36.2
+23.3
+25.8
+50.7
+38.3
+39.8
+48.0
+DiffewS[55]
+NeurIPS’24
+31.4
+71.3
+87.8
+88.3
+34.0
+22.8
+27.8
+48.9
+47.5
+41.6
+50.1
+LDIS-1†[46]
+AAAI’25
+15.9
+57.7
+67.5
+84.5
+33.2
+18.1
+24.2
+25.1
+20.4
+35.1
+38.1
+FSSAM†[50]
+ICML’25
+37.2
+62.3
+88.7
+79.5
+43.8
+33.0
+53.9
+56.7
+50.0
+80.5
+58.6
+COSINE†[27]
+ICCV’25
+35.3
+68.0
+87.2
+86.2
+36.2
+27.7
+28.1
+58.7
+36.4
+30.3
+49.4
+SANSA[9]
+NeurIPS’25
+36.2
+76.4
+88.2
+–
+40.4
+29.2
+–
+–
+–
+–
+–
+No offline task training: Mask-supervised pre-training
+PerSAM†[53]
+ICLR’24
+20.1
+34.3
+72.1
+50.6
+31.6
+25.0
+35.5
+26.0
+29.1
+32.4
+35.7
+Matcher[26]
+ICLR’24
+33.0
+52.7
+87.0
+68.1
+42.9
+34.7
+38.6
+44.1
+33.3
+70.8
+50.5
+GF-SAM v2[52]
+NeurIPS’24
+35.2
+58.7
+88.0
+72.1
+44.5
+36.3
+48.7
+53.1
+47.1
+51.0
+53.5
+GF-SAM v3[52]
+NeurIPS’24
+31.8
+54.8
+88.3†
+71.8†
+44.9
+34.4
+50.9
+50.5
+46.7
+56.1
+53.0
+GSM+Matcher[49]
+AAAI’26
+34.3
+55.9
+87.3
+71.3
+–
+–
+42.7
+–
+36.8
+–
+–
+RNS†[2]
+CVPR’26
+27.1
+45.1
+81.6
+62.8
+28.6
+21.7
+39.3
+51.4
+42.3
+29.2
+42.9
+PR-MaGIC†[21]
+CVPR’26
+23.8
+44.5
+86.6
+63.8
+40.2
+32.6
+42.4
+40.3
+33.3
+75.3
+48.3
+RPG-SAM†[24]
+MICCAI’26
+28.4
+47.7
+75.6
+55.5
+41.6
+36.8
+58.8
+39.7
+41.3
+50.4
+47.6
+No offline task training: Self-supervised pre-training
+INSID3[10]
+CVPR’26
+41.8
+57.6
+85.8†
+67.3†
+50.5
+38.7
+54.4
+54.9
+52.1
+78.8
+58.2
+HERA†[31]
+CVPR’26
+26.0
+45.3
+80.2
+61.6
+45.9
+32.4
+52.9
+48.5
+44.5
+74.0
+51.1
+RSRM†[44]
+ECCV’26
+31.3
+51.6
+80.6
+68.8
+51.1
+38.0
+57.0
+52.4
+48.9
+87.8
+56.8
+FROST[35]
+arXiv’26
+32.8
+48.4
+82.6†
+70.1
+53.1†
+39.1
+52.6
+58.0
+50.5†
+84.7†
+57.2
+ReSA (ours)
+This paper
+44.9
+58.8
+86.4
+73.8
+56.0
+45.5
+58.8
+58.8
+53.2
+89.7
+62.6
+Gain ↑
++4.4
+point
+[27].
+The
+visual-prompt
+configuration
+com-
+bines
+frozen
+DINOv2-L/14
+and
+CLIP
+ConvNeXt-L
+encoders [29, 37] with a task-trained segmentation de-
+coder.
+The CLIP encoder uses OpenCLIP [15], with
+model convnext_large_d_320 and pretrained tag
+laion2b_s29b_b131k_ft_soup [48].
+We retain
+the
+native
+multi-reference
+semantic-prompt
+average,
+first-reference identity prompts, fixed reference order,
+and score threshold 0.7. The released training script lists
+COCO, PACO-LVIS, and Objects365-SAM [18, 42]; the
+checkpoint-specific training manifest is unavailable.
+We
+mark LVIS-92i, COCO-20i, PASCAL-5i, PACO-Part, and
+their averages as possible task-training overlap and exclude
+them from ranking; PASCAL-5i shares target categories
+with COCO.
+SANSA.
+SANSA uses the generalist SAM2-L/Hiera-
+Large architecture trained on COCO and ADE20K [9, 54].
+The available entries are published results; COCO-20i cells
+are marked for task-training overlap.
+Other task-trained entries.
+SINE’s two FSS cells are lo-
+cal official-code evaluations [25]. DiffewS’s FSS scores use
+the baseline results reported by SANSA [9, 55]. SegIC re-
+tains published 1-shot scores, with PASCAL-5i taken from
+a secondary evaluation [32, 35].
+Its ten 5-shot entries
+are local evaluations using the public DINOv2-L 80k×12e
+checkpoint. Our five-reference extension averages the prob-
+abilities from five native single-reference passes at the query
+resolution and applies a fixed threshold of 0.5. SegGPT and
+DiffewS PASCAL-5i cells are gray because of task training
+on PASCAL VOC [47, 55].
+D.3. Methods using mask-pretrained models
+GF-SAM, Matcher, and PerSAM.
+GF-SAM v2 and v3
+use DINOv2-L/14 and DINOv3-L/16 features, respectively,
+with the same SAM-H mask model [10, 52]. The v2 row
+retains the published GF-SAM scores and the additional
+benchmark results reported by INSID3. The v3 row uses
+the DINOv3 variant reported by INSID3, with our local
+FSS and PASCAL-5i evaluations marked by cell-level dag-
+gers. For PASCAL-5i, Matcher uses the result reported by
+GF-SAM [26, 52]. PerSAM combines DINOv2-L localiza-
+16
+
+
+Table S4. 5-shot comparison across all ten datasets. Foreground mIoU (%). Avg weights all ten datasets equally. Conventions follow
+Table S3.
+Method
+Venue
+Natural objects
+Object parts
+Cross-domain
+Avg
+LVIS-
+COCO-
+FSS-
+PASCAL- PASCAL- PACO-
+ISIC
+SUIM
+iSAID
+X-Ray
+92i
+20i
+1000
+5i
+Part
+Part
+Task-specific fine-tuning: Semantic + mask supervision
+SegGPT[47]
+ICCV’23
+25.4
+67.9
+89.3
+89.8
+42.8
+14.1
+45.2
+33.7
+35.9
+89.1
+53.3
+SegIC†[32]
+ECCV’24
+46.8
+74.4
+87.3
+88.4
+38.9
+30.5
+29.1
+64.5
+51.0
+29.6
+54.0
+SINE[25]
+NeurIPS’24
+35.5
+66.1
+85.0†
+86.2
+36.4
+25.4
+28.6
+54.8
+40.5
+40.6
+49.9
+DiffewS[55]
+NeurIPS’24
+35.4
+72.2
+88.0
+87.8
+39.7
+26.1
+32.7
+49.8
+48.0
+45.1
+52.5
+LDIS-1†[46]
+AAAI’25
+20.4
+63.8
+69.3
+86.0
+32.9
+20.7
+24.5
+26.8
+21.8
+34.7
+40.1
+FSSAM†[50]
+ICML’25
+47.7
+71.0
+89.6
+86.3
+52.7
+38.3
+65.1
+61.9
+53.5
+70.0
+63.6
+COSINE†[27]
+ICCV’25
+40.8
+71.5
+87.1
+88.3
+36.0
+28.9
+29.0
+61.9
+36.9
+30.0
+51.0
+SANSA[9]
+NeurIPS’25
+42.5
+77.1
+89.0
+–
+–
+–
+–
+–
+–
+–
+–
+No offline task training: Mask-supervised pre-training
+PerSAM†[53]
+ICLR’24
+24.3
+39.1
+72.8
+56.0
+32.5
+28.5
+38.9
+28.8
+31.1
+31.3
+38.3
+Matcher[26]
+ICLR’24
+40.0
+60.7
+89.6
+74.0
+45.8
+33.6
+35.0
+50.6
+34.3
+71.2
+53.5
+GF-SAM v2[52]
+NeurIPS’24
+44.2
+66.8
+88.9
+82.6
+51.2
+41.9
+55.2
+58.1
+52.4
+52.9
+59.4
+GF-SAM v3[52]
+NeurIPS’24
+42.8
+64.4
+89.1†
+82.1†
+50.3
+39.3
+56.7
+58.6
+53.2
+54.7
+59.1
+GSM+Matcher[49]
+AAAI’26
+41.9
+62.7
+89.6
+75.7
+–
+–
+44.5
+–
+39.1
+–
+–
+RNS†[2]
+CVPR’26
+34.4
+58.8
+87.0
+81.6
+37.0
+28.7
+43.6
+61.1
+52.0
+29.8
+51.4
+PR-MaGIC†[21]
+CVPR’26
+24.5
+48.2
+88.6
+69.8
+41.4
+32.4
+41.5
+43.8
+34.3
+74.3
+49.9
+RPG-SAM†[24]
+MICCAI’26
+39.7
+53.1
+77.9
+64.0
+48.3
+42.5
+63.7
+44.0
+47.4
+49.6
+53.0
+No offline task training: Self-supervised pre-training
+INSID3[10]
+CVPR’26
+47.2
+65.1
+87.4†
+80.1†
+57.1
+46.8
+63.9
+61.7
+56.9
+80.1
+64.6
+HERA†[31]
+CVPR’26
+33.2
+54.0
+82.5
+74.7
+59.4
+45.5
+61.9
+58.0
+52.8
+86.8
+60.9
+RSRM†[44]
+ECCV’26
+39.9
+61.8
+82.8
+79.4
+60.2
+48.5
+63.9
+62.2
+57.1
+89.0
+64.5
+FROST[35]
+arXiv’26
+47.1
+60.5
+86.0†
+82.5
+64.9†
+52.1
+66.3
+68.8
+61.0†
+85.5†
+67.5
+ReSA (ours)
+This paper
+53.0
+68.4
+89.5
+88.9
+66.3
+57.3
+68.2
+69.0
+66.2
+90.7
+71.8
+Gain ↑
++4.3
+tion with SAM-H prompting in both shot settings, without
+PerSAM-F optimization [53]. Both shot settings are locally
+evaluated on all ten datasets. The 5-shot evaluation follows
+the paper’s maximum-location rule across five references.
+RPG-SAM.
+RPG-SAM is locally evaluated on all ten
+datasets with the shared episode lists and scoring [24].
+RPG-SAM uses DINOv2-L/14 and the original SAM2
+Hiera-L checkpoint, retaining the authors’ prototype min-
+ing, geometric threshold selection, and iterative prompting.
+Full reference/query images are resized to 560×560; masks
+use nearest-neighbor resizing. When SLIC [1] foreground
+regions disappear on the feature grid, a single coverage-
+weighted foreground prototype is used.
+An originally
+empty reference mask yields an all-background prediction
+and remains in the evaluation. For 5-shot evaluation, we
+average the five independently computed reference priors
+before threshold selection and SAM2 refinement.
+RNS.
+All twenty RNS entries are local evaluations
+with DINOv3 ViT-L/16 and SAM2.1-L across the ten
+datasets [2]. We disable the text branch and use all anno-
+tated references to build foreground and background feature
+banks, retaining the native region-level sliding-window in-
+ference.
+PR-MaGIC and scoring convention.
+All twenty PR-
+MaGIC entries are local evaluations of the authors’
+Matcher-based variant with DINOv2-L/14 and SAM ViT-
+H [21]. We retain native multi-reference matching and se-
+lect one of six candidate masks by support–query cosine
+similarity. DINOv2 uses 518 × 518 inputs and SAM re-
+tains its native 1024-pixel preprocessing; final scoring fol-
+lows the shared evaluation grids above. The authors’ imple-
+mentation averages foreground and background IoU within
+each episode,
+sPR
+e
+= 1
+2
+ Ie,fg
+Ue,fg
++ Ie,bg
+Ue,bg
+
+,
+(S17)
+then averages episodes and folds. Our tables instead accu-
+mulate foreground intersections and unions by class before
+averaging classes and folds. The reported ten-dataset av-
+erages, 48.3/49.9, use our foreground metric. The original
+PR-MaGIC paper’s “Pascal” benchmark denotes PASCAL-
+Part, distinct from the PASCAL-5i column added here.
+17
+
+
+GSM+Matcher.
+GSM+Matcher uses the published re-
+sults of GSM applied to Matcher [49]. It reports 1-shot/5-
+shot scores on LVIS-92i, COCO-20i, FSS, PASCAL-5i,
+ISIC, and iSAID. PASCAL-Part, PACO-Part, SUIM, and X-
+Ray are unreported; their entries and the incomplete group
+and ten-dataset averages are shown as –.
+Table S5. Group-wise comparison. Equal-weight mean fore-
+ground IoU (%) for objects (4 datasets), parts (2), and cross-
+domain benchmarks (4). –: incomplete groups. Gray: averages
+with task-training overlap, excluded from ranking. Conventions
+follow Table S3.
+Method
+Objects
+Parts
+Cross-domain
+1-shot
+5-shot
+1-shot
+5-shot
+1-shot
+5-shot
+Task-specific fine-tuning: Semantic + mask supervision
+SegGPT[47]
+60.9
+68.1
+24.7
+28.5
+47.7
+51.0
+SegIC[32]
+73.3
+74.2
+32.9
+34.7
+39.6
+43.5
+SINE[25]
+66.3
+68.2
+29.8
+30.9
+38.7
+41.1
+DiffewS[55]
+69.7
+70.9
+28.4
+32.9
+41.5
+43.9
+LDIS-1[46]
+56.4
+59.9
+25.6
+26.8
+26.2
+26.9
+FSSAM[50]
+66.9
+73.7
+38.4
+45.5
+60.3
+62.6
+COSINE[27]
+69.1
+71.9
+31.9
+32.5
+38.4
+39.4
+SANSA[9]
+–
+–
+34.8
+–
+–
+–
+No offline task training: Mask-supervised pre-training
+PerSAM[53]
+44.3
+48.0
+28.3
+30.5
+30.7
+32.5
+Matcher[26]
+60.2
+66.1
+38.8
+39.7
+46.7
+47.8
+GF-SAM v2[52]
+63.5
+70.6
+40.4
+46.6
+50.0
+54.7
+GF-SAM v3[52]
+61.7
+69.6
+39.7
+44.8
+51.1
+55.8
+GSM+Matcher[49]
+62.2
+67.5
+–
+–
+–
+–
+RNS[2]
+54.1
+65.5
+25.1
+32.8
+40.5
+46.6
+PR-MaGIC[21]
+54.7
+57.8
+36.4
+36.9
+47.8
+48.5
+RPG-SAM[24]
+51.8
+58.7
+39.2
+45.4
+47.5
+51.2
+No offline task training: Self-supervised pre-training
+INSID3[10]
+63.1
+70.0
+44.6
+52.0
+60.1
+65.7
+HERA[31]
+53.3
+61.1
+39.1
+52.4
+55.0
+64.9
+RSRM[44]
+58.1
+66.0
+44.5
+54.3
+61.5
+68.0
+FROST[35]
+58.5
+69.0
+46.1
+58.5
+61.4
+70.4
+ReSA (ours)
+66.0
+74.9
+50.7
+61.8
+65.2
+73.5
+Gain ↑
++2.5
++4.3
++4.6
++3.3
++3.7
++3.1
+D.4. Methods using self-supervised features
+INSID3 and RSRM.
+INSID3’s eight original benchmark
+scores come from its paper [10]. Its FSS and PASCAL-5i
+entries are official-code evaluations using the same frozen
+lists as ReSA. All RSRM entries are local official-code eval-
+uations with DINOv3-L/16, whereas RSRM’s paper reports
+B/16 [44].
+FROST.
+The FROST row uses frozen DINOv3-L/16 fea-
+tures without an auxiliary segmentation model [35]. Both
+shot settings on FSS-1000, PASCAL-Part, iSAID, and X-
+Ray are local evaluations and carry cell-level daggers; the
+other six datasets use published scores.
+Local runs use
+1024 × 1024 inputs and the scoring grids in Section C.1;
+5-shot uses the author’s sequential reference interface.
+HERA and episode isolation.
+All twenty HERA en-
+tries are local evaluations with DINOv3-L/16 and native
+400 × 400 inputs [31].
+We retain feature fusion, cali-
+brated attention refinement, and support-only test-time op-
+timization with Adam [17] at learning rate 0.0013, using
+two updates for 1-shot and four for 5-shot. HERA opti-
+mizes selected backbone parameters and its fusion head at
+test time, with no offline task training. For independent
+episodes, we reset both the backbone and fusion head to
+their initial states; the released code resets only the back-
+bone and retains fusion-head state across episodes.
+Our
+row uses this episode-isolated evaluation with the sampling
+and foreground-scoring protocol above. PASCAL-5i uses
+the common four-fold episode lists and original-resolution
+scoring.
+D.5. Detailed benchmark comparisons
+ReSA achieves the highest ten-dataset mean among eligible
+comparisons in both shot settings (Tables S3 and S4) and
+leads the part and cross-domain groups (Table S5). Its part
+scores reach 50.7/61.8 mIoU and its cross-domain scores
+reach 65.2/73.5.
+Tables S3 and S4 additionally include
+SANSA and GF-SAM v3; the main-paper GF-SAM row is
+labeled v2 here.
+Foreground selection.
+ReSA has the lowest extra-
+foreground rates among the methods displayed in Fig. S1 on
+both PASCAL-Part (29.2%) and PACO-Part (42.7%), indi-
+cating more precise selection of the requested part. The fig-
+ure extends the main-paper LVIS-92i analysis to the other
+nine benchmarks.
+On COCO-20i, ReSA reduces the miss rate from
+INSID3’s 27.0% to 21.0%;
+the corresponding extra-
+foreground rates are 30.9% and 27.3%.
+E. Additional ablation results
+Accuracy uses one decimal place unless otherwise speci-
+fied; differences subtract displayed scores. Timing uses sec-
+onds to three decimal places.
+E.1. Module configurations
+RMS improves the RCA-only mean by 1.9/0.4 mIoU points
+in 1-shot/5-shot, and TAR adds a further 0.7/1.1 points to
+RCA+RMS (Table S6). The table follows the five mod-
+ule combinations in main-paper Table 3. Base thresholds
+p0 at T = 0.5 immediately after reference fitting. RCA
+adapts with the conditional objective, retaining the fixed
+λ = 1 branch and T = 0.5. RCA+RMS fits each branch’s
+threshold and then selects the branch with the larger rela-
+tive gain; RCA+TAR refines the same RCA prediction at
+T = 0.5. Full adds TAR to RCA+RMS. All five configura-
+tions use 66,981 episodes per shot and the class/fold aggre-
+gation specified above.
+18
+
+
+FSSAM
+18.4
+RSRM
+20.5
+INSID3
+27.0
+GF-SAM
+23.7
+ReSA
+21.0
+28.2
+41.4
+27.3
+29.2
+30.9
+FSSAM
+4.7
+RSRM
+3.7
+INSID3
+8.0
+GF-SAM
+7.3
+ReSA
+3.7
+7.5
+17.1
+7.6
+5.9
+10.9
+FSSAM
+14.2
+RSRM
+16.2
+INSID3
+29.7
+GF-SAM
+20.9
+ReSA
+16.7
+9.5
+21.9
+7.4
+16.3
+14.7
+FSSAM
+11.0
+RSRM
+27.9
+INSID3
+32.6
+GF-SAM
+28.9
+ReSA
+26.8
+52.3
+36.6
+32.3
+44.6
+29.2
+FSSAM
+9.7
+RSRM
+36.8
+INSID3
+33.7
+GF-SAM
+24.7
+ReSA
+34.1
+65.6
+52.6
+52.1
+58.0
+42.7
+FSSAM
+19.2
+RSRM
+24.6
+INSID3
+20.9
+GF-SAM
+19.4
+ReSA
+26.2
+37.4
+29.9
+34.0
+43.5
+25.9
+FSSAM
+25.4
+RSRM
+26.5
+INSID3
+33.3
+GF-SAM
+28.2
+ReSA
+26.5
+30.4
+37.4
+26.8
+30.2
+27.9
+FSSAM
+22.7
+RSRM
+24.4
+INSID3
+32.7
+GF-SAM
+22.8
+ReSA
+27.6
+42.2
+43.1
+32.1
+44.1
+35.1
+FSSAM
+3.0
+RSRM
+5.8
+INSID3
+8.9
+GF-SAM
+2.4
+ReSA
+7.4
+17.4
+7.2
+14.4
+48.2
+3.3
+Miss ↓
+Extra ↓
+Miss ↓
+Extra ↓
+Miss ↓
+Extra ↓
+Miss ↓
+Extra ↓
+Miss ↓
+Extra ↓
+Miss ↓
+Extra ↓
+Miss ↓
+Extra ↓
+Miss ↓
+Extra ↓
+Miss ↓
+Extra ↓
+Figure S1. 1-shot foreground error rates beyond LVIS-92i. Miss is FN/(TP + FN); Extra is FP/(TP + FP). Counts are pooled
+within each class; classes and folds are averaged equally. Bars report percentages (lower is better), with ReSA in pink; dashed lines mark
+ReSA’s values. Bold values indicate the lowest error. GF-SAM uses our local DINOv2-L/14 + SAM-H reproduction.
+Threshold controls vary the cutoff on the same RMS-
+selected probability map p∗; refinement controls also fix
+its coarse mask and fitted threshold. Query-objective and
+branch-selection controls use matched inputs and optimiza-
+tion settings. Without TAR, token masks are bilinearly re-
+sized and binarized under the same evaluation protocol.
+Adaptation improves the input to mask selection.
+Un-
+der the same single-candidate threshold fit, RCA exceeds
+continued reference supervision by 3.7/2.1 mIoU points
+without TAR (Table S7). The R-only control resets AdamW
+after reference fitting and continues reference supervision
+for the same adaptation budget. Both controls share the fea-
+tures, kernel, and episodes. Here the λ = 1 prediction uses
+a fitted threshold; the RCA-only configuration in Table S6
+uses T = 0.5.
+E.2. RCA objectives and error patterns
+Complementary query objectives.
+With reference su-
+pervision R retained, combining conditional KL C and
+query entropy H raises mean mIoU from 56.8/68.3 to
+60.0/70.3 in 1-shot/5-shot (Table S8). Adding either query
+term alone gives 55.2/67.5 for R + C and 53.9/69.7 for
+R+H, highlighting the benefit of combining the two terms.
+The C + H control reaches 60.0/70.4 under the fixed cut-
+off. With RMS and TAR, C + H and R + C + H reach
+62.47/71.75 and 62.60/71.75, respectively.
+Here R = Lref, C = Lcond, and H = H.
+All
+variants start from the same reference-fitted p0.
+Fixed-
+threshold controls share the adaptation budget, use λ = 1
+and T = 0.5, and omit RMS and TAR; retained query terms
+keep their 1/S scaling. Both full-pipeline variants use the
+same two-branch configuration and the same RMS and TAR
+procedures.
+Complementary reductions in foreground and back-
+ground errors.
+Adding C to R + H reduces foreground
+misses from 37.1/17.9% to 26.5/14.9%, while adding H
+to R + C reduces background false-positive rates from
+7.8/5.4% to 5.7/4.4% in 1-shot/5-shot.
+Relative to R
+alone, the full objective also reduces foreground-area er-
+ror from 7.6/4.9 to 7.1/4.5 percentage points. Main-paper
+19
+
+
+Table S6. Module combinations. Foreground mIoU (%) on 133,962 matched episodes. Base denotes the first-stage initialization p0. Bold
+marks the highest displayed scores per dataset and shot, including ties.
+Dataset
+1-shot
+5-shot
+Base
+RCA
+RCA+RMS
+RCA+TAR
+Full
+Base
+RCA
+RCA+RMS
+RCA+TAR
+Full
+LVIS-92i
+37.5
+44.1
+43.2
+45.2
+44.9
+47.0
+52.4
+50.6
+54.8
+53.0
+COCO-20i
+50.2
+55.3
+58.0
+55.8
+58.8
+63.3
+66.8
+67.2
+67.9
+68.4
+FSS-1000
+81.3
+84.6
+84.6
+86.4
+86.4
+86.2
+87.9
+87.6
+89.7
+89.5
+PASCAL-5i
+66.6
+69.8
+73.4
+69.9
+73.8
+85.2
+87.6
+88.2
+88.1
+88.9
+PASCAL-Part
+51.3
+53.4
+55.5
+53.7
+56.0
+63.0
+65.4
+65.7
+66.0
+66.3
+PACO-Part
+39.5
+41.0
+44.9
+41.3
+45.5
+52.8
+55.2
+56.6
+55.9
+57.3
+ISIC
+54.0
+55.5
+58.7
+55.6
+58.8
+63.7
+65.4
+67.8
+65.9
+68.2
+SUIM
+54.8
+56.5
+58.0
+57.0
+58.8
+65.4
+67.1
+67.7
+68.2
+69.0
+iSAID
+49.5
+51.0
+53.0
+51.0
+53.2
+63.0
+65.2
+65.6
+65.6
+66.2
+X-Ray
+88.3
+89.3
+89.3
+89.9
+89.7
+89.3
+89.8
+90.2
+90.4
+90.7
+Mean
+57.3
+60.0
+61.9
+60.6
+62.6
+67.9
+70.3
+70.7
+71.3
+71.8
+Table S7. Query adaptation under matched threshold fitting
+and refinement. Ten-dataset mean mIoU (%) on 133,962 matched
+episodes. All rows use the same reference-weighted KL threshold
+fit. For RCA, λ weights query entropy; RMS selects between the
+two branches. Bold marks the best per shot.
+Prediction
+Branch setting
+TAR
+1-shot
+5-shot
+p0
+Single prediction
+–
+57.7
+67.1
+R-only
+Single prediction
+–
+57.8
+68.1
+RCA
+Fixed λ = 1
+–
+61.5
+70.2
+RCA
+RMS: λ ∈{1, 3}
+–
+61.9
+70.7
+p0
+Single prediction
+✓
+58.8
+68.4
+R-only
+Single prediction
+✓
+58.8
+69.4
+RCA
+RMS: λ ∈{1, 3}
+✓
+62.6
+71.8
+Fig. 6(a) and Fig. S5 visualize the corresponding probabil-
+ity changes.
+These diagnostics use the matched loss controls in Ta-
+ble S8.
+Foreground miss rate is FN/(TP + FN), and
+background false-positive rate is FP/(FP + TN). Counts
+are pooled within each class before equal class, fold, and
+dataset averaging. Foreground-area error is the absolute dif-
+ference between predicted and annotated foreground frac-
+tions, computed per episode and averaged over classes,
+folds, and datasets.
+Foreground retention by initial confidence.
+Adding C
+to R+H gives the largest recall gains in bins with p0 > 0.5
+(Table S9).
+Recall rises from 44.4/60.5 to 69.6/73.3 in
+(0.5, 0.7] and from 85.1/96.8 to 98.5/99.5 in (0.7, 1], show-
+ing improved retention of target pixels already supported by
+reference fitting.
+We group query pixels by their reference-fitted fore-
+ground probability p0, using fixed boundaries at 0.3, 0.5,
+and 0.7 before query adaptation. The three objectives share
+Table S8. Single, pairwise, and full RCA objectives. Ten-dataset
+mean mIoU (%) on 133,962 matched episodes. R, C, and H
+denote reference supervision, conditional KL, and query entropy.
+The upper block uses λ = 1 and T = 0.5. The lower block in-
+cludes RMS and TAR and reports two decimals. Bold marks the
+best per shot within each block, including ties.
+Objective
+1-shot
+5-shot
+R
+56.8
+68.3
+C
+57.3
+67.9
+H
+48.9
+64.0
+R + C
+55.2
+67.5
+R + H
+53.9
+69.7
+C + H
+60.0
+70.4
+R + C + H
+60.0
+70.3
+Full pipeline (RMS + TAR)
+C + H
+62.47
+71.75
+R + C + H
+62.60
+71.75
+Table S9. Foreground recall by initial confidence. Recall (%) in
+fixed p0 intervals after the same TAR refinement for each objec-
+tive; cells list ten-dataset means for 1-shot/5-shot. All variants use
+λ = 1 and T = 0.5. Objectives follow Table S8.
+Initial p0
+R
+R + H
+R + C + H
+[0, 0.3]
+0.1/0.3
+3.2/3.2
+1.6/1.2
+(0.3, 0.5]
+10.1/13.5
+17.2/23.0
+20.1/20.7
+(0.5, 0.7]
+74.4/76.0
+44.4/60.5
+69.6/73.3
+(0.7, 1]
+99.7/99.8
+85.1/96.8
+98.5/99.5
+initialization, budgets, λ = 1, T = 0.5, and the same
+TAR refinement.
+For grouping, continuous p0 is bilin-
+early resized to the scoring grid; final predictions follow the
+dataset’s scoring convention. The analysis covers 133,690
+episodes with probability outputs. Within each bin, recall
+pools foreground counts per class and then averages defined
+20
+
+
+Table S10. Reference weights in RMS. Ten-dataset mean mIoU
+(%), without TAR. Both rows use prototype-response KL, fitted
+thresholds, and relative-gain selection.
+RMS weights
+1-shot
+5-shot
+Uniform
+61.6
+69.6
+Reference
+61.9
+70.7
+class rates, folds, and datasets. All ten datasets contribute
+to every bin; class–fold groups without foreground in a bin
+are omitted from that bin’s average.
+E.3. Mask selection controls
+Reconstruction weights.
+Reference weighting improves
+mask selection with the adapted candidate maps held fixed:
+mean mIoU rises from 61.6/69.6 to 61.9/70.7 (Table S10).
+The control replaces uniform weights, wi = 1/N, with
+reference-kernel weights, wi = (2S)−1 P
+r Kri, through-
+out threshold fitting and relative-gain scoring.
+Threshold fitting on the selected branch.
+Fitting the
+cutoff improves 1-shot mean mIoU by 1.6 points over T =
+0.5, reaching 61.9; both give 70.7 after rounding in 5-shot
+(Table S11). The comparison holds the RMS-selected prob-
+ability map fixed and varies only the cutoff, without TAR.
+All masks use pi > T.
+On 5-shot LVIS-92i, the fitted cutoff shifts the coverage–
+background balance:
+foreground misses decrease from
+19.2% to 14.0%, while background false positives increase
+from 1.9% to 2.5%. The resulting mIoU is 50.6, compared
+with 53.4 at T = 0.5.
+Branch-selection rule.
+Relative gain provides a stronger
+branch-selection criterion than absolute reconstruction er-
+ror: it improves mIoU by 0.9/0.2 points with candidates and
+fitted thresholds held fixed (Table S12). Min D selects λ∗=
+arg minλ∈{1,3} D∗
+λ; RMS maximizes 1−D∗
+λ/Dλ,const. The
+normalization measures how much each two-level fit im-
+proves on its own constant baseline, allowing comparison
+across maps with different probability variation.
+Selection within a fixed candidate set.
+RMS reaches
+61.9/70.7 mIoU, compared with 61.2/70.4 for random
+branch selection (Table S13).
+The GT-guided selector
+reaches 63.2/71.7 by choosing the candidate with the higher
+IoU for each episode.
+Both randomized controls average 20 seeds (20261115–
+20261134).
+The GT-assisted “50% correct” control sets
+branch-choice correctness to 50% among non-tied episodes.
+All selections are made at the episode level before class-
+level pooling.
+Method
+Mean mIoU (%)
+1-shot 5-shot
+0
+20
+40
+60
+80
+ReSA (DINOv3-L)
+62.6
+71.8
+ReSA (DINOv3-L) w/o debias
+60.1
+71.3
+ReSA (DINOv3-B)
+59.6
+68.9
+ReSA (DINOv3-S)
+55.4
+64.2
+ReSA (DINOv2-L)
+57.0
+67.5
+INSID3
+58.2
+64.6
+FROST
+57.2
+67.5
+RSRM
+56.8
+64.5
+GF-SAM v2
+53.5
+59.4
+GF-SAM v3
+53.0
+59.1
+HERA
+51.1
+60.9
+Matcher
+50.5
+53.5
+PR-MaGIC
+48.3
+49.9
+RPG-SAM
+47.6
+53.0
+RNS
+42.9
+51.4
+PerSAM
+35.7
+38.3
+FSSAM
+58.6
+63.6
+SegIC
+51.7
+54.0
+DiffewS
+50.1
+52.5
+COSINE
+49.4
+51.0
+SegGPT
+48.4
+53.3
+SINE
+48.0
+49.9
+LDIS-1
+38.1
+40.1
+1-shot
+5-shot
+Figure S2. Ten-dataset mean comparison. ReSA uses DINOv2-
+L/14 and DINOv3-S/B/L/16; the no-debias control uses DINOv3-
+L/16.
+Table S14 gives the matched results.
+Methods without
+a complete ten-dataset mean are omitted.
+Gray indicates task-
+training overlap or possible overlap; these results are excluded
+from ranking. Circles/squares denote 1-shot/5-shot.
+E.4. Backbone and debiasing controls
+Table S14 compares DINOv2 ViT-L/14 at 896 × 896
+and DINOv3 ViT-S/B/L/16 at 1024 × 1024, all produc-
+ing 64 × 64 tokens. The controls share the scoring grids,
+133,962 episodes, reference sampling, and dataset/shot
+head settings. All four backbone configurations apply the
+positional-subspace removal inherited from INSID3 [10]:
+500 components for both L backbones, 188 for DINOv3-S
+(d = 384), and 375 for DINOv3-B (d = 768). The DI-
+NOv3 rank follows r = round(500d/1024), fixed before
+evaluation, where d is the feature dimension; each basis is
+computed for its corresponding encoder. Full retains the
+same adaptation, RMS, and TAR settings.
+For the additional DINOv3-L control, we disable the
+post-encoding positional projection in Base and Full, retain-
+ing L2 normalization and the same initialization, episodes,
+and inference settings. The encoder’s native positional en-
+coding is unchanged.
+Encoder and debiasing effects.
+ReSA improves Base
+on every dataset and shot setting across all four encoders.
+21
+
+
+Table S11. Thresholds on fixed RMS-selected probabilities. Foreground mIoU (%) on 133,962 matched episodes, without TAR. Paren-
+theses report differences from the RMS threshold using displayed one-decimal scores; bold marks the best per dataset and shot, including
+ties.
+Dataset
+1-shot
+5-shot
+T = 0.3
+T = 0.5
+T = 0.7
+RMS threshold
+T = 0.3
+T = 0.5
+T = 0.7
+RMS threshold
+LVIS-92i
+44.5 (+1.3)
+44.6 (+1.4)
+43.1 (−0.1)
+43.2
+51.4 (+0.8)
+53.4 (+2.8)
+54.4 (+3.8)
+50.6
+COCO-20i
+56.6 (−1.4)
+55.8 (−2.2)
+53.9 (−4.1)
+58.0
+66.5 (−0.7)
+67.3 (+0.1)
+67.4 (+0.2)
+67.2
+FSS-1000
+83.9 (−0.7)
+84.7 (+0.1)
+85.0 (+0.4)
+84.6
+87.0 (−0.6)
+87.8 (+0.2)
+88.3 (+0.7)
+87.6
+PASCAL-5i
+71.8 (−1.6)
+70.3 (−3.1)
+67.7 (−5.7)
+73.4
+88.1 (−0.1)
+88.0 (−0.2)
+87.3 (−0.9)
+88.2
+PASCAL-Part
+54.4 (−1.1)
+53.4 (−2.1)
+51.0 (−4.5)
+55.5
+64.8 (−0.9)
+65.6 (−0.1)
+65.3 (−0.4)
+65.7
+PACO-Part
+42.6 (−2.3)
+40.9 (−4.0)
+37.6 (−7.3)
+44.9
+55.1 (−1.5)
+55.2 (−1.4)
+53.7 (−2.9)
+56.6
+ISIC
+57.9 (−0.8)
+56.7 (−2.0)
+54.7 (−4.0)
+58.7
+67.4 (−0.4)
+66.8 (−1.0)
+65.1 (−2.7)
+67.8
+SUIM
+57.3 (−0.7)
+56.6 (−1.4)
+55.3 (−2.7)
+58.0
+67.1 (−0.6)
+67.3 (−0.4)
+66.8 (−0.9)
+67.7
+iSAID
+51.8 (−1.2)
+51.1 (−1.9)
+49.8 (−3.2)
+53.0
+64.9 (−0.7)
+65.3 (−0.3)
+65.2 (−0.4)
+65.6
+X-Ray
+89.3 (+0.0)
+89.4 (+0.1)
+87.8 (−1.5)
+89.3
+88.4 (−1.8)
+90.0 (−0.2)
+89.7 (−0.5)
+90.2
+Mean
+61.0 (−0.9)
+60.3 (−1.6)
+58.6 (−3.3)
+61.9
+70.1 (−0.6)
+70.7 (+0.0)
+70.3 (−0.4)
+70.7
+Table S12. Branch selection in RMS. Foreground mIoU (%) on 133,962 matched episodes with fixed probabilities and threshold fits,
+without TAR. Parentheses subtract Relative gain using displayed scores; bold marks the best per setting, including ties.
+Dataset
+1-shot
+5-shot
+λ = 1
+λ = 3
+Min D
+Relative gain
+λ = 1
+λ = 3
+Min D
+Relative gain
+LVIS-92i
+42.5 (−0.7)
+42.8 (−0.4)
+42.5 (−0.7)
+43.2
+49.4 (−1.2)
+51.1 (+0.5)
+50.7 (+0.1)
+50.6
+COCO-20i
+57.5 (−0.5)
+56.8 (−1.2)
+56.7 (−1.3)
+58.0
+66.7 (−0.5)
+67.3 (+0.1)
+67.1 (−0.1)
+67.2
+FSS-1000
+84.5 (−0.1)
+84.5 (−0.1)
+84.4 (−0.2)
+84.6
+87.6 (+0.0)
+87.6 (+0.0)
+87.6 (+0.0)
+87.6
+PASCAL-5i
+73.1 (−0.3)
+72.2 (−1.2)
+72.5 (−0.9)
+73.4
+87.8 (−0.4)
+88.3 (+0.1)
+88.3 (+0.1)
+88.2
+PASCAL-Part
+55.4 (−0.1)
+54.1 (−1.4)
+54.2 (−1.3)
+55.5
+65.4 (−0.3)
+65.5 (−0.2)
+65.4 (−0.3)
+65.7
+PACO-Part
+44.7 (−0.2)
+43.1 (−1.8)
+43.0 (−1.9)
+44.9
+56.2 (−0.4)
+55.9 (−0.7)
+55.8 (−0.8)
+56.6
+ISIC
+57.6 (−1.1)
+57.6 (−1.1)
+57.6 (−1.1)
+58.7
+66.5 (−1.3)
+67.5 (−0.3)
+67.3 (−0.5)
+67.8
+SUIM
+57.7 (−0.3)
+57.5 (−0.5)
+57.5 (−0.5)
+58.0
+67.3 (−0.4)
+67.6 (−0.1)
+67.5 (−0.2)
+67.7
+iSAID
+53.0 (+0.0)
+52.1 (−0.9)
+52.3 (−0.7)
+53.0
+65.3 (−0.3)
+65.4 (−0.2)
+65.5 (−0.1)
+65.6
+X-Ray
+89.3 (+0.0)
+89.2 (−0.1)
+89.3 (+0.0)
+89.3
+90.1 (−0.1)
+90.2 (+0.0)
+90.2 (+0.0)
+90.2
+Mean
+61.5 (−0.4)
+61.0 (−0.9)
+61.0 (−0.9)
+61.9
+70.2 (−0.5)
+70.6 (−0.1)
+70.5 (−0.2)
+70.7
+Table S13. Branch-selection controls. Ten-dataset mean mIoU
+(%) on 133,962 matched episodes, before TAR. Candidate prob-
+abilities and fitted thresholds are fixed; the random controls use
+λ ∈{1, 3}. Randomized controls average 20 fixed seeds.
+Selection rule
+1-shot
+5-shot
+Single branch: λ = 1
+61.5
+70.2
+Single branch: λ = 3
+61.0
+70.6
+Min D: λ ∈{1, 3}
+61.0
+70.5
+Random λ ∈{1, 3}
+61.2
+70.4
+50% correct (GT-assisted)
+61.3
+70.4
+RMS: λ ∈{1, 3}
+61.9
+70.7
+RMS: λ ∈{1, 2, 3}
+61.8
+70.7
+GT oracle: λ ∈{1, 3}
+63.2
+71.7
+GT oracle: λ ∈{1, 2, 3}
+63.3
+71.7
+Mean gains are 4.9/3.2, 5.8/4.1, and 5.3/3.9 points for
+DINOv3-S/B/L, and 6.5/6.7 for DINOv2-L (Table S14).
+These results show that the adaptation and mask-formation
+pipeline benefits different feature capacities and encoder
+generations. With DINOv3-L fixed, positional debiasing
+adds 2.5/0.5 points. Figure S2 compares the resulting con-
+figurations with other methods.
+F. Boundary recovery and threshold alignment
+Boundary refinement and threshold alignment.
+TAR
+improves the RCA+RMS coarse mask by 0.7/1.1 mIoU
+points in 1-shot/5-shot (Table S15).
+Relative to the no-
+evidence control, TAR gains 0.2/0.3 points. Relative to un-
+aligned evidence, it gains 0.4 points in 1-shot; both variants
+round to 71.8 in 5-shot.
+Refinement controls share the selected probabilities,
+coarse masks, boundary bands, pairwise terms, and solver
+22
+
+
+Table S14. Backbone and debiasing results by dataset. Foreground mIoU (%) on 133,962 matched episodes per configuration; cells list
+1-shot/5-shot. Base thresholds the first-stage p0 at 0.5; Full is RCA+RMS+TAR. Each pair shares the encoder, debias setting, episodes,
+and reference initialization. Bold marks the better score within each pair. Gains subtract displayed means.
+Dataset
+DINOv2-L/14
+DINOv3-S/16
+DINOv3-B/16
+DINOv3-L/16
+DINOv3-L/16
+Debias ✓
+Debias ✓
+Debias ✓
+Debias –
+Debias ✓
+Base
+Full
+Base
+Full
+Base
+Full
+Base
+Full
+Base
+Full
+LVIS-92i
+25.9/35.8
+36.8/46.0
+23.5/31.8
+26.1/33.5
+28.8/39.1
+35.4/44.7
+38.1/48.4
+43.2/53.2
+37.5/47.0
+44.9/53.0
+COCO-20i
+41.1/54.1
+51.5/63.1
+41.7/55.1
+48.6/59.3
+47.0/60.6
+56.8/66.4
+48.6/63.0
+56.9/68.4
+50.2/63.3
+58.8/68.4
+FSS-1000
+76.4/80.5
+82.5/85.9
+80.7/85.6
+86.7/89.0
+80.7/86.1
+86.8/89.9
+82.9/86.8
+87.6/90.2
+81.3/86.2
+86.4/89.5
+PASCAL-5i
+60.0/75.6
+68.5/83.3
+64.2/81.2
+71.6/84.7
+68.9/84.5
+75.6/88.3
+60.6/83.2
+67.6/86.9
+66.6/85.2
+73.8/88.9
+PASCAL-Part
+47.5/57.6
+52.9/63.2
+43.7/55.1
+46.9/57.4
+47.9/59.7
+52.3/63.4
+49.7/63.0
+53.9/66.3
+51.3/63.0
+56.0/66.3
+PACO-Part
+33.5/46.1
+38.5/52.3
+29.1/41.1
+33.9/44.7
+33.4/47.2
+40.2/52.4
+39.1/53.2
+44.6/57.5
+39.5/52.8
+45.5/57.3
+ISIC
+47.6/62.3
+51.2/68.1
+48.1/60.7
+56.2/67.6
+50.0/62.6
+56.9/68.7
+49.0/63.1
+51.9/66.9
+54.0/63.7
+58.8/68.2
+SUIM
+48.9/58.4
+54.6/64.3
+48.1/60.3
+52.0/63.7
+52.4/63.8
+57.2/67.3
+51.0/64.2
+54.5/67.7
+54.8/65.4
+58.8/69.0
+iSAID
+42.4/54.6
+46.3/59.8
+40.1/53.0
+44.0/54.2
+41.7/56.2
+45.9/58.8
+47.0/62.1
+50.6/65.6
+49.5/63.0
+53.2/66.2
+X-Ray
+81.7/83.5
+87.3/89.1
+85.4/86.2
+88.1/88.3
+87.4/88.1
+89.3/89.6
+87.8/88.9
+89.7/90.5
+88.3/89.3
+89.7/90.7
+Mean
+50.5/60.8
+57.0/67.5
+50.5/61.0
+55.4/64.2
+53.8/64.8
+59.6/68.9
+55.4/67.6
+60.1/71.3
+57.3/67.9
+62.6/71.8
+Gain
++6.5/+6.7
++4.9/+3.2
++5.8/+4.1
++4.7/+3.7
++5.3/+3.9
+Table S15. Matched refinement controls. No TAR evaluates the RCA+RMS coarse mask; the other variants retain matched bands and
+pairwise terms. Foreground mIoU (%). Each setting covers 133,962 matched episodes. Parentheses give changes from Full TAR, calculated
+from the displayed one-decimal scores. Bold marks the highest displayed scores per dataset and shot, including ties.
+Dataset
+1-shot
+5-shot
+No TAR
+Unaligned
+No evidence
+Full TAR
+No TAR
+Unaligned
+No evidence
+Full TAR
+LVIS-92i
+43.2 (−1.7)
+44.8 (−0.1)
+44.4 (−0.5)
+44.9
+50.6 (−2.4)
+53.7 (+0.7)
+52.5 (−0.5)
+53.0
+COCO-20i
+58.0 (−0.8)
+58.3 (−0.5)
+58.5 (−0.3)
+58.8
+67.2 (−1.2)
+68.5 (+0.1)
+68.1 (−0.3)
+68.4
+FSS-1000
+84.6 (−1.8)
+86.5 (+0.1)
+86.6 (+0.2)
+86.4
+87.6 (−1.9)
+89.7 (+0.2)
+89.7 (+0.2)
+89.5
+PASCAL-5i
+73.4 (−0.4)
+72.9 (−0.9)
+73.5 (−0.3)
+73.8
+88.2 (−0.7)
+88.7 (−0.2)
+88.5 (−0.4)
+88.9
+PASCAL-Part
+55.5 (−0.5)
+55.6 (−0.4)
+55.9 (−0.1)
+56.0
+65.7 (−0.6)
+66.5 (+0.2)
+66.3 (+0.0)
+66.3
+PACO-Part
+44.9 (−0.6)
+44.8 (−0.7)
+45.3 (−0.2)
+45.5
+56.6 (−0.7)
+57.1 (−0.2)
+57.2 (−0.1)
+57.3
+ISIC
+58.7 (−0.1)
+58.1 (−0.7)
+58.7 (−0.1)
+58.8
+67.8 (−0.4)
+67.9 (−0.3)
+68.2 (+0.0)
+68.2
+SUIM
+58.0 (−0.8)
+58.4 (−0.4)
+58.7 (−0.1)
+58.8
+67.7 (−1.3)
+69.0 (+0.0)
+68.9 (−0.1)
+69.0
+iSAID
+53.0 (−0.2)
+52.8 (−0.4)
+52.9 (−0.3)
+53.2
+65.6 (−0.6)
+66.2 (+0.0)
+65.7 (−0.5)
+66.2
+X-Ray
+89.3 (−0.4)
+89.8 (+0.1)
+89.0 (−0.7)
+89.7
+90.2 (−0.5)
+90.7 (+0.0)
+89.9 (−0.8)
+90.7
+Mean
+61.9 (−0.7)
+62.2 (−0.4)
+62.4 (−0.2)
+62.6
+70.7 (−1.1)
+71.8 (+0.0)
+71.5 (−0.3)
+71.8
+settings. Unaligned refinement uses logit(p), while the no-
+evidence control sets both boundary unary scores to zero.
+Boundary metric.
+Boundary IoU [7] uses an inner
+boundary width of max(1, round(0.02 d)) pixels, where
+d is the scoring-image diagonal.
+Ignored pixels are ex-
+cluded from boundary intersections and unions.
+Overall
+scores pool boundary intersections and unions within each
+class, then average classes, folds, and datasets. Threshold-
+deviation bins instead use matched per-episode scores as
+specified below.
+Threshold-deviation groups.
+Figure S3 separates the 1-
+shot and 5-shot results pooled in main-paper Figure 7. Both
+use four |T −0.5| groups, averaging matched per-episode
+Boundary IoUs within each dataset, then equally over repre-
+sented datasets. The lower panel gives episode proportions
+for each shot setting and their union. Probability and thresh-
+old diagnostics cover 133,690 episodes; full-benchmark
+mIoU covers all 133,962.
+The remaining 272 episodes
+(88 in 1-shot and 184 in 5-shot) use the empty-candidate
+or missing-reference-class path in Section A.6, which pro-
+duces masks directly.
+Alignment gains concentrate at large threshold shifts.
+When |T −0.5| ≥0.2, TAR improves Boundary IoU over
+unaligned refinement by 2.61/1.85 points in 1-shot/5-shot
+(Fig. S3). This group contains 38.1% of the valid-threshold
+23
+
+
+I
+II
+III
+IV
+0
+1
+2
+3
+Boundary IoU gain (pp)
+-0.1
+-0.3
++0.1
++2.6
+Alignment: TAR − unaligned
+I
+II
+III
+IV
++2.6
++3.0
++3.0
++1.6
+Refinement: TAR − coarse
+I
+II
+III
+IV
+0
+1
+2
+3
+Boundary IoU gain (pp)
+-0.1
+-0.4
+-0.2
++1.9
+Alignment: TAR − unaligned
+I
+II
+III
+IV
++3.3
++3.3
++3.0
++1.8
+Refinement: TAR − coarse
+0%
+20%
+40%
+60%
+80%
+100%
+I: 21.0%
+II: 22.3%
+III: 27.8%
+IV: 28.9%
+I: 15.4%
+II: 17.3%
+III: 29.2%
+IV: 38.1%
+I: 26.7%
+II: 27.4%
+III: 26.3%
+IV: 19.6%
+1-shot
+5-shot
+Threshold deviation d=|T−0.5|
+Episode distribution (%)
+All episodes
+N = 133,690
+1-shot
+N = 66,893
+5-shot
+N = 66,797
+I: 0≤d<0.05
+II: 0.05≤d<0.10
+III: 0.10≤d<0.20
+IV: d≥0.20
+Figure S3. Boundary refinement across threshold deviations.
+The upper two rows show 1-shot/5-shot Boundary IoU gains in
+percentage points. Left: TAR minus unaligned CRF; right: TAR
+minus the coarse mask. Gains are averaged over matched episodes
+within each dataset, then over datasets. The lower panel shows
+the distribution of 133,690 valid-threshold episodes, normalized
+within each row. Groups I–IV share the d = |T −0.5| intervals
+defined in the legend.
+1-shot episodes and 19.6% of the valid-threshold 5-shot
+episodes.
+TAR aligns the refinement evidence with the
+coarse-mask cutoff, whereas unaligned evidence retains the
+0.5 cutoff. Across all 133,690 diagnostic episodes, class-
+pooled Boundary IoU is 40.44/45.97 for the coarse masks,
+42.32/48.86 for unaligned refinement, and 42.64/48.69 for
+TAR.
+G. Inference cost and benchmark sensitivity
+Measurement protocol.
+Runtime measurements use one
+H100 GPU and one process, with 100 episodes per shot:
+ten from each dataset. Timings cover complete inference,
+including both ReSA candidates and final refinement.
+Table S16. Complete-pipeline accuracy and time by branch
+count.
+mIoU (%) uses all 133,962 benchmark episodes; time
+(s/episode) uses the same 200 inputs and measurement protocol
+in Section G, on an H100. All four configurations include TAR.
+Bold marks the highest displayed mIoU per shot.
+Branch setting
+1-shot
+5-shot
+mIoU
+Time
+mIoU
+Time
+Single: λ = 1
+62.3
+0.176
+71.3
+0.396
+Single: λ = 3
+61.7
+0.177
+71.7
+0.384
+Dual: λ ∈{1, 3}
+62.6
+0.205
+71.8
+0.420
+Three: λ ∈{1, 2, 3}
+62.6
+0.210
+71.7
+0.450
+Candidate count and inference cost.
+Two branches
+achieve 62.6/71.8 mean mIoU at 0.205/0.420 seconds per
+episode (Table S16).
+Adding λ = 2 changes mIoU to
+62.6/71.7 and runtime to 0.210/0.450 seconds. Feature ex-
+traction and reference fitting are shared; each additional
+branch repeats only lightweight adaptation and threshold
+search.
+Table S17. Measured inference time (s/episode). H100 mea-
+surements use 100 episodes per shot, ten from each dataset, with
+complete inference timed as specified in Section G. Groups distin-
+guish offline task training and test-time optimization. Bold marks
+the lowest time within each group and shot.
+Method
+1-shot
+5-shot
+Offline task training
+FSSAM
+0.100
+0.167
+SINE
+0.300
+0.830
+SegIC
+0.267
+1.281
+COSINE
+0.502
+1.068
+LDIS-1
+0.060
+0.161
+No task training or test-time optimization
+INSID3
+0.397
+0.643
+FROST
+0.264
+1.807
+RSRM
+0.087
+0.307
+PerSAM
+0.519
+1.610
+RPG-SAM
+0.468
+1.892
+Test-time adaptation / optimization
+HERA
+1.616
+3.214
+RNS
+2.802
+9.429
+PR-MaGIC
+4.531
+9.112
+ReSA (ours)
+0.205
+0.420
+Comparison groups.
+Table S17 separates methods with
+offline segmentation-task training, reference-conditioned
+inference without gradient-based test-time optimization,
+and test-time adaptation or optimization. The last group
+includes parameter fitting and gradient-based feature refine-
+ment with frozen model weights. Method-specific inference
+configurations are given in Section D.
+24
+
+
+Sensitivity to benchmark composition.
+Paired dataset-
+bootstrap intervals are positive for all five 1-shot compar-
+isons in Table S18.
+In 5-shot, the Full-versus-Base and
+RCA-versus-R-only intervals remain positive, while the
+threshold-fitting and alignment intervals include zero.
+We use 20,000 bootstrap draws of ten datasets with
+replacement (seed 20261108).
+Each draw averages un-
+rounded paired mIoU differences; the 2.5th and 97.5th per-
+centiles define the 95% interval. Point gains use the dis-
+played means.
+Compared settings.
+Full vs. Base: complete ReSA ver-
+sus p0 at T = 0.5. RCA vs. R-only: adding constraints and
+entropy to reference supervision (matched budgets, T =
+0.5, no RMS/TAR; RCA: λ = 1). Fitted T vs. 0.5: fit-
+ted versus fixed cutoff on the same map. Gain vs. min.
+D: relative-gain versus minimum-error selection with fixed
+candidates and thresholds. Both omit TAR. TAR vs. un-
+aligned: changing only evidence alignment.
+Table S18. Paired benchmark-bootstrap intervals. Mean mIoU
+gain in points, followed by its 95% percentile interval. All pairs
+use matched configurations and episodes.
+Comparison
+1-shot
+5-shot
+Full vs. Base
++5.3 [+4.1, +6.5]
++3.9 [+3.1, +4.6]
+RCA vs. R-only
++3.2 [+2.4, +4.2]
++2.0 [+1.4, +2.4]
+Fitted T vs. 0.5
++1.6 [+0.6, +2.5]
++0.0 [−0.7, +0.6]
+Gain vs. min. D
++0.9 [+0.5, +1.2]
++0.2 [+0.0, +0.4]
+TAR vs. unaligned
++0.4 [+0.2, +0.6]
++0.0 [−0.2, +0.1]
+H. Further visual results
+Figures S4–S7 show progressive module predictions, RCA
+loss controls, matched boundary refinements, and compar-
+isons with other methods, respectively. The visualizations
+use recorded outputs from the configuration in Section A.
+One annotated reference is displayed for each query. Prob-
+ability maps share the [0, 1] scale. Cyan and magenta fills
+denote annotations and predictions, respectively, with white
+contours. IoUs are evaluated on the full query, excluding
+ignored pixels; cropped comparisons use the same region
+across methods.
+Progressive module ablation.
+Figure S4 follows the
+same query through adaptation, mask selection, and refine-
+ment. Base thresholds the first-stage reference initializa-
+tion p0 at 0.5; RCA uses the adapted λ = 1 branch at the
+same cutoff. RMS then fits thresholds and selects between
+the two adapted branches; TAR refines the selected coarse
+mask.
+25
+
+
+IoU 26.9
+IoU 81.9
+IoU 95.0
+IoU 97.6
+IoU 10.6
+IoU 20.9
+IoU 90.5
+IoU 93.6
+IoU 22.6
+IoU 35.8
+IoU 90.8
+IoU 97.0
+IoU 45.8
+IoU 60.2
+IoU 88.4
+IoU 97.2
+IoU 42.6
+IoU 65.6
+IoU 78.3
+IoU 91.8
+IoU 15.1
+IoU 60.8
+IoU 90.5
+IoU 96.2
+Reference
+Query + GT
+Base
++RCA
++RMS
++TAR (ReSA)
+(1) Dish
+(2) Sign
+(3) Board
+(4) Business card
+(5) Life buoy
+(6) Ruler
+Reference / query annotation
+Predicted foreground
+26
+
+
+IoU 33.1
+IoU 54.2
+IoU 88.7
+IoU 94.1
+IoU 31.2
+IoU 43.6
+IoU 90.9
+IoU 93.9
+IoU 29.6
+IoU 33.9
+IoU 87.0
+IoU 95.5
+IoU 14.4
+IoU 26.3
+IoU 95.1
+IoU 98.1
+IoU 66.5
+IoU 84.1
+IoU 97.8
+IoU 99.3
+IoU 45.2
+IoU 80.1
+IoU 89.2
+IoU 95.7
+Reference
+Query + GT
+Base
++RCA
++RMS
++TAR (ReSA)
+(7) Apple
+(8) Tennis court
+(9) Blazer
+(10) Chair
+(11) Airplane
+(12) Posters
+Reference / query annotation
+Predicted foreground
+Figure S4. Progressive effects of ReSA components. RCA recovers target regions missed by the initial prediction; RMS improves
+foreground selection; TAR refines the resulting contours. The successive predictions show how these stages contribute to more complete
+target masks and fewer extraneous regions. The figure presents 12 examples. Yellow boxes indicate regions enlarged consistently across
+prediction columns; IoUs are measured on the full query.
+27
+
+
+IoU 62.6
+IoU 50.7
+IoU 92.4
+IoU 54.3
+IoU 40.6
+IoU 92.2
+IoU 61.6
+IoU 46.3
+IoU 91.8
+IoU 50.5
+IoU 35.0
+IoU 94.4
+IoU 89.9
+IoU 62.2
+IoU 98.0
+IoU 62.8
+IoU 52.4
+IoU 87.3
+Query
+GT
+R
+R+H
+R+C+H
+Full RCA
+(1) Shipwreck
+(2) Car side
+(3) Fighter jet
+(4) Trash can body
+(5) Seafloor / rocks
+(6) Chair frame
+Probability
+0
+1
+28
+
+
+IoU 52.1
+IoU 21.6
+IoU 96.5
+IoU 50.7
+IoU 28.8
+IoU 93.1
+IoU 63.9
+IoU 18.8
+IoU 97.3
+IoU 58.2
+IoU 39.3
+IoU 95.6
+IoU 59.2
+IoU 0.0
+IoU 96.7
+IoU 56.6
+IoU 0.0
+IoU 95.3
+Query
+GT
+R
+R+H
+R+C+H
+Full RCA
+(7) Hot dog
+(8) Person
+(9) TV screen
+(10) Airplane
+(11) Boat
+(12) Airplane
+Probability
+0
+1
+Figure S5. Response constraints guide entropy-based adaptation. Adding the entropy term H to reference supervision can sharpen
+responses toward either foreground or background, amplifying distracting regions or suppressing target regions. The response constraint C
+guides this sharpening to retain the reference-specified foreground and suppress distracting responses. The figure presents 12 comparisons
+of R, R + H, and R + C + H, using the same initialization and optimization budgets, with λ = 1, T = 0.5, and no RMS or TAR.
+Probability maps share a common color scale; yellow boxes indicate the enlarged regions.
+29
+
+
+IoU 58.7
+IoU 49.8
+IoU 85.6
+IoU 79.8
+IoU 67.5
+IoU 91.9
+IoU 72.9
+IoU 61.6
+IoU 84.4
+IoU 79.7
+IoU 75.3
+IoU 93.5
+IoU 78.3
+IoU 73.6
+IoU 88.6
+IoU 78.1
+IoU 64.1
+IoU 88.3
+Query
+GT
+Coarse mask
+Unaligned CRF
+TAR
+(1) Gull
+TAR − unaligned: +35.8
+(2) Microwave
+TAR − unaligned: +24.4
+(3) Jet plane
+TAR − unaligned: +22.8
+(4) Urinal
+TAR − unaligned: +18.2
+(5) Box
+TAR − unaligned: +15.0
+(6) Leggings
+TAR − unaligned: +24.2
+Reference / query annotation
+Predicted foreground
+30
+
+
+IoU 90.6
+IoU 76.9
+IoU 98.9
+IoU 65.5
+IoU 39.9
+IoU 82.3
+IoU 71.8
+IoU 75.6
+IoU 89.6
+IoU 79.2
+IoU 62.3
+IoU 89.0
+IoU 83.4
+IoU 82.2
+IoU 96.0
+IoU 78.2
+IoU 80.3
+IoU 93.1
+Query
+GT
+Coarse mask
+Unaligned CRF
+TAR
+(7) Chair
+TAR − unaligned: +22.0
+(8) Parasol
+TAR − unaligned: +42.4
+(9) Television set
+TAR − unaligned: +14.0
+(10) Booklet
+TAR − unaligned: +26.7
+(11) Measuring stick
+TAR − unaligned: +13.8
+(12) Strainer
+TAR − unaligned: +12.8
+Reference / query annotation
+Predicted foreground
+Figure S6. Threshold alignment improves boundary refinement. Aligning the refinement scores with the selected threshold helps
+preserve target structures that unaligned CRF removes or distorts, improving the resulting boundaries. Matched crops highlight these
+differences at thin structures and object contours. The figure presents 12 examples, with both refiners using the same input probabilities
+and coarse mask. Yellow boxes indicate the enlarged regions; the reported gain is the full-image IoU difference between TAR and unaligned
+CRF.
+31
+
+
+IoU 10.8
+IoU 17.2
+IoU 27.6
+IoU 93.8
+IoU 27.2
+IoU 52.3
+IoU 0.0
+IoU 89.2
+IoU 26.4
+IoU 25.8
+IoU 25.3
+IoU 87.2
+IoU 26.5
+IoU 33.8
+IoU 35.7
+IoU 90.0
+IoU 34.3
+IoU 34.8
+IoU 33.2
+IoU 91.7
+IoU 11.0
+IoU 11.8
+IoU 11.6
+IoU 90.7
+Reference
+FSSAM
+ICML’25
+INSID3
+CVPR’26
+RSRM
+ECCV’26
+ReSA
+ours
+GT
+(1) Pitcher’s mound
+ReSA − best: +66.2
+(2) Tray bottom
+ReSA − best: +36.9
+(3) Lamp shade inner side
+ReSA − best: +60.8
+(4) Peach
+ReSA − best: +54.3
+(5) Donkey
+ReSA − best: +56.9
+(6) Car
+ReSA − best: +78.9
+Reference / query annotation
+Predicted foreground
+32
+
+
+IoU 20.9
+IoU 0.0
+IoU 0.0
+IoU 85.9
+IoU 34.7
+IoU 48.6
+IoU 32.8
+IoU 98.9
+IoU 45.4
+IoU 30.9
+IoU 31.5
+IoU 95.4
+IoU 45.6
+IoU 44.9
+IoU 49.3
+IoU 98.1
+IoU 12.8
+IoU 49.2
+IoU 44.7
+IoU 95.4
+IoU 8.0
+IoU 19.8
+IoU 16.6
+IoU 85.6
+Reference
+FSSAM
+ICML’25
+INSID3
+CVPR’26
+RSRM
+ECCV’26
+ReSA
+ours
+GT
+(7) Costume
+ReSA − best: +65.0
+(8) Vacuum cleaner
+ReSA − best: +50.3
+(9) Hot dog
+ReSA − best: +50.0
+(10) Train
+ReSA − best: +48.8
+(11) Tennis court
+ReSA − best: +46.2
+(12) Basket
+ReSA − best: +65.8
+Reference / query annotation
+Predicted foreground
+33
+
+
+IoU 35.2
+IoU 36.4
+IoU 57.4
+IoU 89.7
+IoU 30.2
+IoU 19.2
+IoU 49.5
+IoU 89.7
+IoU 7.6
+IoU 26.6
+IoU 21.4
+IoU 87.8
+IoU 52.3
+IoU 50.7
+IoU 54.5
+IoU 95.5
+IoU 47.3
+IoU 48.7
+IoU 51.0
+IoU 93.7
+IoU 64.0
+IoU 0.1
+IoU 0.0
+IoU 94.1
+Reference
+FSSAM
+ICML’25
+INSID3
+CVPR’26
+RSRM
+ECCV’26
+ReSA
+ours
+GT
+(13) Keyboard
+ReSA − best: +32.3
+(14) Horse torso
+ReSA − best: +40.2
+(15) Clock case
+ReSA − best: +61.2
+(16) Wreck / ruin
+ReSA − best: +41.0
+(17) Puppy
+ReSA − best: +42.7
+(18) Plant foliage
+ReSA − best: +30.1
+Reference / query annotation
+Predicted foreground
+34
+
+
+IoU 30.3
+IoU 44.5
+IoU 46.2
+IoU 95.1
+IoU 39.8
+IoU 37.5
+IoU 50.6
+IoU 90.8
+IoU 11.8
+IoU 11.8
+IoU 12.1
+IoU 91.0
+IoU 32.8
+IoU 32.7
+IoU 55.3
+IoU 91.5
+IoU 57.7
+IoU 59.0
+IoU 39.0
+IoU 89.9
+IoU 25.9
+IoU 26.3
+IoU 5.5
+IoU 89.9
+Reference
+FSSAM
+ICML’25
+INSID3
+CVPR’26
+RSRM
+ECCV’26
+ReSA
+ours
+GT
+(19) Dining table
+ReSA − best: +48.9
+(20) Potted plant
+ReSA − best: +40.2
+(21) Swimming pool
+ReSA − best: +78.9
+(22) Penguin
+ReSA − best: +36.2
+(23) Bird neck
+ReSA − best: +30.9
+(24) Basket rim
+ReSA − best: +63.6
+Reference / query annotation
+Predicted foreground
+Figure S7. Qualitative comparisons with methods with and without offline task training. The comparisons show how ReSA retains
+the reference-specified target extent while rejecting nearby objects and surrounding regions. Whole-object and part examples highlight the
+role of reference guidance in distinguishing the desired foreground from visually similar content. The figure presents 24 five-shot examples
+from seven datasets. All methods receive the same query and five annotated references; one reference is shown. “ReSA −best” reports the
+IoU gain over the highest-scoring method among FSSAM, INSID3, and RSRM for each example.
+35

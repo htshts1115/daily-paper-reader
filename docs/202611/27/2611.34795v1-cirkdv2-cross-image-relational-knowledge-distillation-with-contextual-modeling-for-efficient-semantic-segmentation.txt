@@ -1,0 +1,1013 @@
+Title: CIRKDV2: Cross-Image Relational Knowledge Distillation with Contextual Modeling for Efficient Semantic Segmentation
+
+URL Source: https://arxiv.org/pdf/2611.34795v1
+
+Published Time: Thu, 26 Nov 2026 03:47:18 GMT
+
+Number of Pages: 18
+
+Markdown Content:
+1
+
+# CIRKDV2: Cross-Image Relational Knowledge Distillation with Contextual Modeling for Efficient Semantic Segmentation 
+
+Chuanguang Yang, Yu Wang, Chengqing Yu, Xinqiang Yu, Weilun Feng, Yuqi Li, Zhulin An, Libo Huang, Boyu Diao, Fei Wang, Fuzhen Zhuang, Senior Member, IEEE , Yongjun Xu, Yingli Tian, Fellow, IEEE , Tingwen Huang, Fellow, IEEE , and Yongduan Song, Fellow, IEEE 
+
+Abstract —Existing Knowledge Distillation (KD) methods for semantic segmentation often guide the student to mimic the teacher’s structured information generated from an individ-ual image. However, they ignore the global semantic relations across various images that are valuable for KD. This paper proposes Cross-Image Relational KD V2 (CIRKDV2), which focuses on transferring structured pixel-to-pixel, pixel-to-region, and channel-to-channel relations modeled from global images in the dataset. A large teacher network often constructs awell-structured feature space in terms of global contextual dependencies. CIRKDV2 makes the student mimic the better structured semantic relations of the teacher, thus improving the feature representational capability. Beyond relational distillation, we further propose contextual feature distillation by using context aggregation to augment student pixel embeddings to match the semantic level with the teacher. This avoids the semantic gap problem between the teacher and student occurred in traditional feature distillation studies. Experimental results on Cityscapes, ADE20K, Pascal VOC, and COCO-Stuff-164K demonstrate that CIRKDV2 outperforms the state-of-the-art semantic segmenta-tion distillation methods by large margins across various network architectures. Our code and pre-trained models are publicly available at https://github.com/winycg/CIRKD. 
+
+Index Terms —Knowledge distillation, semantic segmentation, cross-image relations, context aggregation. 
+
+Chuanguang Yang, Yuqi Li, Zhulin An, Libo Huang, Boyu Diao, Fei Wang, and Yongjun Xu are with the Institute of Computing Tech-nology, Chinese Academy of Sciences, Beijing 100190, China (e-mail: yangchuanguang@ict.ac.cn; yuqili010602@gmail.com; anzhulin@ict.ac.cn; www.huanglibo@gmail.com; diaoboyu2012@ict.ac.cn; wangfei@ict.ac.cn; xyj@ict.ac.cn). Yu Wang, Chengqing Yu, and Weilun Feng are with the Institute of Computing Technology, Chinese Academy of Sciences, Beijing 100190, China, and also with University of Chinese Academy of Sciences, Beijing 100049, China (e-mail: wangyu23s@ict.ac.cn; yuchengqing@ict.ac.cn; feng-weilun24s@ict.ac.cn). Xinqiang Yu is with the Institute of Automation, Chinese Academy of Sci-ences, Beijing 100190, China, and also with University of Chinese Academy of Sciences, Beijing 100049, China (e-mail: xinqiang.yu@nlpr.ia.ac.cn). Fuzhen Zhuang is with Institute of Artificial Intelligence, Beihang Univer-sity, Beijing, China (e-mail: zhuangfuzhen@buaa.edu.cn). Yingli Tian is with the Department of Electrical Engineering, The City College, and the Department of Computer Science, the Graduate Cen-ter, the City University of New York, New York, NY, 10031 (e-mail: ytian@ccny.cuny.edu). Tingwen Huang is with the School of Computer Science and Control En-gineering, Shenzhen University of Advanced Technology, Shenzhen 518107, China (e-mail: huangtingwen@suat-sz.edu.cn). Yongduan Song is with the School of Automation, Chongqing University, Chongqing 400044, China (e-mail: ydsong@cqu.edu.cn). Corresponding author: Zhulin An. 𝑡 1
+
+𝑡 2
+
+𝑡 3
+
+𝑡 4
+
+𝑠 1
+
+𝑠 2 𝑠 3
+
+𝑠 4
+
+Teacher  Student 
+
+Mimic  𝑡 1
+
+𝑡 2
+
+𝑡 4
+
+𝑡 3
+
+Teacher 
+
+Mimic 
+
+(a) Intra -image relational distillation 
+
+(b) Cross -image relational distillation (ours) 
+
+11 2 3 41 2 3 4
+
+(a) Intra-image KD 𝑡 1
+
+𝑡 2
+
+𝑡 3
+
+𝑡 4
+
+𝑠 1
+
+𝑠 2 𝑠 3
+
+𝑠 4
+
+Teacher  Student 
+
+Mimic  𝑡 1
+
+𝑡 2
+
+𝑡 4
+
+𝑡 3
+
+𝑠 1
+
+𝑠 2
+
+𝑠 4
+
+𝑠 3
+
+Student Teacher 
+
+Mimic 
+
+(a) Intra -image relational distillation 
+
+(b) Cross -image relational distillation (ours) 
+
+1 2 3 41 2 3 41 2 3 4 (b) Cross-image KD 
+
+Fig. 1. Overview of intra-image ( left ) and our proposed cross-image relational distillation ( right ). The circles with the same color denote pixel embeddings from the same image. ti and si represent the pixel embeddings of the i-th pixel location tagged in an image from the teacher and student, respectively. The dotted line shows the similarity relationship between two pixels. The circles and lines construct a relational graph. 
+
+I. I NTRODUCTION 
+
+Semantic segmentation is a crucial and challenging task in computer vision. It aims to classify each pixel in the input image with an individual category label. The applications of segmentation often focus on autonomous driving, virtual reality, and robot navigation. Although popular state-of-the-art segmentation networks, such as DeepLab [1], [2], PSPNet [3], and SAM [4], achieve remarkable performance, they are often equipped with large image encoders, leading to high computational costs. This weakness makes them difficult to deploy for real-world scenarios on resource-limited mobile devices. Model compression is an effective way to pursue compact networks, mainly divided into quantization [5]–[7], pruning [8], [9], and knowledge distillation (KD) [10]–[12]. This paper investigates KD to improve the performance of a compact student network under the guidance of a high-capacity teacher network for semantic segmentation. A broad range of KD approaches [10], [13], [14] have been well studied but mostly for image classification tasks. Unlike image-level recognition, the segmentation task aims at dense pixel pre-dictions, which is more challenging. Previous researches [15] have found that directly utilizing classification-based KD methods to deal with dense prediction tasks may not achieve desirable performance. This is because strictly aligning the coarse feature maps between the teacher and student networks arXiv:2611.34795v1 [cs.CV] 25 Nov 2026 2
+
+may lead to negative constraints and ignore the structured context among pixels. Recent studies attempt to propose specialized KD meth-ods [16]–[23] for semantic segmentation, mainly divided into relation- and feature-based distillation methods. Most relation-based distillation studies focus on mining correlations or dependencies among spatial pixel locations because segmen-tation needs a structured output. Typical knowledge can be local pixel affinity [16], [21], global pairwise relations [17], [18], [22] and intra-class pixel variation [19]. Such methods often perform better than traditional point-wise alignment in capturing structured spatial knowledge. However, previous segmentation KD methods often guide a student to mimic the teacher’s structured information generated from an individual image sample . They ignore cross-image semantic relations among pixels for knowledge transfer, as shown in Figure 1. Therefore, they only construct narrow context but cannot capture wide contextual dependencies across global im-ages. 
+
+To address this problem, we propose Cross-Image Rela-tional Knowledge Distillation V2 (CIRKDV2) for semantic segmentation. To capture wide contextual dependencies, we aim to construct global relations across the whole training images from both the teacher and student. A good pre-trained teacher network with high performance could often generate a well-structured embedding space and capture better correlations than a student network. Based on this property, we distill pixel-to-pixel, pixel-to-region, and channel-to-channel relations across various images from the teacher to the student. This helps the student fully explore multi-dimensional struc-tured relations to learn long-range contextual dependencies. The pixel-to-pixel and channel-to-channel distillation aims to transfer similarity distributions among pixel and channel embeddings, respectively. The channel embedding means a semantic map along the channel dimension of a feature map. The pixel-to-region distillation focuses on transferring pixel-to-region similarity distributions between pixel and region embeddings. The region embedding is generated by averagely pooling pixel embeddings from the same class and represents the feature center of that class. The pixel-to-region relations indicate the relative similarities between pixels and class-wise prototypes. A naive way for constructing cross-image relations is to derive embeddings from the current mini-batch. However, the batch size of the segmentation task is often small, limiting the network to capture broader pixel dependencies. Moti-vated by the memory mechanism in previous self-supervised learning [24], we introduce a pixel queue, a region queue, and a channel queue in the memory bank to store abundant embeddings for modeling long-range relations. The embed-dings in the queue are consistent in distribution during the distillation process, since they are generated from the pre-trained and frozen teacher network. We regard the teacher and student pixel embeddings from the current mini-batch as anchors, and then randomly sample contrastive pixel and region embeddings from queues to model pixel-to-pixel as well as pixel-to-region similarity distributions. In a similar manner, we regard channel embeddings from the current mini-batch as anchors, and then randomly sample channel embeddings from the channel queue to construct channel-to-channel similarity distributions. Then we align such similarity distributions via KL-divergence from the student to the teacher. This helps the student learn comprehensive structured relation knowledge from the teacher. Beyond popular relation-based distillation, feature-based distillation is also demonstrated as an important technique. Shu 
+
+et al. [20] revealed that each channel represents a category-specific mask and thus proposed Channel-Wise Distillation (CWD). CWD demonstrates the importance of channel-level information for dense prediction tasks. More recently, LAD [23] transfers the classical FitNet idea to semantic segmentation for raw feature distillation. However, previous methods often perform direct alignment without contextual modeling for student pixels, leading to possible mismatch-ing semantics between the teacher and student. This is because the teacher is often equipped with a larger kernel than the student, which means that the teacher pixel extracts semantic information from a wider receptive field. To mitigate the semantic gap, we propose context aggregation over the spatial dimension of the student feature map to augment pixel embeddings with wider contextual information. And then we perform feature distillation of pixel embeddings between the student and teacher. This helps the student learn meaningful pixel semantics from the teacher without negative receptive field gaps. In summary, CIRKDV2 leverages pixel-to-pixel, pixel-to-region, and channel-to-channel dimensions for cross-image relational distillation, and contextual feature distillation to improve the student’s segmentation performance under the guidance of a strong teacher. We evaluate our method over popular DeepLabV3 [2], PSPNet [3], UperNet [25], and SegFormer [26] architectures with various backbones on four challenging semantic segmentation benchmark datasets: Cityscapes [27], ADE20K [28], Pascal VOC [29], and COCO-Stuff-164K [30]. Experimental results indicate that CIRKDV2 achieves the best performance among the state-of-the-art dis-tillation approaches, demonstrating the effectiveness of cross-image relational distillation and contextual feature distillation in semantic segmentation. Parts of this paper, including pixel-to-pixel and pixel-to-region distillation, were published originally in our conference version [31]. This paper extends our earlier work in several valuable aspects for relation and feature distillation. The main contributions are summarized as follows:  
+
+> •
+
+We propose cross-image relational KD by modeling pixel-to-pixel, pixel-to-region, and channel-to-channel re-lations assisted by a memory bank mechanism for struc-tured knowledge transfer. This helps the student learn comprehensive long-range semantic dependencies of var-ious object segments across the whole images.  
+
+> •
+
+We propose contextual feature distillation by using con-text aggregation to augment student pixel embeddings with wider contextual information and then performing feature alignment between the teacher and student. This also avoids the semantic mismatching problem occurred in traditional feature distillation studies. 3 
+
+> •
+
+CIRKDV2 achieves the best performance among the state-of-the-art distillation methods across various ar-chitectures on four challenging semantic segmentation datasets. II. R ELATED WORK 
+
+A. Knowledge Distillation for Image Classification 
+
+The core idea of KD [10] is to transfer meaningful knowl-edge from a cumbersome teacher into a smaller and faster student. Most current KD methods deal with image clas-sification networks, mainly divided into probability-based, feature-based, and relation-based approaches. Probability-based KD [10] transfers the class probabilities produced by the teacher as soft labels to supervise the student. Feature-based KD focuses on intermediate feature maps [32] or their refined information [33] as knowledge. Relation-based KD [34]–[36] aligns correlations or dependencies among multiple instances between the student and teacher networks. However, these image-level KD methods are often unsuitable for pixel-wise semantic segmentation [15], because the latter needs more fine-grained structured knowledge. 
+
+B. Relation-based Distillation for Semantic Segmentation 
+
+Existing KD methods for semantic segmentation can be di-vided into relation-based and feature-based approaches, where relation KD has become a mainstream paradigm. The core idea of relation-based KD is to encode contextual pixel or channel affinity as valuable knowledge for transfer. The main differences among existing work lie in how to construct relationships. Xie et al. [16] align local similarity maps constructed from 8 neighborhood pixels between the student and teacher networks. He et al. [18] transfer non-local pairwise affinity maps using an autoencoder to minimize the discrep-ancy of features. SKD [15], [17] performs pairwise similarity distillation among pixels and an adversarial distillation of score maps. IFVD [19] distills intra-class feature variation to learn more robust relations with class-wise prototypes. DSD [37] constructs pixel-wise and category-wise similarity distillation, where the former uses residual attention maps to strengthen fine-grained spatial relations, and the latter aims to learn category correlation. APD [21] mines sample-wise contextual information by an adaptive local perspective. Af-DCD [22] distills dense structured relations from channel and spatial dimensions primarily within the current image or mini-batch feature structure . CIRKDV2 changes the knowledge be-ing transferred: it models channel-to-channel relations across global images by using teacher channel embeddings stored in an online memory queue. Thus, each current student channel is not only compared with channels from the same image, but also with a broader set of teacher channel embeddings collected from previous images. This transfers dataset-level channel correlation patterns that are not available from an individual image alone. Although the above relation-based distillation methods achieve good performance, their common weakness is that the relational modeling is only limited in an individual image, which cannot capture long-range pixel dependencies. By con-trast, CIRKDV2 proposes pixel-to-pixel and pixel-to-region distillation by sampling pixels from an online memory bank. Compared to the mini-batch, the memory bank significantly increases the number of available pixels for affinity modeling. Therefore, the student can learn longer-range pixel dependen-cies. 
+
+C. Feature-based Distillation for Semantic Segmentation 
+
+Beyond relation-based distillation, some studies examine feature-based distillation to improve the representational capa-bility of the student network. Different from affinity modeling along the spatial dimension, CWD [20] conducts channel-wise distillation to guide each student channel to mimic the corre-sponding teacher channel, where a channel often represents a semantic mask. SSTKD [38], [39] distills structural and statistical texture features to let the student learn low-level detail information from the teacher. Attention distillation [33] has been widely used for image classification. The attention map [40] often emphasizes meaningful semantic information while ignoring meaningless regions. The core idea of attention distillation is to make the student learn critical semantic information by mimicking the teacher’s attention maps. This idea is also extended to semantic segmentation. CAT [41] distills class attention maps to guide the student to focus on class-discriminative regions of the teacher. AttnFD [42] introduces CBAM [40] to extract channel and spatial attention maps and performs alignment between teacher and student. LAD [23] revisits the seminal work FitNet [32] and conducts feature distillation from l2-normalized raw features. Being orthogonal to relation-based distillation, feature-based distillation is also a complementary way to improve the student network. Previous feature-based methods often perform simple alignment between feature maps without high-level feature modeling. By contrast, we propose contex-tual modeling to augment feature representations, facilitating knowledge transfer of valuable high-level semantic informa-tion. III. M ETHODOLOGY 
+
+A. Preliminary 
+
+Notations of Semantic Segmentation Framework. Unlike traditional image classification, semantic segmentation is a pixel-wise dense classification task. A segmentation network needs to classify each pixel in the image to an individual cat-egory label from C classes. The network can be decomposed of a feature extractor and a classifier. The former generates a dense feature map F ∈ RH×W ×D , where H, W , and D
+
+denote the height, width, and number of channels, respectively. We can derive H × W pixel embeddings along the spatial dimension or D channels along the channel dimension. The latter classifier further transforms the F into a categorical logit map Z ∈ RH×W ×C . The conventional segmentation task loss is to train each pixel with its ground-truth label using cross-entropy: 
+
+Ltask = 1
+
+H × W
+
+> H
+
+X
+
+> h=1
+> W
+
+X
+
+> w=1
+
+CE (σ(Zh,w ), y h,w ). (1) 4
+
+Here, CE denotes the cross-entropy loss, σ denotes the softmax function and yh,w denotes the ground-truth label of the (h, w )-th pixel. 
+
+Pixel-wise Class Probability Distillation. Motivated by Hinton’s KD [10], a direct method is to align the class probability distribution of each pixel from the student to the teacher. The formulation is expressed as: 
+
+Lkd = 1
+
+H × W
+
+> H
+
+X
+
+> h=1
+> W
+
+X
+
+> w=1
+
+KL (σ( Zsh,w 
+
+T )|| σ( Zth,w 
+
+T )) . (2) Here, σ(Zsh,w /T ) and σ(Zth,w /T ) represent the soft class probabilities of the (h, w )-th pixel produced by the student and teacher, respectively. KL denotes the Kullback-Leibler divergence, and T is a temperature. Following previous stud-ies [17], [19], T = 1 is good enough. 
+
+B. Overview of CIRKDV2 
+
+A unified framework is shown in Figure 2, which illustrates the complete pipeline of CIRKDV2. Compared to the previous CIRKD, CIRKDV2 is an omni-dimensional distillation frame-work, including not only pixel-to-pixel distillation and pixel-to-region distillation, but also channel-to-channel distillation, channel feature distillation and contextual feature distillation. Semantic segmentation requires both spatially structured prediction and channel-wise semantic discrimination. Pixel-to-pixel distillation captures long-range spatial dependencies among pixels. Pixel-to-region distillation captures the relation between pixel embeddings and class-wise semantic proto-types. Channel-to-channel distillation captures the correlations among semantic response maps. These three dimensions are complementary: the first two focus on spatial/category-level structure, while the third focuses on semantic-channel interac-tion. Cross-image relational distillation transfers structural knowledge by aligning similarity distributions. However, re-lation losses mainly constrain relative similarities, not the absolute semantic content of each pixel embedding. Contextual feature distillation complements this by providing a direct teacher-guided semantic alignment after context aggregation. Therefore, it serves as a semantic anchor for the relational framework. 
+
+C. Pixel-wise Cross-Image Relational Knowledge Distillation 
+
+Motivation. Although the training objectives of Ltask and 
+
+Lkd are widely used in semantic segmentation, they only deal with pixel-wise predictions independently but neglect seman-tic relations between pixels. Some segmentation KD meth-ods [17]–[19] attempt to capture spatial relational knowledge by modeling pixel affinity. Nevertheless, these KD methods only construct the relationships among pixels within a single image , regardless of the semantic dependencies among pixels across global images. This paper demonstrates that cross-image relational knowledge is also valuable for conducting teacher-student-based KD. Our CIRKD makes use of pixel embeddings beyond a single image. Inspired by the recent memory-based contrastive learning [24], [43], we may retrieve pixel embeddings of other images from the current mini-batch or an online memory bank . This paper considers both of two manners to model relationships among pixels, the details of which are shown as follows. 
+
+1) Mini-batch-based pixel-to-pixel distillation: We show the illustration of mini-batch-based pixel-to-pixel distillation in Figure 3a. Given a mini-batch {xn}Nn=1 , the segmen-tation network extracts N structured feature maps {Fn ∈
+
+RH×W ×D }Nn=1 from N input images. We preprocess each pixel embedding in Fn by l2-normalization. For easy notation, we reshape the spatial dimension of {Fn ∈ RH×W ×D }Nn=1 
+
+to {Fn ∈ RA×D }Nn=1 , where A = H × W . For the i-th image xi and the j-th image xj , i, j ∈ { 1, 2, · · · , N },we can calculate the cross-image pair-wise similarity matrix 
+
+Sij = FiF⊤ 
+
+> j
+
+∈ RA×A. The relational matrix Sij captures the cross-image pair-wise correlations among pixels. We guide the pair-wise similarity matrix of Ssij produced from the student to align that of Stij produced from the teacher. The distillation process is formulated as: 
+
+Lp2p(Ssij , Stij ) = 1
+
+A
+
+> A
+
+X
+
+> a=1
+
+KL (σ( Ssij |a, :
+
+τ )|| σ( Stij |a, :
+
+τ )) . (3) Here, Sij |a, : denotes the a-th row vector of Sij . We normal-ize each row similarity distribution of Sij to a probability distribution with a temperature τ by softmax function σ. The magnitude gaps would be removed between the student and teacher networks due to the softmax normalization. KL is used to align each row-wise probability distribution. We perform pixel-to-pixel distillation every two of N images: 
+
+Lbatch p 2p = 1
+
+N 2
+
+> N
+
+X
+
+> i=1
+> N
+
+X
+
+> j=1
+
+Lp2p(Ssij , Stij ). (4) 
+
+2) Memory-based Pixel-to-Pixel Distillation: Although mini-batch-based distillation could capture cross-image rela-tions to some extent, it is difficult to model dependencies among pixels from global images, since the batch size per GPU of segmentation task is often small, e.g. 1 or 2. To address this problem, we introduce an online pixel queue that can store massive pixel embeddings in the memory bank generated from the past mini-batches. It allows us to retrieve abundant embeddings efficiently. The usage of memory bank dates back to self-supervised learning [24]. This is because a large number of negative samples are pivotal for unsupervised contrastive learning, and the mini-batch size limits available contrastive samples. In the context of the dense segmentation task, each image would contain a vast number of pixel samples, and most pixels in the same object region are often homogeneous. Therefore, storing all pixel embeddings may learn redundant relational knowledge and slow down the distillation process. Moreover, saving several last batches to the queue may also damage the diversity of pixel embeddings. Thus we maintain a class-aware pixel queue Qp ∈ RC×Np×D , where Np is the number of pixel embeddings per class and D is the embedding size. For each image in the mini-batch, we only randomly sample a small number, i.e. V (V ≪ Np), of pixel embeddings from the same 5Teacher pixel embeddings 
+
+Image 
+
+Student pixel embeddings 
+
+Teacher Student 
+
+Teacher channels Student channels 
+
+…
+
+Channel queue 
+
+…
+
+Pixel&Region queue 
+
+Channel-to-Channel similarity matrix Channel-to-Channel similarity matrix 
+
+Pixel-to-Pixel similarity matrix Pixel-to-Region similarity matrix 
+
+Context aggregation 
+
+Pixel-to-Pixel similarity matrix Pixel-to-Region similarity matrix 
+
+Contextual feature distillation Pixel-to-Pixel distillation Pixel-to-Region Distillation Channel-to-Channel distillation Channel feature distillation 
+
+Fig. 2. Overview of our proposed CIRKDV2. Teacher pixel embeddings      
+
+> Teacher pixel -to -pixel
+> similarity matrix
+> Image 𝒙 𝑖
+> Image 𝒙 𝑗
+> Teacher pixel embeddings
+> Student pixel embeddings
+> Image 𝒙 𝑖
+> Image 𝒙 𝑗 Student pixel embeddings
+> Student pixel -to -pixel
+> similarity matrix
+> Knowledge
+> alignment
+> Student
+> Teacher
+
+(a) Mini-batch pixel-to-pixel distillation Teacher pixel embeddings      
+
+> Image
+> ……
+> Enqueue Enqueue Teacher region embeddings
+> Region mask Region mask Region mask
+> Region queue Pixel queue
+> Teacher pixel -to -pixel
+> similarity matrix
+> Teacher pixel -to -region
+> similarity matrix
+> Student pixel embeddings
+> Sample Sample
+> Student pixel -to -pixel
+> similarity matrix
+
+Teacher 
+
+Student     
+
+> Student pixel -to -region
+> similarity matrix
+> Knowledge alignment
+> GAP GAP GAP
+> GAP: Global Average Pooling : Element -wise multiplication : Dot product
+
+(b) Memory-based pixel-to-pixel and pixel-to-region distillation 
+
+Fig. 3. Overview of our proposed pixel-to-pixel and pixel-to-region distillation. 
+
+class and push them into the pixel queue Qp. The queue is progressively updated under the “first-in-first-out” strategy as distillation proceeds. Inspired by Fang et al. [34], we adopt a shared pixel queue between the student and teacher networks and store pixel embeddings generated from the teacher during the distillation process. Given an input image xn, the generated pixel embed-dings of the student and teacher networks are Fsn ∈ RA×D
+
+and Ftn ∈ RA×D , respectively. Each pixel embedding of Fsn
+
+and Ftn is preprocessed by l2-normalization. We regard Fsn
+
+and Ftn as anchors and sample Kp contrastive embeddings 
+
+{vk ∈ RD }Kp
+
+k=1 randomly from the pixel queue Qp. Here, we adopt a class-balanced sampling since the numbers of pixels from various classes often conform to a long-tailed distribu-tion. For easy notation, Vp = [ v1, v2, · · · , vKp ] ∈ RKp×D is a concatenation of {vk}Kp
+
+k=1 along the row dimension. Then we model the pixel similarity matrix between the anchors and contrastive embeddings for the student and teacher as Ps and 6
+
+Pt:
+
+Ps = FsnV⊤ 
+
+> p
+
+∈ RA×Kp , Pt = FtnV⊤ 
+
+> p
+
+∈ RA×Kp . (5) The teacher network often shows a better pixel similar-ity matrix than the student. We force the student’s Ps to mimic the teacher’s Pt for penalizing the difference. Similar to Section III-C1, we apply softmax normalization on each row distribution of Ps and Pt and perform pixel-to-pixel distillation via KL-divergence loss. It is formulated as follows: 
+
+Lmemory p 2p = 1
+
+A
+
+> A
+
+X
+
+> a=1
+
+KL (σ( Psa, :
+
+τ )|| σ( Pta, :
+
+τ )) . (6) After each iteration, we push Vp teacher pixel embeddings per class into the pixel queue Qp. Because the teacher is pre-trained and frozen, it can provide consistent feature embeddings during the distillation process. Therefore, we can naturally avoid the inconsistent problem between the anchor and dequeued features appeared in previous contrastive learning [44]–[46]. 
+
+3) Memory-based Pixel-to-Region Distillation: Discrete pixel embeddings may not fully capture image content. There-fore, we introduce an online region queue that can store massive more representative region embeddings in the memory bank. Beyond pixel-to-pixel distillation, we further construct pixel-to-region distillation to model the relations between pixels and class-wise region embeddings across global images. Each region embedding represents the feature center of one semantic class in an image. We formulate the region embed-ding of a class by averagely pooling all the pixel embeddings belonging to that class in a single image. We maintain a region queue Qr ∈ RC×Nr ×D during the distillation process, where Nr is the number of region embeddings per class and D is the embedding size. For each iteration, we sample Kr contrastive region embeddings 
+
+{rk ∈ RD }Kr 
+
+> k=1
+
+from Qr in a class-balanced manner. For easy notation, Vr = [ r1, r2, · · · , rKr ] ∈ RKr ×D is a concatena-tion of {rk}Kr 
+
+> k=1
+
+along the row dimension. Given an input image xn, we model the pixel-to-region similarity matrix from 
+
+Fsn ∈ RA×D and Ftn ∈ RA×D to region embeddings Vr as 
+
+Rs and Rt:
+
+Rs = FsnV⊤ 
+
+> r
+
+∈ RA×Kr , Rt = FtnV⊤ 
+
+> r
+
+∈ RA×Kr . (7) Similar to the Equ. (6), we distill normalized pixel-to-region similarity matrix between the student and teacher networks via KL-divergence loss: 
+
+Lmemory p 2r = 1
+
+A
+
+> A
+
+X
+
+> a=1
+
+KL (σ( Rsa, :
+
+τ )|| σ( Rta, :
+
+τ )) . (8) For each mini-batch, we push all teacher region embeddings into the region queue Qr . The overview of our proposed memory-based distillation is shown in Figure 3b. 
+
+D. Channel-wise Cross-Image Relational Knowledge Distilla-tion 
+
+As shown in Figure 4, we found that various channels in a semantic segmentation network often encode different Input Image Sky Car Person Building Road  
+
+> Fig. 4. Visualization of channel semantics over DeepLabV3 on Cityscapes. Each heatmap corresponds to one channel.
+
+category semantics. This observation is also verified by Shu 
+
+et al. [20]. This property motivates us to model cross-image relational knowledge from channel interaction. 
+
+1) Mini-batch-based channel-to-channel distillation: The illustration of mini-batch-based channel-to-channel distillation is shown in Figure 5a. Given the N structured feature maps 
+
+{Fn ∈ RH×W ×D }Nn=1 from N input images from the mini-batch {xn}Nn=1 , we preprocess each channel in Fn by l2-normalization. For easy notation, we flatten the spatial di-mension to {Fn ∈ RA×D }Nn=1 and then transpose, deriving the set of channel embeddings {F⊤ 
+
+> n
+
+∈ RD×A}Nn=1 , where 
+
+A = H × W . In pixel-to-pixel distillation, the pixels from the same spatial location between teacher and student often represent similar semantics. Unlike spatial dimension, the teacher and student with independent training often show different semantics in the same channel location. To pro-mote channel-to-channel distillation, the same channel location should have similar semantics between teacher and student as the prerequisite. To align channel semantics between teacher and student, we first apply a Mean Squared Error (MSE) loss for each channel: 
+
+Lchannel f d = 1
+
+D
+
+> D
+
+X
+
+> d=1
+
+Fsn|:,d − Ftn|:,d 
+
+> 2
+> F
+
+. (9) In this way, the student could learn similar channel distribu-tions with the teacher. When the student and teacher have different feature dimensions, we first attach a lightweight projection head to the student feature map. The projection head consists of two 1×1 convolutional layers with batch normal-ization and ReLU. It maps the student feature dimension to the teacher feature dimension. Eq. (9) is then applied after this projection. The projection head is only used during training and is discarded during inference. We would like to clarify that we do not assume that the original student channels and teacher channels are naturally aligned. Instead, the projec-tion head learns a teacher-compatible channel space under the supervision of channel feature alignment and relational distillation. The one-to-one alignment is therefore performed in the projected space , rather than between the original raw channels of two heterogeneous networks. For the i-th image xi and the j-th image xj , i, j ∈{1, 2, · · · , N }, we can calculate the cross-image pair-wise channel similarity matrix Gij = F⊤ 
+
+> i
+
+Fj ∈ RD×D. The channel relational matrix Gij captures the cross-image pair-wise correlations among semantic channels. 7Teacher channels Teacher channel-to-channel similarity matrix      
+
+> Image 𝒙 !
+> Image 𝒙 "
+> Teacher channels
+> Student channels
+> Image 𝒙 !
+> Image 𝒙 "Student channels Student channel-to-channel similarity matrix Knowledge alignment
+> Student Teacher
+
+(a) Mini-batch channel distillation Teacher channels Image  
+
+> …
+> Enqueue Channel queue Teacher channel-to-channel similarity matrix Student channels Sample Student channel-to-channel similarity matrix
+> Teacher Student
+> Knowledge alignment Dot product Dot product
+
+(b) Memory-based channel distillation Teacher pixel embeddings  
+
+> Student pixel embeddings
+> Input Image
+> Student Teacher
+> Context aggregation
+> Knowledge alignment
+
+(c) Contextual feature distillation 
+
+Fig. 5. Overview of our proposed channel and feature distillation. 
+
+We guide the pair-wise channel similarity matrix of Gsij 
+
+produced from the student to align that of Gtij produced from the teacher. The distillation process is formulated as: 
+
+Lc2c(Gsij , Gtij ) = 1
+
+D
+
+> D
+
+X
+
+> d=1
+
+KL (σ( Gsij |d, :
+
+τ )|| σ( Gtij |d, :
+
+τ )) . (10) Here, Gij |d, : denotes the d-th row vector of Gij . Similar to pixel-to-pixel distillation, we normalize each row similarity distribution of Gij to a probability distribution with a temper-ature τ by softmax function σ. KL is used to align each row-wise probability distribution. We perform channel-to-channel distillation every two of N images: 
+
+Lbatch c 2c = 1
+
+N 2
+
+> N
+
+X
+
+> i=1
+> N
+
+X
+
+> j=1
+
+Lc2c(Gsij , Gtij ). (11) 
+
+2) Memory-based channel-to-channel distillation: As dis-cussed above, mini-batch-based distillation could not capture cross-image relations from global images. To address this problem, we introduce an online channel queue Qc ∈ RNc×A
+
+that can store massive channel embeddings in the memory bank generated from the past mini-batches, where Nc is the number of channels and A is the embedding size. It allows us to retrieve abundant channel embeddings efficiently. For each iteration, we randomly sample Kc contrastive channel embeddings {ck ∈ RA}Kc 
+
+> k=1
+
+from Qc. For easy notation, Vc = [ c1, c2, · · · , cKc ] ∈ RKc×A is a concatenation of {ck}Kc 
+
+> k=1
+
+along the row dimension. Given an input image 
+
+xn, we model the channel-to-channel similarity matrix from 
+
+(Fsn)⊤ ∈ RD×A and (Ftn)⊤ ∈ RD×A to channel embeddings 
+
+Vc as Cs and Ct:
+
+Cs = ( Fsn)⊤V⊤ 
+
+> c
+
+∈ RD×Kc , Ct = ( Ftn)⊤V⊤ 
+
+> c
+
+∈ RD×Kc .
+
+(12) Similar to the Equ. (6), we distill normalized channel-to-channel similarity matrix between the student and teacher networks via KL-divergence loss: 
+
+Lmemory c 2c = 1
+
+D
+
+> D
+
+X
+
+> d=1
+
+KL (σ( Csd, :
+
+τ )|| σ( Ctd, :
+
+τ )) . (13) After each iteration, we push Vc teacher channel embeddings into the channel queue Qc.
+
+E. Feature Distillation with Context Aggregation 
+
+Cross-image relational modeling often captures struc-tured knowledge. Beyond relation distillation, feature dis-tillation [32], [47] has been demonstrated to reduce the performance gap between teacher and student. We further explore feature distillation of pixel embeddings to increase the similarity of pixel-wise representations between teacher and student. The traditional feature distillation methods often directly align pixel-wise embeddings from the original teacher and student feature maps. However, the pixels over the same spatial location from teacher and student may not have consis-tent semantics, since the teacher is often equipped with a larger kernel size than the student, which means that the teacher pixel extracts semantic information from a wider receptive field. To mitigate the receptive field gap between teacher and student, we utilize context aggregation over the student fea-ture map to augment student pixel-wise representations using wider contextual semantic information. Given the feature map 
+
+F ∈ RA×D , where A is the number of pixels and D is the pixel embedding dimension, we linearly transform it to Q, K,and V as the concepts of query, key and value. We use the self-attention mechanism [48] to model context aggregation for pixel representations: 
+
+ˆF = softmax( QK ⊤
+
+√D )V . (14) We concatenate the original pixel representations F and pixel contextual representations ˆF with transformations as the final augmented pixel representations ¯F:
+
+¯F = T2(F||T 1( ˆF)) . (15) Here, || denotes the concatenation operator. T1 and T2
+
+represent a sequence of transformation functions: 1 × 1
+
+convolution →batch normalization →ReLU. We further conduct feature distillation by guiding the aug-mented pixel representations ¯Fs from the student to mimic the teacher pixel representations Ft by MSE: 
+
+Lcontext f d = 1
+
+AD ¯Fs − Ft 2 
+
+> F
+
+. (16) 8
+
+Benefiting from the contextual feature distillation, the student would learn better pixel representations with meaningful con-text semantics from the teacher, leading to improved semantic segmentation capability. The context aggregation module can indeed be viewed as an auxiliary distillation head during training. However, it is not used to enhance the inference-time capacity of the student. Instead, it provides a teacher-compatible feature transformation for the distillation objective. It is a training-only semantic adapter that improves the quality of feature distillation without introducing any inference overhead. This is consistent with many distillation methods that use auxiliary heads or projection layers during training and remove them during inference. 
+
+F. Overall Framework 
+
+We summarize our mini-batch-based and memory-based relational distillation, as well as feature distillation together to train the student network. We also employ the conventional pixel-wise cross-entropy task loss Ltask (Equ. (1)) and class probability distillation loss Lkd (Equ. (2)) as the basic losses. The overall loss is formulated as: 
+
+LCIRKDV 2 = Ltask + Lkd 
+
+|{z} 
+
+> probability distillation
+
++ α(Lbatch p 2p + Lbatch c 2c)
+
+| {z }
+
+> mini −batch −based relational distillation
+
++ β(Lmemory p 2p + Lmemory p 2r + Lmemory c 2c)
+
+| {z }
+
+> memory −based relational distillation
+
++ γL channel f d + λL context f d 
+
+| {z }
+
+> f eature distillation
+
+. (17) Here, α, β, γ, and λ are weight coefficients of mini-batch-based relational distillation, memory-based relational distilla-tion, channel feature distillation, and contextual feature dis-tillation, respectively. We adopt the same weight α for mini-batch-based Lbatch p 2p as well as Lbatch c 2c, and the same weight β for Lmemory p 2p, Lmemory p 2r , and Lmemory c 2c,because losses belonging to the identical type have the consis-tent order of magnitudes. We set α = 1 , β = 0 .1, γ = 100 , and 
+
+λ = 10 . Empirically, we find our CIRKDV2 is not sensitive to coefficients. When the student and teacher networks mismatch the embedding size, we attach a projection head to the student network. It can map the student’s embeddings to match the teacher’s dimension. The projection head is composed of two 1 × 1 convolutional layers with batch normalization and ReLU. It would be discarded at the inference phase without introducing extra costs. In Algorithm 1, we use pseudo-code to illustrate the overall training pipeline of CIRKDV2. IV. M AIN EXPERIMENTS 
+
+A. Experimental Setup 
+
+Datasets. We employ four popular semantic segmentation datasets to conduct our experiments. 
+
+Algorithm 1 Cross-Image Relational KD (CIRKDV2)  
+
+> 1:
+
+Initialize the pixel queue Qp, region queue Qr , and channel queue Qc with random unit vectors.  
+
+> 2:
+
+while the student network has not converged do  
+
+> 3:
+
+Sample a mini-batch.  
+
+> 4:
+
+Generate the student and teacher feature maps.  
+
+> 5:
+
+Compute the mini-batch-based pixel-to-pixel distillation loss Lbatch p 2p and channel-to-channel distillation loss 
+
+Lbatch c 2c. 
+
+> 6:
+
+Compute channel alignment loss Lchannel f d . 
+
+> 7:
+
+Sample contrastive pixel, region, and channel embed-dings from Qp, Qr , and Qc. 
+
+> 8:
+
+Compute the memory-based pixel-to-pixel loss 
+
+Lmemory p 2p, pixel-to-region loss Lmemory p 2r , and channel-to-channel loss Lmemory c 2c. 
+
+> 9:
+
+Compute contextual feature distillation loss Lcontext f d . 
+
+> 10:
+
+Update the student w.r.t the overall loss LCIRKDV 2. 
+
+> 11:
+
+Enqueue the current teacher pixel, region, and channel embeddings to Qp, Qr , and Qc. 
+
+> 12:
+
+Dequeue the earliest pixel, region, and channel embed-dings from Qp, Qr , and Qc. 
+
+> 13:
+
+end while 
+
+1) Cityscapes [27] is an urban scene parsing dataset that contains 5000 finely annotated images, where 2,975/500/1525 images are used for train/val/test .The segmentation performance is reported on 19 classes. 2) ADE20K [28] contains 20K/2K/3K images for 
+
+train/val/test with 150 semantic categories under diverse scenes. 3) Pascal VOC [29] is a visual object segmentation dataset that includes 20 foreground object categories and one background class. We adopt the augmented data with extra annotations provided by Hariharan et al. [49]. The resulting dataset contains 10,582/1,449/1,456 images for 
+
+train/val/test .4) COCO-Stuff-164K [30] contains 164K images from COCO-2017 [50]: 118K for training, 5K for validation, 20K for test-dev, and 20K for the test-challenge. It covers 172 classes: 80 thing classes, 91 stuff classes, and 1 class “unlabeled”. 
+
+Evaluation metrics. Following the standard setup, we employ mean Intersection-over-Union (mIoU) to measure the segmentation performance. The model size is measured by the number of network parameters, and the computing complexity is represented by the sum of floating point operations (FLOPs) in one forward step using a fixed input size, where the input size is 1024 ×2048 for Cityscapes, and 512 ×512 for other datasets. 
+
+Network architectures. Besides SegFormer [26], we use the segmentation framework DeepLabV3 [2] with ResNet-101 backbone [51] as the powerful teacher network. For student networks, we use diverse segmentation architectures to verify the effectiveness of distillation methods. Specifically, we adopt various combinations of DeepLabV3, PSPNet [3], and UperNet [25] with different light-weight backbones of ResNet-18 [51], MobileNetV3 [52], and MobileViT [53]. For 9wall fence motorcycle truck pole train rider light bicycle sign terrain bus person sidewalk building vegetation sky car road average 40 50 60 70 80 90 100 IoU (%) on Cityscapes test set W/O distillation LAD CIRKDV2 
+
+Fig. 6. Illustration of individual class IoU scores over the student network DeepLabV3-MobileNetV3-Small with baseline (W/O distillation), the state-of-the-art LAD and our proposed CIRKDV2 on Cityscapes test set. Our CIRKDV2 can consistently improve individual class IoU scores compared to the baseline and LAD, especially for those challenging classes with low IoU scores. 
+
+SegFormer [26] distillation, the teacher and student backbones are MiT-B4 and MiT-B0, respectively. All backbones are initialized by pretrained weights from ImageNet-1K [54]. 
+
+Training details. Following the standard data augmentation, we employ random flipping and scaling in the range of [0 .5, 2] .For Convolutional Neural Network (CNN)-based networks, we use SGD optimizer with weight decay 0.0001. For Cityscapes, the batch size is 8, and the initial learning rate is 0.01. For other datasets, the batch size is 16, and the initial learning rate is 0.02. The number of the total training iterations is 80K. The learning rate is decayed by (1 − iter total iter )0.9 following the polynomial annealing policy [55]. For MobileViT, we follow the official setup [53] by adopting AdamW optimizer with an initial learning rate 0.0009 and weight decay 0.01. Following the official setup [26], SegFormer is optimized by AdamW with an initial learning rate 0.0002 and weight decay 0.0001. For crop size during the training phase, we use 1024 ×1024 on SegFormer and 512 ×1024 on other networks for Cityscapes. Other datasets follow the 512 ×512 crop size. 
+
+Evaluation details. Following the common protocol with previous works [17], [31], we evaluate the segmentation performance under a single-scale setting over the original image size. Moreover, we report test mIoU for Cityscapes by submitting results to the official Cityscapes test server 1.Beyond Cityscapes, we report validation mIoU for other semantic segmentation datasets. 
+
+Compared distillation methods. We compare our pro-posed CIRKDV2 with state-of-the-art segmentation distilla-tion methods: SKD [17], IFVD [19], CWD [20], DSD [37], CIRKD [31], APD [21], Af-DCD [22], and LAD [23]. We re-run all methods using author-provided code under the same pre-trained teacher. 
+
+Hyper-parameters setup. The hyper-parameters are mainly from the pixel, region, and channel queues. For the pixel queue, we set the queue size Np = 20 K for each class and enqueue Vp = 16 pixels per class for each image. For the region queue, we set the queue size Nr = 2 K for each class. The channel queue size is Nc = 10 K, and we enqueue 
+
+Vc = 256 channels per iteration. For each mini-batch, we 
+
+> 1
+
+https://www.cityscapes-dataset.com/submit/ TABLE I PERFORMANCE COMPARISON WITH THE STATE -OF -THE -ART DISTILLATION METHODS OVER VARIOUS CNN-BASED SEGMENTATION NETWORKS ON CITYSCAPES .Method Params FLOPs mIoU (%) T: DeepLabV3-ResNet-101 79.1M 3228.5G 78.30 S: DeepLabV3-ResNet-18 22.8M 972.4G 73.56 +SKD [17] 74.21 +IFVD [19] 74.35 +CWD [20] 74.28 +DSD [37] 74.05 +CIRKD [31] 75.15 +APD [21] 74.68 +Af-DCD [22] 75.22 +LAD [23] 75.28 +CIRKDV2 (Ours) 75.60 
+
+S: UperNet-ResNet-18 16.6M 650.7G 68.90 +SKD [17] 70.34 +IFVD [19] 69.84 +CWD [20] 71.13 +DSD [37] 70.84 +CIRKD [31] 71.46 +APD [21] 70.84 +Af-DCD [22] 70.82 +LAD [23] 71.57 +CIRKDV2 (Ours) 72.11 
+
+S: DeepLabV3-MobileNetV3-Small 3.3M 130.2G 65.05 +SKD [17] 66.14 +IFVD [19] 65.46 +CWD [20] 66.73 +DSD [37] 66.32 +CIRKD [31] 66.84 +APD [21] 65.72 +Af-DCD [22] 66.53 +LAD [23] 65.65 +CIRKDV2 (Ours) 67.62 
+
+S: PSPNet-MobileNetV3-Small 2.6M 58.4G 62.78 +SKD [17] 63.53 +IFVD [19] 63.24 +CWD [20] 63.64 +DSD [37] 64.14 +CIRKD [31] 64.52 +APD [21] 64.23 +Af-DCD [22] 64.68 +LAD [23] 64.32 +CIRKDV2 (Ours) 65.42 10   
+
+> TABLE II PERFORMANCE COMPARISON WITH THE STATE -OF -THE -ART DISTILLATION METHODS OVER VARIOUS MOBILE VIT-BASED SEGMENTATION NETWORKS ON CITYSCAPES .
+
+Method Params FLOPs mIoU (%) T: DeepLabV3-ResNet-101 79.1M 3228.5G 78.30 S: DeepLabV3-MobileViT-XXS 2.4M 473.6G 66.24 +SKD [17] 67.45 +IFVD [19] 67.13 +CWD [20] 67.89 +DSD [37] 67.34 +CIRKD [31] 68.04 +APD [21] 67.84 +Af-DCD [22] 68.14 +LAD [23] 67.48 +CIRKDV2 (Ours) 68.91 
+
+S: PSPNet-MobileViT-XXS 1.8M 452.7G 65.48 +SKD [17] 66.84 +IFVD [19] 66.52 +CWD [20] 66.28 +DSD [37] 66.74 +CIRKD [31] 67.45 +APD [21] 66.63 +Af-DCD [22] 67.54 +LAD [23] 66.56 +CIRKDV2 (Ours) 68.45   
+
+> TABLE III PERFORMANCE COMPARISON WITH THE STATE -OF -THE -ART DISTILLATION METHODS OVER SEG FORMER NETWORKS ON CITYSCAPES .
+
+Method Params FLOPs mIoU (%) T: SegFormer-MiT-B4 64.0M 1,229.8G 80.38 S: SegFormer-MiT-B0 3.7M 121.7G 74.12 +SKD [17] 74.35 +IFVD [19] 74.18 +CWD [20] 73.86 +DSD [37] 74.70 +CIRKD [31] 74.87 +APD [21] 74.83 +Af-DCD [22] 74.52 +LAD [23] 74.82 +CIRKDV2 (Ours) 75.52 (a) Image (b) Student (c) LAD (d) CIRKDV2 (e) Teacher (f) GT  
+
+> Fig. 7. Qualitative segmentation results on the validation set of Cityscapes using the DeepLabV3-MobileNetV3-Large network: (a) raw images, (b) the original student network without KD, (c) LAD, (d) our CIRKDV2, (e) Teacher, and (f) ground truth.
+
+(a) LAD [23] (b) Our CIRKDV2  
+
+> Fig. 8. T-SNE visualization of learned feature embeddings on the validation set of Cityscapes over the DeepLabV3-ResNet18 network trained with LAD (left ) and our proposed CIRKDV2 ( right ).
+
+sample Kp = 4 , 096 pixel embeddings from the pixel queue, 
+
+Kr = 1 , 024 region embeddings from the region queue, and 
+
+Kc = 2 , 048 channel embeddings from the channel queue to compute similarity matrices. 
+
+B. Results on Cityscapes 
+
+In Table I, we compare our proposed CIRKDV2 against popular distillation methods on Cityscapes over CNN-based segmentation architectures. We can observe that all segmen-tation distillation methods improve student networks under the teacher’s supervision. CIRKDV2 achieves the best seg-mentation performance across various student networks with homogeneous or heterogeneous architecture styles. Notice that LAD [23], a feature-based distillation method, is often superior in the homogeneous architecture pair like ResNet-101 and ResNet-18, but inferior in the heterogeneous architecture pair like ResNet-101 and MobileNetV3. By contrast, relation-based methods, like CIRKD [31], Af-DCD [22], and CIRKDV2, do not rely on architecture-specific cues. Moreover, CIRKDV2 outperforms the previous state-of-the-art CIRKD, Af-DCD, and LAD methods with 0.70%, 0.88%, and 0.98% improve-ments on average across four CNN-based models, respectively. Table II shows the distillation results on MobileViT-XXS, a light-weight vision transformer for mobile devices. CIRKDV2 obtains 0.94%, 0.84%, and 1.66% mIoU gains on average compared to CIRKD, Af-DCD, and LAD, respectively. As shown in Table III, we further evaluate distillation methods on SegFormer. CIRKDV2 achieves the best performance and surpasses the second-best CIRKD by 0.65%. The results demonstrate that CIRKDV2 can also bring remarkable im-provements on transformer architectures. The superiority of CIRKDV2 may be attributed to distilling more comprehensive knowledge than previous feature- and relation-based methods. As illustrated in Figure 6, we also show the performance of individual class IoU scores over the student network. We can observe that our CIRKDV2 achieves better class IoU scores than baseline (W/O distillation) and LAD consistently, especially for those categories with low IoU scores. For example, CIRKDV2 obtains 2.08%, 5.18%, and 5.81% gains on wall , fence , and truck than LAD, respectively. We further show the qualitative segmentation results visually in Figure 7. We can observe that our CIRKDV2 produces more consistent 11 
+
+TABLE IV PERFORMANCE COMPARISON WITH THE STATE -OF -THE -ART DISTILLATION METHODS OVER VARIOUS SEGMENTATION NETWORKS ON 
+
+ADE20K. Method Params FLOPs mIoU (%) T: DeepLabV3-ResNet-101 79.2M 575.0G 43.83 S: DeepLabV3-ResNet-18 22.8M 167.5G 36.92 +SKD [17] 38.12 +IFVD [19] 37.67 +CWD [20] 38.96 +DSD [37] 38.53 +CIRKD [31] 39.05 +APD [21] 38.55 +Af-DCD [22] 39.21 +LAD [23] 39.37 +CIRKDV2 (Ours) 39.82 
+
+S: UperNet-ResNet-18 16.6M 85.5G 34.37 +SKD [17] 35.25 +IFVD [19] 35.08 +CWD [20] 35.86 +DSD [37] 35.33 +CIRKD [31] 35.81 +APD [21] 35.10 +Af-DCD [22] 36.36 +LAD [23] 36.38 +CIRKDV2 (Ours) 36.87 
+
+S: DeepLabV3-MobileNetV3-Large 6.8M 49.0G 32.83 +SKD [17] 33.78 +IFVD [19] 34.21 +CWD [20] 34.18 +DSD [37] 33.64 +CIRKD [31] 35.15 +APD [21] 34.53 +Af-DCD [22] 35.12 +LAD [23] 34.61 +CIRKDV2 (Ours) 36.14 
+
+S: PSPNet-MobileNetV3-Large 6.1M 15.2G 33.63 +SKD [17] 34.82 +IFVD [19] 34.32 +CWD [20] 34.93 +DSD [37] 33.90 +CIRKD [31] 35.27 +APD [21] 35.21 +Af-DCD [22] 35.41 +LAD [23] 34.85 +CIRKDV2 (Ours) 36.01 (a) Image (b) Student (c) LAD (d) CIRKDV2 (e) Teacher (f) GT 
+
+Fig. 9. Qualitative segmentation results on the validation set of ADE20K using the DeepLabV3-MobileNetV3-Large network: (a) raw images, (b) the original student network without KD, (c) LAD, (d) our CIRKDV2, (e) Teacher, and (f) ground truth. TABLE V PERFORMANCE COMPARISON WITH THE STATE -OF -THE -ART DISTILLATION METHODS OVER VARIOUS SEGMENTATION NETWORKS ON 
+
+PASCAL VOC. Method Params FLOPs mIoU (%) T: DeepLabV3-ResNet-101 79.2M 575.0G 77.80 S: DeepLabV3-MobileNetV3-Small 3.3M 28.1G 62.45 +SKD [17] 63.49 +IFVD [19] 63.33 +CWD [20] 63.67 +DSD [37] 63.51 +CIRKD [31] 63.82 +APD [21] 63.61 +Af-DCD [22] 64.03 +LAD [23] 63.55 +CIRKDV2 (Ours) 64.67 
+
+S: DeepLabV3-MobileNetV3-Large 6.8M 49.0G 69.33 +SKD [17] 70.57 +IFVD [19] 70.84 +CWD [20] 71.15 +DSD [37] 70.66 +CIRKD [31] 71.24 +APD [21] 71.19 +Af-DCD [22] 71.32 +LAD [23] 71.08 +CIRKDV2 (Ours) 71.90 
+
+S: PSPNet-MobileNetV3-Small 2.6M 7.4G 61.92 +SKD [17] 62.45 +IFVD [19] 62.51 +CWD [20] 63.12 +DSD [37] 62.79 +CIRKD [31] 63.22 +APD [21] 62.43 +Af-DCD [22] 63.45 +LAD [23] 63.42 +CIRKDV2 (Ours) 63.84 
+
+S: PSPNet-MobileNetV3-Large 6.1M 15.2G 68.77 +SKD [17] 70.64 +IFVD [19] 70.45 +CWD [20] 70.28 +DSD [37] 69.74 +CIRKD [31] 70.73 +APD [21] 70.34 +Af-DCD [22] 70.62 +LAD [23] 70.06 +CIRKDV2 (Ours) 71.55 (a) Image (b) Student (c) LAD (d) CIRKDV2 (e) Teacher (f) GT 
+
+Fig. 10. Qualitative segmentation results on the validation set of Pascal VOC using the DeepLabV3-MobileNetV3-Large network: (a) raw images, (b) the original student network without KD, (c) LAD, (d) our CIRKDV2, (e) Teacher, and (f) ground truth. 12                                                    
+
+> TABLE VI PERFORMANCE COMPARISON WITH THE STATE -OF -THE -ART DISTILLATION METHODS OVER VARIOUS SEGMENTATION NETWORKS ON
+> COCO-S TUFF -164K. Method Params FLOPs mIoU (%) T: DeepLabV3-ResNet-101 79.2M 575.0G 38.48 S: DeepLabV3-ResNet-18 22.8M 167.5G 32.65 +SKD [17] 33.27 +IFVD [19] 33.30 +CWD [20] 33.81 +DSD [37] 33.26 +CIRKD [31] 33.92 +APD [21] 33.71 +Af-DCD [22] 33.86 +LAD [23] 33.95 +CIRKDV2 (Ours) 34.42
+> S: PSPNet-MobileNetV3-Small 2.6M 7.4G 26.48 +SKD [17] 27.52 +IFVD [19] 27.15 +CWD [20] 27.18 +DSD [37] 27.42 +CIRKD [31] 27.66 +APD [21] 27.28 +Af-DCD [22] 27.71 +LAD [23] 27.33 +CIRKDV2 (Ours) 28.28
+> S: DeepLabV3-MobileNetV3-Small 3.3M 28.1G 26.04 +SKD [17] 26.72 +IFVD [19] 26.46 +CWD [20] 27.12 +DSD [37] 26.73 +CIRKD [31] 26.83 +APD [21] 26.70 +Af-DCD [22] 27.25 +LAD [23] 27.11 +CIRKDV2 (Ours) 27.66
+> S: DeepLabV3-MobileNetV3-Large 6.8M 49.0G 30.31 +SKD [17] 30.83 +IFVD [19] 30.99 +CWD [20] 31.24 +DSD [37] 30.81 +CIRKD [31] 31.62 +APD [21] 31.45 +Af-DCD [22] 31.59 +LAD [23] 31.08 +CIRKDV2 (Ours) 32.14 (a) Image (b) Student (c) LAD (d) CIRKDV2 (e) Teacher (f) GT
+> Fig. 11. Qualitative segmentation results on the validation set of COCO-Stuff-164K using the DeepLabV3-MobileNetV3-Large network: (a) raw images, (b) the original student network without KD, (c) LAD, (d) our CIRKDV2, (e) Teacher, and (f) ground truth.
+
+semantic labels with the ground truth than baseline and LAD, indicating more meaningful pixel semantics are captured. T-SNE visualization of learned feature embeddings on the student network by LAD and our proposed CIRKDV2 is shown in Figure 8. Compared to LAD, the network trained by CIRKDV2 shows a more discriminative pixel-wise se-mantic feature space. The visual result suggests that learning cross-image relations with pixel-to-pixel, pixel-to-region, and channel-to-channel dimensions from the teacher network can guide the student to learn comprehensive knowledge, helping the student achieve better intra-class compactness and inter-class separability, thus improving segmentation performance. 
+
+C. Results on ADE20K 
+
+In Table IV, we evaluate various distillation methods on ADE20K. ADE20K is a popular semantic segmentation bench-mark and more challenging than Cityscapes. CIRKDV2 also achieves the best performance across various segmentation frameworks. It surpasses previous state-of-the-art CIRKD, Af-DCD, and LAD methods by 0.89%, 0.69%, and 0.91% on average across four networks, respectively. The results manifest that CIRKDV2 can also work well on more diverse scenes. 
+
+D. Results on Pascal VOC 
+
+Beyond scene-parsing datasets, we also evaluate our CIRKDV2 on Pascal VOC, a representative visual object seg-mentation dataset. As shown in Table V, CIRKDV2 achieves the best performance compared to other segmentation KD approaches. Compared to the previous state-of-the-art CIRKD, Af-DCD, and LAD methods, CIRKDV2 results in 0.74%, 0.64%, and 0.96% improvements across four segmentation models on average, respectively. The results indicate that CIRKDV2 can lead to accurate semantic masks on visual object segmentation. 
+
+E. Results on COCO-Stuff-164K 
+
+As shown in Table VI, we compare various distillation meth-ods on COCO-Stuff-164K. COCO-Stuff-164K is a large-scale semantic segmentation dataset and has more complex scenes and objects. CIRKDV2 performs the best consistently among the existing segmentation distillation methods. It brings 0.62%, 0.52%, and 0.76% mIoU gains over CIRKD, Af-DCD, and LAD methods on average across four networks, respectively. The promising results demonstrate the good scalability of our CIRKDV2 to work reasonably well on large-scale and complex scenes. We follow the MobileSAM [56] setup to apply CIRKDV2 to distill a SAM model with a lightweight image encoder ViT-Tiny. The teacher is a pretrained SAM model with a high-performance ViT-Large image encoder. As shown in Table VII, CIRKDV2 achieves 3.16% and 1.89% mIoU improvements compared to the baseline and MobileSAM on the challenging COCO-Stuff-164K, respectively. The results demonstrate that CIRKDV2 can also be effectively extended to SAM foundation models. 13                       
+
+> TABLE VII DISTILLATION EXPERIMENTS ON SAM MODEL ON COCO-S TUFF -164K. Method mIoU (%) T: SAM-ViT-Large 42.82 S: SAM-ViT-Tiny 27.64 +MobileSAM [56] 28.91 +CIRKDV2 30.80
+> TABLE VIII COMPARISON OF TRAINING EFFICIENCY OVER DEEP LAB V3-R ES NET 18
+> ON ADE20K. Method Time GPU Memory mIoU (%) +Af-DCD [22] 16s 9.8GB 39.21 +LAD [23] 12s 8.5GB 39.37 +CIRKDV2 (Ours) 17s 11.7GB 39.82
+
+F. Comparison of training complexity 
+
+As shown in Table VIII, we compare our CIRKDV2 with Af-DCD and LAD methods, which represent the state-of-the-art relation and feature distillation works, respectively. The training time is recorded from one training step with a batch size of 16 on 8 NVIDIA RTX 4090 GPUs. LAD achieves the best training efficiency because it aligns feature maps without sophisticated relational modeling between teacher and student. Both Af-DCD and CIRKDV2 are relation-based distillation methods. Compared to Af-DCD, CIRKDV2 needs extra 6.25% training time and 19.39% GPU memory costs but results in the best 39.82% mIoU. The good performance justifies the minor increase of training costs. Notice that all distillation methods do not change the student network architecture, therefore, the inference time and memory are the same as the original baseline network without distillation. V. A BLATION STUDY AND PARAMETER ANALYSIS 
+
+We conduct thorough ablation experiments of our proposed CIRKDV2 on ADE20K, a standard yet challenging bench-mark for semantic segmentation. For all experiments in this section, we choose DeepLabV3-ResNet-101 as the teacher and DeepLabV3-ResNet-18 as the student by default. 
+
+A. Ablation study of loss terms 
+
+As shown in Table X, we conduct a comprehensive ablation study to examine the contribution of each distillation loss and various loss combinations. 
+
+KD loss . The conventional KD loss Lkd improves the baseline Ltask loss by 0.46%. This means that pixel-wise class                                 
+
+> TABLE IX ABLATION STUDY OF CONTEXTUAL FD AND C2C DISTILLATION ON
+> SEG FORMER .Student: SegFormer B0 B0 B1 Dataset Citys ADE20K ADE20K W/O Distillation 74.12 33.83 38.12 +Contextual FD(W/O Nonlinear Branch) 74.67 35.18 38.73 +Contextual FD 74.75 35.39 38.94 +Channel FD 74.48 34.56 38.40 +mini-batch C2C 74.76 35.89 39.34 +memory-based C2C 74.92 36.28 39.62 All 75.24 36.74 40.18
+
+probability distillation leads to a moderate improvement for semantic segmentation. 
+
+Mini-batch-based relational distillation loss . Apply-ing mini-batch-based relational KD losses of Lbatch p 2p,
+
+Lbatch c 2c, and Lbatch c 2c+Lchannel f d leads to 1.32%, 1.09% and 1.64% mIoU gains over the baseline without distillation, respectively. Lchannel f d boosts Lbatch c 2c by 0.55%, because it regularizes the semantics of student channels to be consistent with the teacher channels. The overall mini-batch-based rela-tional distillation losses achieve a 1.9% mIoU improvement over baseline. 
+
+Memory-based relational distillation loss . The memory-based relational distillation losses of Lmemory p 2p,
+
+Lmemory p 2r , Lmemory c 2c, Lmemory c 2c + Lchannel f d result in 1.39%, 1.24%, 1.18%, and 1.68% mIoU improvements, respectively. Similar to mini-batch-based channel-to-channel distillation, Lchannel f d can also facilitate the effectiveness of memory-based channel-to-channel distillation Lmemory c 2c
+
+with a 0.50% mIoU gain. Moreover, we found that channel-to-channel distillation is better than pixel-to-pixel and pixel-to-region distillation. This reveals that modeling channel interaction is more informative than pixel-to-pixel and pixel-to-region interactions. The overall memory-based relational distillation losses outperform baseline and mini-batch-based relational distillation by 2.40% and 0.50%, respectively. Compared to mini-batch-based distillation, memory-based distillation can capture broader relational dependencies from many more images, therefore bringing better segmentation performance. 
+
+Contextual feature distillation . The loss Lcontext f d 
+
+achieves a 1.15% mIoU increase over the traditional KD Lkd 
+
+while keeping the same inference cost as the original student. Moreover, combining cross-image relational distillation with contextual feature distillation maximizes the segmentation mIoU to 39.82%, reducing the performance gap between teacher and student from 6.91% to 4.01%. 
+
+Channel feature distillation . As shown in Table XI, the ablation experiments on heterogeneous teacher-student pairs, such as ResNet →MobileNetV3 and ResNet →MobileViT, show consistent improvements of 1.18% and 1.24%, suggest-ing that the proposed design does not cause representation col-lapse or negative transfer. We further demonstrate that channel distillation leads to one-to-one semantic alignment between teacher and student channels. As shown in Appendix Figure R.2, we found that the student trained by Lchannel f d exhibits similar semantic correspondence with the teacher. By contrast, the independently trained student without Lchannel f d loss demonstrates different semantic patterns with the teacher. The qualitative results support the claimed channel semantic consistency. In Table IX, we systematically evaluate the individual contributions of Contextual FD, Channel FD, mini-batch C2C, and memory-based C2C on SegFormer architectures across Cityscapes and ADE20K. Specifically, on SegFormer-MiT-B0 with ADE20K, Contextual FD, Channel FD, mini-batch C2C, and memory-based C2C improve the baseline mIoU from 33.83% to 35.39%, 34.56%, 35.89%, and 36.28%, respec-tively. Similar improvements are observed on Cityscapes and 14 
+
+TABLE X ABLATION STUDY OF DISTILLATION LOSS TERMS ON ADE20K. Loss Ltask Various distillation loss combinations of CIRKDV2 
+
+Lkd - ✓ ✓ ✓ ✓ ✓ ✓ ✓ ✓ ✓ ✓ ✓ ✓ ✓
+
+Lbatch p 2p - - ✓ - - - ✓ - - - - - - ✓
+
+Lbatch c 2c - - - ✓ - ✓ ✓ - - - - - - ✓
+
+Lmemory p 2p - - - - - - - ✓ - - - ✓ - ✓
+
+Lmemory p 2r - - - - - - - - ✓ - - ✓ - ✓
+
+Lmemory c 2c - - - - - - - - - ✓ ✓ ✓ - ✓
+
+Lchannel f d - - - - ✓ ✓ ✓ - - - ✓ ✓ - ✓
+
+Lcontext f d - - - - - - - - - - - - ✓ ✓
+
+mIoU (%) 36.92 37.38 38.24 38.01 37.68 38.56 38.82 38.77 38.62 38.56 39.06 39.32 38.53 39.82 
+
+Method Baseline KD Mini-batch-based relational distillation Memory-based relational distillation Context Overall TABLE XI ABLATION STUDY OF Lchannel f d OVER HETEROGENEOUS TEACHER -STUDENT PAIRS ON CITYSCAPES .Method mIoU (%) T: DeepLabV3-ResNet-101 78.30 S: PSPNet-MobileNetV3-Small 62.78 +Lchannel f d 63.96    
+
+> T: DeepLabV3-ResNet-101 78.30 S: PSPNet-MobileViT-XXS 65.48 +Lchannel f d 66.72
+
+TABLE XII ABLATION STUDY OF CONTEXT AGGREGATION FOR FEATURE DISTILLATION ON ADE20K. Method mIoU (%) Baseline 36.92 W/O contextual aggregation 37.33 Equal contextual aggregation 37.65 Object contextual aggregation [57] 37.82 Attention contextual aggregation (Ours) 38.53 
+
+TABLE XIII ANALYSIS OF VARIOUS SAMPLING METHODS ON ADE20K. Method Complexity mIoU (%) W/O sampling O(1) 39.24 Uniform sampling O(1) 39.55 Random sampling O(1) 39.82             
+
+> Hardest sampling C(Np+Nr) + Nc39.44 Semi-hard sampling C(Np+Nr) + Nc39.65
+
+with SegFormer-MiT-B1 on ADE20K. The substantial gains retained after removing the branch support the effectiveness of the contextual feature alignment mechanism. 
+
+B. Ablation of context aggregation for feature distillation 
+
+As shown in Table XII, we conduct an ablation study of various context aggregation methods for feature distillation. The feature distillation without contextual aggregation only achieves a 0.41% mIoU gain over baseline. This is because the traditional feature distillation ignores that the teacher pixel has a wider receptive field than the student pixel. Although contex-tual aggregation with equal weights improves the traditional feature distillation by 0.32%, it neglects the correlation among contextual pixels. The object contextual aggregation [57] ab-sorbs object region representations to augment student pixels and boosts the equal contextual aggregation by 0.17%. We think the reason why object region representations lead to a marginal improvement is that the object-level coarse-grained representations do not contribute to the optimization of pixel-wise feature distillation. Our method introduces the attention mechanism for weighted pixel-level contextual aggregation and achieves the best 1.61% improvement over baseline. The results demonstrate that our method makes the student pixels learn better semantic information from the teacher. This is because our method widens the student receptive field and leads the student to learn matched pixel semantic information from the teacher. 
+
+C. Impact of the queue size 
+
+We investigate the impact of memory sizes of the pixel queue, region queue, and channel queue. As shown in Ap-pendix Figure R.1, distillation performance increases as the sizes of the pixel queue, region queue, and channel queue grow. This is because a larger queue could provide more abundant and diverse embeddings for capturing long-range dependencies. The results also show that the distillation per-formance saturates at a certain memory capacity. In summary, the pixel, region, and channel queues occupy 368MB, 40MB, and 92MB memory costs, which only account for <1% of the whole memory. In our design, the region queue stores features generated 
+
+by the frozen teacher network . Since the teacher is fixed, the stored region embeddings remain semantically invariant throughout training, therefore the “staleness” problem does not exist. In addition, we use a class-wise queue and class-balanced sampling. This prevents frequent categories from dominating the relation construction and ensures that rare classes can still be sampled once their region embeddings are stored. As shown in Figure 6 of our manuscript, the Cityscapes class-wise IoU analysis also shows gains than SOTA dis-tillation method LAD on rare classes like wall, fence, and truck by 2.08%, 5.18% and 5.81% mIoUs, respectively. This indicates that the class-wise region queue does not harm rare classes. Instead, it helps preserve teacher-provided prototypes and makes them available to provide stable information for later iterations. We investigate whether a large memory queue is more effective than a smaller but more frequently refreshed queue. In Table XIV and XV, the experiments are conducted on both CNN-based (DeepLabV3-ResNet-18) and Transformer-based (SegFormer-MiT-B0) architectures across Cityscapes and ADE20K. For DeepLabV3-ResNet-18, the large queue (20K, 16) achieves 75.26% and 38.77% mIoU on Cityscapes and ADE20K, respectively, outperforming the smaller queue (5K, 40) by 0.22% and 0.42% mIoU. Similarly, for SegFormer-MiT-B0, the large queue achieves 75.35% and 36.52% mIoU, exceeding the smaller queue by 0.17% and 0.25% mIoU. The intermediate configurations also exhibit a consistent trend of improved performance with larger queue capacities. These results suggest that preserving diverse historical embeddings 15 
+
+is more beneficial than increasing the queue refresh rate in our cross-image relational distillation framework.                                     
+
+> TABLE XIV ANALYSIS OF PIXEL QUEUE SIZE WITH UPDATE FREQUENCY ON
+> DEEP LAB V3-R ES NET -18. Queue size Np20K 15K 10K 5K Enqueue size Vp16 24 32 40 Cityscapes mIoU (%) 75.26 75.18 75.12 75.04 ADE20K mIoU (%) 38.77 38.68 38.57 38.35 TABLE XV ANALYSIS OF PIXEL QUEUE SIZE WITH UPDATE FREQUENCY ON
+> SEG FORMER -M IT-B0. Queue size Np20K 15K 10K 5K Enqueue size Vp16 24 32 40 Cityscapes mIoU (%) 75.35 75.34 75.26 75.18 ADE20K mIoU (%) 36.52 36.50 36.42 36.27
+
+D. Impact of sampling methods 
+
+As shown in Table XIII, we examine the impact of vari-ous sampling methods for memory-based distillation. “W/O sampling” means that the queue size is equal to the number of contrastive samples. “Hardest sampling” represents that we sample the hardest contrastive instances from the queues. Some previous studies [58], [59] found that the hardest nega-tives may lead to bad local minima. To alleviate this problem, we attempt a semi-hard sampling strategy. We first collect the top 20% hardest negatives from the queues and then randomly sample contrastive instances from them. We found that “W/O sampling” is harmful to the performance gain, since this way decreases the queue size and range for modeling dependencies. Other advanced sampling methods, like hardest and semi-hard sampling, also do not produce improvements but introduce extra computation complexity. Finally, we choose random sampling, a simple yet effective way. In dense semantic segmentation, the memory bank is used to approximate the teacher’s dataset-level relational distribution, not only to mine the hardest negatives. A large queue provides diverse cross-image semantic contexts, while random class-balanced sampling gives a stable estimate of this global distribution. By contrast, hardest mining can overemphasize outliers, boundary pixels, mislabeled regions, or visually similar classes that are not reliable negatives. This may explain why hardest and semi-hard sampling introduce extra computation but do not improve performance. 
+
+E. Impact of the temperature τ
+
+Temperature τ is used to calibrate the similarity distribution for relational distillation. A more significant temperature τ
+
+brings a smoother distribution. As shown in Figure 12a, we investigate the impact of τ and find τ = 0 .1 is the best choice. A smaller τ than 0.1 may lead to under-smoothing, while a larger τ than 0.1 may result in over-smoothing, causing information loss of similarity distributions. 0.05 0.1 0.5 1.0 Temperature τ
+
+38 40 mIoU (%) 
+
+512 1024 2048 4096 Contrastive pixel number Kp
+
+38 40 mIoU (%) 
+
+128 Contras 
+
+37 38 39 mIoU (%) 
+
+(a) Temperature τ0.05 0.1 0.5 1.0 Temperature τ
+
+38 40 mIoU (%) 
+
+512 1024 2048 4096 Contrastive pixel number Kp
+
+38 40 mIoU (%) 
+
+128 Contrast 
+
+37 38 39 mIoU (%) (b) Pixel-based Kp0.05 0.1 0.5 1.0 Temperature τ
+
+38 40 mIoU (%) 
+
+512 1024 2048 4096 Contrastive pixel number Kp
+
+38 40 mIoU (%) 
+
+128 256 512 1024 Contrastive region number Kr
+
+37 38 39 mIoU (%) 
+
+256 512 1024 2048 Contrastive channel number Kc
+
+38 40 mIoU (%) 
+
+(c) Region-based Kr0.05 0.1 0.5 1.0 Temperature τ             
+
+> 38 40 mIoU (%)
+> 512 1024 2048 4096 Contrastive pixel number Kp
+> 38 40 mIoU (%)
+> 128 256 512 1024 Contrastive region number Kr
+> 37 38 39 mIoU (%)
+> 256 512 1024 2048 Contrastive channel number Kc
+> 38 40 mIoU (%)
+
+(d) Channel-based Kc                   
+
+> Fig. 12. Impact of (a) the temperature τ, (b) the number of contrastive pixel embeddings Kp, (c) the number of contrastive region embeddings Kr, and (d) the number of contrastive channel embeddings Kcon ADE20K. 0.1 0.5 1235Loss weight α
+> 38 39 40 41 mIoU (%)
+> 0.0010.05 0.1 0.5 12Loss weight β
+> 38 39 40 41 mIoU (%)
+> 110 L
+> 38 39 40 41 mIoU (%)
+
+(a) Mini-batch-based α0.1 0.5 1 2 3 5Loss weight α      
+
+> 38 39 40 41 mIoU (%)
+> 0.0010.05 0.1 0.5 12Loss weight β
+> 38 39 40 41 mIoU (%)
+> 110 L
+> 38 39 40 41 mIoU (%)
+
+(b) Memory-based β0.1 0.5 1 2 3 5Loss weight α              
+
+> 38 39 40 41 mIoU (%)
+> 0.0010.05 0.1 0.5 12Loss weight β
+> 38 39 40 41 mIoU (%)
+> 110 50 100 200 500 Loss weight γ
+> 38 39 40 41 mIoU (%)
+> 1510 20 50 100 Loss weight λ
+> 38 39 40 41 mIoU (%)
+
+(c) Channel-based γ0.1 0.5 1 2 3 5Loss weight α               
+
+> 38 39 40 41 mIoU (%)
+> 0.0010.05 0.1 0.5 12Loss weight β
+> 38 39 40 41 mIoU (%)
+> 110 50 100 200 500 Loss weight γ
+> 38 39 40 41 mIoU (%)
+> 1510 20 50 100 Loss weight λ
+> 38 39 40 41 mIoU (%)
+
+(d) Context-based λ     
+
+> Fig. 13. Sensitivity analyses of (a) mini-batch-based distillation loss weight
+> α, (b) memory-based distillation loss weight β, (c) channel distillation loss weight γ, and (d) contextual distillation loss weight λon ADE20K.
+
+F. Impact of the number of contrastive embeddings 
+
+As shown in Figure 12b, 12c, 12d, we examine the number of contrastive embeddings to calculate pixel-to-pixel, pixel-to-region, and channel-to-channel similarity matrices. The distillation performance increases as Kp, Kr , and Kc grow, because the similarity distribution with a larger dimension would encode broader pixel dependencies. The upper bound of distillation performance may saturate at Kp = 4 , 096 for pixel-to-pixel distillation, Kr = 1 , 024 for pixel-to-region dis-tillation, and Kc = 2 , 048 for channel-to-channel distillation. 
+
+G. Sensitivity analyses of loss weights 
+
+As shown in Figure 13, we analyze the sensitivity of the loss weights α, β, γ, and λ, where we set α ∈ [0 .1, 5] ,
+
+β ∈ [0 .001 , 2] , γ ∈ [1 , 500] , and λ ∈ [1 , 100] . For relational 16 
+
+distillation weights α and β, we find that performance in-creases from α = 0 .1 to α = 1 , and from β = 0 .001 to 
+
+β = 0 .1, reaching the best results when α = 1 and β = 0 .1.When α > 1 and β > 0.1, the performance becomes subopti-mal. We think that smaller α and β reduce the contributions of relational distillation, while larger counterparts may lead to over-optimization and negative regularization. Moreover, we observe that γ ∈ [50 , 200] and λ ∈ [1 , 10] work well for feature distillation. Overall, loss weights are not sensitive within our recommended ranges. VI. C ONCLUSION 
+
+This paper presents CIRKDV2, an improved cross-image relational KD method for efficient semantic segmentation. We construct pixel-to-pixel, pixel-to-region, and channel-to-channel relation modeling to transfer multi-dimensional struc-tured knowledge for learning long-range pixel and chan-nel dependencies. Moreover, we propose contextual feature distillation that first performs spatial context aggregation to augment the student pixels with richer contextual information and then aligns the augmented student pixels with the teacher pixels. Experiments on four challenging semantic segmen-tation datasets demonstrate that CIRKDV2 outperforms the state-of-the-art segmentation distillation methods. We hope our work can inspire future research to explore more advanced segmentation KD works towards global relational modeling and contextual feature distillation. ACKNOWLEDGMENT 
+
+This work was supported by the Youth Key Deployment Project of the Chinese Academy of Sciences under Grant No. GFQN-2026-34, the National Natural Science Foundation of China under Grant Nos. 62676389, 62406312, 62476264, 62606510, 62606511, and the Beijing Natural Science Foun-dation under Grant No. QG26011, the Postdoctoral Fellowship Program of CPSF under Grant Number GZC20260905. REFERENCES [1] L.-C. Chen, G. Papandreou, I. Kokkinos, K. Murphy, and A. L. Yuille, “Deeplab: Semantic image segmentation with deep convolutional nets, atrous convolution, and fully connected crfs,” IEEE transactions on pattern analysis and machine intelligence , vol. 40, no. 4, pp. 834–848, 2017. [2] L.-C. Chen, Y. Zhu, G. Papandreou, F. Schroff, and H. Adam, “Encoder-decoder with atrous separable convolution for semantic image segmen-tation,” in Proceedings of the European conference on computer vision (ECCV) , 2018, pp. 801–818. [3] H. Zhao, J. Shi, X. Qi, X. Wang, and J. Jia, “Pyramid scene parsing network,” in Proceedings of the IEEE conference on computer vision and pattern recognition , 2017, pp. 2881–2890. [4] A. Kirillov, E. Mintun, N. Ravi, H. Mao, C. Rolland, L. Gustafson, T. Xiao, S. Whitehead, A. C. Berg, W.-Y. Lo et al. , “Segment anything,” in Proceedings of the IEEE/CVF international conference on computer vision , 2023, pp. 4015–4026. [5] W. Feng, C. Yang, H. Qin, X. Li, Y. Wang, Z. An, L. Huang, B. Diao, Z. Zhao, Y. Xu, and M. Magno, “Q-VDiT: Towards accurate quan-tization and distillation of video-generation diffusion transformers,” in 
+
+Proceedings of the 42nd International Conference on Machine Learning ,2025, pp. 16 956–16 976. [6] W. Feng, C. Yang, H. Qin, Y. Li, M. Wu, G. Fan, X. Li, Z. An, L. Huang, B. Diao, R. Tao, F. Zhuang, M. Magno, Y. Xu, Z. Zeng, T. Huang, and Y. Tian, “S 2Q-VDiT +: Accurate quantized video diffusion transformer with multi-resolution sampling and structural distillation,” IEEE Trans-actions on Pattern Analysis and Machine Intelligence , 2026. [7] W. Feng, C. Yang, H. Qin, Y. Li, X. Li, Z. An, L. Huang, B. Diao, F. Zhuang, M. Magno, Y. Xu, Y. Tian, and T. Huang, “MPQ-DMv2: Flexible residual mixed precision quantization for low-bit diffusion mod-els with temporal distillation,” IEEE Transactions on Pattern Analysis and Machine Intelligence , 2026. [8] C. Yang, Z. An, C. Li, B. Diao, and Y. Xu, “Multi-objective pruning for cnns using genetic algorithm,” in International Conference on Artificial Neural Networks . Springer, 2019, pp. 299–305. [9] L. Cai, Z. An, C. Yang, Y. Yan, and Y. Xu, “Prior gradient mask guided pruning-aware fine-tuning,” in Proceedings of the AAAI Conference on Artificial Intelligence , 2022. [10] G. Hinton, O. Vinyals, and J. Dean, “Distilling the knowledge in a neural network,” arXiv preprint arXiv:1503.02531 , 2015. [11] C. Yang, Z. An, L. Cai, and Y. Xu, “Hierarchical self-supervised augmented knowledge distillation,” International Joint Conference on Artificial Intelligence , pp. 1217–1223, 2021. [12] C. Yang, Z. An, H. Zhou, F. Zhuang, Y. Xu, and Q. Zhang, “Online knowledge distillation via mutual contrastive learning for visual recogni-tion,” IEEE Transactions on Pattern Analysis and Machine Intelligence ,vol. 45, no. 8, pp. 10 212–10 227, 2023. [13] C. Yang, Z. An, H. Zhou, L. Cai, X. Zhi, J. Wu, Y. Xu, and Q. Zhang, “MixSKD: Self-knowledge distillation from mixup for image recogni-tion,” in European Conference on Computer Vision . Springer, 2022, pp. 534–551. [14] C. Yang, X. Yu, H. Yang, Z. An, C. Yu, L. Huang, and Y. Xu, “Multi-teacher knowledge distillation with reinforcement learning for visual recognition,” in Proceedings of the AAAI Conference on Artificial Intelligence , vol. 39, no. 9, 2025, pp. 9148–9156. [15] Y. Liu, C. Shu, J. Wang, and C. Shen, “Structured knowledge distilla-tion for dense prediction,” IEEE transactions on pattern analysis and machine intelligence , 2020. [16] J. Xie, B. Shuai, J.-F. Hu, J. Lin, and W.-S. Zheng, “Improv-ing fast segmentation with teacher-student learning,” arXiv preprint arXiv:1810.08476 , 2018. [17] Y. Liu, K. Chen, C. Liu, Z. Qin, Z. Luo, and J. Wang, “Structured knowledge distillation for semantic segmentation,” in Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition ,2019, pp. 2604–2613. [18] T. He, C. Shen, Z. Tian, D. Gong, C. Sun, and Y. Yan, “Knowledge adaptation for efficient semantic segmentation,” in Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition ,2019, pp. 578–587. [19] Y. Wang, W. Zhou, T. Jiang, X. Bai, and Y. Xu, “Intra-class feature vari-ation distillation for semantic segmentation,” in European Conference on Computer Vision . Springer, 2020, pp. 346–362. [20] C. Shu, Y. Liu, J. Gao, Z. Yan, and C. Shen, “Channel-wise knowledge distillation for dense prediction,” in Proceedings of the IEEE/CVF International Conference on Computer Vision , 2021, pp. 5311–5320. [21] Z. Tian, P. Chen, X. Lai, L. Jiang, S. Liu, H. Zhao, B. Yu, M.-C. Yang, and J. Jia, “Adaptive perspective distillation for semantic segmentation,” IEEE Transactions on Pattern Analysis and Machine Intelligence , vol. 45, no. 2, pp. 1372–1387, 2022. [22] J. Fan, C. Li, X. Liu, M. Song, and A. Yao, “Augmentation-free dense contrastive knowledge distillation for efficient semantic segmentation,” 
+
+Advances in Neural Information Processing Systems , vol. 36, pp. 51 359–51 370, 2023. [23] T. Liu, C. Chen, X. Yang, and W. Tan, “Rethinking knowledge distil-lation with raw features for semantic segmentation,” in Proceedings of the IEEE/CVF Winter Conference on Applications of Computer Vision ,2024, pp. 1155–1164. [24] Z. Wu, Y. Xiong, S. X. Yu, and D. Lin, “Unsupervised feature learning via non-parametric instance discrimination,” in Proceedings of the IEEE conference on computer vision and pattern recognition , 2018, pp. 3733– 3742. [25] T. Xiao, Y. Liu, B. Zhou, Y. Jiang, and J. Sun, “Unified perceptual parsing for scene understanding,” in Proceedings of the European conference on computer vision (ECCV) , 2018, pp. 418–434. [26] E. Xie, W. Wang, Z. Yu, A. Anandkumar, J. M. Alvarez, and P. Luo, “Segformer: Simple and efficient design for semantic segmentation with transformers,” arXiv preprint arXiv:2105.15203 , 2021. [27] M. Cordts, M. Omran, S. Ramos, T. Rehfeld, M. Enzweiler, R. Be-nenson, U. Franke, S. Roth, and B. Schiele, “The cityscapes dataset for semantic urban scene understanding,” in Proceedings of the IEEE conference on computer vision and pattern recognition , 2016, pp. 3213– 3223. [28] B. Zhou, H. Zhao, X. Puig, S. Fidler, A. Barriuso, and A. Torralba, “Scene parsing through ade20k dataset,” in Proceedings of the IEEE 17 
+
+conference on computer vision and pattern recognition , 2017, pp. 633– 641. [29] M. Everingham, L. Van Gool, C. K. Williams, J. Winn, and A. Zisser-man, “The pascal visual object classes (voc) challenge,” International journal of computer vision , vol. 88, no. 2, pp. 303–338, 2010. [30] H. Caesar, J. Uijlings, and V. Ferrari, “Coco-stuff: Thing and stuff classes in context,” in Proceedings of the IEEE conference on computer vision and pattern recognition , 2018, pp. 1209–1218. [31] C. Yang, H. Zhou, Z. An, X. Jiang, Y. Xu, and Q. Zhang, “Cross-image relational knowledge distillation for semantic segmentation,” in Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , 2022, pp. 12 319–12 328. [32] A. Romero, N. Ballas, S. E. Kahou, A. Chassang, C. Gatta, and Y. Bengio, “Fitnets: Hints for thin deep nets,” International Conference on Learning Representations , 2015. [33] S. Zagoruyko and N. Komodakis, “Paying more attention to attention: Improving the performance of convolutional neural networks via atten-tion transfer,” arXiv preprint arXiv:1612.03928 , 2016. [34] Z. Fang, J. Wang, L. Wang, L. Zhang, Y. Yang, and Z. Liu, “Seed: Self-supervised distillation for visual representation,” International Confer-ence on Learning Representations , 2021. [35] C. Yang, Z. An, L. Cai, and Y. Xu, “Mutual contrastive learning for visual representation learning,” in Proceedings of the AAAI Conference on Artificial Intelligence , 2022. [36] W. Feng, C. Yang, Z. An, L. Huang, B. Diao, F. Wang, and Y. Xu, “Relational diffusion distillation for efficient image generation,” in 
+
+Proceedings of the 32nd ACM International Conference on Multimedia ,2024, pp. 205–213. [37] Y. Feng, X. Sun, W. Diao, J. Li, and X. Gao, “Double similarity distillation for semantic image segmentation,” IEEE Transactions on Image Processing , vol. 30, pp. 5363–5376, 2021. [38] D. Ji, H. Wang, M. Tao, J. Huang, X.-S. Hua, and H. Lu, “Structural and statistical texture knowledge distillation for semantic segmentation,” in Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 2022, pp. 16 876–16 885. [39] D. Ji, F. Zhao, H. Lu, F. Wu, and J. Ye, “Structural and statistical texture knowledge distillation and learning for segmentation,” IEEE Transactions on Pattern Analysis and Machine Intelligence , 2025. [40] S. Woo, J. Park, J.-Y. Lee, and I. S. Kweon, “Cbam: Convolutional block attention module,” in Proceedings of the European conference on computer vision (ECCV) , 2018, pp. 3–19. [41] Y. Cho and S. Kang, “Class attention transfer for semantic segmenta-tion,” in 2022 IEEE 4th International Conference on Artificial Intelli-gence Circuits and Systems (AICAS) . IEEE, 2022, pp. 41–45. [42] A. M. Mansourian, A. Jalali, R. Ahmadi, and S. Kasaei, “Attention-guided feature distillation for semantic segmentation,” arXiv preprint arXiv:2403.05451 , 2024. [43] T. Chen, S. Kornblith, M. Norouzi, and G. Hinton, “A simple framework for contrastive learning of visual representations,” in International conference on machine learning . PMLR, 2020, pp. 1597–1607. [44] K. He, H. Fan, Y. Wu, S. Xie, and R. Girshick, “Momentum contrast for unsupervised visual representation learning,” in Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition ,2020, pp. 9729–9738. [45] H. Hu, J. Cui, and L. Wang, “Region-aware contrastive learning for semantic segmentation,” in Proceedings of the IEEE/CVF International Conference on Computer Vision , 2021, pp. 16 291–16 301. [46] W. Wang, T. Zhou, F. Yu, J. Dai, E. Konukoglu, and L. Van Gool, “Exploring cross-image pixel contrast for semantic segmentation,” in 
+
+Proceedings of the IEEE/CVF International Conference on Computer Vision , 2021, pp. 7303–7313. [47] C. Yang, Z. An, L. Huang, J. Bi, X. Yu, H. Yang, B. Diao, and Y. Xu, “Clip-kd: An empirical study of clip model distillation,” in 
+
+Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 2024, pp. 15 952–15 962. [48] A. Vaswani, N. Shazeer, N. Parmar, J. Uszkoreit, L. Jones, A. N. Gomez, Ł. Kaiser, and I. Polosukhin, “Attention is all you need,” Advances in neural information processing systems , vol. 30, 2017. [49] B. Hariharan, P. Arbel´ aez, L. Bourdev, S. Maji, and J. Malik, “Semantic contours from inverse detectors,” in 2011 international conference on computer vision . IEEE, 2011, pp. 991–998. [50] T.-Y. Lin, M. Maire, S. Belongie, J. Hays, P. Perona, D. Ramanan, P. Doll´ ar, and C. L. Zitnick, “Microsoft coco: Common objects in context,” in Computer vision–ECCV 2014: 13th European conference, zurich, Switzerland, September 6-12, 2014, proceedings, part v 13 .Springer, 2014, pp. 740–755. [51] K. He, X. Zhang, S. Ren, and J. Sun, “Deep residual learning for image recognition,” in Proceedings of the IEEE conference on computer vision and pattern recognition , 2016, pp. 770–778. [52] A. Howard, M. Sandler, G. Chu, L.-C. Chen, B. Chen, M. Tan, W. Wang, Y. Zhu, R. Pang, V. Vasudevan et al. , “Searching for mobilenetv3,” in Proceedings of the IEEE/CVF international conference on computer vision , 2019, pp. 1314–1324. [53] S. Mehta and M. Rastegari, “Mobilevit: light-weight, general-purpose, and mobile-friendly vision transformer,” arXiv preprint arXiv:2110.02178 , 2021. [54] O. Russakovsky, J. Deng, H. Su, J. Krause, S. Satheesh, S. Ma, Z. Huang, A. Karpathy, A. Khosla, M. Bernstein et al. , “Imagenet large scale visual recognition challenge,” International journal of computer vision , vol. 115, pp. 211–252, 2015. [55] L.-C. Chen, G. Papandreou, F. Schroff, and H. Adam, “Rethinking atrous convolution for semantic image segmentation,” arXiv preprint arXiv:1706.05587 , 2017. [56] C. Zhang, D. Han, Y. Qiao, J. U. Kim, S.-H. Bae, S. Lee, and C. S. Hong, “Faster segment anything: Towards lightweight sam for mobile applications,” arXiv preprint arXiv:2306.14289 , 2023. [57] Y. Yuan, X. Chen, and J. Wang, “Object-contextual representations for semantic segmentation,” in European conference on computer vision .Springer, 2020, pp. 173–190. [58] F. Schroff, D. Kalenichenko, and J. Philbin, “Facenet: A unified embed-ding for face recognition and clustering,” in Proceedings of the IEEE conference on computer vision and pattern recognition , 2015, pp. 815– 823. [59] T. T. Cai, J. Frankle, D. J. Schwab, and A. S. Morcos, “Are all negatives created equal in contrastive instance discrimination?” arXiv preprint arXiv:2010.06682 , 2020. 
+
+VII. B IOGRAPHY SECTION 
+
+Chuanguang Yang received the B.E. degree from the Shandong Normal University, Jinan, China, in 2018, and the Ph.D. degree from the Institute of Computing Technology, Chinese Academy of Sci-ences, Beijing, China, in 2023. He is currently an associate professor at the Institute of Computing Technology, Chinese Academy of Sciences, Beijing, China. His research interests include knowledge dis-tillation, model compression, and computer vision. 
+
+Yu Wang received the B.E. degree from Capital Normal University, Beijing, China, in 2022. He is currently pursuing a Ph.D. degree with the Insti-tute of Computing Technology, Chinese Academy of Sciences, China. His research interests include knowledge distillation and visual generation. 
+
+Chengqing Yu received the B.S. degree in Transport Equipment and Control Engineering from Central South University, Changsha, China, in 2019, the M.S. degree in Traffic and Transportation Engineer-ing from the same university in 2022, and the Ph.D. degree from the Institute of Computing Technology, Chinese Academy of Sciences, Beijing, China, in 2026. He is currently an assistant professor with the Institute of Computing Technology, Chinese Academy of Sciences. His main research interests include deep learning and time series forecasting. 
+
+Xinqiang Yu received a B.E. degree from Liaon-ing Technical University, Liaoning, China, in 2020, and an M.E. degree from the Chinese Academy of Sciences, Beijing, China, in 2024. He is currently pursuing a Ph.D. degree with the Institute of Au-tomation, Chinese Academy of Sciences, China. He has published papers on some prestigious refereed conferences such as CVPR, ICCV, AAAI and CoRL etc. His research interests include 3D computer vision, embodied AI and dexterous manipulation. 18 
+
+Weilun Feng received the B.E. degree from Beihang University, Beijing, China, in 2024. He is currently working toward the Master degree with the Institute of Computing Technology, Chinese Academy of Sci-ences, China. He has published papers on some pres-tigious refereed conferences such as ICML, CVPR, and AAAI etc. His research interests include model quantization, knowledge distillation, and visual gen-eration. 
+
+Yuqi Li is currently interning at the Institute of Computing Technology, Chinese Academy of Sci-ences. He graduated with a Bachelor’s degree from Southwest University in 2023. His research interests lie in the field of computer vision and multimodal learning. 
+
+Zhulin An received B.Eng. and M.Eng. degrees in Computer Science from Hefei University of Tech-nology, Hefei, China, in 2003 and 2006, respectively, and a Ph.D. degree in Computer Communication from the Chinese Academy of Sciences, Beijing, China, in 2010. He is currently an associate re-searcher at the Institute of Computing Technology, Chinese Academy of Sciences, Beijing, China. His research interests include the optimization of deep neural networks and lifelong learning. 
+
+Libo Huang received a B.S. degree in Mathematics from Jiangxi Normal University, Jiangxi, China, in 2016, and a Ph.D. degree in Information Engineer-ing from the Guangdong University of Technology, Guangdong, China, in 2021. He was a joint Ph.D. student at Brunel University, London, UK, from 2019 to 2020. He is currently an assistant researcher at the Institute of Computing Technology, Chinese Academy of Sciences, Beijing, China. His research interests include machine learning theories and deep learning applications. 
+
+Boyu Diao is an Associate Professor at the Institute of Computing Technology, Chinese Academy of Sciences; He received his Ph.D. in Computer Ar-chitecture from ICT CAS in 2018 and his B.Eng. in Computer Science from Beijing Institute of Technol-ogy in 2012. He leads a group towards Efficient Ma-chine Learning for Edge Intelligence Systems with main research interests in algorithm and hardware co-design for efficient deep learning, deep learning compilers, and on-device learning systems. 
+
+Fei Wang received the B.S. degree in computer sci-ence from the Beijing Institute of Technology, Bei-jing, China, in 2011. He received the Ph.D. degree in computer architecture from Institute of Computing Technology, Chinese Academy of Sciences in 2017. From 2017 to 2020, he was a research assistant with the Institute of Computing Technology, Chinese Academy of Sciences. Since 2020, he has been working as associate professor in Institute of Com-puting Technology, Chinese Academy of Sciences. His main research interests include spatiotemporal data mining, Information fusion, and graph neural networks. 
+
+Fuzhen Zhuang (Member, IEEE) received the B.E. degree from the College of Computer Science, Chongqing University, Chongqing, China, in 2006, and the Ph.D. degree in computer science from the Institute of Computing Technology, Chinese Academy of Sciences, Beijing, China, in 2011. He is currently a full professor with the Institute of Artificial Intelligence, Beihang University. He has published more than 200 papers in many prestigious refereed journals and conference proceedings. His research interests include transfer learning, machine learning, data mining, multitask learning, knowledge graph, and recommen-dation systems. 
+
+Yongjun Xu received a B.Eng. degree in Computer Communication from the Xi’an Institute of Posts and Telecoms, Xi’an, China, in 2001, and a Ph.D. degree in Computer Communication from the Insti-tute of Computing Technology, Chinese Academy of Sciences, Beijing, China, in 2006. He is currently a researcher at the Institute of Computing Technology, Chinese Academy of Sciences, Beijing, China. His research interests include artificial intelligence sys-tems and big data processing. 
+
+Yingli Tian (M’99–SM’01–F’18) received her B.S. and M.S. degrees from Tianjin University, China, in 1987 and 1990, respectively, and the Ph.D. de-gree from the Chinese University of Hong Kong in 1996. After holding a faculty position at the National Laboratory of Pattern Recognition, Chinese Academy of Sciences, Beijing, she joined Carnegie Mellon University in 1998 as a postdoctoral fellow at the Robotics Institute. From 2001 to 2008, she worked as a research staff member at the IBM T. J. Watson Research Center. She is one of the inventors of the IBM Smart Surveillance Solutions. Currently, she is a CUNY Distinguished Professor in the Department of Electrical Engineering at the City College and the Department of Computer Science at the Graduate Center, the City University of New York. Her research focuses on a wide range of computer vision problems, including scene understanding, medical imaging analysis, human behavior analysis, facial expression recognition, and assistive technology. She is a Fellow of IEEE, IAPR, AAAS, and AAIA. 
+
+Tingwen Huang (Fellow, IEEE) received the B.S. degree in mathematics from Southwest Univer-sity, Chongqing, China, in 1990, the M.S. degree in applied mathematics from Sichuan University, Chengdu, China, in 1993, and the Ph.D. degree in applied mathematics from Texas A&M University at College Station, College Station, TX, USA, in 2002. Following his graduation, he worked as a Visiting Assistant Professor with Texas A&M University at College Station. Then, he joined Texas A&M University at Qatar, Doha, Qatar, as an Assistant Professor in August 2003, then he was promoted to Professor in 2013. His focus areas for research interests include computational intelligence, smart grid, dynamical systems, optimization and control, and cybersecurity. 
+
+Yongduan Song (Fellow, IEEE) received the Ph.D. degree in electrical and computer engineering from Tennessee Technological University, Cookeville, TN, USA, in 1992. He was a tenured Full Professor with the North Carolina A & T State University, Greensboro, NC, USA, from 1993 to 2008. He was one of the six Langley Distinguished Professors of National Institute of Aerospace (NIA), Hampton, VA, USA and the Founding Director of Cooperative Systems at NIA. He is currently the Chair Professor with the School of Automation, Chongqing Uni-versity, Chongqing, China. His current research interests include intelligent systems, guidance navigation and control, and bio-inspire adaptive and co-operative systems. Dr. Song has served/been serving as an Associate Editor for several prestigious international journals, including the IEEE Transactions on Automatic Control, IEEE Transactions on Neural Networks and Learning Systems, IEEE Transactions on Intelligent Transportation Systems, and IEEE Transactions on Systems, Man, and Cybernetics. He is currently the Editor-in-Chief of the IEEE Transactions on Neural Networks and Learning Systems.
