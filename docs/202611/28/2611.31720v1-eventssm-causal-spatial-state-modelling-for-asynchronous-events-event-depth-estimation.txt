@@ -1,0 +1,1708 @@
+EventSSM: Causal Spatial-State Modelling for Asynchronous Events
+Event-Depth Estimation
+Sadiq O. Macaulay
+University of Surrey
+s.macaulay@surrey.ac.uk
+Dipon Kumar Ghosh
+University of Surrey
+d.ghosh@surrey.ac.uk
+Hadfield Simon
+University of Surrey
+s.hadfield@surrey.ac.uk
+Traditional 
+approaches
+Event stream
+EventSSM
+𝑻𝟎→𝒏
+⊕
+Depth stream
+Figure 1. Overview of event-associated depth estimation and target-time geometric rendering from asynchronous observations.
+Abstract
+Event cameras report asynchronous brightness changes,
+yet metric-depth supervision is typically available only at
+sparsely sampled reference timestamps. Aggregating events
+into frame-like representations simplifies learning but can
+obscure the fine-grained temporal structure of the original
+event stream. We introduce EventSSM, a causal spatial-
+state framework for event-associated metric-depth estima-
+tion using a recurrent memory updated by chronological
+event packets.
+To bridge asynchronous predictions and
+frame-time supervision, predicted event depths are geomet-
+rically transported using calibrated camera poses and dif-
+ferentiably rendered at reference timestamps. Benchmark
+evaluations demonstrate improvements over established
+event-depth methods across multiple depth-error measures.
+Controlled ablations further examine cross-modal initial-
+ization, temporal recurrence, individual state, readout and
+supervision components, and packet subdivision. Together,
+these findings establish EventSSM as an effective frame-
+work for causal event-associated metric-depth estimation,
+combining persistent spatial context with physically timed
+state retention.
+1. Introduction
+Event cameras report changes in logarithmic brightness as
+asynchronous, polarity-labelled events rather than periodi-
+cally acquired intensity frames [5, 14, 20]. Their fine tem-
+poral resolution and high dynamic range have supported
+high-speed optical flow, camera tracking, and geometric re-
+construction [1, 18, 22]. However, an event specifies nei-
+ther scene depth nor an image-wide geometric measure-
+ment: event activity depends on motion, local contrast, and
+sensor characteristics [4, 17]. Repeated observations may
+concentrate along moving texture boundaries while nearby
+surfaces produce few events. Estimating depth therefore re-
+quires spatial context that persists across irregularly timed
+measurements.
+A widely adopted strategy converts event streams into
+count images, time surfaces, or voxel grids before ap-
+plying a dense predictor [6, 8].
+This has enabled re-
+current monocular depth networks such as E2Depth and
+recurrent-transformer estimators, as well as event–frame
+fusion [7, 12, 15]. More recent depth estimators exploit
+adverse-condition modelling or spatial knowledge trans-
+ferred from image networks [2, 26, 35]. These approaches
+provide important dense-depth baselines, but the acquisition
+window or temporal binning of an intermediate representa-
+1
+arXiv:2611.31720v1  [cs.CV]  24 Nov 2026
+
+
+tion constrains when its prediction can be formed. For a
+model that attaches depth to the original event locations, a
+complementary design is to retain a spatial state between
+packets and query it using each event’s coordinates, polar-
+ity, and age.
+A second challenge concerns supervision. Event times-
+tamps are much finer than the depth and pose annotations
+available in datasets such as MVSEC [32]; geometric recon-
+struction and continuous-time event-camera odometry both
+demonstrate the importance of accounting for camera mo-
+tion between observations [18, 23]. Assigning a reference-
+frame depth directly to an event at another time ignores the
+change in viewpoint, although over short MVSEC intervals
+this has little effect on accuracy (Sec. 4.5). We instead as-
+sociate predictions with packet-time events, transport them
+through calibrated, interpolated camera poses, and render
+depth at the reference timestamp. This uses frame-time la-
+bels for learning and evaluation without forcing the predic-
+tion domain to become frame-synchronous.
+We introduce EventSSM, an event-based encoder archi-
+tecture that pairs a motion-transported spatial state with a
+local event-conditioned depth readout. Chronological pack-
+ets produce polarity-separated observations that update a
+single spatial memory through learned backward transport,
+physical-time decay, and support-gated injection. A feed-
+forward multiscale pyramid supplies each event query with
+20 spatial descriptors sampled from a fixed local neighbor-
+hood across four feature scales. Attending to these descrip-
+tors enables localized depth inference from the accumulated
+spatiotemporal context without pairwise attention across the
+event stream. The recurrence is causal at packet boundaries:
+it can use later events within the current packet, but not ob-
+servations from subsequent packets. State-space sequence
+modelling motivates the persistent-state perspective [9, 10],
+while image-trained representations offer spatial initializa-
+tion during training only [28].
+Our contributions are: (i) a physically timed spatial-
+state transition that couples learned feature transport with
+observation-dependent updates; (ii) a multiscale, constant-
+neighborhood attention readout producing bounded met-
+ric depth at individual event coordinates; and (iii) a cal-
+ibrated target-time renderer that places event-time depth
+predictions in the annotated reference view for supervision
+and matched evaluation. We evaluate these components on
+matched MVSEC outdoor windows through depth compar-
+isons and controlled initialization, recurrence, component
+and packet-subdivision studies.
+2. Related Work
+Event representations and temporal context.
+Count
+images, time surfaces, and event voxels expose asyn-
+chronous measurements to conventional convolutional net-
+works; learned event encodings can optimise this conver-
+sion for downstream tasks [5, 6]. Image reconstruction pro-
+vides another interface to frame-based vision [24], whereas
+point- and graph-based processing preserves irregular event
+support more explicitly [25]. Recurrent event transformers
+extend temporal context across discretised inputs [8, 15].
+These methods motivate different trade-offs between spatial
+completeness, event timing, and the cost of irregular com-
+putation. EventSSM retains packet chronology in a persis-
+tent image-plane state but assigns its final depth estimates
+to events rather than to every image pixel.
+Depth estimation from events.
+Classical event-based ge-
+ometry exploits calibrated stereo or motion-induced multi-
+view consistency [23, 29], while event-only monocular
+depth learning commonly produces dense maps at des-
+ignated times [12, 15].
+RAMNet combines event and
+frame observations in a recurrent depth architecture [7];
+other methods target adverse night-time conditions, oc-
+clusion handling, or dense-to-sparse transfer [26, 31, 35].
+Depth AnyEvent investigates transferring visual knowledge
+to event-depth models [2], and ScaleEvent extends event-
+stream pretraining with visual foundation-model represen-
+tations [3]. We compare against the corresponding event-
+depth baselines under matched reference-time evaluation.
+Our distinction lies primarily in the output domain: the
+model predicts event-associated metric depth and renders
+those samples into a reference image for comparison, rather
+than treating a dense frame as its native depth prediction.
+Continuous-time geometry and supervision.
+Motion
+compensation and contrast maximisation exploit the times-
+tamp structure of events in flow and motion estima-
+tion [4, 27].
+Event-based multi-view reconstruction and
+continuous-time visual-inertial odometry further demon-
+strate that camera geometry must be evaluated at the ap-
+propriate observation time [18, 23].
+Event-based self-
+supervised approaches obtain learning signals through mo-
+tion or cross-modal consistency [11, 33, 34]. Our training
+setting is different: metric reference depth and annotated
+camera poses are available. We use those poses to project
+event-associated 3D samples into the labelled viewpoint,
+addressing the temporal mismatch between irregular predic-
+tions and sparse metric supervision.
+State-space models and spatial context.
+Structured and
+selective state-space models show how long-range sequen-
+tial context can be maintained without all-pairs token atten-
+tion [9, 10]. Visual adaptations, including Vision Mamba,
+VMamba and LocalMamba, investigate spatial scans and
+locality for image features [13, 16, 36]. These are related
+motivations rather than interchangeable implementations:
+EventSSM does not use a global Mamba scan. It main-
+tains a full-resolution spatial tensor whose transition explic-
+2
+
+
+itly depends on elapsed physical time, learned image-plane
+transport and local event support. Its four-scale pyramid is
+constructed for readout and does not form an independently
+recurrent hierarchy.
+Cross-modal spatial priors.
+Image-based depth models
+demonstrate the value of broad visual representations for
+monocular geometry [19, 21, 30]. Distillation into event-
+depth estimators offers one route to exploiting such priors
+without requiring RGB frames during deployment [2, 35].
+Our initialization instead aligns intermediate event-state
+features with a frozen DINOv3 image encoder [28]. The
+teacher participates only during representation initializa-
+tion; the trained depth head and inference pipeline consume
+events and recurrent memory.
+3. Method
+Figure 2 illustrates the packet update and event-conditioned
+readout.
+3.1. Packet-causal event-depth prediction
+An event stream is E = {ei = (xi, yi, ti, pi)}N
+i=1, where
+pi ∈{−1, +1}. We partition each accepted reference inter-
+val into K ordered, non-overlapping packets Ek of duration
+∆tk. Packet event counts vary with activity. The recurrent
+model returns one optical-axis depth per valid event:
+Mk = Fθ(Mk−1, Ek, ∆tk),
+ˆdk = Gθ(Mk, Ek).
+(1)
+The output for Ek is available only after that packet closes.
+Its events can jointly affect Mk, while later packets cannot.
+This retains event-specific output coordinates, in contrast
+to conventional temporally accumulated event representa-
+tions [6, 15]. A validity mask removes padded events from
+both the spatial update and readout.
+3.2. Polarity-aware spatial observations
+Normalized coordinates, within-packet time, and polarity
+are embedded into a 64-dimensional event token qi. For
+each pixel u and polarity p, the spatial stem collects token
+means µp
+k(u) and log-counts log(1+np
+k(u)). Concatenating
+the two mean maps and two count channels gives 130 fea-
+tures, projected to a 64-channel packet observation Ok by
+pointwise mixing and a depthwise spatial convolution. The
+support indicator Sk(u) = ⊮[n+
+k (u)+n−
+k (u) > 0] identifies
+pixels at which a new observation may enter the recurrent
+memory.
+The polarity-specific pooling preserves signed
+contrast information before fusion into a single shared state,
+as motivated by the polarity structure of event measure-
+ments and learned event representations [6, 14].
+3.3. Transported spatial state
+The retained memory Mk−1 ∈RB×64×260×346 is trans-
+ported in image coordinates by a bounded, learned back-
+ward sampling field:
+fk(u) = vmax∆tk tanh(Fθ([Mk−1, Ok])(u)) ,
+(2)
+f
+Mk−1(u) = Sample(Mk−1, u + fk(u)).
+(3)
+A positive learned channelwise rate r gives retention αk =
+exp(−r∆tk). The state is updated by
+Mk = αk ⊙f
+Mk−1
++ (1 −αk) ⊙Sk ⊙σ(Gθ(Ok)) ⊙tanh(Vθ(Ok)).
+(4)
+Transport and decay propagate existing context, includ-
+ing where the current packet has no events; support gat-
+ing restricts new injection to observed pixels.
+Motion-
+compensated event reconstruction also uses temporal align-
+ment of spatial evidence [4, 23], but our displacement field
+transports learned features rather than reconstructing geom-
+etry from a supplied flow field. The retention coefficients
+compose with physical elapsed time, Q
+k exp(−r∆tk) =
+exp(−r P
+k ∆tk), although the complete state is not invari-
+ant to packet subdivision because transport and gating de-
+pend on intermediate observations.
+3.4. Multiscale event-conditioned depth head
+A four-level feed-forward pyramid is derived from Mk at
+spatial factors s ∈{1, 2, 4, 8}, and a lightweight coarse-
+to-fine decoder yields spatial descriptors. Multi-resolution
+spatial features are a recurring component of monocular
+depth prediction [19, 21]; here the hierarchy is derived from
+a single event-updated state rather than storing additional
+recurrent memories. For each event, its 64-dimensional to-
+ken is combined with normalized coordinates, signed polar-
+ity, relative packet time, and physical age bk −ti. At each
+scale, bilinear sampling extracts the centre descriptor and
+four neighboring offsets. The resulting 20 keys are aggre-
+gated by local cross-attention:
+ci =
+20
+X
+j=1
+softmaxj
+⟨WQq′
+i, WKkij⟩
+√da
+
+WV kij.
+(5)
+A residual event MLP predicts a scalar ℓi mapped into a
+bounded log-metric depth interval,
+ˆdi = exp(log dmin + σ(ℓi)(log dmax −log dmin)) .
+(6)
+The outdoor checkpoint uses dmin = 0.25 m and dmax =
+30 m.
+Depth outputs retain the input event indices after
+packet-wise processing. The query-to-key interaction count
+is 20Nk rather than all-pairs event attention; the spatial re-
+currence and pyramid have additional costs.
+3
+
+
+Spatial-state encoder
+Multiscale event readout
+Event packets
+B × Np × 4
+x, y, time, polarity
+Sensor: 260 × 346
+Frozen DINOv3
+Encoder distillation
+Four layer targets
+B × 1200 × 384 each
+Polarity-aware tokenizer
+B × Np × 4 → B × Np × 64
+Polarity-separated aggregation
+B × Np × 64 → B × 64 × H × W
+Separate feature means and event counts
+Persistent spatial memory
+In / out: B × 64 × H × W
+Transport
+Decay + gate
+Carry state to the next packet
+Residual event MLP → metric depth
+B × Np × 32 → B × Np × 1
+Event-token skip
+Query projection
+B × Np × 69 → B × Np × 32
+Position · polarity · time · age
+Semantic pyramid
+In: B × 64 × H × W
+B × 64 × 32 × 43
+B × 64 × 65 × 86
+B × 64 × 130 × 173
+B × 64 × 260 × 346
+Coarse-to-fine decoder
+In: 4 scales, 64 channels
+Out: 4 scales, 32 channels
+Spatial resolutions preserved
+Local cross-attention
+Q: B × Np × 32
+K,V: B × Np × 20 × 32
+Out: B × Np × 32
+Per-event depths
+B × Np × 1
+GT poses + calibration
+Pose: 4×4 · K: 3×3
+Target-time rendering
+In: B × Np × 1
+Out: B × 1 × H × W
+Rendered target depth
+B × 1 × 260 × 346
+Inference
+Training / assisted evaluation
+Figure 2. Causal event-depth architecture. Each event packet updates a transported spatial memory; a derived multiscale feature pyramid
+provides descriptors for local event-conditioned cross-attention. The event-depth stream can be geometrically rendered at annotated refer-
+ence times for supervision.
+3.5. Target-time geometric supervision
+For event image coordinate ui = [xi, yi, 1]⊤and predicted
+optical-axis depth ˆdi, lift the event to Xi =
+ˆdiK−1ui.
+Given camera-to-world poses T(t), the same point in a ref-
+erence camera at tr is
+Xr = T(tr)−1T(ti)Xi,
+(˜ur
+i , ˜dr
+i ) = (π(KXr), [Xr]z).
+(7)
+The transform in Eq. (7) accounts for camera motion alone
+and therefore assumes that the projected scene point re-
+mains stationary in world coordinates between ti and tr.
+Independently moving objects violate this correspondence
+and may introduce erroneous depth supervision; visibil-
+ity changes and occlusions further limit valid projections.
+To reduce these violations, regions containing complex in-
+dependent object motion were cropped out during dataset
+preparation.
+Translation is linearly interpolated and camera rotation
+interpolated by quaternion SLERP at event timestamps,
+consistent with the need for time-indexed camera geometry
+in event-based reconstruction and odometry [18, 23]. Valid
+projected depths are differentiably splatted to a target-time
+image bDr with rendered support Ωr. The training loss com-
+pares this image with the reference depth DGT
+r
+:
+LSiLog =
+q
+⟨e2⟩Ωr −1
+2⟨e⟩2
+Ωr,
+e = log DGT
+r
+−log bDr.
+(8)
+Only pixels with valid rendered and reference depths con-
+tribute. The mean-residual penalty in Eq. (8) retains sensi-
+tivity to metric depth. Pose annotations are used for geo-
+metric supervision and reference-time evaluation. Synchro-
+nized intensity images are training-only inputs used exclu-
+sively for encoder distillation. The native inference input
+consists of events and recurrent memory.
+3.6. Cross-modal encoder initialization
+Prior event-depth distillation studies exploit pretrained im-
+age representations to supply spatial cues where events are
+sparse [2, 35]. We use a frozen DINOv3 ViT-S/16 teacher to
+supply features from layers 2, 5, 8, and 11 at synchronized
+training images [28]. Student spatial features are pooled to
+a 30 × 40 grid and projected to the teacher-token dimen-
+sion. SmoothL1 feature regression, cosine alignment, and
+spatial-relation matching initialize the student representa-
+tion before event-depth training. The teacher is discarded
+at inference, and the event encoder and newly initialized
+local-attention head are subsequently optimized for target-
+time metric-depth supervision.
+4. Experiments
+4.1. Evaluation protocol
+We evaluate on MVSEC [32], training on outdoor day2
+and
+selecting
+checkpoints
+using
+native
+AbsRel
+on
+outdoor day1. The three outdoor-night sequences form
+the held-out evaluation set; Day 1 is also the checkpoint-
+selection sequence, and its results are interpreted accord-
+ingly. An eligible approximately 50 ms reference interval
+contains at least 10,000 natural events and has camera-pose
+annotations within 5 ms of both depth endpoints. We se-
+lect 7,500 events while retaining their chronology and di-
+vide each interval into six non-overlapping equal-duration
+4
+
+
+Table 1. Per-sequence metric-depth accuracy on the MVSEC outdoor recordings.
+Sequence Method
+AbsRel ↓SqRel ↓RMSE (m) ↓MAE (m) ↓δ1 (%) ↑δ2 (%) ↑δ3 (%) ↑
+Day 1
+E2Depth
+0.729
+9.195
+8.182
+5.612
+36.99
+60.86
+75.36
+EReFormer
+0.702
+7.678
+8.646
+6.272
+31.53
+57.25
+74.18
+DepthAnyEvent-R
+0.599
+6.097
+10.536
+7.984
+8.16
+18.32
+27.86
+ScaleEvent
+0.357
+3.174
+6.353
+3.964
+55.71
+78.23
+90.11
+EventSSM (Ours)
+0.286
+1.413
+4.745
+3.152
+46.77
+76.80
+91.39
+Night 1
+E2Depth
+1.020
+16.868
+9.028
+6.166
+36.28
+60.10
+73.29
+EReFormer
+0.598
+6.870
+7.690
+5.232
+42.94
+67.06
+80.10
+DepthAnyEvent-R
+0.633
+6.962
+11.367
+8.848
+6.62
+16.53
+24.85
+ScaleEvent
+0.318
+2.307
+5.889
+3.898
+45.86
+72.43
+87.70
+EventSSM (Ours)
+0.304
+1.664
+5.001
+3.446
+46.56
+77.06
+91.41
+Night 2
+E2Depth
+0.712
+10.754
+8.171
+4.887
+40.12
+65.69
+80.19
+EReFormer
+0.354
+2.104
+5.131
+3.523
+44.83
+72.78
+89.09
+DepthAnyEvent-R
+0.613
+5.728
+9.771
+7.523
+6.01
+15.31
+25.82
+ScaleEvent
+0.314
+2.243
+5.656
+3.453
+50.09
+75.83
+90.38
+EventSSM (Ours)
+0.310
+1.470
+4.597
+3.217
+40.16
+72.05
+89.75
+Night 3
+E2Depth
+0.797
+13.328
+8.803
+5.315
+37.04
+64.28
+79.58
+EReFormer
+0.319
+1.764
+5.030
+3.435
+46.07
+74.31
+90.50
+DepthAnyEvent-R
+0.621
+6.098
+10.217
+7.902
+6.47
+16.12
+25.20
+ScaleEvent
+0.303
+2.153
+5.772
+3.566
+49.15
+75.26
+89.89
+EventSSM (Ours)
+0.299
+1.467
+4.642
+3.216
+43.26
+74.31
+90.84
+packets; packet event counts need not be equal. The spa-
+tial memory is initialised at the beginning of each indepen-
+dently sampled training or checkpoint-evaluation interval.
+Training uses 15 epochs, batch size four, Adam optimisa-
+tion and a validation-driven learning-rate schedule.
+Because target-time supervision uses camera motion to
+relate event observations to the annotated view, the prepa-
+ration protocol excludes image regions containing complex
+independently moving objects through cropping. These re-
+gions would not generally obey the static-world correspon-
+dence assumed by the camera-only warp. The reported eval-
+uation uses the retained image regions and matched spatial
+scoring masks.
+Evaluation uses matched reference timestamps, windows
+and spatial scoring masks across the compared depth meth-
+ods. The data preprocessing will be released to the commu-
+nity to support future comparisons. EventSSM estimates
+are transported to the annotated viewpoint using the cam-
+era trajectory and rendered onto the reference-time image,
+whereas dense baseline depth maps are sampled at the same
+scored locations. EReFormer’s official test code crops its
+input to a fixed 224 × 224 window so its prediction cov-
+ers only that window. To ensure fairness of comparison,
+the scoring masks are shared across every method in Ta-
+bles 1 and 2. AbsRel and SqRel measure the relative and
+squared-relative residuals. RMSE and MAE measure er-
+rors in metres. The threshold accuracies δj give the per-
+centage of estimates satisfying max( ˆd/d, d/ ˆd) < 1.25j for
+j ∈{1, 2, 3}. For MAE@r, the mean absolute error is re-
+stricted to valid reference depths no greater than r metres,
+Table 2. Mean absolute depth error (metres) within the specified
+ground-truth depth limits on MVSEC.
+Sequence Method
+MAE@10 ↓MAE@20 ↓MAE@30 ↓
+Day 1
+E2Depth
+4.938
+5.338
+5.612
+EReFormer
+5.232
+6.229
+6.272
+DepthAnyEvent-R
+2.809
+5.764
+7.984
+ScaleEvent
+2.200
+3.431
+3.964
+EventSSM (Ours)
+1.544
+2.300
+3.152
+Night 1
+E2Depth
+7.136
+6.109
+6.166
+EReFormer
+4.541
+4.825
+5.232
+DepthAnyEvent-R
+2.937
+6.368
+8.848
+ScaleEvent
+1.704
+2.850
+3.898
+EventSSM (Ours)
+1.782
+2.526
+3.446
+Night 2
+E2Depth
+4.688
+4.631
+4.887
+EReFormer
+2.112
+2.893
+3.523
+DepthAnyEvent-R
+3.081
+5.982
+7.523
+ScaleEvent
+1.682
+2.831
+3.453
+EventSSM (Ours)
+1.797
+2.582
+3.217
+Night 3
+E2Depth
+5.312
+5.048
+5.315
+EReFormer
+1.782
+2.664
+3.435
+DepthAnyEvent-R
+3.075
+6.167
+7.902
+ScaleEvent
+1.570
+2.802
+3.566
+EventSSM (Ours)
+1.760
+2.547
+3.216
+with r ∈{10, 20, 30}.
+Missing predictions are not im-
+puted as correct estimates. The fixed evaluation windows
+and masks provide direct numerical comparisons within the
+stated protocol.
+4.2. MVSEC depth comparison
+Table 1 compares EventSSM with four established event-
+depth estimators using their published codebases on com-
+mon reference-time geometry.
+EventSSM leads all four
+5
+
+
+sequences in AbsRel, SqRel, RMSE and MAE, improv-
+ing both relative depth consistency and absolute geomet-
+ric error. Against the strongest competing method for each
+measure, the reductions on Day 1 reach 19.9% in AbsRel,
+55.5% in SqRel, 25.3% in RMSE and 20.5% in MAE.
+The advantage persists on the held-out night sequences:
+SqRel falls by 16.8–30.1% and RMSE by 7.7–15.1% rel-
+ative to the best corresponding baseline. These improve-
+ments across different lighting conditions support the value
+of accumulating event evidence in a persistent spatial repre-
+sentation.
+The threshold measures provide a complementary view
+of prediction quality. EventSSM achieves the strongest ac-
+curacy at all three tolerances on Night 1, and the highest
+δ3 on Day 1 and Night 3. ScaleEvent leads at some tighter
+thresholds, while EventSSM consistently lowers the aggre-
+gate depth errors. The combined results therefore favour
+EventSSM for reducing the magnitude of geometric residu-
+als.
+The distance-restricted comparison in Table 2 further
+identifies where the gains arise. EventSSM leads MAE@20
+and MAE@30 on every evaluated sequence, reducing the
+best competing errors by 4.4–33.0% and 6.4–20.5%, re-
+spectively. At the nearest 10 m cutoff, its Day 1 error is
+29.8% below the strongest alternative, while ScaleEvent
+leads on the three night sequences. The broader-range con-
+sistency is significant: predictions remain accurate as eval-
+uation includes more distant geometry, despite the irregular
+spatial sampling of asynchronous events.
+Table 3. Effect of cross-modal encoder initialization on depth es-
+timation.
+Variant
+Depth Error (m) ↓
+Without distillation
+2.724
+With distillation
+2.331
+Figure 3 complements these aggregate findings with
+reference-time reconstructions under daylight and night
+conditions.
+Event-supported predictions preserve visible
+scene structure despite highly nonuniform activity across
+textured boundaries and less active surfaces. The qualitative
+comparison illustrates how a spatially contextualised event
+representation supports depth recovery beyond a purely lo-
+cal interpretation of each brightness change.
+4.3. Architecture and initialization ablations
+The cross-modal initialization study (Table 3) shows that
+transferring image-trained spatial features reduces down-
+stream depth error by 14.4%. This establishes the benefit
+of a stronger spatial prior for the event encoder, while in-
+ference remains entirely event-based and does not depend
+on the image teacher. The gain complements, rather than
+replaces, the causal memory and event-conditioned predic-
+tion mechanism.
+Table 4. Depth accuracy, model size and inference time for undis-
+tilled temporal-state encoders. All packet-level inference measure-
+ments were obtained on one NVIDIA GeForce RTX 2080 Ti, in
+FP32 with batch size one
+Temporal backbone
+Params.
+(k) ↓
+Depth error
+(m) ↓
+Packet time
+(ms) ↓
+Spatial RNN
+73.6
+3.566
+21.847
+Spatial LSTM
+98.4
+3.543
+23.433
+bi-Mamba
+79.2
+3.596
+27.423
+EventSSM (ours)
+69.5
+3.507
+5.519
+The undistilled temporal-core comparison (Table 4) iso-
+lates the choice of recurrent update under a common 64-
+channel configuration. EventSSM attains 1.0–2.5% lower
+depth error than the RNN, LSTM and bi-Mamba alterna-
+tives while using 5.6–29.4% fewer parameters.
+Its most
+pronounced advantage is computational: packet inference
+is approximately 4.0–5.0× faster than those recurrent al-
+ternatives on the same GPU. This combination of compa-
+rable accuracy and substantially lower update latency mo-
+tivates the proposed spatial-state transition for fine-grained
+event processing. The initialization and temporal-core stud-
+ies use distinct training conditions and are interpreted inde-
+pendently.
+4.4. Packet-count sensitivity
+Figure 4 tests whether the representation remains effective
+as the same annotated event interval is divided into differ-
+ent numbers of causal packets. The common Day 1 valida-
+tion population and scoring intersection make the accuracy
+trends directly comparable within this ablation. With the
+original K = 6 weights retained, relative error changes lit-
+tle around the three- to six-packet settings, indicating that
+the learned memory tolerates moderate changes in update
+frequency. Independently trained packet-specific configura-
+tions improve MAE but not AbsRel uniformly, and increas-
+ing K does not produce monotonic accuracy gains. Thus,
+finer temporal subdivision is an operational design choice
+rather than a guarantee of better reference-time error.
+We retain K = 6 as a practical balance between tempo-
+ral responsiveness and repeated state-update cost. Dividing
+an approximately 50 ms annotated interval into six chrono-
+logical packets permits an event-associated depth readout
+after roughly 8.3 ms of observations, instead of waiting for
+the next annotated endpoint. The packetisation is used dur-
+ing supervised training to expose causal intermediate states;
+a deployed model can continue updating its memory as
+new packets arrive without requiring a ground-truth-aligned
+window. These findings concern accuracy on the shared
+6
+
+
+Event
+image
+Ground
+truth
+EventSSM
+(Ours)
+E2Depth
+EReFormer
+DepthAny-
+Event-R
+ScaleEvent
+outdoor
+day1
+outdoor
+night1
+outdoor
+night2
+outdoor
+night3
+Figure 3. Qualitative metric depth on MVSEC outdoor sequences. EventSSM predicts depth for individual events, shown rendered at the
+reference time; for a like-for-like view, the ground truth and the baselines’ dense maps are shown only at those event pixels. EReFormer
+predicts only inside the fixed lower-right 224 × 224 window of its official test code (dashed), shown at its position in the frame. Colours
+encode inverse depth with a shared range per row (red is near). White marks pixels without a value.
+1
+3
+6
+12
+24
+3.60
+3.62
+3.64
+3.66
+3.68
+Packets per window, K
+MAE (m) ↓
+(a) Mean absolute error
+1
+3
+6
+12
+24
+0.31
+0.32
+0.33
+0.34
+Packets per window, K
+AbsRel ↓
+(b) Absolute relative error
+Fixed K=6 weights
+Trained per K
+K=6 source
+Figure 4. Per-event depth on outdoor day1 versus packets per
+window K: (a) native MAE and (b) native AbsRel. Dashed curves
+retain the K = 6 source weights; solid curves use separate K-
+specific full-model training with a 20-epoch budget and guarded
+Day1 AbsRel selection. Stars mark the source at K = 6.
+3,066-window validation subset, whose intersection covers
+16.98% of eligible ground-truth pixels, while inference cost
+is evaluated separately below.
+4.5. Component ablations
+Table 5 changes one component of the spatial state
+(Sec. 3.3), the depth head (Sec. 3.4) or the training supervi-
+sion (Sec. 3.5) at a time. No transport sets f
+Mk−1 = Mk−1.
+Per-update retention replaces exp(−r∆tk) by a learned
+channelwise constant that does not depend on ∆tk. No for-
+Table 5. Component ablations. Mean absolute depth error, aver-
+aged over evaluation windows. Values are the mean ± half-range
+over two training seeds; each variant changes one component of
+the full model.
+Variant
+Params.
+(k)
+Day 1
+MAE (m) ↓
+Nights
+MAE (m) ↓
+EventSSM (full)
+69.5
+3.553 ± 0.004
+3.534 ± 0.002
+Spatial state (Sec. 3.3)
+No transport
+67.0
+3.564 ± 0.049
+3.541 ± 0.007
+Per-update retention
+69.5
+3.616 ± 0.016
+3.620 ± 0.039
+No forgetting
+69.4
+3.540 ± 0.021
+3.521 ± 0.007
+No input gate
+65.3
+3.621 ± 0.085
+3.537 ± 0.036
+No support mask
+69.5
+3.597 ± 0.033
+3.566 ± 0.031
+Depth head (Sec. 3.4)
+Average-pooled scales
+49.8
+3.555 ± 0.005
+3.511 ± 0.008
+Centre-sample readout
+70.5
+3.556 ± 0.086
+3.578 ± 0.072
+Supervision (Sec. 3.5)
+No target-time warp
+69.5
+3.535 ± 0.002
+3.535 ± 0.006
+getting replaces αk ⊙f
+Mk−1 in Eq. (4) by f
+Mk−1, with the
+rate fixed at its initial value. No input gate and no sup-
+port mask set σ(Gθ(Ok)) ≡1 and Sk ≡1, respectively.
+The latter also writes new evidence at pixels without events.
+Average-pooled scales replaces the learned pyramid by av-
+erage pooling of Mk at the same factors, and centre-sample
+readout passes the four concatenated centre descriptors to
+the event MLP instead of attending over the 20 keys of
+7
+
+
+Eq. (5). No target-time warp sets T(ti) = T(tr) in Eq. (7)
+during training only, so each predicted depth is compared
+with the reference depth at its own pixel.
+The spatial-state and pooled-scale variants are distilled
+with their change in place (Sec. 3.6). The other variants
+reuse the full model’s encoder. Event heads are trained with
+the protocol of Sec. 4.1, including selection by Day 1 Ab-
+sRel, the full model is retrained identically, and every row
+uses the same two seeds. Errors are scored on each model’s
+own rendered support over the full frame, not on the masks
+shared with the baselines, so they are compared only within
+Table 5.
+The full-model results agree across seeds to within
+0.01 m, whereas the seeds of some variants differ by up to
+0.17 m. Removing transport, forgetting or the input gate,
+or using centre samples, changes the mean error by at most
+0.07 m on Day 1 and 0.05 m at night. The results across
+seeds for each of these variants include errors at or below
+the full model on Day 1, and their AbsRel stays within 0.010
+of the full model. Removing the support mask raises the
+error by 0.045 m (1.3%) on Day 1 and 0.032 m (0.9%) at
+night. Its errors consistently exceed the full model across
+seeds on Day 1, whereas the night results include a match.
+Under the reset-window protocol the memory spans only
+six packets of about 8.3 ms, so transported and retained con-
+text has little time to accumulate.
+Per-update retention is the only change whose error
+range across seeds lies entirely above that of the full model,
+on Day 1 and at night: the error rises by 0.064 m (1.8%)
+and 0.087 m (2.5%), and the night increase remains after
+per-frame median scaling (0.093 m). All packets have equal
+duration, so both forms can express the same retention. The
+gap therefore reflects how retention is parameterised and
+learned.
+Average-pooled scales remove 19.7k parameters (28%)
+without increasing the error (+0.002 m on Day 1, −0.022 m
+at night), and the results agree across seeds to within
+0.016 m.
+Fixed pooling of the state thus supplies the
+multiscale context, making the 49.8k-parameter variant an
+equally accurate, more compact alternative in this protocol.
+Training without the target-time warp matches the full
+model: at night the error changes by +0.002 m, with the
+results across seeds on either side of the full model, and on
+Day 1, the selection sequence, it is 0.018 m (0.5%) lower.
+AbsRel differs by at most 0.002, and after median scaling
+the error is 0.006–0.009 m higher. Over about 50 ms the
+camera moves little, so warping the supervision does not
+change accuracy here. Selection and evaluation use Eq. (7)
+for every row.
+4.6. Inference-only computation
+Table 6 highlights the computational advantage of the event-
+conditioned architecture. EventSSM has an approximately
+Table 6. Inference time and model complexity on an NVIDIA
+GeForce RTX 2080 Ti (FP32, batch size one).
+Method
+Params. (M) ↓
+Mean (ms) ↓
+Calls/s ↑
+RTF ↓
+GFLOPsref ↓
+E2Depth
+10.7104
+11.88
+84.16
+0.238
+84.393
+EReFormer
+89.5291
+44.86
+22.29
+0.897
+39.061
+DepthAnyEvent-R
+26.1135
+10.59
+94.47
+0.212
+38.235
+ScaleEvent
+24.3297
+15.76
+63.47
+0.315
+99.097
+EventSSM (ours; packet)
+0.0695
+5.58
+179.11
+0.670
+5.541
+154× smaller parameter count than the smallest compared
+full-window baseline, and its cost is about 6.9× below the
+next-lowest baseline. Its packet call has the shortest mea-
+sured inference latency and the highest call rate, supporting
+more frequent depth updates from a compact model.
+The temporal support of each call matters when in-
+terpreting these figures. EventSSM produces six packet-
+boundary predictions over an approximately 50 ms interval,
+whereas the baselines make one complete-window predic-
+tion. The real-time factor (RTF) divides the mean inference
+time of a call by the sensor time that call covers, approx-
+imately 50 ms for a baseline window and 8.33 ms for an
+EventSSM packet. Values below one mean that inference
+keeps pace with the sensor. The measured packet latency
+is below its approximately 8.33 ms observation span, giving
+an inference-only RTF of 0.670 and leaving computational
+headroom for successive updates. Its RTF is consequently
+higher than those of three window-based baselines because
+the model performs more readouts per unit of sensor time.
+The benefit is a finer prediction cadence rather than a claim
+of lower total window-normalised execution cost. These
+measurements use FP32, batch size one, and exclude input
+preparation, host transfers, rendering and scoring.
+5. Conclusion
+We introduced EventSSM, a causal spatial-state framework
+that combines persistent motion-transported memory with
+local event-conditioned metric-depth prediction.
+Target-
+time rendering relates event-time predictions to sparse ref-
+erence annotations for supervision and evaluation without
+restricting predictions to frame timestamps.
+Across the
+MVSEC outdoor comparisons, EventSSM consistently im-
+proves the principal relative and metric depth errors, with
+particularly strong squared-relative and wider-range accu-
+racy. Ablations establish the benefits of cross-modal spatial
+initialization, the exponential retention parametization and
+the efficiency of the recurrent update, while packet-count
+experiments clarify the choice of temporal resolution. The
+resulting compact model supports depth readouts at succes-
+sive short packet boundaries, advancing event-native geo-
+metric perception through a combination of accuracy, spa-
+tial context and fine-grained temporal responsiveness.
+8
+
+
+References
+[1] Patrick Alexander Bardow, Andrew J. Davison, and Stefan
+Leutenegger. Simultaneous Optical Flow and Intensity Es-
+timation from an Event Camera. In 2016 IEEE Conference
+on Computer Vision and Pattern Recognition (CVPR), pages
+884–892, 2016. 1
+[2] Luca Bartolomei, Enrico Mannocci, Fabio Tosi, Matteo
+Poggi, and Stefano Mattoccia.
+Depth anyevent: A cross-
+modal distillation paradigm for event-based monocular depth
+estimation. In Proceedings of the IEEE/CVF International
+Conference on Computer Vision, pages 19669–19678, 2025.
+1, 2, 3, 4
+[3] Zhiwen Chen, Junhui Hou, Zhiyu Zhu, Jinjian Wu, and
+Guangming Shi.
+Scaling dense event-stream pretraining
+from visual foundation models.
+In Proceedings of the
+IEEE/CVF Conference on Computer Vision and Pattern
+Recognition (CVPR), pages 8011–8022, 2026. 2
+[4] Guillermo Gallego, Henri Rebecq, and Davide Scaramuzza.
+A unifying contrast maximization framework for event cam-
+eras, with applications to motion, depth, and optical flow
+estimation.
+In Proceedings of the IEEE/CVF Conference
+on Computer Vision and Pattern Recognition, pages 3867–
+3876, 2018. 1, 2, 3
+[5] Guillermo Gallego, Tobi Delbruck, Garrick Orchard, Chiara
+Bartolozzi, Brian Taba, Andrea Censi, Stefan Leutenegger,
+Andrew J. Davison, Joerg Conradt, Kostas Daniilidis, and
+Davide Scaramuzza. Event-based vision: A survey. IEEE
+Transactions on Pattern Analysis and Machine Intelligence,
+44(1):154–180, 2022. 1, 2
+[6] Daniel Gehrig, Antonio Loquercio, Konstantinos G. Derpa-
+nis, and Davide Scaramuzza. End-to-end learning of repre-
+sentations for asynchronous event-based data. In Proceed-
+ings of the IEEE/CVF International Conference on Com-
+puter Vision, pages 5633–5643, 2019. 1, 2, 3
+[7] Daniel Gehrig, Michelle R¨uegg, Mathias Gehrig, Javier
+Hidalgo-Carri´o, and Davide Scaramuzza. Combining events
+and frames using recurrent asynchronous multimodal net-
+works for monocular depth prediction. IEEE Robotics and
+Automation Letters, 6(2):2822–2829, 2021. 1, 2
+[8] Mathias Gehrig and Davide Scaramuzza. Recurrent Vision
+Transformers for Object Detection with Event Cameras. In
+2023 IEEE/CVF Conference on Computer Vision and Pat-
+tern Recognition (CVPR), pages 13884–13893, 2023. 1, 2
+[9] Albert Gu and Tri Dao.
+Mamba: Linear-time sequence
+modeling with selective state spaces, 2023. arXiv preprint
+arXiv:2312.00752. 2
+[10] Albert Gu, Karan Goel, and Christopher R´e. Efficiently mod-
+eling long sequences with structured state spaces. In Inter-
+national Conference on Learning Representations, 2022. 2
+[11] Jesse J. Hagenaars, Yilun Wu, Federico Paredes-Vall´es, Stein
+Stroobants, and Guido C. H. E. de Croon. On-device self-
+supervised learning of low-latency monocular depth from
+only events. In Proceedings of the IEEE/CVF Conference
+on Computer Vision and Pattern Recognition, pages 17114–
+17123, 2025. 2
+[12] Javier Hidalgo-Carrio, Daniel Gehrig, and Davide Scara-
+muzza. Learning monocular dense depth from events. In In-
+ternational Conference on 3D Vision, pages 534–542, 2020.
+1, 2
+[13] Tao Huang, Xiaohuan Pei, Shan You, Fei Wang, Chen Qian,
+and Chang Xu. LocalMamba: Visual state space model with
+windowed selective scan. In Computer Vision – ECCV 2024
+Workshops, pages 12–22, 2025. 2
+[14] Patrick Lichtsteiner, Christoph Posch, and Tobi Delbruck. A
+128×128 120 dB 15 µs latency asynchronous temporal con-
+trast vision sensor. IEEE Journal of Solid-State Circuits, 43
+(2):566–576, 2008. 1, 3
+[15] Xu Liu, Jianing Li, Jinqiao Shi, Xiaopeng Fan, Yonghong
+Tian, and Debin Zhao. Event-based monocular depth estima-
+tion with recurrent transformers. IEEE Transactions on Cir-
+cuits and Systems for Video Technology, 34(8):7417–7429,
+2024. 1, 2, 3
+[16] Yue Liu, Yunjie Tian, Yuzhong Zhao, Hongtian Yu, Lingxi
+Xie, Yaowei Wang, Qixiang Ye, Jianbin Jiao, and Yunfan
+Liu.
+VMamba: Visual state space model.
+In Advances
+in Neural Information Processing Systems, pages 103031–
+103063, 2024. 2
+[17] Elias Mueggler, Henri Rebecq, Guillermo Gallego, Tobi Del-
+bruck, and Davide Scaramuzza. The event-camera dataset
+and simulator: Event-based data for pose estimation, visual
+odometry, and SLAM. The International Journal of Robotics
+Research, 36(2):142–149, 2017. 1
+[18] Elias Mueggler, Guillermo Gallego, Henri Rebecq, and Da-
+vide Scaramuzza. Continuous-Time Visual-Inertial Odome-
+try for Event Cameras. IEEE Transactions on Robotics, 34
+(6):1425–1440, 2018. 1, 2, 4
+[19] Luigi Piccinelli, Yung-Hsu Yang, Christos Sakaridis, Mattia
+Segu, Siyuan Li, Luc Van Gool, and Fisher Yu. Unidepth:
+Universal monocular metric depth estimation. In Proceed-
+ings of the IEEE/CVF Conference on Computer Vision and
+Pattern Recognition, pages 10106–10116, 2024. 3
+[20] Christoph Posch, Teresa Serrano-Gotarredona, Bernab´e
+Linares-Barranco, and Tobi Delbruck. Retinomorphic event-
+based vision sensors: Bioinspired cameras with spiking out-
+put. Proceedings of the IEEE, 102(10):1470–1484, 2014. 1
+[21] Rene Ranftl,
+Katrin Lasinger,
+David Hafner,
+Konrad
+Schindler, and Vladlen Koltun. Towards Robust Monocu-
+lar Depth Estimation: Mixing Datasets for Zero-Shot Cross-
+Dataset Transfer. IEEE Transactions on Pattern Analysis and
+Machine Intelligence, 44(3):1623–1637, 2022. 3
+[22] Henri Rebecq, Timo Horstschaefer, Guillermo Gallego, and
+Davide Scaramuzza. EVO: A geometric approach to event-
+based 6-dof parallel tracking and mapping in real time. IEEE
+Robotics and Automation Letters, 2(2):593–600, 2017. 1
+[23] Henri Rebecq, Guillermo Gallego, Elias Mueggler, and Da-
+vide Scaramuzza. EMVS: Event-based multi-view stereo—
+3D reconstruction with an event camera in real-time. Inter-
+national Journal of Computer Vision, 126(12):1394–1414,
+2018. 2, 3, 4
+[24] Henri Rebecq, Rene Ranftl, Vladlen Koltun, and Davide
+Scaramuzza. Events-to-video: Bringing modern computer
+vision to event cameras. In Proceedings of the IEEE/CVF
+Conference on Computer Vision and Pattern Recognition,
+pages 3857–3866, 2019. 2
+9
+
+
+[25] Simon Schaefer, Daniel Gehrig, and Davide Scaramuzza.
+AEGNN: Asynchronous event-based graph neural networks.
+In Proceedings of the IEEE/CVF Conference on Computer
+Vision and Pattern Recognition, pages 12361–12371, 2022.
+2
+[26] Peilun Shi, Jiachuan Peng, Jianing Qiu, Xinwei Ju, Frank P.-
+W. Lo, and Benny Lo. EVEN: An Event-Based Framework
+for Monocular Depth Estimation at Adverse Night Condi-
+tions. In 2023 IEEE International Conference on Robotics
+and Biomimetics (ROBIO), pages 1–7, 2023. 1, 2
+[27] Shintaro Shiba, Yannick Klose, Yoshimitsu Aoki, and
+Guillermo Gallego. Secrets of Event-Based Optical Flow,
+Depth and Ego-Motion Estimation by Contrast Maximiza-
+tion. IEEE Transactions on Pattern Analysis and Machine
+Intelligence, 46(12):7742–7759, 2024. 2
+[28] Oriane Sim´eoni, Huy V. Vo, Maximilian Seitzer, Federico
+Baldassarre, Maxime Oquab, Cijo Jose, Vasil Khalidov,
+Marc Szafraniec, Seungeun Yi, Micha¨el Ramamonjisoa,
+Francisco Massa, Daniel Haziza, Luca Wehrstedt, Jianyuan
+Wang, Timoth´ee Darcet, Th´eo Moutakanni, Leonel Sentana,
+Claire Roberts, Andrea Vedaldi, Jamie Tolan, John Brandt,
+Camille Couprie, Julien Mairal, Herv´e J´egou, Patrick La-
+batut, and Piotr Bojanowski. DINOv3, 2025. 2, 3, 4
+[29] Zhen Xie, Shengyong Chen, and Garrick Orchard. Event-
+Based Stereo Depth Estimation Using Belief Propagation.
+Frontiers in Neuroscience, 11:535–535, 2017. 2
+[30] Lihe Yang, Bingyi Kang, Zilong Huang, Zhen Zhao, Xiao-
+gang Xu, Jiashi Feng, and Hengshuang Zhao. Depth any-
+thing v2. In Advances in Neural Information Processing Sys-
+tems, 2024. 3
+[31] Kangrui Zhou, Taihang Lei, Banglei Guan, and Qifeng Yu.
+Event-based depth estimation with dense occlusion. Optics
+Letters, 49(12):3376–3376, 2024. 2
+[32] Alex Zihao Zhu, Dinesh Thakur, Tolga Ozaslan, Bernd
+Pfrommer, Vijay Kumar, and Kostas Daniilidis. The multi-
+vehicle stereo event camera dataset: An event camera dataset
+for 3D perception. IEEE Robotics and Automation Letters, 3
+(3):2032–2039, 2018. 2, 4
+[33] Alex Zihao Zhu, Liangzhe Yuan, Kenneth Chaney, and
+Kostas Daniilidis.
+Unsupervised event-based learning of
+optical flow, depth, and egomotion.
+In Proceedings of
+the IEEE/CVF Conference on Computer Vision and Pattern
+Recognition, pages 989–997, 2019. 2
+[34] Junyu Zhu, Lina Liu, Bofeng Jiang, Feng Wen, Hongbo
+Zhang, Wanlong Li, and Yong Liu. Self-supervised event-
+based monocular depth estimation using cross-modal consis-
+tency. In Proceedings of the IEEE/RSJ International Confer-
+ence on Intelligent Robots and Systems, pages 7704–7710,
+2023. 2
+[35] Jinjing Zhu, Tianbo Pan, Zidong Cao, Yexin Liu, James T.
+Kwok, and Hui Xiong. Depth any event stream: Enhancing
+event-based monocular depth estimation via dense-to-sparse
+distillation. In Proceedings of the IEEE/CVF International
+Conference on Computer Vision, pages 5146–5155, 2025. 1,
+2, 3, 4
+[36] Lianghui Zhu, Bencheng Liao, Qian Zhang, Xinlong Wang,
+Wenyu Liu, and Xinggang Wang. Vision Mamba: Efficient
+visual representation learning with bidirectional state space
+model. In Proceedings of the International Conference on
+Machine Learning, 2024. 2
+10
+
+
+EventSSM: Causal Spatial-State Modelling for Asynchronous Events
+Event-Depth Estimation
+Supplementary Material
+A. Model details for Sec. 3
+Table 7 lists the network of Fig. 2 layer by layer for one
+packet, with the output size of each stage, and the settings
+of both training stages.
+Packet interface (Sec. 3.1, Eq. (1)).
+Packet Ek spans
+[bk−1, bk], so ∆tk = bk −bk−1. The depths ˆdk of a packet
+become available at its endpoint bk, after its last event has
+arrived, so the packet endpoint is the earliest output time
+of every event in Ek. The validity mask of Sec. 3.1 also
+excludes padded queries from the loss and from evaluation.
+Polarity-aware observations (Sec. 3.2).
+Each event to-
+ken qi is a linear–ReLU–linear projection of
+ 2xi/(W −
+1)−1, 2yi/(H −1)−1, τi, pi
+
+, with W ×H = 346×260
+and within-packet time τi = (ti −bk−1)/∆tk ∈[0, 1], to
+which a polarity embedding and a polarity-specific resid-
+ual embedding are added before layer normalization. In
+the spatial stem, a polarity group without events at a pixel
+contributes a zero mean and a zero log-count, while the
+other polarity contributes normally, and padded events are
+removed before the counts and means are formed.
+Transport and retention (Sec. 3.3, Eqs. (3) and (4)).
+In
+Eq. (3), Sample is bilinear resampling and the last layer
+of Fθ is initialized to zero, so training starts from identity
+transport. The checkpoint uses vmax = 800 px s−1, so the
+displacement of the state per packet is bounded coordinate-
+wise by vmax∆tk, about 6.7 px for an 8.3 ms packet. The
+channelwise rates r are initialized with a time constant of
+0.1 s and are learned thereafter. A packet without events ad-
+vances the state by its physical duration through transport
+and retention alone, since Sk ≡0 in Eq. (4).
+Pyramid and readout (Sec. 3.4, Eqs. (5) and (6)).
+Ev-
+ery pyramid level is computed from the current state Mk
+by average pooling by the factor s followed by the learned
+block of Table 7, and no scale carries its own recurrent
+memory. The decoder fuses the levels from coarse to fine
+with bilinear upsampling, so each finer descriptor combines
+evidence at its own resolution with context summarized at
+larger scales. The query q′
+i of Eq. (5) is a 32-dimensional
+projection (LayerNorm, linear, GELU) of qi, the normal-
+ized coordinates, log(1+agems) of the physical age bk −ti
+in milliseconds, τi and pi. The keys kij are the decoded
+descriptors of the four scales, sampled at the event and one
+cell to its left, right, top and bottom, each plus a learned
+scale embedding; keys outside the image are masked. WK
+and WV are 32 × 32, WQ is the identity and da = 32. The
+context ci is fused with q′
+i by a residual linear layer and a
+residual MLP, and a linear layer gives ℓi of Eq. (6).
+Target-time supervision (Sec. 3.5, Eqs. (7) and (8)).
+For
+an interval [t0, tr] that ends at the reference time, the ren-
+derer splats each transported depth bilinearly and aver-
+ages, bDr(u) = P
+i wiβu,i ˜dr
+i / P
+i wiβu,i, with the bilin-
+ear weight βu,i of ˜ur
+i at pixel u and the recency weight
+wi = exp
+ −(tr −ti)/(0.2 (tr −t0))
+
+, so every contributing
+event receives a gradient. A transported event contributes
+only if its depth ˜dr
+i is positive and finite and its projection ˜ur
+i
+lies inside the reference image, and a pixel enters Ωr only
+if its rendered and reference depths are both valid, with the
+reference depth between 0.25 and 30 m. Training minimizes
+Eq. (8) with unit weight; each window is unrolled through
+its six packets from a reset state before the update.
+Encoder initialization (Sec. 3.6).
+In stage 1 (Table 7), the
+event encoder is trained for 20 epochs to match the teacher
+features of Sec. 3.6; the spatial-relation term is the mean
+squared difference between the token cosine-similarity ma-
+trices of student and teacher after pooling both to 15×20. In
+stage 2, the depth model loads the compatible encoder ten-
+sors of the distilled checkpoint, the local-attention head of
+Sec. 3.4 is newly initialized, and a new optimizer is created.
+The learning rates follow a plateau schedule on validation
+AbsRel, which is also the checkpoint-selection criterion of
+Sec. 4.1.
+B. Experimental details for Sec. 4
+B.1.
+Input
+intervals
+and
+event
+subsampling
+(Sec. 4.1)
+Intervals.
+Candidate intervals span adjacent depth anno-
+tations of the MVSEC outdoor recordings at the native
+260 × 346 resolution; an interval that fails the criteria of
+Sec. 4.1 is removed rather than moved to a nearby annota-
+tion. The endpoint poses and the pose at every event times-
+tamp used in Eq. (7) are interpolated at the exact times-
+tamps. The same interval identifiers and endpoint times are
+used for training, rendering, scoring and baseline pairing.
+Subsampling to 7,500 events.
+Every accepted interval
+holds at least 10,000 events and is reduced to the 7,500
+1
+
+
+Table 7. Network and training settings of EventSSM (69.5k parameters). Feature maps are channels × height × width at the native 260 ×
+346 resolution; Nk is the number of events in packet Ek.
+Stage
+Operation
+Output
+Event token MLP of normalized (x, y), packet time τi and
+polarity; polarity embedding and residual; Layer-
+Norm
+Nk × 64
+Observation Per-polarity token means and log(1 + n±
+k ) (130
+ch.); 1 × 1, GELU, 3 × 3 depthwise
+64 × H × W
+Transport
+Backward field, ∥fk∥∞≤vmax∆tk, vmax =
+800 px s−1
+64 × H × W
+State update Eq. (4); rates initialized to a 0.1 s time constant
+64 × H × W
+Pyramid
+Average pool by s ∈{1, 2, 4, 8}, GroupNorm,
+3 × 3 depthwise, GELU, 1 × 1
+64 per scale
+Decoder
+1×1 to 32 ch.; coarse-to-fine bilinear upsampling,
+addition, residual block
+32 per scale
+Event query Token, (x, y), polarity, τi, log(1 + agems)
+Nk × 32
+Attention
+Eq. (5): event position and its 4 neighboring cells
+on 4 scales (20 keys)
+Nk × 32
+Readout
+Residual MLP; Eq. (6), dmin = 0.25 m, dmax =
+30 m
+Nk × 1
+Setting
+Value
+Stage 1: encoder distillation (Sec. 3.6)
+Teacher
+DINOv3 ViT-S/16, frozen; layers 2, 5, 8, 11
+Targets
+Pyramid pooled to 30 × 40, 64 →384 ch.;
+SmoothL1, cosine, spatial relation; 20 epochs
+Stage 2: depth training (Sec. 3.5)
+Objective
+LSiLog (Eq. (8)); new attention head
+Optimizer
+Adam, weight decay 10−2, batch 4, 15 epochs
+Learning rate Encoder 10−6, head 2 × 10−4; plateau on val.
+AbsRel (factor 0.5, patience 4, threshold 10−3,
+cooldown 1, min. 10−7)
+Other
+Gradient norm 1; FP32
+Input windows
+Intervals
+outdoor day2; ≥10,000 events; poses within
+5 ms of both ends
+Events
+7,500 per interval (Sec. B.1); K = 6 packets
+Depth range
+Supervision 0.25–30 m; evaluation 2–30 m
+of Sec. 4.1 before it is divided into packets, balancing it
+in space and time jointly. Its events are grouped into cells
+formed by 30 equal time bins between the first and last event
+and a 16 × 12 grid of image cells. The sampler finds the
+largest quota κ for which taking min(nc, κ) events from
+every occupied cell c, holding nc events, fits the budget,
+gives each remaining slot to a different randomly chosen
+cell that still holds unselected events, and draws the events
+of every cell uniformly without replacement. The retained
+events keep their exact coordinates, timestamps and polari-
+ties and are returned in time order. Only then is the interval
+divided into the K = 6 equal-duration packets of Sec. 3.1,
+so each packet receives the retained events of its own time
+span.
+Figure 5 applies the sampler to a Day 1 interval with
+30,729 events, the accepted interval closest to the 75th per-
+centile of event counts. Its events occupy 3,167 of the 5,760
+time–space cells. The quota is two events per cell, and the
+remaining 1,815 slots add a third event to as many cells;
+1,245 cells are kept whole. Textured regions are thinned
+most: the 19 busiest of the 192 image cells hold 57.7% of
+all events but 21.8% of the retained ones (Fig. 5c), so sparse
+structure elsewhere in the image remains represented. In
+time, each bin keeps close to its share of the interval, and
+the six packets receive 1,155–1,386 events (Fig. 5d).
+B.2. Scoring and metrics (Sec. 4.1, Tables 1 and 2)
+Scored pixels.
+Sec. 4.1 gives the upper limits of the eval-
+uated depth; the lower limit is 2 m. EventSSM’s per-event
+depths are transported to the reference camera with the in-
+terpolated annotated poses of Eq. (7) and rendered as in
+training. For each reference frame, the scored set Ωcontains
+the pixels whose reference depth lies between 2 and 30 m,
+that EventSSM’s rendered prediction covers, and at which
+every compared method gives a finite positive depth, includ-
+ing the restriction imposed by EReFormer’s fixed 224×224
+window. Every method is scored on this set, and errors
+are pooled over the scored pixels of each sequence, so
+MAE@30 in Table 2 equals the MAE of Table 1.
+Metrics.
+With reference depth du and prediction ˆdu at the
+scored pixels u ∈Ω, AbsRel and SqRel average | ˆdu −
+du|/du and ( ˆdu −du)2/du over Ω, MAE and RMSE are the
+mean absolute and root-mean-square residuals in metres,
+δj is the percentage of pixels with max( ˆdu/du, du/ ˆdu) <
+1.25j, and MAE@r evaluates MAE on the subset of Ωwith
+du ≤r.
+B.3. Baselines (Sec. 4.2, Table 1)
+E2Depth [12] uses the released model trained on DENSE
+and MVSEC, DepthAnyEvent-R [2] the released recurrent
+model fine-tuned on MVSEC, and ScaleEvent [3] the re-
+leased MVSEC depth model with a ViT-S encoder, run at
+a 640 × 480 input. No trained EReFormer [15] model is
+released, so it is trained on outdoor day2 with its un-
+modified official code. Every baseline receives all natural
+events of the same interval in its own input representation
+and predicts one depth map at the reference time, and re-
+current baselines start each interval from a reset state, as
+EventSSM does.
+B.4. Ablation protocols and results (Secs. 4.3–4.5)
+Temporal cores (Sec. 4.3, Table 4).
+The spatial RNN,
+spatial LSTM and bi-Mamba rows replace the update of
+Eq. (4) by a recurrent cell applied at every pixel of the
+state, with transitions shared across pixels (1 × 1 convo-
+lutions), while keeping the learned transport of Eq. (3), the
+2
+
+
+(a) all 30,729 events
+(b) kept 7,500 events
+(c) kept fraction per cell
+0.0
+0.5
+1.0
+0
+10
+20
+30
+40
+50
+time in interval [ms]
+0
+500
+1000
+1500
+events per bin
+1
+2
+3
+4
+5
+6
+(d) time bins and packets
+all events
+kept
+Figure 5. Fixed-count input of one 50 ms outdoor day1 interval. (a) All 30,729 events and the 16 × 12 sampling grid. (b) The 7,500
+kept events. (c) Kept fraction per grid cell, from 4.6% in dense cells to all events in sparse ones (white: no events). (d) Events per sampling
+time bin before and after selection, and the six packets Ek. Each of the 3,167 occupied time–grid cells keeps min(n, 2) of its n events;
+1,815 cells keep one more.
+64-channel encoder width and the event-conditioned read-
+out of Sec. 3.4. Every row, including EventSSM, is trained
+for 15 epochs without the initialization of Sec. 3.6, and its
+checkpoint is selected by validation AbsRel. Packet times
+are measured on one RTX 2080 Ti in FP32 with batch size
+one, in a benchmark separate from that of Table 6.
+Packet count (Sec. 4.4, Fig. 4).
+The fixed-weight curves
+evaluate the K = 6 model on the same windows divided
+into K ∈{1, 3, 6, 12, 24} equal-duration packets; the per-
+K curves train the full model separately for each K with a
+20-epoch budget and select it by Day 1 AbsRel. All points
+are scored on the same 3,066 Day 1 windows, on the pixels
+valid for every configuration, 16.98% of the eligible refer-
+ence pixels between 2 and 30 m, with the state reset before
+each window. Across K, the fixed-weight MAE stays be-
+tween 3.650 and 3.669 m and its AbsRel between 0.311 and
+0.315; the per-K models reach 3.607–3.617 m and 0.330–
+0.334.
+Component ablations (Sec. 4.5, Table 5).
+The errors of
+Table 5 are averaged over 3,066 Day 1 windows and over
+7,667 windows pooled from the three night sequences, with
+reference depths between 2 and 30 m on each model’s own
+rendered support, and every variant is trained with two
+seeds.
+Table 8 adds AbsRel and the MAE for the same runs
+and windows, to separate effects on metric scale from ef-
+fects on relative depth structure. The MAE rescales each
+frame by the ratio of the reference and predicted median
+depths over its scored pixels, so it measures the error left
+once the frame’s global scale is corrected. Per-update reten-
+tion keeps its night increase after median scaling (0.093 m,
+2.8%), with both seeds above both full-model seeds, and
+raises the Day 1 scaled error by 0.060 m (1.8%). Without
+the input gate, the night AbsRel falls from 0.321 to 0.311
+and the night scaled error by 0.056 m (1.7%), with both
+seeds below those of the full model, whereas its unscaled
+Table 8. Component ablations of Table 5: absolute relative error
+and mean absolute error after per-frame median scaling, averaged
+over evaluation windows. Values are the mean ± half-range over
+the same two training seeds. Each group starts with EventSSM
+(full); lower is better, best per column within each group in bold.
+AbsRel ↓
+Median-scaled MAE (m) ↓
+Variant
+Day 1
+Nights
+Day 1
+Nights
+Spatial state (Sec. 3.3)
+EventSSM (full)
+0.295 ± 0.003
+0.321 ± 0.002
+3.302 ± 0.022
+3.372 ± 0.006
+No transport
+0.295 ± 0.001
+0.322 ± 0.007
+3.315 ± 0.007
+3.372 ± 0.013
+Per-update retention
+0.293 ± 0.003
+0.325 ± 0.001
+3.362 ± 0.042
+3.465 ± 0.056
+No forgetting
+0.293 ± 0.001
+0.320 ± 0.002
+3.302 ± 0.010
+3.367 ± 0.007
+No input gate
+0.291 ± 0.002
+0.311 ± 0.004
+3.282 ± 0.006
+3.316 ± 0.009
+No support mask
+0.295 ± 0.004
+0.320 ± 0.001
+3.323 ± 0.017
+3.387 ± 0.025
+Depth head (Sec. 3.4)
+EventSSM (full)
+0.295 ± 0.003
+0.321 ± 0.002
+3.302 ± 0.022
+3.372 ± 0.006
+Average-pooled scales
+0.296 ± 0.000
+0.320 ± 0.002
+3.304 ± 0.001
+3.352 ± 0.007
+Centre-sample readout
+0.292 ± 0.002
+0.323 ± 0.001
+3.319 ± 0.051
+3.433 ± 0.063
+Supervision (Sec. 3.5)
+EventSSM (full)
+0.295 ± 0.003
+0.321 ± 0.002
+3.302 ± 0.022
+3.372 ± 0.006
+No target-time warp
+0.293 ± 0.000
+0.322 ± 0.001
+3.311 ± 0.004
+3.378 ± 0.007
+night error is 0.004 m higher. Every other variant changes
+AbsRel by at most 0.004. Average-pooled scales change the
+scaled error by +0.002 m on Day 1 and −0.020 m at night,
+and training without the target-time warp raises it by 0.009
+and 0.006 m.
+3

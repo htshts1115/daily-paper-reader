@@ -48,17 +48,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-11-27</span>
+      <span class="dpr-home-dashboard-kicker">2026-11-28</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 6 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 1 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>2</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>4</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>0</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>1</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-11-27 02:25:17 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-11-28 01:59:58 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -69,7 +69,7 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>2026-11-27 日报共筛选 6 篇，精读 2 篇、速读 4 篇，重点聚焦图像抠图与分割前沿。最值得看的是高分论文《High-Fidelity Image Matting with Pixel-Space Diffusion Transformers》（9.0/10）和《X-Matte》（8.0/10），两者都在探索像素空间扩散与流匹配以提升抠图精度与效率。普通读者可先读这两篇精读，把握“像素空间生成式抠图”这一主线，再按需浏览分割与几何模型评估类速读。</p>
+<p>今日速读 1 篇，聚焦事件相机深度估计。《EventSSM: Causal Spatial-State Modelling for Asynchronous Events Event-Depth Estimation》评分为 6.0/10；这篇论文关注用因果空间状态建模处理异步事件流，适合了解事件深度估计新思路。普通读者可先浏览摘要和实验部分，判断其因果建模是否真能提升异步事件下的深度精度。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -78,12 +78,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">2 篇</strong>
+    <strong class="dpr-home-dashboard-count">0 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="High-Fidelity Image Matting with Pixel-Space Diffusion Transformers">High-Fidelity Image Matting with Pixel-Space Diffusion Transformers</span></li><li><span class="dpr-home-dashboard-paper-title" title="X-Matte: VAE-Free Pixel-Space Flow Matching for Single-Step Image Matting">X-Matte: VAE-Free Pixel-Space Flow Matching for Single-Step Image Matting</span></li></ul>
+<p class="dpr-home-dashboard-empty">今日暂无推荐。</p>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">matting <strong>2</strong></span></div>
+
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -91,12 +91,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">4 篇</strong>
+    <strong class="dpr-home-dashboard-count">1 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="CIRKDV2: Cross-Image Relational Knowledge Distillation with Contextual Modeling for Efficient Semantic Segmentation">CIRKDV2: Cross-Image Relational Knowledge Distillation with Contextual Modeling for Efficient Semantic Segmentation</span></li><li><span class="dpr-home-dashboard-paper-title" title="ReSA: Preserving Reference-Specified Foreground in In-Context Segmentation">ReSA: Preserving Reference-Specified Foreground in In-Context Segmentation</span></li><li><span class="dpr-home-dashboard-paper-title" title="SpatialArena: Where Do Geometric Foundation Models Stand?">SpatialArena: Where Do Geometric Foundation Models Stand?</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="EventSSM: Causal Spatial-State Modelling for Asynchronous Events Event-Depth Estimation">EventSSM: Causal Spatial-State Modelling for Asynchronous Events Event-Depth Estimation</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">seg <strong>3</strong></span><span class="dpr-home-dashboard-tag">mono-depth <strong>1</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">mono-depth <strong>1</strong></span></div>
 </section>
 </div>
 
